@@ -10,6 +10,7 @@ import type { Core } from "./core.ts";
 import { openGoal, removeGoal, slugFor, takenSlugs } from "./git.ts";
 import { GOAL_MACHINE, step } from "./machines.ts";
 import type { Meetings } from "./meetings.ts";
+import { recordFile } from "./records.ts";
 import type { Scheduler } from "./scheduler.ts";
 import { serialBy } from "./serial.ts";
 import type { Goal, Subtask } from "./types.ts";
@@ -94,8 +95,8 @@ export class Goals {
   }
 
   /**
-   * Deletes an archived goal for good: its subtasks' worktrees and branches,
-   * its own worktree and its plans' documents, then its tasks, subtasks,
+   * Deletes an archived goal for good: its subtasks' worktrees, branches and
+   * records, its own worktree and its plans' documents, then its tasks, subtasks,
    * meetings and their questions. Its branch stays, yours to merge or delete.
    */
   delete(id: string): Promise<void> {
@@ -112,11 +113,12 @@ export class Goals {
       await this.meetings.settled(id);
       // Its files go first: should one fail, it stays archived, to delete again.
       await removeGoal(core.places, goal.slug);
-      await Promise.all(
-        core.state.meetings.flatMap((m) =>
+      await Promise.all([
+        ...core.state.meetings.flatMap((m) =>
           m.goalId === id && m.planFile ? [rm(m.planFile, { force: true })] : [],
         ),
-      );
+        ...subtasks.map((s) => rm(recordFile(core.places, s.id), { force: true })),
+      ]);
       const gone = new Set(subtasks.map((s) => s.id));
       const { state } = core;
       state.questions = state.questions.filter((q) => !q.subtaskId || !gone.has(q.subtaskId));

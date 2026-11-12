@@ -44,7 +44,7 @@ beforeEach(async () => {
     cwd: repo,
     dataFolder: path.join(dir, "openplan-inline"),
     env: {},
-    host: { changed: vi.fn(), recorder: () => ({}), speech: () => ({}), failed: vi.fn() },
+    host: { changed: vi.fn(), failed: vi.fn() },
   });
   // A run goes on until it is stopped.
   vi.mocked(runSubtask).mockImplementation(

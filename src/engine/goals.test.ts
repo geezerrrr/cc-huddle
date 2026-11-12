@@ -14,6 +14,7 @@ import {
 } from "./git.ts";
 import { Goals } from "./goals.ts";
 import type { Meetings } from "./meetings.ts";
+import { recordFile } from "./records.ts";
 import type { Scheduler } from "./scheduler.ts";
 import type { Meeting, Member } from "./types.ts";
 
@@ -131,7 +132,7 @@ describe("Goals", () => {
     expect(scheduler.pump).toHaveBeenCalled();
   });
 
-  it("are deleted once archived: worktrees, subtask branches and plans go, the goal's branch stays", async () => {
+  it("are deleted once archived: worktrees, subtask branches, records and plans go, the goal's branch stays", async () => {
     const goal = await goals.start("Dice");
     await openDesk(core.places, goal.slug, "s1");
     expect(await branches()).toContain(subtaskBranch("dice", "s1"));
@@ -139,6 +140,9 @@ describe("Goals", () => {
     await mkdir(plans);
     const planFile = path.join(plans, "dice-m1.md");
     await writeFile(planFile, "# Plan");
+    const record = recordFile(core.places, "s1");
+    await mkdir(path.dirname(record));
+    await writeFile(record, "");
     const { state } = core;
     state.tasks.push({ id: "t1", goalId: goal.id, title: "", outcome: "", createdAt: 0 });
     state.subtasks.push({
@@ -176,6 +180,7 @@ describe("Goals", () => {
     expect(await exists(deskFolder(core.places, "s1"))).toBe(false);
     expect(await exists(goalFolder(core.places, "dice"))).toBe(false);
     expect(await exists(planFile)).toBe(false);
+    expect(await exists(record)).toBe(false);
     await goals.delete(goal.id);
   });
 

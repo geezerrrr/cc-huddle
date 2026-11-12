@@ -21,20 +21,16 @@ import { memberSettings, pluginId, readOnlyOptions, workOptions, writeSettings }
 import { recordMembersIn, stopMembers } from "./processes.ts";
 import { systemPrompt } from "./prompts.ts";
 import { Questions, type Answer } from "./questions.ts";
+import { Records } from "./records.ts";
 import { Scheduler } from "./scheduler.ts";
 import { allowInTeam, loadTeam } from "./team.ts";
-import type { TurnListener } from "./turns.ts";
-import type { Meeting, MeetingSize, Question, Subtask, TeamState } from "./types.ts";
+import type { MeetingSize, Question, TeamState } from "./types.ts";
 
 /** Where the engine tells what happens. */
 export interface Host {
   /** The state changed. */
   changed(): void;
-  /** Where what a subtask's runs do is told. */
-  recorder(subtask: Subtask): TurnListener;
-  /** Where what is said at a meeting is told as it is said. */
-  speech(meeting: Meeting, speaker: string): TurnListener;
-  /** Something went wrong that nobody waits on: the state couldn't be written. */
+  /** Something went wrong that nobody waits on: the state or a record couldn't be written. */
   failed(error: unknown): void;
 }
 
@@ -53,9 +49,12 @@ export class Engine {
   readonly scheduler: Scheduler;
   readonly meetings: Meetings;
   readonly goals: Goals;
+  /** How many times the state has changed since the team opened. */
+  private changes = 0;
 
   private constructor(
     private readonly core: Core,
+    readonly records: Records,
     private readonly files: ReturnType<typeof dataFiles>,
     private readonly writer: StateWriter,
     private readonly options: EngineOptions,
@@ -90,21 +89,25 @@ export class Engine {
         },
       );
       const places: Places = { repo, root };
+      const records = new Records(places, (error) => {
+        host.failed(error);
+      });
       // Its calls reach into the engine, made just below.
       const core: Core = {
         state,
         team,
         places,
         changed: () => {
+          engine.changes++;
           writer.changed();
           host.changed();
         },
         allowAlways: (rules) => engine.allow(rules),
         options: (member, kind, cwd) => Promise.resolve(engine.turnOptions(member, kind, cwd)),
-        recorder: (subtask) => host.recorder(subtask),
-        speech: (meeting, speaker) => host.speech(meeting, speaker),
+        recorder: (subtask) => records.recorder(subtask.id),
+        speech: (meeting, speaker) => records.speech(meeting, speaker),
       };
-      const engine = new Engine(core, files, writer, options, meetingSize);
+      const engine = new Engine(core, records, files, writer, options, meetingSize);
       await engine.writeMemberSettings(team, settings);
       engine.questions.recover();
       engine.scheduler.recover();
@@ -124,6 +127,11 @@ export class Engine {
 
   get team(): Team {
     return this.core.team;
+  }
+
+  /** Changes as the state does: the same number, the same state. */
+  get revision(): number {
+    return this.changes;
   }
 
   /** The size a meeting has unless you say. */
@@ -164,7 +172,7 @@ export class Engine {
       if (goal.status === "active") await this.goals.pause(goal.id);
     await Promise.all([this.scheduler.close(), this.meetings.close()]);
     this.writer.changed();
-    await this.writer.flush();
+    await Promise.all([this.writer.flush(), this.records.flush()]);
     releaseTeam(this.files.lock);
   }
 

@@ -50,7 +50,7 @@ beforeEach(async () => {
     cwd: repo,
     dataFolder,
     env: { GLM_KEY: "key-1" },
-    host: { changed: vi.fn(), recorder: () => ({}), speech: () => ({}), failed: vi.fn() },
+    host: { changed: vi.fn(), failed: vi.fn() },
   };
   files = dataFiles(repoFolder(dataFolder, await openRepository(repo)));
 });

@@ -39,8 +39,6 @@ const team = (): Promise<Engine> => {
             say(`your session couldn't be told: ${errorText(error)}`);
           });
       },
-      recorder: () => ({}),
-      speech: () => ({}),
       failed(error) {
         say(`the team's state couldn't be written: ${errorText(error)}`);
       },
