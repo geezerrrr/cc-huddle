@@ -7,6 +7,8 @@
  * the whole meeting, in the goal's worktree.
  */
 import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import {
   createSdkMcpServer,
   tool,
@@ -18,7 +20,7 @@ import { z } from "zod";
 import { errorText, workOf, type Core } from "./core.ts";
 import { busyMembers, meetingResumes } from "./derive.ts";
 import { openGoal } from "./git.ts";
-import { MEETING_MACHINE, step } from "./machines.ts";
+import { can, MEETING_MACHINE, step } from "./machines.ts";
 import { hostPlanSchema, parsePlan } from "./plan.ts";
 import {
   MEETING_TOOLS,
@@ -32,7 +34,16 @@ import {
 } from "./prompts.ts";
 import type { Scheduler } from "./scheduler.ts";
 import { askOnce, type Reply, type TurnListener } from "./turns.ts";
-import type { Meeting, MeetingHand, MeetingSize, MeetingTurn, Member } from "./types.ts";
+import type {
+  Goal,
+  Meeting,
+  MeetingHand,
+  MeetingSize,
+  MeetingTurn,
+  Member,
+  Plan,
+  Subtask,
+} from "./types.ts";
 
 /** How many times each attendee but the host may have the floor in the discussion. */
 export const MEETING_TURNS_EACH: Record<MeetingSize, number> = {
@@ -199,6 +210,40 @@ export class Meetings {
     return this.ongoing.get(id);
   }
 
+  /**
+   * Your changes to a plan under review: `raw` is the whole plan as the host
+   * hands one in (hostPlanSchema), and may give work to any member.
+   */
+  change(id: string, raw: unknown) {
+    const { core } = this;
+    const { meeting } = this.underReview(id, "change");
+    // A plan under review came out of a meeting, so the team has members.
+    const names = core.team.members.map((m) => m.name) as [string, ...string[]];
+    meeting.plan = parsePlan(raw, names);
+    core.changed();
+  }
+
+  /**
+   * Approves a plan under review: its document is saved in the data folder,
+   * and its tasks and subtasks go to the scheduler, pending until they can
+   * start. Returns the subtasks.
+   */
+  async approve(id: string): Promise<Subtask[]> {
+    const { core } = this;
+    const { meeting, plan } = this.underReview(id, "approve");
+    const goal = this.activeGoal(meeting.goalId);
+    const file = path.join(core.places.root, "plans", `${goal.slug}-${meeting.id}.md`);
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, plan.markdown);
+    // Changed, called off or approved meanwhile, or its goal held: not approved now (the file stays).
+    if (meeting.plan !== plan || !can(MEETING_MACHINE, meeting.status, "approve"))
+      throw new Error("The plan changed while it was being approved");
+    this.activeGoal(goal.id);
+    meeting.status = step(MEETING_MACHINE, meeting.status, "approve");
+    meeting.planFile = file;
+    return this.scheduler.assign(goal.id, plan.tasks, meeting.id);
+  }
+
   /** Stops every meeting under way, as cancelled; settles once they have ended. */
   async close() {
     for (const abort of this.aborts.values()) abort.abort();
@@ -227,9 +272,7 @@ export class Meetings {
    */
   private admit(goalId: string, attendees: readonly string[]) {
     const { core } = this;
-    const goal = core.state.goals.find((g) => g.id === goalId);
-    if (!goal) throw new Error("There is no such goal");
-    if (goal.status !== "active") throw new Error(`The goal "${goal.name}" is ${goal.status}`);
+    this.activeGoal(goalId);
     if (!attendees.length) throw new Error("The team has no members");
     const names = new Set(core.team.members.map((m) => m.name));
     const stranger = attendees.find((name) => !names.has(name));
@@ -237,6 +280,22 @@ export class Meetings {
     const busy = busyMembers(workOf(core));
     const taken = attendees.find((name) => busy.has(name));
     if (taken) throw new Error(`${taken} is busy: working, reviewing, or at another meeting`);
+  }
+
+  /** A goal that is active, or throws why it isn't. */
+  private activeGoal(goalId: string): Goal {
+    const goal = this.core.state.goals.find((g) => g.id === goalId);
+    if (!goal) throw new Error("There is no such goal");
+    if (goal.status !== "active") throw new Error(`The goal "${goal.name}" is ${goal.status}`);
+    return goal;
+  }
+
+  /** A meeting whose plan is under review and can take `event`, or throws. */
+  private underReview(id: string, event: "change" | "approve"): { meeting: Meeting; plan: Plan } {
+    const meeting = this.core.state.meetings.find((m) => m.id === id);
+    if (!meeting?.plan || !can(MEETING_MACHINE, meeting.status, event))
+      throw new Error("That meeting has no plan under review");
+    return { meeting, plan: meeting.plan };
   }
 
   /** Runs a meeting, kept as under way until it ends. */

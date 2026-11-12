@@ -1,4 +1,4 @@
-import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -26,6 +26,7 @@ let dir: string;
 let core: Core;
 let meetings: Meetings;
 const pump = vi.fn();
+const assign = vi.fn(() => []);
 
 beforeEach(async () => {
   dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-meetings-")));
@@ -56,8 +57,9 @@ beforeEach(async () => {
     recorder: () => ({}),
     speech: () => ({}),
   };
-  meetings = new Meetings(core, { pump } as unknown as Scheduler);
+  meetings = new Meetings(core, { pump, assign } as unknown as Scheduler);
   vi.mocked(askOnce).mockReset();
+  assign.mockClear();
 });
 
 afterEach(async () => {
@@ -291,5 +293,54 @@ describe("Meetings", () => {
     const [goal] = core.state.goals;
     if (goal) goal.status = "paused";
     expect(call(["sonnet"])).toThrow('The goal "Dice" is paused');
+  });
+});
+
+describe("A plan under review", () => {
+  const reviewed = async () => {
+    scripted();
+    const meeting = meetings.start({ goalId: "g1", agenda: "x", size: "small", attendees: [] });
+    await ended(meeting);
+    return meeting;
+  };
+  const changed = (assignee: string) => ({
+    ...plan,
+    plan_markdown: "# Plan, changed",
+    tasks: [
+      { ...plan.tasks[0], subtasks: plan.tasks[0]?.subtasks.map((s) => ({ ...s, assignee })) },
+    ],
+  });
+
+  it("takes your changes, and is approved into the goal's work with its document saved", async () => {
+    const meeting = await reviewed();
+    expect(() => {
+      meetings.change(meeting.id, changed("ann"));
+    }).toThrow();
+    meetings.change(meeting.id, changed("sonnet"));
+    expect(meeting.plan?.tasks[0]?.subtasks.map((s) => s.assignee)).toEqual(["sonnet", "sonnet"]);
+
+    await meetings.approve(meeting.id);
+    expect(meeting).toMatchObject({
+      status: "approved",
+      planFile: path.join(core.places.root, "plans", `dice-${meeting.id}.md`),
+    });
+    expect(await readFile(meeting.planFile ?? "", "utf8")).toBe("# Plan, changed");
+    expect(assign).toHaveBeenCalledWith("g1", meeting.plan?.tasks, meeting.id);
+    await expect(meetings.approve(meeting.id)).rejects.toThrow("no plan under review");
+  });
+
+  it("isn't approved once called off while its document is written, or with its goal paused", async () => {
+    const meeting = await reviewed();
+    const approving = meetings.approve(meeting.id);
+    await meetings.cancel(meeting.id);
+    await expect(approving).rejects.toThrow("changed while it was being approved");
+    expect(meeting.status).toBe("cancelled");
+
+    const next = await reviewed();
+    const [goal] = core.state.goals;
+    if (goal) goal.status = "paused";
+    await expect(meetings.approve(next.id)).rejects.toThrow('The goal "Dice" is paused');
+    expect(next.status).toBe("review");
+    expect(assign).not.toHaveBeenCalled();
   });
 });

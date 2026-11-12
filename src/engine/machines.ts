@@ -20,6 +20,7 @@ export const MEETING_MACHINE = {
   plan: { from: ["running"], to: "review" },
   fail: { from: ["running"], to: "failed" },
   cancel: { from: ["running", "review"], to: "cancelled" },
+  change: { from: ["review"], to: "review" },
   approve: { from: ["review"], to: "approved" },
   resume: { from: ["failed", "cancelled"], to: "running" },
 } as const satisfies Machine<MeetingStatus>;
