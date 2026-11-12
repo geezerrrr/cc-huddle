@@ -120,6 +120,8 @@ pnpm check:mod    # validates the plugin and marketplace, and runs the mod's tes
 
 `claude --plugin-dir plugin` starts a session with the plugin as it is in the working tree; the mod reloads as you edit it.
 
+To release, move what [CHANGELOG.md](CHANGELOG.md) lists under Unreleased to a new version, set the same `version` in `plugin/.claude-plugin/plugin.json` (installs update when it changes), commit, and push a `v<version>` tag.
+
 ## Origin
 
 openplan's engine comes from [Crewloft](https://playcrewloft.com), a game in which it runs a studio of AI staff.
