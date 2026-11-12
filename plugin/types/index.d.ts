@@ -1,6 +1,6 @@
 /**
  * What openplan's pane draws, as the MCP server's `view` tool gives it
- * (src/plugin/pane.ts), and the values the mod keeps for the session.
+ * (src/plugin/pane.ts in the repository), and the values the mod keeps for the session.
  */
 
 /** The team as the pane shows it; it comes again only when it changed. */

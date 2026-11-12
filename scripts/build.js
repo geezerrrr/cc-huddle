@@ -1,5 +1,5 @@
 /**
- * Builds what the plugin runs into `dist/`, which is committed: a plugin is
+ * Builds what the plugin runs into `plugin/dist/`, which is committed: a plugin is
  * installed as its repository is, with no build step.
  *
  * - `server.mjs`: the MCP server. Our code, with the dependencies the Agent
@@ -15,7 +15,7 @@ import { build } from "esbuild";
 const INSTALLED = ["@anthropic-ai/claude-agent-sdk", "@modelcontextprotocol/sdk", "zod"];
 
 const common = {
-  outdir: "dist",
+  outdir: "plugin/dist",
   outExtension: { ".js": ".mjs" },
   bundle: true,
   platform: "node",
@@ -28,7 +28,7 @@ const common = {
   logLevel: "warning",
 };
 
-await rm("dist", { recursive: true, force: true });
+await rm("plugin/dist", { recursive: true, force: true });
 await build({
   ...common,
   entryPoints: [{ in: "src/plugin/bootstrap.ts", out: "server" }],
@@ -44,6 +44,6 @@ const dependencies = Object.fromEntries(
   await Promise.all(INSTALLED.map(async (name) => [name, await version(name)])),
 );
 await writeFile(
-  "dist/package.json",
+  "plugin/dist/package.json",
   `${JSON.stringify({ private: true, type: "module", dependencies }, null, 2)}\n`,
 );

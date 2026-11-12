@@ -9,7 +9,7 @@ import { Engine } from "../engine/engine.ts";
 import { git } from "../engine/git.ts";
 import { teamFolder } from "../engine/team.ts";
 import type { Question } from "../engine/types.ts";
-import type { OpenplanView } from "../../types/index.d.ts";
+import type { OpenplanView } from "../../plugin/types/index.d.ts";
 import { addPaneTools } from "./pane-tools.ts";
 
 let dir: string;

@@ -9,7 +9,7 @@ import type {
   OpenplanMember,
   OpenplanNeed,
   OpenplanTeam,
-} from "../../types/index.d.ts";
+} from "../../plugin/types/index.d.ts";
 import { derive, reviewerOf, type Work } from "../engine/derive.ts";
 import type { Member, Meeting, Question, Subtask } from "../engine/types.ts";
 import { YOU } from "../engine/types.ts";

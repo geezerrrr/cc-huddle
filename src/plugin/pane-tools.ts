@@ -6,7 +6,7 @@
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { OpenplanView } from "../../types/index.d.ts";
+import type { OpenplanView } from "../../plugin/types/index.d.ts";
 import { workOf } from "../engine/core.ts";
 import type { Engine } from "../engine/engine.ts";
 import type { Answer } from "../engine/questions.ts";
