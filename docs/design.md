@@ -175,25 +175,31 @@ Kinds: a teammate's question (answered by that teammate in a read-only session),
 .claude/openplan/
   roles/gameplay-programmer.md
   members/sonnet.md
+  members/glm.md
   settings.json
+  team.json
 ```
 
-The team sits beside the rest of the repository's Claude Code setup. It is not in `.claude/agents/`: Claude Code would load members there as its own subagents, on its own provider.
+The team sits beside the rest of the repository's Claude Code setup, and you write its files yourself. It is not in `.claude/agents/`: Claude Code would load members there as its own subagents, on its own provider.
 
-A role file is its duties in Markdown with a `title` in front matter. A member file:
+A role file is its duties in Markdown with a `title` in front matter. A member file names its role, model and effort, and the environment its Claude Code runs with:
 
 ```markdown
 ---
-role: gameplay-programmer
-provider: anthropic
-model: claude-sonnet-5-5
-effort: high
+role: ui-designer
+model: glm-5.3-flashx
+effort: max
+env:
+  ANTHROPIC_BASE_URL: https://open.bigmodel.cn/api/anthropic
+  ANTHROPIC_AUTH_TOKEN: ${GLM_API_KEY}
 ---
 ```
 
-The member's name is the file name. `provider` names an entry in the provider table: base URL, which environment variable holds the key, how the model is passed. The table has the common providers built in, and a team can add its own with a base URL and a key variable. Keys are read from the environment only. You write these files yourself.
+The member's name is the file name. `env` is written as in `.mcp.json`: `${VAR}` and `${VAR:-default}` are filled in from the environment openplan runs in, so keys stay out of the files. A member without `env` runs on your own Claude Code sign-in.
 
-Settings that are the team's, not one member's, live in `settings.json`: acceptance review on or off (on by default), the default meeting size, and the permission rules members work under, written as Claude Code writes them.
+`settings.json` is a Claude Code settings file applied to every member: the permission rules they work under, the sandbox, anything else Claude Code settings hold. `team.json` holds openplan's own: acceptance review on or off (on by default) and the default meeting size.
+
+A member session loads your user and project settings like any session of yours. On top, as flag settings, which outrank both: the team's `settings.json`, the member's `env`, and the guards of §8. Your own settings' `env` would otherwise override the member's. The engine writes these to a file only you can read in the data folder before each turn and passes its path, since settings given inline end up on a command line where other processes can read them.
 
 ## 7. Interaction
 
