@@ -10572,77 +10572,6 @@ async function executableOf(pid) {
 
 // src/plugin/pane-tools.ts
 import { z as z6 } from "zod";
-var json = (value) => ({
-  content: [{ type: "text", text: JSON.stringify(value) }]
-});
-var PANE_ONLY = "For openplan's pane only: your session never calls it.";
-function addPaneTools(server2, team2) {
-  server2.registerTool(
-    "view",
-    {
-      description: `${PANE_ONLY} The team as the pane draws it.`,
-      inputSchema: {
-        revision: z6.number().int().optional().describe("The revision the pane has"),
-        record: z6.object({ subtask: z6.string(), from: z6.number().int().min(0) }).optional().describe("The subtask whose record the pane follows, and the byte it read up to")
-      },
-      annotations: { readOnlyHint: true }
-    },
-    async ({ revision, record: record2 }) => {
-      const engine2 = await team2();
-      const { state } = engine2;
-      const view = {
-        revision: engine2.revision,
-        ...revision !== engine2.revision && {
-          team: {
-            members: engine2.team.members.map((m) => ({
-              name: m.name,
-              role: m.role.title,
-              ...m.model && { model: m.model }
-            })),
-            state,
-            derived: derive(workOf(engine2))
-          }
-        },
-        speaking: Object.fromEntries(
-          state.meetings.flatMap((m) => {
-            const spoken = engine2.records.speaking(m);
-            return spoken ? [[m.id, spoken]] : [];
-          })
-        ),
-        ...record2 && {
-          record: {
-            subtask: record2.subtask,
-            ...await engine2.records.read(record2.subtask, record2.from)
-          }
-        }
-      };
-      return json(view);
-    }
-  );
-  server2.registerTool(
-    "answer",
-    {
-      description: `${PANE_ONLY} Answers what waits on the user, as they pressed it.`,
-      inputSchema: {
-        question: z6.string(),
-        option: z6.enum(PERMISSION_OPTIONS).optional().describe("A permission's answer"),
-        picks: z6.array(z6.string()).optional().describe("One pick per question with choices"),
-        decision: z6.enum(DECISION_OPTIONS).optional(),
-        note: z6.string().trim().optional().describe("Why it is denied, or what to change"),
-        sent_back: z6.string().optional().describe("The subtask a revised task goes back to")
-      }
-    },
-    async ({ question, option, picks, decision, note, sent_back }) => {
-      const words = note ? { note } : {};
-      const answer = option ? { option, ...words } : decision ? { decision, ...words, ...sent_back !== void 0 && { sentBack: sent_back } } : { picks: picks ?? [] };
-      await (await team2()).answer(question, answer);
-      return json({ answered: question });
-    }
-  );
-}
-
-// src/plugin/tools.ts
-import { z as z7 } from "zod";
 
 // src/plugin/status.ts
 var MEETING_STATUS = {
@@ -10726,7 +10655,229 @@ function statusText(work) {
   return lines.join("\n");
 }
 
+// src/plugin/pane.ts
+var plural = (n, one, many) => `${String(n)} ${n === 1 ? one : many}`;
+function shownMeeting(work) {
+  const latest = (status) => work.meetings.filter((m) => !status || m.status === status).at(-1);
+  return latest("running") ?? latest("review") ?? latest();
+}
+function meetingStatus(meeting2) {
+  switch (meeting2.status) {
+    case "running":
+      return meeting2.planning ? `${meeting2.host} writes the plan` : meeting2.speaking ? `${meeting2.speaking} speaks` : meeting2.weighing ? "deciding who speaks next" : "under way";
+    case "review":
+      return "its plan waits for you";
+    case "approved":
+      return "plan approved";
+    case "cancelled":
+      return "cancelled";
+    case "failed":
+      return `failed${meeting2.error ? `: ${meeting2.error}` : ""}`;
+  }
+}
+var meetingOf = (meeting2) => ({
+  id: meeting2.id,
+  agenda: meeting2.agenda,
+  status: meetingStatus(meeting2),
+  participants: meeting2.participants,
+  turns: meeting2.turns.map((t) => ({
+    speaker: t.speaker,
+    text: t.text,
+    ...t.calls && { to: t.calls }
+  })),
+  hands: (meeting2.hands ?? []).map((h) => ({ member: h.member, point: h.point })),
+  ...meeting2.plan && { plan: meeting2.plan.summary }
+});
+function stepText(subtask2) {
+  const { done, total, current } = subtask2.progress;
+  if (!total) return "";
+  const step2 = `step ${String(Math.min(done + 1, total))} of ${String(total)}`;
+  return current ? `, ${step2}: ${current}` : `, ${step2}`;
+}
+function memberOf(member, work, derived) {
+  const own = work.subtasks.filter((s) => s.assignee === member.name);
+  const at = (status) => own.find((s) => s.status === status);
+  const reviewing = work.subtasks.find(
+    (s) => s.status === "reviewing" && s.assignee !== member.name && reviewerOf(work, s) === member.name && derived.busy.includes(member.name)
+  );
+  const meeting2 = work.meetings.find(
+    (m) => m.status === "running" && m.participants.includes(member.name)
+  );
+  const next = at("pending");
+  const running3 = at("running");
+  let doing;
+  if (running3) doing = `works on "${running3.title}"${stepText(running3)}`;
+  else if (meeting2) doing = `at the meeting on "${meeting2.agenda}"`;
+  else if (reviewing) doing = `reviews "${reviewing.title}" by ${reviewing.assignee}`;
+  else if (at("reviewing")) doing = `"${at("reviewing")?.title ?? ""}" is in review`;
+  else if (at("merging")) doing = `"${at("merging")?.title ?? ""}" is being merged`;
+  else if (next) {
+    const waits = derived.subtasks[next.id]?.waits ?? [];
+    doing = `next: "${next.title}"${waits.length ? `, ${waits.map((w) => waitText(w, work)).join(", ")}` : ""}`;
+  } else doing = "free";
+  const followed = running3 ?? own.filter((s) => s.startedAt).sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0))[0];
+  const spoken = work.meetings.flatMap((m) => m.turns).filter((t) => t.speaker === member.name).reduce((sum, t) => sum + t.tokens, 0);
+  return {
+    name: member.name,
+    role: member.role.title,
+    ...member.model && { model: member.model },
+    doing,
+    ...followed && { subtask: followed.id },
+    tokens: own.reduce((sum, s) => sum + s.tokens, 0) + spoken
+  };
+}
+function callText(permission) {
+  if (permission.title) return permission.title;
+  const { input } = permission;
+  const main = ["command", "file_path", "path", "url", "pattern"].map((key) => input[key]).find((value) => typeof value === "string");
+  return main ? `${permission.tool}: ${main}` : permission.tool;
+}
+function needOf(question, work) {
+  const subtask2 = work.subtasks.find((s) => s.id === question.subtaskId);
+  const head = {
+    id: question.id,
+    from: question.from,
+    about: subtask2?.title ?? "",
+    text: question.text
+  };
+  if (question.permission)
+    return {
+      ...head,
+      kind: "permission",
+      call: callText(question.permission),
+      options: question.permission.options
+    };
+  if (question.choices)
+    return {
+      ...head,
+      kind: "choices",
+      choices: question.choices.map((c) => ({
+        question: c.question,
+        header: c.header,
+        options: c.options.map((o) => o.label),
+        multiSelect: c.multiSelect
+      }))
+    };
+  if (question.decision) {
+    const done = work.subtasks.filter((s) => s.taskId === subtask2?.taskId && s.status === "done");
+    return {
+      ...head,
+      kind: "decision",
+      options: question.decision.options,
+      ...question.decision.kind === "delivery" && {
+        sendBack: done.map((s) => ({ id: s.id, title: s.title }))
+      }
+    };
+  }
+  return void 0;
+}
+function milestones(work) {
+  const said2 = [];
+  for (const meeting2 of work.meetings)
+    if (meeting2.status === "approved")
+      said2.push({ key: `plan:${meeting2.id}`, text: `Plan approved: "${meeting2.agenda}"` });
+  for (const s of work.subtasks) {
+    if (s.review?.rounds)
+      said2.push({
+        key: `back:${s.id}:${String(s.review.rounds)}`,
+        text: `"${s.title}" went back to ${s.assignee}${s.review.notes ? `: ${s.review.notes}` : ""}`
+      });
+    if (s.status === "done")
+      said2.push({ key: `done:${s.id}`, text: `"${s.title}" by ${s.assignee} is merged` });
+    if (s.status === "failed")
+      said2.push({
+        key: `failed:${s.id}:${String(s.startedAt ?? 0)}`,
+        text: `"${s.title}" by ${s.assignee} failed${s.error ? `: ${s.error}` : ""}`
+      });
+  }
+  return said2;
+}
+function bandText(work, needs) {
+  if (!work.goals.length) return void 0;
+  const parts = [];
+  if (work.meetings.some((m) => m.status === "running")) parts.push("meeting");
+  const working = work.subtasks.filter((s) => s.status === "running").length;
+  if (working) parts.push(`${String(working)} working`);
+  if (needs) parts.push(`${plural(needs, "needs", "need")} you`);
+  if (!parts.length) {
+    const paused = work.goals.filter((g) => g.status === "paused").length;
+    parts.push(paused ? plural(paused, "goal paused", "goals paused") : "idle");
+  }
+  return parts.join(" \xB7 ");
+}
+function paneTeam(work, members) {
+  const derived = derive(work);
+  const needs = work.questions.filter((q) => q.to === YOU && q.status === "open").flatMap((q) => needOf(q, work) ?? []);
+  const meeting2 = shownMeeting(work);
+  const band = bandText(work, needs.length);
+  return {
+    ...band && { band },
+    ...meeting2 && { meeting: meetingOf(meeting2) },
+    members: members.map((m) => memberOf(m, work, derived)),
+    needs,
+    milestones: milestones(work)
+  };
+}
+
+// src/plugin/pane-tools.ts
+var json = (value) => ({
+  content: [{ type: "text", text: JSON.stringify(value) }]
+});
+var PANE_ONLY = "For openplan's pane only: your session never calls it.";
+function addPaneTools(server2, team2) {
+  server2.registerTool(
+    "view",
+    {
+      description: `${PANE_ONLY} The team as the pane draws it.`,
+      inputSchema: {
+        revision: z6.number().int().optional().describe("The revision the pane has"),
+        record: z6.object({ subtask: z6.string(), from: z6.number().int().min(0) }).optional().describe("The subtask whose record the pane follows, and the byte it read up to")
+      },
+      annotations: { readOnlyHint: true }
+    },
+    async ({ revision, record: record2 }) => {
+      const engine2 = await team2();
+      const work = workOf(engine2);
+      const meeting2 = shownMeeting(work);
+      const spoken = meeting2 && engine2.records.speaking(meeting2);
+      const view = {
+        revision: engine2.revision,
+        ...revision !== engine2.revision && { team: paneTeam(work, engine2.team.members) },
+        ...spoken && { speaking: { speaker: spoken.speaker, text: spoken.text } },
+        ...record2 && {
+          record: {
+            subtask: record2.subtask,
+            ...await engine2.records.read(record2.subtask, record2.from)
+          }
+        }
+      };
+      return json(view);
+    }
+  );
+  server2.registerTool(
+    "answer",
+    {
+      description: `${PANE_ONLY} Answers what waits on the user, as they pressed it.`,
+      inputSchema: {
+        question: z6.string(),
+        option: z6.enum(PERMISSION_OPTIONS).optional().describe("A permission's answer"),
+        picks: z6.array(z6.string()).optional().describe("One pick per question with choices"),
+        decision: z6.enum(DECISION_OPTIONS).optional(),
+        note: z6.string().trim().optional().describe("Why it is denied, or what to change"),
+        sent_back: z6.string().optional().describe("The subtask a revised task goes back to")
+      }
+    },
+    async ({ question, option, picks, decision, note, sent_back }) => {
+      const words = note ? { note } : {};
+      const answer = option ? { option, ...words } : decision ? { decision, ...words, ...sent_back !== void 0 && { sentBack: sent_back } } : { picks: picks ?? [] };
+      await (await team2()).answer(question, answer);
+      return json({ answered: question });
+    }
+  );
+}
+
 // src/plugin/tools.ts
+import { z as z7 } from "zod";
 var said = (text2) => ({ content: [{ type: "text", text: text2 }] });
 var names = (items) => new Intl.ListFormat("en", { type: "conjunction" }).format(items);
 function goalOf(engine2, ref) {

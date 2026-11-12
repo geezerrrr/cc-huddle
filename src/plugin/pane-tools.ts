@@ -6,35 +6,12 @@
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import type { OpenplanView } from "../../types/index.d.ts";
 import { workOf } from "../engine/core.ts";
-import { derive } from "../engine/derive.ts";
 import type { Engine } from "../engine/engine.ts";
 import type { Answer } from "../engine/questions.ts";
-import type { LiveRun, RecordEntry, Spoken } from "../engine/records.ts";
-import {
-  DECISION_OPTIONS,
-  PERMISSION_OPTIONS,
-  type Derived,
-  type TeamState,
-} from "../engine/types.ts";
-
-/** The tools only the pane calls. */
-export const PANE_TOOLS = ["view", "answer"] as const;
-
-/** What `view` gives the pane. */
-export interface PaneView {
-  /** The state's revision: `team` comes only when it isn't the one the pane has. */
-  revision: number;
-  team?: {
-    members: { name: string; role: string; model?: string }[];
-    state: TeamState;
-    derived: Derived;
-  };
-  /** The meeting turns being spoken now, by meeting id. */
-  speaking: Record<string, Spoken>;
-  /** The record of the subtask the pane follows, from where it last read. */
-  record?: { subtask: string; entries: RecordEntry[]; next: number; live?: LiveRun };
-}
+import { DECISION_OPTIONS, PERMISSION_OPTIONS } from "../engine/types.ts";
+import { paneTeam, shownMeeting } from "./pane.ts";
 
 const json = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value) }],
@@ -59,26 +36,13 @@ export function addPaneTools(server: McpServer, team: () => Promise<Engine>) {
     },
     async ({ revision, record }) => {
       const engine = await team();
-      const { state } = engine;
-      const view: PaneView = {
+      const work = workOf(engine);
+      const meeting = shownMeeting(work);
+      const spoken = meeting && engine.records.speaking(meeting);
+      const view: OpenplanView = {
         revision: engine.revision,
-        ...(revision !== engine.revision && {
-          team: {
-            members: engine.team.members.map((m) => ({
-              name: m.name,
-              role: m.role.title,
-              ...(m.model && { model: m.model }),
-            })),
-            state,
-            derived: derive(workOf(engine)),
-          },
-        }),
-        speaking: Object.fromEntries(
-          state.meetings.flatMap((m) => {
-            const spoken = engine.records.speaking(m);
-            return spoken ? [[m.id, spoken]] : [];
-          }),
-        ),
+        ...(revision !== engine.revision && { team: paneTeam(work, engine.team.members) }),
+        ...(spoken && { speaking: { speaker: spoken.speaker, text: spoken.text } }),
         ...(record && {
           record: {
             subtask: record.subtask,

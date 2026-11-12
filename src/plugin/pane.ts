@@ -1,0 +1,215 @@
+/**
+ * The team as openplan's pane shows it (docs/design.md §7.2), worked out here
+ * from the state so the mod only draws: the band's words, the meeting, each
+ * member at what they do, what waits on you with the answers it takes, and
+ * the milestones the transcript keeps.
+ */
+import type {
+  OpenplanMeeting,
+  OpenplanMember,
+  OpenplanNeed,
+  OpenplanTeam,
+} from "../../types/index.d.ts";
+import { derive, reviewerOf, type Work } from "../engine/derive.ts";
+import type { Member, Meeting, Question, Subtask } from "../engine/types.ts";
+import { YOU } from "../engine/types.ts";
+import { waitText } from "./status.ts";
+
+const plural = (n: number, one: string, many: string) => `${String(n)} ${n === 1 ? one : many}`;
+
+/** The meeting the pane shows: one under way, else one whose plan waits on you, else the latest. */
+export function shownMeeting(work: Work): Meeting | undefined {
+  const latest = (status?: Meeting["status"]) =>
+    work.meetings.filter((m) => !status || m.status === status).at(-1);
+  return latest("running") ?? latest("review") ?? latest();
+}
+
+function meetingStatus(meeting: Meeting): string {
+  switch (meeting.status) {
+    case "running":
+      return meeting.planning
+        ? `${meeting.host} writes the plan`
+        : meeting.speaking
+          ? `${meeting.speaking} speaks`
+          : meeting.weighing
+            ? "deciding who speaks next"
+            : "under way";
+    case "review":
+      return "its plan waits for you";
+    case "approved":
+      return "plan approved";
+    case "cancelled":
+      return "cancelled";
+    case "failed":
+      return `failed${meeting.error ? `: ${meeting.error}` : ""}`;
+  }
+}
+
+const meetingOf = (meeting: Meeting): OpenplanMeeting => ({
+  id: meeting.id,
+  agenda: meeting.agenda,
+  status: meetingStatus(meeting),
+  participants: meeting.participants,
+  turns: meeting.turns.map((t) => ({
+    speaker: t.speaker,
+    text: t.text,
+    ...(t.calls && { to: t.calls }),
+  })),
+  hands: (meeting.hands ?? []).map((h) => ({ member: h.member, point: h.point })),
+  ...(meeting.plan && { plan: meeting.plan.summary }),
+});
+
+/** Where a running subtask is, in words. */
+function stepText(subtask: Subtask): string {
+  const { done, total, current } = subtask.progress;
+  if (!total) return "";
+  const step = `step ${String(Math.min(done + 1, total))} of ${String(total)}`;
+  return current ? `, ${step}: ${current}` : `, ${step}`;
+}
+
+function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>): OpenplanMember {
+  const own = work.subtasks.filter((s) => s.assignee === member.name);
+  const at = (status: Subtask["status"]) => own.find((s) => s.status === status);
+  const reviewing = work.subtasks.find(
+    (s) =>
+      s.status === "reviewing" &&
+      s.assignee !== member.name &&
+      reviewerOf(work, s) === member.name &&
+      derived.busy.includes(member.name),
+  );
+  const meeting = work.meetings.find(
+    (m) => m.status === "running" && m.participants.includes(member.name),
+  );
+  const next = at("pending");
+  const running = at("running");
+  let doing: string;
+  if (running) doing = `works on "${running.title}"${stepText(running)}`;
+  else if (meeting) doing = `at the meeting on "${meeting.agenda}"`;
+  else if (reviewing) doing = `reviews "${reviewing.title}" by ${reviewing.assignee}`;
+  else if (at("reviewing")) doing = `"${at("reviewing")?.title ?? ""}" is in review`;
+  else if (at("merging")) doing = `"${at("merging")?.title ?? ""}" is being merged`;
+  else if (next) {
+    const waits = derived.subtasks[next.id]?.waits ?? [];
+    doing = `next: "${next.title}"${waits.length ? `, ${waits.map((w) => waitText(w, work)).join(", ")}` : ""}`;
+  } else doing = "free";
+  const followed =
+    running ??
+    own.filter((s) => s.startedAt).sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0))[0];
+  const spoken = work.meetings
+    .flatMap((m) => m.turns)
+    .filter((t) => t.speaker === member.name)
+    .reduce((sum, t) => sum + t.tokens, 0);
+  return {
+    name: member.name,
+    role: member.role.title,
+    ...(member.model && { model: member.model }),
+    doing,
+    ...(followed && { subtask: followed.id }),
+    tokens: own.reduce((sum, s) => sum + s.tokens, 0) + spoken,
+  };
+}
+
+/** A tool call in a line: Claude Code's own sentence for it, else the tool and its main argument. */
+function callText(permission: NonNullable<Question["permission"]>): string {
+  if (permission.title) return permission.title;
+  const { input } = permission;
+  const main = ["command", "file_path", "path", "url", "pattern"]
+    .map((key) => input[key])
+    .find((value) => typeof value === "string");
+  return main ? `${permission.tool}: ${main}` : permission.tool;
+}
+
+function needOf(question: Question, work: Work): OpenplanNeed | undefined {
+  const subtask = work.subtasks.find((s) => s.id === question.subtaskId);
+  const head = {
+    id: question.id,
+    from: question.from,
+    about: subtask?.title ?? "",
+    text: question.text,
+  };
+  if (question.permission)
+    return {
+      ...head,
+      kind: "permission",
+      call: callText(question.permission),
+      options: question.permission.options,
+    };
+  if (question.choices)
+    return {
+      ...head,
+      kind: "choices",
+      choices: question.choices.map((c) => ({
+        question: c.question,
+        header: c.header,
+        options: c.options.map((o) => o.label),
+        multiSelect: c.multiSelect,
+      })),
+    };
+  if (question.decision) {
+    const done = work.subtasks.filter((s) => s.taskId === subtask?.taskId && s.status === "done");
+    return {
+      ...head,
+      kind: "decision",
+      options: question.decision.options,
+      ...(question.decision.kind === "delivery" && {
+        sendBack: done.map((s) => ({ id: s.id, title: s.title })),
+      }),
+    };
+  }
+  return undefined;
+}
+
+/** What the transcript keeps a line of, each once. */
+function milestones(work: Work): OpenplanTeam["milestones"] {
+  const said: OpenplanTeam["milestones"] = [];
+  for (const meeting of work.meetings)
+    if (meeting.status === "approved")
+      said.push({ key: `plan:${meeting.id}`, text: `Plan approved: "${meeting.agenda}"` });
+  for (const s of work.subtasks) {
+    if (s.review?.rounds)
+      said.push({
+        key: `back:${s.id}:${String(s.review.rounds)}`,
+        text: `"${s.title}" went back to ${s.assignee}${s.review.notes ? `: ${s.review.notes}` : ""}`,
+      });
+    if (s.status === "done")
+      said.push({ key: `done:${s.id}`, text: `"${s.title}" by ${s.assignee} is merged` });
+    if (s.status === "failed")
+      said.push({
+        key: `failed:${s.id}:${String(s.startedAt ?? 0)}`,
+        text: `"${s.title}" by ${s.assignee} failed${s.error ? `: ${s.error}` : ""}`,
+      });
+  }
+  return said;
+}
+
+/** The band's words: what goes on and what waits on you; nothing before the first goal. */
+function bandText(work: Work, needs: number): string | undefined {
+  if (!work.goals.length) return undefined;
+  const parts: string[] = [];
+  if (work.meetings.some((m) => m.status === "running")) parts.push("meeting");
+  const working = work.subtasks.filter((s) => s.status === "running").length;
+  if (working) parts.push(`${String(working)} working`);
+  if (needs) parts.push(`${plural(needs, "needs", "need")} you`);
+  if (!parts.length) {
+    const paused = work.goals.filter((g) => g.status === "paused").length;
+    parts.push(paused ? plural(paused, "goal paused", "goals paused") : "idle");
+  }
+  return parts.join(" · ");
+}
+
+/** The team as the pane shows it. */
+export function paneTeam(work: Work, members: readonly Member[]): OpenplanTeam {
+  const derived = derive(work);
+  const needs = work.questions
+    .filter((q) => q.to === YOU && q.status === "open")
+    .flatMap((q) => needOf(q, work) ?? []);
+  const meeting = shownMeeting(work);
+  const band = bandText(work, needs.length);
+  return {
+    ...(band && { band }),
+    ...(meeting && { meeting: meetingOf(meeting) }),
+    members: members.map((m) => memberOf(m, work, derived)),
+    needs,
+    milestones: milestones(work),
+  };
+}

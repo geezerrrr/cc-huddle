@@ -9,7 +9,8 @@ import { Engine } from "../engine/engine.ts";
 import { git } from "../engine/git.ts";
 import { teamFolder } from "../engine/team.ts";
 import type { Question } from "../engine/types.ts";
-import { addPaneTools, type PaneView } from "./pane-tools.ts";
+import type { OpenplanView } from "../../types/index.d.ts";
+import { addPaneTools } from "./pane-tools.ts";
 
 let dir: string;
 let engine: Engine;
@@ -64,22 +65,21 @@ async function call(name: string, args: Record<string, unknown> = {}) {
 }
 
 const view = async (args: Record<string, unknown> = {}) =>
-  JSON.parse((await call("view", args)).text) as PaneView;
+  JSON.parse((await call("view", args)).text) as OpenplanView;
 
 describe("the pane's tools", () => {
   it("give the team only when it changed since the pane's revision", async () => {
     const first = await view();
-    expect(first.team?.members).toEqual([{ name: "glm", role: "Developer", model: "glm-5" }]);
-    expect(first.team?.derived).toMatchObject({ busy: [] });
-    expect(first.speaking).toEqual({});
-    expect(await view({ revision: first.revision })).toEqual({
-      revision: first.revision,
-      speaking: {},
+    expect(first.team).toEqual({
+      members: [{ name: "glm", role: "Developer", model: "glm-5", doing: "free", tokens: 0 }],
+      needs: [],
+      milestones: [],
     });
+    expect(await view({ revision: first.revision })).toEqual({ revision: first.revision });
     await engine.goals.start("Dice");
     const next = await view({ revision: first.revision });
     expect(next.revision).toBeGreaterThan(first.revision);
-    expect(next.team?.state.goals).toMatchObject([{ name: "Dice" }]);
+    expect(next.team?.band).toBe("idle");
   });
 
   it("follow a subtask's record from where the pane read up to", async () => {

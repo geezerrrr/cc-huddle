@@ -16,7 +16,7 @@ const MEETING_STATUS: Record<Meeting["status"], string> = {
 };
 
 /** What a subtask waits on, in words. */
-function waitText(wait: Wait, work: Work): string {
+export function waitText(wait: Wait, work: Work): string {
   switch (wait.kind) {
     case "goal":
       return `its goal is ${wait.status}`;
