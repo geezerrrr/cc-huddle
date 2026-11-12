@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { dataFiles, repoFolder } from "../engine/data.ts";
+import { dataFiles, repoFolder, type Holder } from "../engine/data.ts";
 import { git, openRepository } from "../engine/git.ts";
 import { teamFolder } from "../engine/team.ts";
 import { sessionContext } from "./context.ts";
@@ -33,7 +33,10 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-async function writeTeamAndGoal() {
+/** This test's session, as the hook's parent process. */
+const SESSION = 41;
+
+async function writeTeamAndGoal(status = "paused") {
   for (const [name, text] of [
     ["roles/dev.md", "---\ntitle: Developer\n---\n"],
     ["members/glm.md", "---\nrole: dev\n---\n"],
@@ -49,7 +52,7 @@ async function writeTeamAndGoal() {
     JSON.stringify({
       version: 1,
       state: {
-        goals: [{ id: "g1", name: "Dice", slug: "dice", status: "paused", createdAt: 0 }],
+        goals: [{ id: "g1", name: "Dice", slug: "dice", status, createdAt: 0 }],
         tasks: [],
         subtasks: [],
         meetings: [],
@@ -59,16 +62,45 @@ async function writeTeamAndGoal() {
   );
 }
 
+/** Writes the team's lock as `holder` holds it. */
+async function hold(holder: Holder) {
+  await writeFile(
+    dataFiles(repoFolder(data, await openRepository(repo))).lock,
+    JSON.stringify(holder),
+  );
+}
+
 describe("the session's context", () => {
   it("is where the team stands, once it has a goal", async () => {
-    expect(await sessionContext(repo, data)).toBeUndefined();
+    expect(await sessionContext(repo, data, SESSION)).toBeUndefined();
     await writeTeamAndGoal();
-    expect(await sessionContext(repo, data)).toBe(`openplan's team on this repository, as it stands:
+    expect(await sessionContext(repo, data, SESSION))
+      .toBe(`openplan's team on this repository, as it stands:
 
 Team: glm
 
 Goal "Dice" [g1]: paused, on branch openplan/dice/main`);
-    expect(await sessionContext(dir, data)).toBeUndefined();
+    expect(await sessionContext(dir, data, SESSION)).toBeUndefined();
+  });
+
+  it("says what a session that ended without closing the team left going is paused as it opens", async () => {
+    await writeTeamAndGoal("active");
+    const left = "The session before ended without closing the team.";
+    expect(await sessionContext(repo, data, SESSION)).toContain(left);
+    // This session's server has the team, but hasn't opened it yet.
+    await hold({ pid: process.pid, session: SESSION, open: false });
+    expect(await sessionContext(repo, data, SESSION)).toContain(left);
+    // It has: the goal is active in this session (the context after /clear).
+    await hold({ pid: process.pid, session: SESSION, open: true });
+    expect(await sessionContext(repo, data, SESSION)).not.toContain(left);
+  });
+
+  it("says when another session runs the team", async () => {
+    await writeTeamAndGoal("active");
+    await hold({ pid: process.pid, session: 42, open: true });
+    expect(await sessionContext(repo, data, SESSION)).toMatch(
+      /^openplan's team on this repository runs in another Claude Code session \(pid 42\)/,
+    );
   });
 
   it("is what the SessionStart hook adds", async () => {

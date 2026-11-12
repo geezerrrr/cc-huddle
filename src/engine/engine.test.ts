@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { dataFiles, repoFolder } from "./data.ts";
+import { dataFiles, holderOf, repoFolder } from "./data.ts";
 import { Engine, type EngineOptions } from "./engine.ts";
 import { git, openRepository } from "./git.ts";
 import { teamFolder } from "./team.ts";
@@ -74,7 +74,7 @@ describe("Engine", () => {
       env: { ANTHROPIC_AUTH_TOKEN: "key-1" },
       enabledPlugins: { "openplan@inline": false },
     });
-    expect(await readFile(files.lock, "utf8")).toBe(String(process.pid));
+    expect(holderOf(files.lock)).toEqual({ pid: process.pid, session: process.ppid, open: true });
   });
 
   it("pauses every active goal as it closes, writes the state, and lets the team go", async () => {
@@ -123,6 +123,8 @@ describe("Engine", () => {
     const engine = await open();
     expect(engine.state.goals[0]?.status).toBe("paused");
     expect(engine.state.subtasks[0]).toMatchObject({ status: "pending", goOn: [{ why: "held" }] });
+    // Written before the lock says the team is open (context.ts reads both).
+    expect(await saved()).toMatchObject({ state: { goals: [{ status: "paused" }] } });
   });
 
   it("answers a question put to you and carries out the decision", async () => {

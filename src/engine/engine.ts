@@ -7,6 +7,7 @@ import type { Settings } from "@anthropic-ai/claude-agent-sdk";
 import { errorText, type Core, type Team } from "./core.ts";
 import {
   dataFiles,
+  openedTeam,
   readState,
   releaseTeam,
   repoFolder,
@@ -116,6 +117,8 @@ export class Engine {
       engine.meetings.recover();
       for (const goal of state.goals)
         if (goal.status === "active") await engine.goals.pause(goal.id);
+      await writer.flush();
+      await openedTeam(files.lock);
       return engine;
     } catch (error) {
       releaseTeam(files.lock);

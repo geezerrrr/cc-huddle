@@ -114,30 +114,50 @@ function running(pid: number): boolean {
   }
 }
 
-/** The pid in a lock file; undefined when there is none. */
-function holderOf(file: string): number | undefined {
+/**
+ * Who has a repository's team: the process that runs it, the session that
+ * started that process, and whether it has opened the team yet (`Engine.open`).
+ */
+export interface Holder {
+  pid: number;
+  session: number;
+  open: boolean;
+}
+
+/** Who holds a lock, while they run; undefined when nobody does. */
+export function holderOf(lock: string): Holder | undefined {
+  let holder: Holder;
   try {
-    return Number(readFileSync(file, "utf8")) || undefined;
+    holder = JSON.parse(readFileSync(lock, "utf8")) as Holder;
   } catch {
     return undefined;
   }
+  return running(holder.pid) ? holder : undefined;
 }
 
+const hold = async (lock: string, open: boolean) => {
+  await mkdir(path.dirname(lock), { recursive: true });
+  const holder: Holder = { pid: process.pid, session: process.ppid, open };
+  await writeFile(lock, JSON.stringify(holder));
+};
+
 /**
- * Takes a repository's team for this process, held by `lock` with its pid,
- * or throws which process holds it. One that has ended holds nothing.
+ * Takes a repository's team for this process and the session that started
+ * it, or throws which session holds it. One that has ended holds nothing.
  */
 export async function takeTeam(lock: string): Promise<void> {
   const holder = holderOf(lock);
-  if (holder !== undefined && holder !== process.pid && running(holder))
+  if (holder && holder.pid !== process.pid)
     throw new Error(
-      `Another Claude Code session runs this repository's team (pid ${String(holder)}). If it has ended, delete ${lock}`,
+      `Another Claude Code session runs this repository's team (pid ${String(holder.session)}). If it has ended, delete ${lock}`,
     );
-  await mkdir(path.dirname(lock), { recursive: true });
-  await writeFile(lock, String(process.pid));
+  await hold(lock, false);
 }
+
+/** Tells the lock that this process has opened the team: its state is the team's as it goes on. */
+export const openedTeam = (lock: string) => hold(lock, true);
 
 /** Lets the team go, as this process ends: at once, since it may be exiting. */
 export function releaseTeam(lock: string) {
-  if (holderOf(lock) === process.pid) unlinkSync(lock);
+  if (holderOf(lock)?.pid === process.pid) unlinkSync(lock);
 }

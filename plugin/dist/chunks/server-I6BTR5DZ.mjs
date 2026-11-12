@@ -7487,24 +7487,31 @@ function running(pid) {
     return error.code === "EPERM";
   }
 }
-function holderOf(file) {
+function holderOf(lock) {
+  let holder;
   try {
-    return Number(readFileSync(file, "utf8")) || void 0;
+    holder = JSON.parse(readFileSync(lock, "utf8"));
   } catch {
     return void 0;
   }
+  return running(holder.pid) ? holder : void 0;
 }
+var hold = async (lock, open2) => {
+  await mkdir(path.dirname(lock), { recursive: true });
+  const holder = { pid: process.pid, session: process.ppid, open: open2 };
+  await writeFile(lock, JSON.stringify(holder));
+};
 async function takeTeam(lock) {
   const holder = holderOf(lock);
-  if (holder !== void 0 && holder !== process.pid && running(holder))
+  if (holder && holder.pid !== process.pid)
     throw new Error(
-      `Another Claude Code session runs this repository's team (pid ${String(holder)}). If it has ended, delete ${lock}`
+      `Another Claude Code session runs this repository's team (pid ${String(holder.session)}). If it has ended, delete ${lock}`
     );
-  await mkdir(path.dirname(lock), { recursive: true });
-  await writeFile(lock, String(process.pid));
+  await hold(lock, false);
 }
+var openedTeam = (lock) => hold(lock, true);
 function releaseTeam(lock) {
-  if (holderOf(lock) === process.pid) unlinkSync(lock);
+  if (holderOf(lock)?.pid === process.pid) unlinkSync(lock);
 }
 
 // src/engine/git.ts
@@ -10448,6 +10455,8 @@ var Engine = class _Engine {
       engine2.meetings.recover();
       for (const goal2 of state.goals)
         if (goal2.status === "active") await engine2.goals.pause(goal2.id);
+      await writer.flush();
+      await openedTeam(files.lock);
       return engine2;
     } catch (error) {
       releaseTeam(files.lock);

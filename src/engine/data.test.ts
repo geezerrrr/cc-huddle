@@ -4,7 +4,15 @@ import { mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { readState, releaseTeam, repoFolder, stateWriter, takeTeam } from "./data.ts";
+import {
+  holderOf,
+  openedTeam,
+  readState,
+  releaseTeam,
+  repoFolder,
+  stateWriter,
+  takeTeam,
+} from "./data.ts";
 import type { TeamState } from "./types.ts";
 
 let dir: string;
@@ -84,13 +92,17 @@ describe("the lock", () => {
     await takeTeam(lock);
     const other = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
     await once(other, "spawn");
-    await writeFile(lock, String(other.pid));
+    await writeFile(lock, JSON.stringify({ pid: other.pid, session: 7, open: true }));
     releaseTeam(lock);
-    await expect(takeTeam(lock)).rejects.toThrow(`(pid ${String(other.pid)})`);
+    await expect(takeTeam(lock)).rejects.toThrow("(pid 7)");
     other.kill();
     await once(other, "exit");
+    expect(holderOf(lock)).toBeUndefined();
     await takeTeam(lock);
-    expect(await readFile(lock, "utf8")).toBe(String(process.pid));
+    const holder = { pid: process.pid, session: process.ppid };
+    expect(holderOf(lock)).toEqual({ ...holder, open: false });
+    await openedTeam(lock);
+    expect(holderOf(lock)).toEqual({ ...holder, open: true });
     releaseTeam(lock);
     await expect(stat(lock)).rejects.toThrow();
   });

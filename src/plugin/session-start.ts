@@ -7,7 +7,8 @@ import { sessionContext } from "./context.ts";
 
 const input = JSON.parse(await text(process.stdin)) as { cwd: string };
 const dataFolder = process.env.CLAUDE_PLUGIN_DATA;
-const context = dataFolder && (await sessionContext(input.cwd, dataFolder));
+// Claude Code starts the hook itself.
+const context = dataFolder && (await sessionContext(input.cwd, dataFolder, process.ppid));
 if (context)
   process.stdout.write(
     JSON.stringify({

@@ -7375,6 +7375,7 @@ import { text } from "node:stream/consumers";
 // src/engine/data.ts
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { readFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
 
 // src/engine/core.ts
@@ -7413,6 +7414,23 @@ async function readState(file2) {
   if (saved.version > STATE_VERSION)
     throw new Error(`${file2} was written by a newer openplan: update openplan to go on`);
   return saved.state;
+}
+function running(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error62) {
+    return error62.code === "EPERM";
+  }
+}
+function holderOf(lock) {
+  let holder;
+  try {
+    holder = JSON.parse(readFileSync(lock, "utf8"));
+  } catch {
+    return void 0;
+  }
+  return running(holder.pid) ? holder : void 0;
 }
 
 // src/engine/git.ts
@@ -27569,7 +27587,7 @@ function statusText(work) {
 }
 
 // src/plugin/context.ts
-async function sessionContext(cwd, dataFolder2) {
+async function sessionContext(cwd, dataFolder2, session) {
   let repo;
   let team;
   try {
@@ -27578,18 +27596,27 @@ async function sessionContext(cwd, dataFolder2) {
   } catch {
     return void 0;
   }
-  const state = await readState(dataFiles(repoFolder(dataFolder2, repo)).state);
+  const files = dataFiles(repoFolder(dataFolder2, repo));
+  const state = await readState(files.state);
   if (!state.goals.length) return void 0;
-  const work = { ...state, members: team.members.map((m) => m.name) };
-  return `openplan's team on this repository, as it stands:
+  const status = statusText({ ...state, members: team.members.map((m) => m.name) });
+  const holder = holderOf(files.lock);
+  if (holder && holder.session !== session)
+    return `openplan's team on this repository runs in another Claude Code session (pid ${String(holder.session)}); this one can't run it while that one does. As it stands:
 
-${statusText(work)}`;
+${status}`;
+  const context2 = `openplan's team on this repository, as it stands:
+
+${status}`;
+  return !holder?.open && state.goals.some((g) => g.status === "active") ? `${context2}
+
+The session before ended without closing the team. This session pauses what it left going as it opens the team; nothing goes on until a goal is resumed.` : context2;
 }
 
 // src/plugin/session-start.ts
 var input2 = JSON.parse(await text(process.stdin));
 var dataFolder = process.env.CLAUDE_PLUGIN_DATA;
-var context = dataFolder && await sessionContext(input2.cwd, dataFolder);
+var context = dataFolder && await sessionContext(input2.cwd, dataFolder, process.ppid);
 if (context)
   process.stdout.write(
     JSON.stringify({
