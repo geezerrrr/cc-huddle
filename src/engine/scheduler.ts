@@ -87,6 +87,11 @@ export class Scheduler {
   private live = new Map<string, Live>();
   /** Closing: nothing starts, and what stopped work still reports goes nowhere. */
   private closed = false;
+  /**
+   * Runs stopped to go on in their sessions (their goal was paused, or you
+   * added to them): they go back to pending with these, not to stopped.
+   */
+  private held = new Map<string, GoOn[]>();
 
   constructor(
     private readonly core: Core,
@@ -101,6 +106,75 @@ export class Scheduler {
   }
 
   /**
+   * After a restart nothing is under way: what was running goes back to
+   * pending, to go on in its session; what was in review or being merged is
+   * taken up again by the next pump.
+   */
+  recover() {
+    for (const subtask of this.core.state.subtasks) {
+      if (subtask.status !== "running") continue;
+      this.move(subtask, "hold");
+      if (subtask.session) goOnWith(subtask, { why: "held" });
+    }
+  }
+
+  /**
+   * Puts a goal's work on hold (it was paused or archived): its runs stop, to
+   * go on in their sessions when it is resumed; its reviews stop, to be done
+   * again then. Nothing of it starts meanwhile; a merge under way finishes.
+   */
+  hold(goalId: string) {
+    for (const subtask of this.core.state.subtasks) {
+      const live = this.live.get(subtask.id);
+      if (subtask.goalId !== goalId || !live || live.kind === "merge") continue;
+      if (live.kind === "run") this.keepOn(subtask.id, { why: "held" });
+      live.abort.abort();
+    }
+  }
+
+  /**
+   * You add to a subtask (a message to its member): it goes on in its
+   * session, from where it stopped, with `note`; a running one stops first,
+   * one not started yet hears it in its brief. One being reviewed or merged
+   * is handed over already, and a paused or archived goal's work waits for
+   * the goal to be resumed.
+   */
+  carry(subtaskId: string, note: string): "goes" | "handedOver" | "onHold" {
+    const subtask = this.subtask(subtaskId);
+    if (!subtask || this.goalOf(subtask).status !== "active") return "onHold";
+    if (subtask.status === "reviewing" || subtask.status === "merging") return "handedOver";
+    const live = this.live.get(subtaskId);
+    if (live) {
+      this.keepOn(subtaskId, { why: "carried", note });
+      live.abort.abort();
+      return "goes";
+    }
+    if (subtask.status === "failed" || subtask.status === "stopped") this.move(subtask, "continue");
+    else if (subtask.status === "done") this.move(subtask, "redo");
+    goOnWith(subtask, { why: "carried", note });
+    subtask.error = undefined;
+    this.core.changed();
+    this.pump();
+    return "goes";
+  }
+
+  /**
+   * Lets go of work about to be deleted: what waits to start won't, what runs
+   * or is reviewed stops, not to go on, and this settles once all of it under
+   * way has ended (a merge finishes first), so nothing of it is written after.
+   */
+  async release(subtaskIds: string[]) {
+    await Promise.all(
+      subtaskIds.flatMap((id) => {
+        this.held.delete(id);
+        const live = this.live.get(id);
+        const stopping = this.stop(id);
+        return live ? [live.ended, stopping] : [stopping];
+      }),
+    );
+  }
+
+  /**
    * You stop a subtask: one not started, a run (it ends as stopped), a
    * review, a merge waiting on your decision (its half-done merge undone). One
    * handed over keeps its delivery and the stage it stopped in, to go on from.
@@ -109,6 +183,8 @@ export class Scheduler {
     const subtask = this.subtask(subtaskId);
     const live = this.live.get(subtaskId);
     if (live?.kind === "run") {
+      // Your stop wins over going on.
+      this.held.delete(subtaskId);
       live.abort.abort();
       return;
     }
@@ -274,6 +350,11 @@ export class Scheduler {
     if (from === "stopped") subtask.stoppedIn = undefined;
   }
 
+  /** A run about to be stopped goes on in its session, with `reason` too. */
+  private keepOn(subtaskId: string, reason: GoOn) {
+    this.held.set(subtaskId, [...(this.held.get(subtaskId) ?? []), reason]);
+  }
+
   private subtask(id: string): Subtask | undefined {
     return this.core.state.subtasks.find((s) => s.id === id);
   }
@@ -411,8 +492,14 @@ export class Scheduler {
     this.questions.cancelFor(subtask.id);
     end();
     subtask.tokens += outcome.tokens;
+    const held = this.held.get(subtask.id);
+    this.held.delete(subtask.id);
     if (this.closed) return;
-    if (outcome.status === "delivered") {
+    // Held with its goal, it goes on if it stopped; added to by you, even if it delivered just before.
+    if (held && (outcome.status === "stopped" || held.some((g) => g.why === "carried"))) {
+      this.move(subtask, "hold");
+      for (const reason of held) goOnWith(subtask, reason);
+    } else if (outcome.status === "delivered") {
       subtask.delivery = { ...outcome.handover, at: Date.now() };
       subtask.conflict = undefined;
       this.move(subtask, core.team.review ? "review" : "merge");

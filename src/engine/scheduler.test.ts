@@ -454,4 +454,97 @@ describe("Scheduler", () => {
       });
     });
   });
+
+  describe("work on hold", () => {
+    const working = (run: Run) =>
+      new Promise<RunOutcome>((resolve) => {
+        run.signal.addEventListener("abort", () => {
+          resolve({ status: "stopped", tokens: 0 });
+        });
+      });
+    const runs = () => vi.mocked(runSubtask).mock.calls.map(([run]) => run);
+    const started = (n: number) =>
+      vi.waitFor(() => {
+        expect(runs()).toHaveLength(n);
+      });
+
+    it("stops with its goal, and goes on in its session when the goal is resumed", async () => {
+      const s1 = subtask("s1", { session: "glm-1" });
+      core.state.subtasks.push(s1);
+      vi.mocked(runSubtask)
+        .mockImplementationOnce(working)
+        .mockImplementationOnce(delivering({ "score.txt": "1\n" }));
+      scheduler.pump();
+      await started(1);
+      const [goal] = core.state.goals;
+      if (goal) goal.status = "paused";
+      scheduler.hold("g1");
+      await settled(s1, "pending");
+      expect(s1.goOn).toEqual([{ why: "held" }]);
+      scheduler.pump();
+      expect(runs()).toHaveLength(1);
+      if (goal) goal.status = "active";
+      scheduler.pump();
+      await settled(s1, "done");
+      expect(runs()[1]).toMatchObject({
+        resume: "glm-1",
+        opening: "Your work was paused and now goes on. Pick up where you left off.",
+      });
+    });
+
+    it("takes what you add to it: a run stops and goes on with it, one not started hears it first", async () => {
+      const s1 = subtask("s1", { session: "glm-1" });
+      const s2 = subtask("s2", { assignee: "sonnet" });
+      core.state.subtasks.push(s1, s2);
+      vi.mocked(runSubtask).mockImplementation(async (run) =>
+        run.opening.includes("Make s1") && !run.resume
+          ? working(run)
+          : delivering({ [`${run.resume ?? "s2"}.txt`]: "x\n" })(run),
+      );
+      expect(scheduler.carry("s2", "Use blue")).toBe("goes");
+      scheduler.pump();
+      await settled(s2, "done");
+      expect(runs().find((r) => r.opening.includes("Make s2"))?.opening).toContain(
+        "The user adds to your subtask:\nUse blue",
+      );
+      expect(scheduler.carry("s1", "Top right")).toBe("goes");
+      await settled(s1, "done");
+      expect(runs().at(-1)).toMatchObject({
+        resume: "glm-1",
+        opening: "The user adds to your subtask:\nTop right",
+      });
+    });
+
+    it("isn't added to while handed over or while its goal is paused", () => {
+      core.state.subtasks.push(subtask("s1", { status: "reviewing" }), subtask("s2"));
+      expect(scheduler.carry("s1", "x")).toBe("handedOver");
+      const [goal] = core.state.goals;
+      if (goal) goal.status = "paused";
+      expect(scheduler.carry("s2", "x")).toBe("onHold");
+    });
+
+    it("is let go of before it is deleted, once its run has ended", async () => {
+      const s1 = subtask("s1", { session: "glm-1" });
+      core.state.subtasks.push(s1);
+      vi.mocked(runSubtask).mockImplementation(working);
+      scheduler.pump();
+      await started(1);
+      scheduler.hold("g1");
+      await scheduler.release(["s1"]);
+      expect(s1.status).toBe("stopped");
+    });
+
+    it("goes on in its session after a restart", () => {
+      const s1 = subtask("s1", { status: "running", session: "glm-1" });
+      const s2 = subtask("s2", { status: "running" });
+      core.state.subtasks.push(s1, s2);
+      scheduler.recover();
+      expect([s1.status, s1.goOn, s2.status, s2.goOn]).toEqual([
+        "pending",
+        [{ why: "held" }],
+        "pending",
+        undefined,
+      ]);
+    });
+  });
 });
