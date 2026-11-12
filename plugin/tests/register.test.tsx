@@ -265,3 +265,26 @@ test("/openplan status prints where the team stands", async ($, on) => {
   });
   expect(text).toBe("Team: glm");
 });
+
+test("/openplan with a task hands it to your session for the team, with who is on it", async ($, on) => {
+  const clock = mock.clock(on);
+  const calls = serve(on, [{ revision: 1, team: TEAM }]);
+  const prompts: string[] = [];
+  on("prompt.submit", (_, e) => {
+    prompts.push(e.text);
+    return { text: e.text };
+  });
+  await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
+  await clock.advance(500);
+  await $.command.run({
+    command: "openplan",
+    args: "make a dice game, @glm on the rules",
+    origin: { kind: "composer" },
+    presentation: { isFullscreen: true, columns: 120 },
+  });
+  await clock.advance(1);
+  expect(prompts).toHaveLength(1);
+  expect(prompts[0]).toContain("The team: glm (Developer).");
+  expect(prompts[0]).toContain("\nmake a dice game, @glm on the rules\n");
+  expect(calls.filter((c) => c.tool === "ui.open")).toEqual([]);
+});

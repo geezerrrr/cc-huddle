@@ -1,7 +1,8 @@
 /**
  * openplan's mod (docs/design.md §7.2): the pane, the band above the prompt,
  * toasts for what needs you, transcript rows for milestones, prompts to your
- * session for what needs a conversation, and the `/openplan` command. It draws what the MCP server's `view` tool gives and
+ * session for what needs a conversation, and the `/openplan` command, which
+ * hands the team a task. It draws what the MCP server's `view` tool gives and
  * answers through its `answer` tool, with no model in between; the model is
  * kept from both.
  */
@@ -117,6 +118,18 @@ async function call($: $, tool: string, args: Record<string, unknown> = {}): Pro
   const text = result.content.find((block) => block.type === "text")?.text ?? "";
   if (result.isError) throw new Refused(text);
   return text;
+}
+
+/** The prompt `/openplan <task>` gives your session: the task, for the team and not for it. */
+function handOff(task: string, now: OpenplanTeam | null): string {
+  const roster = now && ` The team: ${now.members.map((m) => `${m.name} (${m.role})`).join(", ")}.`;
+  return [
+    `The user hands this to openplan's team. Don't do any of it yourself.${roster ?? ""}`,
+    "",
+    task,
+    "",
+    "Propose who takes it, keeping to anyone the user named: a meeting when it needs planning among several members (who attends, the host first, and what each brings to it), or one member when it doesn't (what they will do). Ask the user with AskUserQuestion to start with that or say what to change, and propose again until they start. Then start a goal (start_goal) and hold the meeting (hold_meeting) or assign the work (assign).",
+  ].join("\n");
 }
 
 /** Polls the team, unless it does already. */
@@ -498,8 +511,9 @@ export const register: Register = (on) => {
   on("session.start", async ($, e, next) => {
     await $.command.register({
       name: "openplan",
-      description: "Show openplan's team in a pane; `/openplan status` prints where it stands",
-      argumentHint: "[status]",
+      description:
+        "Hand openplan's team a task; with none, show the team in a pane; `/openplan status` prints where it stands",
+      argumentHint: "[task | status]",
     });
     watch($);
     return next(e);
@@ -507,15 +521,26 @@ export const register: Register = (on) => {
 
   on("command.run", { command: "openplan" }, async ($, e) => {
     watch($);
-    if (e.args.trim() !== "status") {
+    const task = e.args.trim();
+    if (task === "status") {
+      try {
+        return { text: await call($, "status") };
+      } catch (error) {
+        return { text: `openplan: ${words(error)}` };
+      }
+    }
+    if (!task) {
       await openPane($);
       return {};
     }
-    try {
-      return { text: await call($, "status") };
-    } catch (error) {
-      return { text: `openplan: ${words(error)}` };
-    }
+    const text = handOff(task, await read($, team));
+    // Once the command is done: a prompt submitted while it runs would wait on it.
+    $.clock.after(0, () => {
+      $.prompt.submit({ text }).catch((error: unknown) => {
+        $.ui.toast(`openplan: your session couldn't be given the task: ${words(error)}`);
+      });
+    });
+    return {};
   });
 
   // Your session at the team: it may have one to open now.

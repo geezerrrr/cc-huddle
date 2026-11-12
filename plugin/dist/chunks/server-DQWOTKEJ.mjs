@@ -10937,7 +10937,7 @@ function addTools(server2, team2) {
   const meetingTool = server2.registerTool(
     "hold_meeting",
     {
-      description: "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and the session is told when its plan waits for the user.",
+      description: "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and the session is told when its plan waits for the user. Hold one only once the user has agreed who attends.",
       inputSchema: meetingInput(memberName())
     },
     async ({ goal: ref, agenda, size, attendees }) => {
@@ -11015,7 +11015,7 @@ function addTools(server2, team2) {
   const assignTool = server2.registerTool(
     "assign",
     {
-      description: "Give a member one subtask directly, without a meeting. It starts once they are free.",
+      description: "Give a member one subtask directly, without a meeting. It starts once they are free. Assign only once the user has agreed who takes it.",
       inputSchema: assignInput(memberName())
     },
     async ({ goal: ref, ...work }) => {

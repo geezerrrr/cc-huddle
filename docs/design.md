@@ -76,7 +76,7 @@ One session runs a repository's team at a time, held by a lock in the repository
 ### 3.3 Plugin
 
 - **MCP server `openplan`**: the engine and the tools your session uses (§7.3). Two more tools serve the mod, which calls them with `$.mcp.call`: `view` (the team as the pane draws it, a member's record from where it left off) and `answer`. The mod keeps both from your session's model, so an answer comes only from you.
-- **Mod**: the pane, the band, toasts, transcript rows and the `/openplan` commands (§7.2), and the prompts that wake your session (§7.3). Commands run without a model turn.
+- **Mod**: the pane, the band, toasts, transcript rows and the `/openplan` command (§7.2), and the prompts that wake your session (§7.3). `/openplan <task>` hands your session the task for the team; the pane and `status` run without a model turn.
 - **Skill**: tells your session what it is for: relay and act, never do the work itself.
 - **SessionStart hook**: tells your session what stopped or waits on you, as context. The mod shows you the same in the band.
 
@@ -214,11 +214,12 @@ A member session loads your user and project settings like any session of yours.
 
 ### 7.1 A goal, end to end
 
-1. You say what you want: "hold a meeting and build a two-player dice game", or "have GLM do the scoreboard". Your session calls a tool and returns at once.
-2. The meeting runs in the background. You watch it live in the pane.
-3. The plan is ready: your session wakes, shows the plan's summary and asks with `AskUserQuestion`: approve, change it, or drop it. Changes are said in words, and your session rewrites the plan with them; any member can be given work, not only those who attended.
-4. Members work. Everything that needs you lands in the pane's "Needs you" tab with a toast, and the pane opens where it docks beside the transcript; you answer there with its own options.
-5. A task is done: its delivery waits for your acceptance. Accepting it unblocks work that depends on it.
+1. You hand the team a task: `/openplan build a two-player dice game, GLM on the art`, or ask your session in words. The command makes it the team's for certain: the mod gives your session the task, the team's roster, and the rule not to do it itself.
+2. Your session proposes who takes it, keeping to anyone you named: a meeting (who attends, the host first, what each brings) or one member for work that needs no planning. It asks with `AskUserQuestion`: start, or say what to change; it proposes again until you start. Then it starts the goal and holds the meeting or assigns the work, and returns at once.
+3. The meeting runs in the background. You watch it live in the pane.
+4. The plan is ready: your session wakes, shows the plan's summary and asks with `AskUserQuestion`: approve, change it, or drop it. Changes are said in words, and your session rewrites the plan with them; any member can be given work, not only those who attended.
+5. Members work. Everything that needs you lands in the pane's "Needs you" tab with a toast, and the pane opens where it docks beside the transcript; you answer there with its own options.
+6. A task is done: its delivery waits for your acceptance. Accepting it unblocks work that depends on it.
 
 ### 7.2 What you see
 
@@ -272,6 +273,8 @@ Checked on Claude Code 2.1.322 and Agent SDK 0.3.322, with a probe plugin and a 
 
 - An MCP server is not given `CLAUDE_PID` (hooks are); its parent process is the session. A command-form hook is the session's child too.
 - A plugin's skill takes the plugin's name as its short command: a skill named `openplan` in the plugin `openplan` keeps the mod from registering `/openplan`, `user-invocable: false` or not.
+- A plugin's `$.prompt.submit` from a `command.run` hook is refused, as it would wait on the command's own run; from a timer after it, it starts the turn. `/openplan <task>` so reaches the session, with the roster of a team kept only in `CLAUDE_CONFIG_DIR/openplan/`.
+- Claude Code refreshes a server's tools on `notifications/tools/list_changed`, so the member names in the tools follow the team as it is read.
 - Loaded with `--plugin-dir` against the mock: the first start installs the dependencies and connects in about 5 s, later ones at once; the band, `/openplan`, `/openplan status`, the pane and the SessionStart context all show the team as its state file has it.
 
 Left: whether the pane redraws smoothly, polling the MCP server every 500 ms with `$.mcp.call`, while a meeting streams.

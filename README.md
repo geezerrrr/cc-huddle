@@ -85,15 +85,19 @@ A repository's `.claude/openplan/` adds to yours: a role or member there replace
 
 ## Use it
 
-Start Claude Code in the repository and say what you want:
+Start Claude Code in the repository and hand the team a task, in your own words:
 
-- "Hold a meeting and build a two-player dice game."
-- "Have glm do the scoreboard."
-- "@sonnet put the scoreboard top right."
+```
+/openplan build a two-player dice game, glm on the art, sonnet on the code
+/openplan make the buttons on the settings page rounder
+```
 
-Your session hands the work to the team and returns at once. The members meet, and the host writes a plan of tasks with owners, dependencies and acceptance criteria. Your session shows you the plan and asks you to approve it, change it or drop it. Then the members work in parallel, each subtask in its own worktree, reviewed and merged into the goal's branch. A finished task waits for you to accept it.
+Your session proposes who takes it: a meeting, with who attends and what each brings, or one member for a job that needs no planning. It keeps to anyone you named, and asks you to start with that or say what to change. Once you start it, the team works in the background and your session is free. You can also just ask your session ("have glm do the scoreboard"); `/openplan` makes sure the task goes to the team.
 
-- `/openplan` opens the pane: the meeting as it goes, each member at what they do (select one to follow their record), and what needs you, answered there with a button. Permissions are granted only there, by you.
+The members meet, and the host writes a plan of tasks with owners, dependencies and acceptance criteria. Your session shows you the plan and asks you to approve it, change it or drop it. Then the members work in parallel, each subtask in its own worktree, reviewed and merged into the goal's branch. A finished task waits for you to accept it.
+
+- `@sonnet put the scoreboard top right` passes a member a message, in their session.
+- `/openplan` with no task opens the pane: the meeting as it goes, each member at what they do (select one to follow their record), and what needs you, answered there with a button. Permissions are granted only there, by you.
 - `/openplan status` prints where the team stands.
 - The band above the prompt says what goes on: `openplan · meeting · 3 working · 1 needs you`.
 
