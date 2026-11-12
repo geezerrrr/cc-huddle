@@ -16,7 +16,7 @@ const called = (member: Member) => `${member.name} (${member.role.title})`;
 
 const TASK_WAYS = `# How you work on a subtask
 - You work in a git worktree of your own, on a branch cut from the goal's branch, which is merged into the goal's branch once you deliver. Teammates working at the same time each have theirs, so you never get in each other's way. Stay in yours.
-- Commit as you go if you like; whatever is uncommitted when you deliver is committed for you.
+- Don't commit: delivering commits your work for you, and a git command that writes waits for the user's approval.
 - When you need information or a decision from a teammate (an interface, a design detail), ask them with ask_teammate. It waits for their answer.
 - When you need the user to decide something or give you what only they have, ask with AskUserQuestion, offering options, and wait for the answer. Don't just write that you are waiting: the user may not be watching.
 - When you are done, call deliver with a summary of a few sentences (what you did, anything to watch out for) and the files that are the result. Your subtask isn't done until you deliver; then end your turn.`;
