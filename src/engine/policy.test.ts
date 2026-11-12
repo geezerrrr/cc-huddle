@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 import {
   expandEnv,
   memberSettings,
-  pluginId,
   readOnlyOptions,
   workOptions,
   writeSettings,
@@ -19,13 +18,6 @@ const glm: Member = {
   effort: "max",
   env: { ANTHROPIC_BASE_URL: "https://glm.example", ANTHROPIC_AUTH_TOKEN: "${GLM_KEY}" },
 };
-
-describe("pluginId", () => {
-  it("reads the plugin's id back from its data folder", () => {
-    expect(pluginId("/home/you/.claude/plugins/data/openplan-openplan")).toBe("openplan@openplan");
-    expect(pluginId("/x/data/openplan-my-tools")).toBe("openplan@my-tools");
-  });
-});
 
 describe("expandEnv", () => {
   it("fills in variables and defaults as .mcp.json does", () => {

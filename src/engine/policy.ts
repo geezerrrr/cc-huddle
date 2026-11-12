@@ -33,17 +33,6 @@ const SESSION_VARS = [
 /** Built-in tools a read-only session has: meetings, answers to teammates, reviews. */
 export const READ_ONLY_TOOLS = ["Read", "Glob", "Grep", "WebSearch", "WebFetch"];
 
-const PLUGIN = "openplan";
-
-/**
- * openplan's id as `enabledPlugins` names it (`openplan@<marketplace>`),
- * read back from its data folder, which Claude Code names after the id with
- * every character but letters, digits, `_` and `-` turned into `-`.
- */
-export function pluginId(dataFolder: string): string {
-  return `${PLUGIN}@${path.basename(dataFolder).slice(PLUGIN.length + 1)}`;
-}
-
 /**
  * Fills in `${VAR}` and `${VAR:-default}` from `from`, as `.mcp.json` does.
  * A variable that is unset and has no default is an error naming it.
@@ -142,7 +131,7 @@ export function workOptions(seat: Seat, from: Env): Options {
     systemPrompt: { type: "preset", preset: "claude_code", append: seat.system },
     includePartialMessages: true,
     toolConfig: { askUserQuestion: { previewFormat: "markdown" } },
-    extraArgs: { name: `${PLUGIN}-${member.name}` },
+    extraArgs: { name: `openplan-${member.name}` },
     pathToClaudeCodeExecutable: seat.claude,
   };
 }

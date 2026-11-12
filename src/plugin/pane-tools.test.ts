@@ -41,6 +41,8 @@ beforeEach(async () => {
     cwd: repo,
     dataFolder: path.join(dir, "openplan-inline"),
     claude: "claude",
+    session: 41,
+    plugin: "openplan@inline",
     env: {},
     host: { changed: vi.fn(), failed: vi.fn() },
   });

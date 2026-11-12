@@ -10,6 +10,7 @@ import { errorText } from "../engine/core.ts";
 import { Engine } from "../engine/engine.ts";
 import { stopMembers } from "../engine/processes.ts";
 import { executableOf } from "./claude.ts";
+import { pluginId } from "./plugin-id.ts";
 import { addPaneTools } from "./pane-tools.ts";
 import { addTools } from "./tools.ts";
 import { NewForYou, wakeSession } from "./wake.ts";
@@ -36,6 +37,8 @@ const openTeam = async () =>
     cwd: process.env.CLAUDE_PROJECT_DIR ?? process.cwd(),
     dataFolder,
     claude: await (claude ??= executableOf(process.ppid)),
+    session: process.ppid,
+    plugin: pluginId(dataFolder),
     env: process.env,
     host: {
       changed() {

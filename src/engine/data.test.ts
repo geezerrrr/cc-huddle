@@ -85,23 +85,26 @@ describe("the state file", () => {
   });
 });
 
+/** The session the team is taken for. */
+const SESSION = 41;
+
 describe("the lock", () => {
   it("gives the team to one running process, and is let go of by its holder", async () => {
     const lock = path.join(dir, "repo", "lock");
-    await takeTeam(lock);
-    await takeTeam(lock);
+    await takeTeam(lock, SESSION);
+    await takeTeam(lock, SESSION);
     const other = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
     await once(other, "spawn");
     await writeFile(lock, JSON.stringify({ pid: other.pid, session: 7, open: true }));
     releaseTeam(lock);
-    await expect(takeTeam(lock)).rejects.toThrow("(pid 7)");
+    await expect(takeTeam(lock, SESSION)).rejects.toThrow("(pid 7)");
     other.kill();
     await once(other, "exit");
     expect(holderOf(lock)).toBeUndefined();
-    await takeTeam(lock);
-    const holder = { pid: process.pid, session: process.ppid };
+    await takeTeam(lock, SESSION);
+    const holder = { pid: process.pid, session: SESSION };
     expect(holderOf(lock)).toEqual({ ...holder, open: false });
-    await openedTeam(lock);
+    await openedTeam(lock, SESSION);
     expect(holderOf(lock)).toEqual({ ...holder, open: true });
     releaseTeam(lock);
     await expect(stat(lock)).rejects.toThrow();
@@ -111,7 +114,7 @@ describe("the lock", () => {
     const lock = path.join(dir, "repo", "lock");
     const take = `
       import { takeTeam } from ${JSON.stringify(path.join(import.meta.dirname, "data.ts"))};
-      takeTeam(process.argv[1]).then(() => console.log("took"), () => console.log("refused"));
+      takeTeam(process.argv[1], 1).then(() => console.log("took"), () => console.log("refused"));
       setTimeout(() => {}, 2000);
     `;
     const race = async () => {

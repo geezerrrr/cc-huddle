@@ -145,10 +145,10 @@ const busy = (lock: string, holder: Holder) =>
   );
 
 /** This process as the holder, in a file of its own beside the lock, to be put in place whole. */
-async function holding(lock: string, open: boolean): Promise<string> {
+async function holding(lock: string, session: number, open: boolean): Promise<string> {
   await mkdir(path.dirname(lock), { recursive: true });
   const file = `${lock}.${String(process.pid)}`;
-  const holder: Holder = { pid: process.pid, session: process.ppid, open };
+  const holder: Holder = { pid: process.pid, session, open };
   await writeFile(file, JSON.stringify(holder));
   return file;
 }
@@ -156,13 +156,13 @@ async function holding(lock: string, open: boolean): Promise<string> {
 const code = (error: unknown) => (error as NodeJS.ErrnoException).code;
 
 /**
- * Takes a repository's team for this process and the session that started
- * it, or throws which session holds it. The lock is made whole or not at
+ * Takes a repository's team for this process and `session` (its pid), or
+ * throws which session holds it. The lock is made whole or not at
  * all, so two sessions starting at once can't both take it; one whose holder
  * has ended is moved aside first, by one taker only.
  */
-export async function takeTeam(lock: string): Promise<void> {
-  const mine = await holding(lock, false);
+export async function takeTeam(lock: string, session: number): Promise<void> {
+  const mine = await holding(lock, session, false);
   try {
     for (;;) {
       try {
@@ -202,8 +202,8 @@ export async function takeTeam(lock: string): Promise<void> {
 }
 
 /** Tells the lock that this process has opened the team: its state is the team's as it goes on. */
-export async function openedTeam(lock: string): Promise<void> {
-  await rename(await holding(lock, true), lock);
+export async function openedTeam(lock: string, session: number): Promise<void> {
+  await rename(await holding(lock, session, true), lock);
 }
 
 /** Lets the team go, as this process ends: at once, since it may be exiting. */

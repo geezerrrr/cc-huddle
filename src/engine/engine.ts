@@ -18,7 +18,7 @@ import {
 import { openRepository, type Places } from "./git.ts";
 import { Goals } from "./goals.ts";
 import { Meetings } from "./meetings.ts";
-import { memberSettings, pluginId, readOnlyOptions, workOptions, writeSettings } from "./policy.ts";
+import { memberSettings, readOnlyOptions, workOptions, writeSettings } from "./policy.ts";
 import { recordMembersIn, stopMembers } from "./processes.ts";
 import { systemPrompt } from "./prompts.ts";
 import { Questions, type Answer } from "./questions.ts";
@@ -42,6 +42,10 @@ export interface EngineOptions {
   dataFolder: string;
   /** The Claude Code members run. */
   claude: string;
+  /** The pid of the session the team runs for, which the lock names. */
+  session: number;
+  /** openplan's id as `enabledPlugins` names it, turned off in members' sessions. */
+  plugin: string;
   /** The environment members' `${VAR}`s are filled in from. */
   env: Record<string, string | undefined>;
   host: Host;
@@ -80,7 +84,7 @@ export class Engine {
     const files = dataFiles(root);
     // A repository without a team gets no lock or folder of openplan's.
     const { team, settings, meetingSize } = await loadTeam(repo.top);
-    await takeTeam(files.lock);
+    await takeTeam(files.lock, options.session);
     try {
       await recordMembersIn(files.members);
       const state = await readState(files.state);
@@ -119,7 +123,7 @@ export class Engine {
       for (const goal of state.goals)
         if (goal.status === "active") await engine.goals.pause(goal.id);
       await writer.flush();
-      await openedTeam(files.lock);
+      await openedTeam(files.lock, options.session);
       return engine;
     } catch (error) {
       releaseTeam(files.lock);
@@ -204,7 +208,7 @@ export class Engine {
    * member's environment names a variable that isn't set.
    */
   private async writeMemberSettings(team: Team, settings: Settings) {
-    const plugin = pluginId(this.options.dataFolder);
+    const { plugin } = this.options;
     const each = team.members.map((member) => {
       try {
         return [member.name, memberSettings(settings, member, this.options.env, plugin)] as const;

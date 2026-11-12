@@ -50,6 +50,8 @@ beforeEach(async () => {
     cwd: repo,
     dataFolder,
     claude: "claude",
+    session: 41,
+    plugin: "openplan@inline",
     env: { GLM_KEY: "key-1" },
     host: { changed: vi.fn(), failed: vi.fn() },
   };
@@ -74,7 +76,7 @@ describe("Engine", () => {
       env: { ANTHROPIC_AUTH_TOKEN: "key-1" },
       enabledPlugins: { "openplan@inline": false },
     });
-    expect(holderOf(files.lock)).toEqual({ pid: process.pid, session: process.ppid, open: true });
+    expect(holderOf(files.lock)).toEqual({ pid: process.pid, session: 41, open: true });
   });
 
   it("leaves a repository without a team as it is", async () => {
