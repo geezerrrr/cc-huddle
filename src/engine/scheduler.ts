@@ -182,11 +182,12 @@ export class Scheduler {
    * session, from where it stopped, with `note`; a running one stops first,
    * one not started yet hears it in its brief. One being reviewed or merged
    * is handed over already, and a paused or archived goal's work waits for
-   * the goal to be resumed.
+   * the goal to be resumed. Throws when there is no such subtask.
    */
   carry(subtaskId: string, note: string): "goes" | "handedOver" | "onHold" {
     const subtask = this.subtask(subtaskId);
-    if (!subtask || this.goalOf(subtask).status !== "active") return "onHold";
+    if (!subtask) throw new Error("There is no such subtask");
+    if (this.goalOf(subtask).status !== "active") return "onHold";
     if (subtask.status === "reviewing" || subtask.status === "merging") return "handedOver";
     const live = this.live.get(subtaskId);
     if (live) {

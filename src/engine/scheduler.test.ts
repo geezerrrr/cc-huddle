@@ -605,12 +605,13 @@ describe("Scheduler", () => {
       });
     });
 
-    it("isn't added to while handed over or while its goal is paused", () => {
+    it("isn't added to while handed over, while its goal is paused, or when there is none", () => {
       core.state.subtasks.push(subtask("s1", { status: "reviewing" }), subtask("s2"));
       expect(scheduler.carry("s1", "x")).toBe("handedOver");
       const [goal] = core.state.goals;
       if (goal) goal.status = "paused";
       expect(scheduler.carry("s2", "x")).toBe("onHold");
+      expect(() => scheduler.carry("s9", "x")).toThrow("There is no such subtask");
     });
 
     it("is let go of before it is deleted, once its run has ended", async () => {
