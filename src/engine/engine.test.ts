@@ -117,6 +117,49 @@ describe("Engine", () => {
     expect(engine.state.subtasks[0]).toMatchObject({ status: "pending", goOn: [{ why: "held" }] });
   });
 
+  it("answers a question put to you and carries out the decision", async () => {
+    const engine = await open();
+    const goal = await engine.goals.start("Dice");
+    await engine.goals.pause(goal.id);
+    engine.state.tasks.push({
+      id: "t1",
+      goalId: goal.id,
+      title: "Game",
+      outcome: "",
+      createdAt: 0,
+    });
+    const subtask = {
+      id: "s1",
+      taskId: "t1",
+      goalId: goal.id,
+      title: "Rules",
+      description: "",
+      acceptance: "",
+      assignee: "glm",
+      dependsOn: [],
+      status: "done" as const,
+      createdAt: 0,
+      progress: { done: 0, total: 0 },
+      tokens: 0,
+    };
+    engine.state.subtasks.push(subtask);
+    engine.questions.openDecision(
+      subtask,
+      { kind: "delivery", options: ["accept", "revise"] },
+      "Game",
+    );
+    const [question] = engine.state.questions;
+    await expect(engine.answer(question?.id ?? "", { decision: "revise" })).rejects.toThrow(
+      "doesn't fit",
+    );
+    await engine.answer(question?.id ?? "", { decision: "revise", note: "Bigger dice" });
+    expect(question?.status).toBe("answered");
+    expect(engine.state.subtasks[0]).toMatchObject({
+      status: "pending",
+      goOn: [{ why: "revised", note: "Bigger dice" }],
+    });
+  });
+
   it("won't open without a member's key, and keeps its team when the files can't be filled in", async () => {
     await expect(open({ env: {} })).rejects.toThrow("glm: Not set in the environment: GLM_KEY");
     const engine = await open();

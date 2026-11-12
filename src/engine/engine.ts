@@ -20,11 +20,11 @@ import { Meetings } from "./meetings.ts";
 import { memberSettings, pluginId, readOnlyOptions, workOptions, writeSettings } from "./policy.ts";
 import { recordMembersIn } from "./processes.ts";
 import { systemPrompt } from "./prompts.ts";
-import { Questions } from "./questions.ts";
+import { Questions, type Answer } from "./questions.ts";
 import { Scheduler } from "./scheduler.ts";
 import { allowInTeam, loadTeam } from "./team.ts";
 import type { TurnListener } from "./turns.ts";
-import type { Meeting, MeetingSize, Subtask, TeamState } from "./types.ts";
+import type { Meeting, MeetingSize, Question, Subtask, TeamState } from "./types.ts";
 
 /** Where the engine tells what happens. */
 export interface Host {
@@ -142,6 +142,17 @@ export class Engine {
     this.size = meetingSize;
     this.core.changed();
     this.scheduler.pump();
+  }
+
+  /**
+   * Answers a question put to you, and carries out a decision (a stuck
+   * review, a merge, a task done). Throws when it is no longer open or the
+   * answer doesn't fit it.
+   */
+  async answer(id: string, answer: Answer): Promise<Question> {
+    const question = this.questions.answer(id, answer);
+    if ("decision" in answer) await this.scheduler.decide(question, answer);
+    return question;
   }
 
   /**
