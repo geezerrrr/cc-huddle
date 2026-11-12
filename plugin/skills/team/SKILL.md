@@ -1,5 +1,6 @@
 ---
-name: openplan
+name: team
+user-invocable: false
 description: Run the repository's openplan team, members who are Claude Code sessions of their own. Use when the user asks the team or a member to do something (build, plan, hold a meeting, take over a piece of work), passes a member a message, decides on a plan or a finished task, or asks how the team stands.
 ---
 
