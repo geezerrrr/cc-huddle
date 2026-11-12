@@ -1,8 +1,8 @@
 /**
  * The Claude Code your session runs, which members run too (docs/design.md
  * §3.2): the same version and install, and nothing else of its own to ship.
- * Claude Code tells its MCP servers its pid (`CLAUDE_PID`); the system tells
- * which executable that process runs.
+ * The MCP server's parent is your session's process; the system tells which
+ * executable it runs.
  */
 import { execFile } from "node:child_process";
 import { readlink } from "node:fs/promises";

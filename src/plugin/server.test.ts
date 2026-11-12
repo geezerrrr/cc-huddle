@@ -45,7 +45,7 @@ async function writeTeam() {
   }
 }
 
-/** The server as Claude Code starts it for a session in the repository. */
+/** The server as Claude Code starts it for a session in the repository: the test stands for the session. */
 async function connect() {
   const transport = new StdioClientTransport({
     command: process.execPath,
@@ -54,8 +54,6 @@ async function connect() {
       PATH: process.env.PATH ?? "",
       CLAUDE_PLUGIN_DATA: path.join(dir, "openplan-inline"),
       CLAUDE_PROJECT_DIR: repo,
-      // The test stands for the session.
-      CLAUDE_PID: String(process.pid),
     },
     stderr: "pipe",
   });

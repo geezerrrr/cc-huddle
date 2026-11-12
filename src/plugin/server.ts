@@ -14,11 +14,9 @@ import { addPaneTools } from "./pane-tools.ts";
 import { addTools } from "./tools.ts";
 import { NewForYou, wakeSession } from "./wake.ts";
 
-const { CLAUDE_PLUGIN_DATA: dataFolder, CLAUDE_PID: sessionPid } = process.env;
-if (!dataFolder || !sessionPid)
-  throw new Error(
-    "openplan's MCP server runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA and CLAUDE_PID",
-  );
+const dataFolder = process.env.CLAUDE_PLUGIN_DATA;
+if (!dataFolder)
+  throw new Error("openplan's MCP server runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA");
 
 const say = (text: string) => {
   console.error(`openplan: ${text}`);
@@ -34,8 +32,8 @@ const openTeam = async () =>
   Engine.open({
     cwd: process.env.CLAUDE_PROJECT_DIR ?? process.cwd(),
     dataFolder,
-    // Members run the Claude Code your session runs.
-    claude: await executableOf(Number(sessionPid)),
+    // Members run the Claude Code your session runs: the process that started this one.
+    claude: await executableOf(process.ppid),
     env: process.env,
     host: {
       changed() {

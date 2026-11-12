@@ -7387,7 +7387,8 @@ var package_default = {
     lint: "eslint .",
     format: "prettier --write .",
     "format:check": "prettier --check .",
-    test: "vitest run"
+    test: "vitest run --dir src",
+    "check:mod": "claude plugin validate plugin && claude plugin test plugin"
   },
   devDependencies: {
     "@eslint/js": "^10.0.0",
@@ -9230,7 +9231,6 @@ var SESSION_VARS = [
   "CLAUDE_CODE_MESSAGING_TOKEN",
   "CLAUDE_CODE_SESSION_ID",
   "CLAUDE_EFFORT",
-  "CLAUDE_PID",
   "CLAUDE_PLUGIN_DATA",
   "CLAUDE_PLUGIN_ROOT",
   "CLAUDE_PROJECT_DIR"
@@ -11156,11 +11156,9 @@ var NewForYou = class {
 };
 
 // src/plugin/server.ts
-var { CLAUDE_PLUGIN_DATA: dataFolder, CLAUDE_PID: sessionPid } = process.env;
-if (!dataFolder || !sessionPid)
-  throw new Error(
-    "openplan's MCP server runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA and CLAUDE_PID"
-  );
+var dataFolder = process.env.CLAUDE_PLUGIN_DATA;
+if (!dataFolder)
+  throw new Error("openplan's MCP server runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA");
 var say = (text2) => {
   console.error(`openplan: ${text2}`);
 };
@@ -11170,8 +11168,8 @@ var news2;
 var openTeam = async () => Engine.open({
   cwd: process.env.CLAUDE_PROJECT_DIR ?? process.cwd(),
   dataFolder,
-  // Members run the Claude Code your session runs.
-  claude: await executableOf(Number(sessionPid)),
+  // Members run the Claude Code your session runs: the process that started this one.
+  claude: await executableOf(process.ppid),
   env: process.env,
   host: {
     changed() {

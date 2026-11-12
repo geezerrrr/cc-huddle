@@ -96,7 +96,6 @@ describe("session options", () => {
     PATH: "/bin",
     CLAUDE_CODE_MESSAGING_SOCKET: "/tmp/cc-socks/1.sock",
     CLAUDE_EFFORT: "low",
-    CLAUDE_PID: "1",
   };
 
   it("starts a member as a session of its own, under its name", () => {
