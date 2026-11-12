@@ -232,8 +232,16 @@ export interface Question {
   createdAt: number;
   /** A call the scheduler acts on; no run waits on it. `files`: conflicts that can't be merged line by line. */
   decision?: { kind: DecisionKind; options: DecisionOption[]; files?: string[] };
-  /** A tool call waiting to be allowed: the tool and what it works on. */
-  permission?: { tool: string; detail: string; options: PermissionOption[] };
+  /**
+   * A tool call waiting to be allowed: the tool, its input as the member gave
+   * it, and Claude Code's own sentence for the call when it has one.
+   */
+  permission?: {
+    tool: string;
+    input: Record<string, unknown>;
+    title?: string;
+    options: PermissionOption[];
+  };
 }
 
 /** The addressee of a question put to you. */
