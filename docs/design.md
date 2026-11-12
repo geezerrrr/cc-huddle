@@ -29,7 +29,7 @@ openplan comes out of [Crewloft](https://playcrewloft.com), a game in which the 
 | Question      | Anything that waits on someone: a member asking a teammate or you, a permission request, a decision on a stuck review or merge, a finished task to accept. |
 | Your session  | The Claude Code session you talk in. It relays what you want and acts on it through tools. It never does the team's work.                                  |
 
-A member is busy while a subtask of theirs runs, while they review a delivery, or while they sit in a meeting. A busy member starts nothing new. Everyone does one thing at a time.
+A member is busy while a subtask of theirs runs or waits on its review, while they review a delivery, or while they sit in a meeting. A busy member starts nothing new. Everyone does one thing at a time.
 
 ## 3. Architecture
 
@@ -207,7 +207,7 @@ The member's name is the file name. `env` is written as in `.mcp.json`: `${VAR}`
 
 `settings.json` is a Claude Code settings file applied to every member: the permission rules they work under, the sandbox, anything else Claude Code settings hold. `team.json` holds openplan's own: acceptance review on or off (on by default) and the default meeting size.
 
-A member session loads your user and project settings like any session of yours. On top, as flag settings, which outrank both: the team's `settings.json`, the member's `env`, and the guards of §8. Your own settings' `env` would otherwise override the member's. The engine writes these to a file only you can read in the data folder before each turn and passes its path, since settings given inline end up on a command line where other processes can read them.
+A member session loads your user and project settings like any session of yours. On top, as flag settings, which outrank both: the team's `settings.json`, the member's `env`, and the guards of §8. Your own settings' `env` would otherwise override the member's. The engine writes these to a file only you can read in the data folder as the team opens, and again as you allow a rule always, and passes its path, since settings given inline end up on a command line where other processes can read them.
 
 ## 7. Interaction
 
@@ -232,7 +232,7 @@ A member session loads your user and project settings like any session of yours.
 
 ### 7.3 Your session
 
-Your session talks; the pane shows and answers. The tools your session has: start a goal, hold a meeting, assign a subtask directly, change a plan under review, approve or cancel it, pause, resume, archive or delete a goal, stop, go on, retry or redo a subtask, and pass a message to a member (`@GLM put the scoreboard top right`), which goes on in that member's session.
+Your session talks; the pane shows and answers. The tools your session has: see where the team stands (`status`); start a goal (`start_goal`); hold a meeting (`hold_meeting`), cancel one (`cancel_meeting`) or resume one that failed or was cancelled (`resume_meeting`); show a plan under review (`show_plan`), change it (`change_plan`) or approve it (`approve_plan`); assign a subtask directly (`assign`); pause, resume, archive or delete a goal (`goal_action`); stop, go on, retry or redo a subtask (`subtask_action`); pass a message to a member (`message`: `@GLM put the scoreboard top right`), which goes on in that member's session; and carry out your decision on a task done, a stuck review or a merge (`decide`).
 
 Your session is woken only for what needs a conversation: a plan to review and a task to accept. The `view` tool lists each, and the mod submits each new one to your session with `$.prompt.submit`, Claude Code's call for a plugin's prompt: an idle session starts a turn with it, read as a message from the openplan plugin. What waits already when the team opens is the SessionStart hook's to tell.
 
