@@ -44,7 +44,7 @@ const question = (fields: Partial<Question> & Pick<Question, "id">): Question =>
 
 const work = (fields: Partial<Work> = {}): Work => ({
   members: ["host", "ann", "bob"],
-  goals: [{ id: "p1", name: "dice", branch: "openplan/dice", status: "active", createdAt: 0 }],
+  goals: [{ id: "p1", name: "dice", slug: "dice", status: "active", createdAt: 0 }],
   tasks: [{ id: "t1", goalId: "p1", title: "", outcome: "", createdAt: 0, meetingId: "m1" }],
   subtasks: [],
   meetings: [meeting()],
@@ -104,7 +104,7 @@ describe("waitsIn", () => {
 
   it("holds everything pending while its goal is paused", () => {
     const state = work({
-      goals: [{ id: "p1", name: "dice", branch: "b", status: "paused", createdAt: 0 }],
+      goals: [{ id: "p1", name: "dice", slug: "dice", status: "paused", createdAt: 0 }],
     });
     expect(waitsIn(state, subtask("s1"), new Set())).toEqual([{ kind: "goal", status: "paused" }]);
   });
@@ -163,7 +163,7 @@ describe("derive", () => {
 
   it("offers delete only for an archived goal", () => {
     const state = work({
-      goals: [{ id: "p1", name: "dice", branch: "b", status: "archived", createdAt: 0 }],
+      goals: [{ id: "p1", name: "dice", slug: "dice", status: "archived", createdAt: 0 }],
     });
     expect(derive(state).goals.p1).toEqual(["resume", "delete"]);
   });

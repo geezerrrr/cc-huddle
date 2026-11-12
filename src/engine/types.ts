@@ -12,8 +12,8 @@ export type GoalStatus = (typeof GOAL_STATUSES)[number];
 export interface Goal {
   id: string;
   name: string;
-  /** The branch its work is merged into: `openplan/<name>`, or `<name>-2` and on when taken. */
-  branch: string;
+  /** Its name in git: its branches are under `openplan/<slug>/` (git.ts). */
+  slug: string;
   status: GoalStatus;
   createdAt: number;
   /** When it was archived, while it is. */

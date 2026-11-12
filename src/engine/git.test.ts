@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { git, GitError, openRepository } from "./git.ts";
+import { git, GitError, goalBranch, openGoal, openRepository, slugFor, takenSlugs } from "./git.ts";
 
 const ME = {
   GIT_AUTHOR_NAME: "you",
@@ -73,5 +73,44 @@ describe("openRepository", () => {
   it("refuses a repository with no commit", async () => {
     await git({ cwd: repo }, ["init", "-q"]);
     await expect(openRepository(repo)).rejects.toThrow("no commit");
+  });
+});
+
+describe("goals", () => {
+  const placesOf = async () => ({ repo: await openRepository(repo), root: path.join(dir, "data") });
+
+  it("names a goal from its name, apart from the names taken", () => {
+    expect(slugFor("Two-player Dice Game!", new Set())).toBe("two-player-dice-game");
+    expect(slugFor("dice", new Set(["dice", "dice-2"]))).toBe("dice-3");
+    expect(slugFor("骰子", new Set())).toBe("goal");
+  });
+
+  it("cuts a goal's branch from HEAD and checks it out in its own folder", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    const folder = await openGoal(places, "dice");
+    const head = await git({ cwd: repo }, ["rev-parse", "HEAD"]);
+    const tip = await git({ cwd: repo }, ["rev-parse", goalBranch("dice")]);
+    expect(tip.stdout).toBe(head.stdout);
+    const checkedOut = await git({ cwd: folder }, ["branch", "--show-current"]);
+    expect(checkedOut.stdout.trim()).toBe("openplan/dice/main");
+    expect(await takenSlugs(places.repo)).toEqual(new Set(["dice"]));
+  });
+
+  it("checks the goal out again when its folder was deleted by hand", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    const folder = await openGoal(places, "dice");
+    await rm(folder, { recursive: true });
+    await openGoal(places, "dice");
+    const checkedOut = await git({ cwd: folder }, ["branch", "--show-current"]);
+    expect(checkedOut.stdout.trim()).toBe("openplan/dice/main");
+  });
+
+  it("leaves your checkout where it was", async () => {
+    await makeRepository();
+    await openGoal(await placesOf(), "dice");
+    const current = await git({ cwd: repo }, ["branch", "--show-current"]);
+    expect(current.stdout.trim()).toBe("main");
   });
 });
