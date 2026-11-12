@@ -69,9 +69,11 @@ export function expandEnv(env: Record<string, string>, from: Env): Record<string
 
 /**
  * The flag settings a member's sessions run under: the team's settings, the
- * member's environment, and the guards every member has. openplan is off in
- * them, so a member never starts a team of its own, and they take no message
- * from your sessions and send none.
+ * member's environment, and the guards every member has. Unless the team says
+ * otherwise, a member edits freely in its worktree (`acceptEdits`) and runs
+ * commands in Claude Code's sandbox, or unsandboxed with a warning where the
+ * system has none. openplan is off in them, so a member never starts a team
+ * of its own, and they take no message from your sessions and send none.
  */
 export function memberSettings(
   team: Settings,
@@ -81,10 +83,12 @@ export function memberSettings(
 ): Settings {
   return {
     ...team,
+    sandbox: { enabled: true, ...team.sandbox },
     env: { ...team.env, ...expandEnv(member.env, from) },
     enabledPlugins: { ...team.enabledPlugins, [plugin]: false },
     crossSessionInbound: "refuse",
     permissions: {
+      defaultMode: "acceptEdits",
       ...team.permissions,
       deny: [...(team.permissions?.deny ?? []), "SendMessage", "ListAgents"],
     },

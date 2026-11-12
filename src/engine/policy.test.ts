@@ -57,13 +57,28 @@ describe("memberSettings", () => {
       "openplan@openplan",
     );
     expect(settings).toEqual({
+      sandbox: { enabled: true },
       permissions: {
+        defaultMode: "acceptEdits",
         allow: ["Bash(pnpm test)"],
         deny: ["Bash(git push:*)", "SendMessage", "ListAgents"],
       },
       env: { CI: "1", ANTHROPIC_BASE_URL: "https://glm.example", ANTHROPIC_AUTH_TOKEN: "secret" },
       enabledPlugins: { "other@market": true, "openplan@openplan": false },
       crossSessionInbound: "refuse",
+    });
+  });
+
+  it("keeps the team's own permission mode and sandbox", () => {
+    const settings = memberSettings(
+      { permissions: { defaultMode: "default" }, sandbox: { enabled: false } },
+      glm,
+      { GLM_KEY: "secret" },
+      "openplan@openplan",
+    );
+    expect(settings).toMatchObject({
+      permissions: { defaultMode: "default" },
+      sandbox: { enabled: false },
     });
   });
 });

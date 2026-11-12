@@ -9243,10 +9243,12 @@ function expandEnv(env, from) {
 function memberSettings(team2, member, from, plugin) {
   return {
     ...team2,
+    sandbox: { enabled: true, ...team2.sandbox },
     env: { ...team2.env, ...expandEnv(member.env, from) },
     enabledPlugins: { ...team2.enabledPlugins, [plugin]: false },
     crossSessionInbound: "refuse",
     permissions: {
+      defaultMode: "acceptEdits",
       ...team2.permissions,
       deny: [...team2.permissions?.deny ?? [], "SendMessage", "ListAgents"]
     }
