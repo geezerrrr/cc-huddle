@@ -8,10 +8,13 @@ import {
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
-import { registerHooks } from "node:module";
+import * as nodeModule from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+if (!("registerHooks" in nodeModule))
+  throw new Error(`openplan needs Node.js 22.15 or later; this is ${process.version}`);
+var { registerHooks } = nodeModule;
 var INSTALL_TIMEOUT_MS = 5 * 6e4;
 var here = path.dirname(fileURLToPath(import.meta.url));
 var manifests = await Promise.all(

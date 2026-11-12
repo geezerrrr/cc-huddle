@@ -8,12 +8,17 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
-import { registerHooks } from "node:module";
+// Whole, so an older Node.js gets to say what it lacks.
+import * as nodeModule from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { running } from "../engine/running.ts";
 import { dataFolder } from "./data-folder.ts";
+
+if (!("registerHooks" in nodeModule))
+  throw new Error(`openplan needs Node.js 22.15 or later; this is ${process.version}`);
+const { registerHooks } = nodeModule;
 
 /** How long the first start may take to install the dependencies. */
 const INSTALL_TIMEOUT_MS = 5 * 60_000;
