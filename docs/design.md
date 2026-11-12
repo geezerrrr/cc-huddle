@@ -144,6 +144,8 @@ The flow is Crewloft's (its `team.md` §4): the host opens with the questions to
 
 A third failed review, a review that errors, a binary conflict and a git error each become a decision for you (§4.4) rather than a move.
 
+A running subtask's member has two tools beyond Claude Code's own, from an in-process MCP server given to its turn: `ask_teammate`, a question a teammate answers in a read-only session, and `deliver`, a summary and the files that are the result. A run is done only once it delivers. The Team tab follows its steps from its own `TodoWrite` calls.
+
 ### 4.4 Question
 
 | From | Event                   | To        |
