@@ -8836,8 +8836,7 @@ function claudeProcess() {
     }
   };
 }
-async function askOnce(params) {
-  const { prompt, options, schema, signal, listener = {} } = params;
+async function runTurn(prompt, options, signal, decode) {
   signal.throwIfAborted();
   const abortController = new AbortController();
   const stop = () => {
@@ -8845,38 +8844,16 @@ async function askOnce(params) {
   };
   signal.addEventListener("abort", stop, { once: true });
   const claude2 = claudeProcess();
-  let session = "";
-  const decode = turnDecoder({
-    ...listener,
-    session: (id, model) => {
-      session = id;
-      listener.session?.(id, model);
-    }
-  });
   const run2 = query({
     prompt,
-    options: {
-      ...options,
-      ...schema && { outputFormat: { type: "json_schema", schema } },
-      abortController,
-      spawnClaudeCodeProcess: claude2.spawn
-    }
+    options: { ...options, abortController, spawnClaudeCodeProcess: claude2.spawn }
   });
   try {
     for await (const message of run2) {
       const outcome = decode(message);
-      if (!outcome) continue;
-      if (!outcome.ok) throw new Error(outcome.error);
-      if (schema && outcome.structured === void 0)
-        throw new Error("The model answered in words instead of the result asked for");
-      return {
-        text: outcome.text,
-        structured: outcome.structured,
-        session,
-        tokens: outcome.tokens
-      };
+      if (outcome) return outcome;
     }
-    throw new Error("The session ended without a result");
+    return { ok: false, error: "The session ended without a result", tokens: 0 };
   } catch (error) {
     throw new Error(claude2.failure(error), { cause: error });
   } finally {
@@ -8884,6 +8861,26 @@ async function askOnce(params) {
     run2.close();
     await claude2.gone();
   }
+}
+async function askOnce(params) {
+  const { prompt, options, schema, signal, listener = {} } = params;
+  let session = "";
+  const outcome = await runTurn(
+    prompt,
+    { ...options, ...schema && { outputFormat: { type: "json_schema", schema } } },
+    signal,
+    turnDecoder({
+      ...listener,
+      session: (id, model) => {
+        session = id;
+        listener.session?.(id, model);
+      }
+    })
+  );
+  if (!outcome.ok) throw new Error(outcome.error);
+  if (schema && outcome.structured === void 0)
+    throw new Error("The model answered in words instead of the result asked for");
+  return { text: outcome.text, structured: outcome.structured, session, tokens: outcome.tokens };
 }
 
 // src/engine/meetings.ts
@@ -9527,7 +9524,6 @@ import { z as z4 } from "zod";
 // src/engine/run.ts
 import {
   createSdkMcpServer as createSdkMcpServer2,
-  query as query2,
   tool as tool2
 } from "@anthropic-ai/claude-agent-sdk";
 import { z as z3 } from "zod";
@@ -9583,44 +9579,22 @@ async function runSubtask(params) {
       request.agentID ? { behavior: "deny", message: SESSION_ONLY } : { behavior: "allow", updatedInput: input }
     );
   };
-  const turn = async (prompt) => {
-    const abortController = new AbortController();
-    const stop = () => {
-      abortController.abort();
-    };
-    signal.addEventListener("abort", stop, { once: true });
-    const claude2 = claudeProcess();
-    const run2 = query2({
-      prompt,
-      options: {
-        ...options,
-        ...session !== void 0 && { resume: session },
-        mcpServers: {
-          ...options.mcpServers,
-          [SERVER2]: teamServer(params.collaboration, (given) => handover = given)
-        },
-        canUseTool,
-        abortController,
-        spawnClaudeCodeProcess: claude2.spawn
-      }
-    });
-    try {
-      for await (const message of run2) {
-        const outcome = decode(message);
-        if (outcome) return outcome;
-      }
-      return { ok: false, error: "The session ended without a result", tokens: 0 };
-    } catch (error) {
-      throw new Error(claude2.failure(error), { cause: error });
-    } finally {
-      signal.removeEventListener("abort", stop);
-      run2.close();
-      await claude2.gone();
-    }
-  };
+  const turn = (prompt) => runTurn(
+    prompt,
+    {
+      ...options,
+      ...session !== void 0 && { resume: session },
+      mcpServers: {
+        ...options.mcpServers,
+        [SERVER2]: teamServer(params.collaboration, (given) => handover = given)
+      },
+      canUseTool
+    },
+    signal,
+    decode
+  );
   let tokens = 0;
   try {
-    signal.throwIfAborted();
     let outcome = await turn(params.opening);
     tokens += outcome.tokens;
     if (outcome.ok && !handover && !signal.aborted) {

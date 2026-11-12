@@ -5,7 +5,6 @@
  */
 import {
   createSdkMcpServer,
-  query,
   tool,
   type CanUseTool,
   type Options,
@@ -13,7 +12,7 @@ import {
 import { z } from "zod";
 import { errorText } from "./core.ts";
 import { DELIVER_REMINDER, SESSION_ONLY } from "./prompts.ts";
-import { claudeProcess, turnDecoder, type TurnListener, type TurnOutcome } from "./turns.ts";
+import { runTurn, turnDecoder, type TurnListener } from "./turns.ts";
 
 /** The in-process MCP server a run's turns have: its tools are `mcp__openplan__<name>`. */
 const SERVER = "openplan";
@@ -115,16 +114,10 @@ export async function runSubtask(params: {
   };
 
   /** One turn: the opening, or the reminder, in the run's session. */
-  const turn = async (prompt: string): Promise<TurnOutcome> => {
-    const abortController = new AbortController();
-    const stop = () => {
-      abortController.abort();
-    };
-    signal.addEventListener("abort", stop, { once: true });
-    const claude = claudeProcess();
-    const run = query({
+  const turn = (prompt: string) =>
+    runTurn(
       prompt,
-      options: {
+      {
         ...options,
         ...(session !== undefined && { resume: session }),
         mcpServers: {
@@ -132,28 +125,13 @@ export async function runSubtask(params: {
           [SERVER]: teamServer(params.collaboration, (given) => (handover = given)),
         },
         canUseTool,
-        abortController,
-        spawnClaudeCodeProcess: claude.spawn,
       },
-    });
-    try {
-      for await (const message of run) {
-        const outcome = decode(message);
-        if (outcome) return outcome;
-      }
-      return { ok: false, error: "The session ended without a result", tokens: 0 };
-    } catch (error) {
-      throw new Error(claude.failure(error), { cause: error });
-    } finally {
-      signal.removeEventListener("abort", stop);
-      run.close();
-      await claude.gone();
-    }
-  };
+      signal,
+      decode,
+    );
 
   let tokens = 0;
   try {
-    signal.throwIfAborted();
     let outcome = await turn(params.opening);
     tokens += outcome.tokens;
     if (outcome.ok && !handover && !signal.aborted) {

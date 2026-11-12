@@ -339,6 +339,45 @@ export function claudeProcess() {
   };
 }
 
+/**
+ * Runs one turn in a Claude Code of its own, `decode` reading its messages
+ * until one says how the turn ended. Stopped by `signal`, it waits until
+ * Claude Code has exited. Throws what went wrong around the turn (Claude Code
+ * couldn't start, or died), with the end of its stderr.
+ */
+export async function runTurn(
+  prompt: string,
+  options: Options,
+  signal: AbortSignal,
+  decode: (message: SDKMessage) => TurnOutcome | undefined,
+): Promise<TurnOutcome> {
+  signal.throwIfAborted();
+  const abortController = new AbortController();
+  // Removed again when the turn ends: the caller's signal outlives many turns.
+  const stop = () => {
+    abortController.abort();
+  };
+  signal.addEventListener("abort", stop, { once: true });
+  const claude = claudeProcess();
+  const run = query({
+    prompt,
+    options: { ...options, abortController, spawnClaudeCodeProcess: claude.spawn },
+  });
+  try {
+    for await (const message of run) {
+      const outcome = decode(message);
+      if (outcome) return outcome;
+    }
+    return { ok: false, error: "The session ended without a result", tokens: 0 };
+  } catch (error) {
+    throw new Error(claude.failure(error), { cause: error });
+  } finally {
+    signal.removeEventListener("abort", stop);
+    run.close();
+    await claude.gone();
+  }
+}
+
 /** What a turn run to its end gave: its words, its structured output if asked for, its session. */
 export interface Reply {
   text: string;
@@ -351,7 +390,7 @@ export interface Reply {
  * Runs one turn to its end (a meeting turn, a teammate's answer, a review)
  * and gives what it said, or throws why it failed. Given a `schema`, the turn
  * hands its result back in that shape, and one that answers in words instead
- * has failed too. Stopped by `signal`, it waits until Claude Code has exited.
+ * has failed too.
  */
 export async function askOnce(params: {
   prompt: string;
@@ -361,51 +400,21 @@ export async function askOnce(params: {
   listener?: TurnListener;
 }): Promise<Reply> {
   const { prompt, options, schema, signal, listener = {} } = params;
-  signal.throwIfAborted();
-  const abortController = new AbortController();
-  // Removed again when the turn ends: the caller's signal outlives many turns.
-  const stop = () => {
-    abortController.abort();
-  };
-  signal.addEventListener("abort", stop, { once: true });
-  const claude = claudeProcess();
   let session = "";
-  const decode = turnDecoder({
-    ...listener,
-    session: (id, model) => {
-      session = id;
-      listener.session?.(id, model);
-    },
-  });
-  const run = query({
+  const outcome = await runTurn(
     prompt,
-    options: {
-      ...options,
-      ...(schema && { outputFormat: { type: "json_schema", schema } }),
-      abortController,
-      spawnClaudeCodeProcess: claude.spawn,
-    },
-  });
-  try {
-    for await (const message of run) {
-      const outcome = decode(message);
-      if (!outcome) continue;
-      if (!outcome.ok) throw new Error(outcome.error);
-      if (schema && outcome.structured === undefined)
-        throw new Error("The model answered in words instead of the result asked for");
-      return {
-        text: outcome.text,
-        structured: outcome.structured,
-        session,
-        tokens: outcome.tokens,
-      };
-    }
-    throw new Error("The session ended without a result");
-  } catch (error) {
-    throw new Error(claude.failure(error), { cause: error });
-  } finally {
-    signal.removeEventListener("abort", stop);
-    run.close();
-    await claude.gone();
-  }
+    { ...options, ...(schema && { outputFormat: { type: "json_schema", schema } }) },
+    signal,
+    turnDecoder({
+      ...listener,
+      session: (id, model) => {
+        session = id;
+        listener.session?.(id, model);
+      },
+    }),
+  );
+  if (!outcome.ok) throw new Error(outcome.error);
+  if (schema && outcome.structured === undefined)
+    throw new Error("The model answered in words instead of the result asked for");
+  return { text: outcome.text, structured: outcome.structured, session, tokens: outcome.tokens };
 }
