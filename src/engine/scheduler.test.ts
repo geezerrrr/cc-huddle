@@ -97,6 +97,16 @@ const delivering =
     return { status: "delivered", handover: { summary: "Done.", files: checked.files }, tokens: 3 };
   };
 
+/** A run that goes on until it is stopped, as runSubtask does: at once, when stopped before it began. */
+const working = (run: Run) =>
+  new Promise<RunOutcome>((resolve) => {
+    const stopped = () => {
+      resolve({ status: "stopped", tokens: 0 });
+    };
+    if (run.signal.aborted) stopped();
+    else run.signal.addEventListener("abort", stopped);
+  });
+
 const settled = (s: Subtask, status: Subtask["status"]) =>
   vi.waitFor(() => {
     expect(s.status).toBe(status);
@@ -151,6 +161,43 @@ describe("Scheduler", () => {
     expect(vi.mocked(runSubtask).mock.lastCall?.[0].opening).toContain(
       "- Make s1, by glm: Done. Files: rules.txt",
     );
+  });
+
+  it("takes new work as tasks and pending subtasks, their dependencies by key", () => {
+    vi.mocked(runSubtask).mockImplementation(working);
+    const planned = (key: string, assignee: string, dependsOn: string[] = []) => ({
+      key,
+      title: key,
+      description: "",
+      assignee,
+      dependsOn,
+      acceptance: "",
+    });
+    const [rules, board, score] = scheduler.assign(
+      "g1",
+      [
+        {
+          title: "Game",
+          outcome: "Playable",
+          subtasks: [planned("a", "glm"), planned("b", "sonnet", ["a"])],
+        },
+        { title: "Score", outcome: "", subtasks: [planned("c", "sonnet", ["b"])] },
+      ],
+      "m1",
+    );
+    expect(core.state.tasks.slice(1)).toMatchObject([
+      { goalId: "g1", title: "Game", outcome: "Playable", meetingId: "m1" },
+      { goalId: "g1", title: "Score" },
+    ]);
+    expect(board?.dependsOn).toEqual([rules?.id]);
+    expect(score?.dependsOn).toEqual([board?.id]);
+    expect(score?.taskId).toBe(core.state.tasks[2]?.id);
+    // Nothing waits on the first, so it starts at once.
+    expect([rules?.status, board?.status, score?.status]).toEqual([
+      "running",
+      "pending",
+      "pending",
+    ]);
   });
 
   it("gives a subtask from a plan the plan's document in its brief", async () => {
@@ -313,13 +360,6 @@ describe("Scheduler", () => {
   });
 
   describe("your actions", () => {
-    /** A run that goes on until it is stopped. */
-    const working = (run: Run) =>
-      new Promise<RunOutcome>((resolve) => {
-        run.signal.addEventListener("abort", () => {
-          resolve({ status: "stopped", tokens: 0 });
-        });
-      });
     const runs = () => vi.mocked(runSubtask).mock.calls.map(([run]) => run);
 
     it("stop a run, which then goes on in its session", async () => {
@@ -482,12 +522,6 @@ describe("Scheduler", () => {
   });
 
   describe("work on hold", () => {
-    const working = (run: Run) =>
-      new Promise<RunOutcome>((resolve) => {
-        run.signal.addEventListener("abort", () => {
-          resolve({ status: "stopped", tokens: 0 });
-        });
-      });
     const runs = () => vi.mocked(runSubtask).mock.calls.map(([run]) => run);
     const started = (n: number) =>
       vi.waitFor(() => {

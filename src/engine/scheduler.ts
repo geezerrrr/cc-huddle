@@ -5,6 +5,7 @@
  * has what is delivered reviewed when review is on, and merges it into the
  * goal's branch, one merge at a time per goal.
  */
+import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
@@ -38,6 +39,7 @@ import type {
   Goal,
   GoOn,
   Member,
+  PlanTask,
   Progress,
   Question,
   Subtask,
@@ -116,6 +118,49 @@ export class Scheduler {
       this.move(subtask, "hold");
       if (subtask.session) goOnWith(subtask, { why: "held" });
     }
+  }
+
+  /**
+   * Gives a goal new work: tasks, each with its subtasks, their dependencies
+   * by the keys they have in `tasks`. They wait as pending until they can
+   * start. `meetingId`: the meeting whose plan they come from.
+   */
+  assign(goalId: string, tasks: readonly PlanTask[], meetingId?: string): Subtask[] {
+    const { state } = this.core;
+    const now = Date.now();
+    const ids = new Map<string, string>();
+    const added = tasks.flatMap(({ title, outcome, subtasks }) => {
+      const task: Task = {
+        id: randomUUID(),
+        goalId,
+        title,
+        outcome,
+        createdAt: now,
+        ...(meetingId !== undefined && { meetingId }),
+      };
+      state.tasks.push(task);
+      return subtasks.map(({ key, ...planned }): Subtask => {
+        const id = randomUUID();
+        ids.set(key, id);
+        return {
+          ...planned,
+          id,
+          taskId: task.id,
+          goalId,
+          status: "pending",
+          createdAt: now,
+          progress: { done: 0, total: 0 },
+          tokens: 0,
+        };
+      });
+    });
+    // Keys become ids once every subtask has one.
+    for (const subtask of added)
+      subtask.dependsOn = subtask.dependsOn.flatMap((k) => ids.get(k) ?? []);
+    state.subtasks.push(...added);
+    this.core.changed();
+    this.pump();
+    return added;
   }
 
   /**
