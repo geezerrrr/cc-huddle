@@ -52,13 +52,14 @@ describe("systemPrompt", () => {
 });
 
 describe("taskBrief", () => {
-  it("gives the work, where to do it, what it builds on, and your words for it", () => {
+  it("gives the work, where to do it, its plan, what it builds on, and your words for it", () => {
     const brief = taskBrief({
       goal: { id: "g1", name: "Dice game", slug: "dice-game", status: "active", createdAt: 0 },
       task: { id: "t1", goalId: "g1", title: "Board", outcome: "A board to roll on", createdAt: 0 },
       subtask: subtask("Scoreboard", { acceptance: "Shows both scores" }),
       cwd: "/desks/s2",
       branch: "openplan/dice-game/s2",
+      plan: "# Dice game\n\nTwo players.",
       upstream: [
         {
           subtask: subtask("Rules", { delivery: { summary: "Done.", files: ["rules.ts"], at: 0 } }),
@@ -83,6 +84,12 @@ Your subtask: Scoreboard
 Acceptance criteria: Shows both scores
 
 Your worktree is /desks/s2, on branch openplan/dice-game/s2.
+
+The plan your team agreed on, which this subtask is part of:
+
+# Dice game
+
+Two players.
 
 It builds on this work, merged into the goal's branch:
 - Rules, by sonnet: Done. Files: rules.ts

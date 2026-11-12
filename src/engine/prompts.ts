@@ -41,9 +41,10 @@ export interface Upstream {
 
 /**
  * The first message of a subtask's run: the goal, the task, the subtask,
- * where to work, what came from upstream, and your words for it from before
- * it had a session to go on in (`notes`: you added to it, or sent its task
- * back).
+ * where to work, the plan it is part of (the approved plan's document, when
+ * it came from one), what came from upstream, and your words for it from
+ * before it had a session to go on in (`notes`: you added to it, or sent its
+ * task back).
  */
 export function taskBrief(input: {
   goal: Goal;
@@ -51,6 +52,7 @@ export function taskBrief(input: {
   subtask: Subtask;
   cwd: string;
   branch: string;
+  plan?: string;
   upstream: readonly Upstream[];
   notes: readonly GoOn[];
 }): string {
@@ -65,6 +67,8 @@ export function taskBrief(input: {
     "",
     `Your worktree is ${input.cwd}, on branch ${input.branch}.`,
   ];
+  if (input.plan)
+    lines.push("", "The plan your team agreed on, which this subtask is part of:", "", input.plan);
   const delivered = (s: Subtask) =>
     `- ${s.title}, by ${s.assignee}: ${s.delivery?.summary ?? ""}${s.delivery?.files.length ? ` Files: ${s.delivery.files.join(", ")}` : ""}`;
   const direct = input.upstream.filter((u) => u.direct).map((u) => delivered(u.subtask));

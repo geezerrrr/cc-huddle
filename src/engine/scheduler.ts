@@ -371,6 +371,11 @@ export class Scheduler {
     return task;
   }
 
+  /** The document of the approved plan a task came from, if it came from one. */
+  private planOf(task: Task): string | undefined {
+    return this.core.state.meetings.find((m) => m.id === task.meetingId)?.plan?.markdown;
+  }
+
   /** A member by name: one taken off the team since can't work or review. */
   private memberOf(name: string): Member {
     const member = this.core.team.members.find((m) => m.name === name);
@@ -433,6 +438,7 @@ export class Scheduler {
     try {
       const member = this.memberOf(subtask.assignee);
       const goal = this.goalOf(subtask);
+      const task = this.taskOf(subtask);
       const desk = await openDesk(core.places, goal.slug, subtask.id);
       const recorder = core.recorder(subtask);
       outcome = await runSubtask({
@@ -441,10 +447,11 @@ export class Scheduler {
           ? goOnMessage(goOn, subtask)
           : taskBrief({
               goal,
-              task: this.taskOf(subtask),
+              task,
               subtask,
               cwd: desk,
               branch: subtaskBranch(goal.slug, subtask.id),
+              plan: this.planOf(task),
               upstream: this.upstreamOf(subtask),
               notes,
             }),

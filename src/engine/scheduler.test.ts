@@ -153,6 +153,31 @@ describe("Scheduler", () => {
     );
   });
 
+  it("gives a subtask from a plan the plan's document in its brief", async () => {
+    core.state.meetings.push({
+      id: "m1",
+      goalId: "g1",
+      agenda: "A dice game",
+      size: "small",
+      participants: ["glm"],
+      host: "glm",
+      status: "approved",
+      turns: [],
+      plan: { summary: "Dice", markdown: "# Dice\n\nTwo players.", tasks: [] },
+      tokens: 0,
+      createdAt: 0,
+    });
+    core.state.tasks = [
+      { id: "t1", goalId: "g1", title: "Board", outcome: "", createdAt: 0, meetingId: "m1" },
+    ];
+    const s1 = subtask("s1");
+    core.state.subtasks.push(s1);
+    vi.mocked(runSubtask).mockImplementation(delivering({ "rules.txt": "roll\n" }));
+    scheduler.pump();
+    await settled(s1, "done");
+    expect(vi.mocked(runSubtask).mock.lastCall?.[0].opening).toContain("# Dice\n\nTwo players.");
+  });
+
   it("fails a run with its error, and refuses files not in the worktree", async () => {
     const s1 = subtask("s1");
     core.state.subtasks.push(s1);
