@@ -94,7 +94,7 @@ export class Engine {
           writer.changed();
         },
         allowAlways: (rules) => engine.allow(rules),
-        options: (member, kind, cwd) => Promise.resolve(engine.turnOptions(member, kind, cwd)),
+        options: (member, kind, cwd) => engine.turnOptions(member, kind, cwd),
         recorder: (subtask) => records.recorder(subtask.id),
         speech: (meeting, speaker) => records.speech(meeting, speaker),
       };

@@ -26,8 +26,7 @@ export interface Member {
   env: Record<string, string>;
 }
 
-export const GOAL_STATUSES = ["active", "paused", "archived"] as const;
-export type GoalStatus = (typeof GOAL_STATUSES)[number];
+export type GoalStatus = "active" | "paused" | "archived";
 
 /** One goal, on a branch of its own cut from your HEAD when it started (§5). */
 export interface Goal {
@@ -53,16 +52,8 @@ export interface Task {
   meetingId?: string;
 }
 
-export const SUBTASK_STATUSES = [
-  "pending",
-  "running",
-  "reviewing",
-  "merging",
-  "done",
-  "failed",
-  "stopped",
-] as const;
-export type SubtaskStatus = (typeof SUBTASK_STATUSES)[number];
+export type SubtaskStatus =
+  "pending" | "running" | "reviewing" | "merging" | "done" | "failed" | "stopped";
 
 /** Failed or stopped: it waits for you to go on or retry. */
 export const isHalted = (status: SubtaskStatus) => status === "failed" || status === "stopped";
@@ -152,8 +143,7 @@ export interface Plan {
 export const MEETING_SIZES = ["small", "discussion", "large"] as const;
 export type MeetingSize = (typeof MEETING_SIZES)[number];
 
-export const MEETING_STATUSES = ["running", "review", "approved", "cancelled", "failed"] as const;
-export type MeetingStatus = (typeof MEETING_STATUSES)[number];
+export type MeetingStatus = "running" | "review" | "approved" | "cancelled" | "failed";
 
 export interface MeetingTurn {
   speaker: string;

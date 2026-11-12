@@ -490,7 +490,7 @@ export class Scheduler {
       const desk = await openDesk(core.places, goal.slug, subtask.id);
       const recorder = core.recorder(subtask);
       outcome = await runSubtask({
-        options: await core.options(member, "task", desk),
+        options: core.options(member, "task", desk),
         opening: goOn
           ? goOnMessage(goOn, subtask)
           : taskBrief({
@@ -600,7 +600,7 @@ export class Scheduler {
                 (s) => s.goalId === subtask.goalId && s.assignee === target.name,
               ),
             }),
-            options: await core.options(
+            options: core.options(
               target,
               "answer",
               await openGoal(core.places, this.goalOf(subtask).slug),
@@ -670,7 +670,7 @@ export class Scheduler {
           delivery,
           cwd: desk,
         }),
-        options: await core.options(reviewer, "review", desk),
+        options: core.options(reviewer, "review", desk),
         schema: VERDICT,
         signal: abort.signal,
       });

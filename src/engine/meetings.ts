@@ -53,7 +53,7 @@ import type {
 } from "./types.ts";
 
 /** How many times each attendee but the host may have the floor in the discussion. */
-export const MEETING_TURNS_EACH: Record<MeetingSize, number> = {
+const MEETING_TURNS_EACH: Record<MeetingSize, number> = {
   small: 1,
   discussion: 2,
   large: 4,
@@ -348,7 +348,7 @@ export class Meetings {
       } = {},
     ): Promise<Reply> => {
       const heard = turn.heard ?? meeting.turns.length;
-      const options = await core.options(member, "meeting", ctx.cwd);
+      const options = core.options(member, "meeting", ctx.cwd);
       const seat = meeting.seats?.[member.name];
       const reply = await askOnce({
         prompt,

@@ -31,7 +31,7 @@ const SESSION_VARS = [
 ];
 
 /** Built-in tools a read-only session has: meetings, answers to teammates, reviews. */
-export const READ_ONLY_TOOLS = ["Read", "Glob", "Grep", "WebSearch", "WebFetch"];
+const READ_ONLY_TOOLS = ["Read", "Glob", "Grep", "WebSearch", "WebFetch"];
 
 /**
  * Fills in `${VAR}` and `${VAR:-default}` from `from`, as `.mcp.json` does.
@@ -104,8 +104,6 @@ export interface Seat {
   cwd: string;
   /** Their settings file (writeSettings). */
   settings: string;
-  /** The session to go on in; a new one when absent. */
-  session?: string;
   /** Appended to Claude Code's own system prompt. */
   system: string;
 }
@@ -125,7 +123,6 @@ export function workOptions(seat: Seat, from: Env): Options {
     cwd: seat.cwd,
     model: member.model,
     effort: member.effort,
-    resume: seat.session,
     settings: seat.settings,
     env: { ...env, ...authorEnv(memberSigner(member.name)) },
     systemPrompt: { type: "preset", preset: "claude_code", append: seat.system },

@@ -106,12 +106,11 @@ describe("session options", () => {
   };
 
   it("starts a member as a session of its own, under its name", () => {
-    const options = workOptions({ ...seat, session: "s1" }, from);
+    const options = workOptions(seat, from);
     expect(options).toMatchObject({
       cwd: "/desk",
       model: "glm-5.3-flashx",
       effort: "max",
-      resume: "s1",
       settings: "/data/glm.json",
       systemPrompt: { type: "preset", preset: "claude_code", append: "Your duties" },
       extraArgs: { name: "openplan-glm" },

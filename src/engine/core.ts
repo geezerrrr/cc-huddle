@@ -23,7 +23,7 @@ export interface Core extends Inbox {
   team: Team;
   places: Places;
   /** The Agent SDK options of a member's turn of `kind` in `cwd`: their settings and system prompt. */
-  options(member: Member, kind: SessionKind, cwd: string): Promise<Options>;
+  options(member: Member, kind: SessionKind, cwd: string): Options;
   /** Where what a subtask's runs do is told: its record and the pane. */
   recorder(subtask: Subtask): TurnListener;
   /** Where what is said at a meeting is told as it is said: the pane. */

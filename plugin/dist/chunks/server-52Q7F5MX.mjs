@@ -8601,7 +8601,6 @@ function resultOutcome(message, subagentTokens = 0) {
       ok: true,
       text: message.result,
       structured: message.structured_output,
-      turns: message.num_turns,
       tokens
     };
   const error = message.subtype === "success" ? message.result : message.subtype === "error_max_turns" ? `Stopped after ${String(message.num_turns)} turns, the most it may take` : message.subtype === "error_max_budget_usd" ? "Stopped at its spending limit" : message.subtype === "error_max_structured_output_retries" ? "The model didn't hand back a result in the shape asked for" : message.errors.join("\n");
@@ -9069,7 +9068,7 @@ var Meetings = class {
     let ctx = { meeting: meeting2, goal: goal2, attendees: [host, ...others], cwd: "" };
     const ask = async (member, prompt, turn = {}) => {
       const heard = turn.heard ?? meeting2.turns.length;
-      const options = await core.options(member, "meeting", ctx.cwd);
+      const options = core.options(member, "meeting", ctx.cwd);
       const seat = meeting2.seats?.[member.name];
       const reply = await askOnce({
         prompt,
@@ -9265,7 +9264,6 @@ function workOptions(seat, from) {
     cwd: seat.cwd,
     model: member.model,
     effort: member.effort,
-    resume: seat.session,
     settings: seat.settings,
     env: { ...env, ...authorEnv(memberSigner(member.name)) },
     systemPrompt: { type: "preset", preset: "claude_code", append: seat.system },
@@ -9977,7 +9975,7 @@ var Scheduler = class {
       const desk = await openDesk(core.places, goal2.slug, subtask2.id);
       const recorder = core.recorder(subtask2);
       outcome = await runSubtask({
-        options: await core.options(member, "task", desk),
+        options: core.options(member, "task", desk),
         opening: goOn ? goOnMessage(goOn, subtask2) : taskBrief({
           goal: goal2,
           task,
@@ -10071,7 +10069,7 @@ ${outcome.handover.summary}`
               (s) => s.goalId === subtask2.goalId && s.assignee === target.name
             )
           }),
-          options: await core.options(
+          options: core.options(
             target,
             "answer",
             await openGoal(core.places, this.goalOf(subtask2).slug)
@@ -10135,7 +10133,7 @@ ${outcome.handover.summary}`
           delivery,
           cwd: desk
         }),
-        options: await core.options(reviewer, "review", desk),
+        options: core.options(reviewer, "review", desk),
         schema: VERDICT,
         signal: abort.signal
       });
@@ -10398,7 +10396,7 @@ var Engine = class _Engine {
           writer.changed();
         },
         allowAlways: (rules) => engine2.allow(rules),
-        options: (member, kind, cwd) => Promise.resolve(engine2.turnOptions(member, kind, cwd)),
+        options: (member, kind, cwd) => engine2.turnOptions(member, kind, cwd),
         recorder: (subtask2) => records.recorder(subtask2.id),
         speech: (meeting2, speaker) => records.speech(meeting2, speaker)
       };

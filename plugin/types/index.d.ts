@@ -45,7 +45,7 @@ export type OpenplanMember = {
 export type OpenplanNeed = {
   id: string;
   from: string;
-  /** What it is about: the subtask's title, or the goal. */
+  /** What it is about: its subtask's title; empty for none. */
   about: string;
   text: string;
 } & (

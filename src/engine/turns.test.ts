@@ -21,7 +21,6 @@ describe("resultOutcome", () => {
       ok: true,
       text: "done",
       structured: undefined,
-      turns: 3,
       tokens: 100,
     });
   });

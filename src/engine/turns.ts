@@ -26,7 +26,7 @@ export const toolText = (text: string) => ({ content: [{ type: "text" as const, 
 
 /** How a turn ended: its final text, or why it failed, and the tokens it used. */
 export type TurnOutcome = (
-  { ok: true; text: string; structured?: unknown; turns: number } | { ok: false; error: string }
+  { ok: true; text: string; structured?: unknown } | { ok: false; error: string }
 ) & { tokens: number };
 
 /** All the tokens a usage counts: read fresh, read from the cache, written to it, and written out. */
@@ -49,7 +49,6 @@ export function resultOutcome(message: SDKResultMessage, subagentTokens = 0): Tu
       ok: true,
       text: message.result,
       structured: message.structured_output,
-      turns: message.num_turns,
       tokens,
     };
   const error =

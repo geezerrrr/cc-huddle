@@ -69,7 +69,7 @@ beforeEach(async () => {
     places: { repo: await openRepository(repo), root: path.join(dir, "data") },
     changed: vi.fn(),
     allowAlways: vi.fn(),
-    options: () => Promise.resolve({}),
+    options: () => ({}),
     recorder: () => ({}),
     speech: () => ({}),
   };
