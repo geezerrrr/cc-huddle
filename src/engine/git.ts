@@ -417,3 +417,29 @@ export function abortMerge(places: Places, slug: string, subtaskId: string): Pro
     if (await merging(desk)) await git(desk, ["merge", "--abort"]);
   });
 }
+
+/** Throws a subtask's worktree away with its branch: it starts over, or its goal is deleted. */
+export function dropDesk(places: Places, slug: string, subtaskId: string): Promise<void> {
+  return perGoal(places, slug, () => removeDesk(places, slug, subtaskId));
+}
+
+/**
+ * Takes a deleted goal out of the repository: its subtasks' worktrees and
+ * branches and its own worktree. Its branch stays, yours to merge or delete.
+ */
+export function removeGoal(places: Places, slug: string): Promise<void> {
+  return perGoal(places, slug, async () => {
+    const { repo } = places;
+    const refs = await git({ cwd: repo.top }, [
+      "for-each-ref",
+      "--format=%(refname:lstrip=4)",
+      `refs/heads/openplan/${slug}/`,
+    ]);
+    for (const id of refs.stdout.split("\n")) {
+      if (id && id !== "main") await removeDesk(places, slug, id);
+    }
+    const folder = goalFolder(places, slug);
+    await unlist(repo, folder);
+    await rm(folder, { recursive: true, force: true });
+  });
+}

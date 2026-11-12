@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   abortMerge,
   commitDesk,
+  dropDesk,
   git,
   GitError,
   goalBranch,
@@ -15,6 +16,7 @@ import {
   openGoal,
   openRepository,
   pickSide,
+  removeGoal,
   slugFor,
   subtaskBranch,
   takenSlugs,
@@ -305,5 +307,35 @@ describe("mergeDesk", () => {
     const status = await git({ cwd: repo }, ["status", "--porcelain"]);
     const current = await git({ cwd: repo }, ["branch", "--show-current"]);
     expect([status.stdout, current.stdout.trim()]).toEqual(["", "main"]);
+  });
+});
+
+describe("removing", () => {
+  const placesOf = async () => ({ repo: await openRepository(repo), root: path.join(dir, "data") });
+  const branches = () =>
+    git({ cwd: repo }, ["branch", "--list", "--format=%(refname:short)", "openplan/*"]).then((r) =>
+      r.stdout.split("\n").filter(Boolean),
+    );
+
+  it("drops a subtask's worktree and branch so it can start over", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    const desk = await openDesk(places, "dice", "s1");
+    await writeFile(path.join(desk, "half.ts"), "half\n");
+    await dropDesk(places, "dice", "s1");
+    expect(await branches()).toEqual(["openplan/dice/main"]);
+    await openDesk(places, "dice", "s1");
+    await expect(readFile(path.join(desk, "half.ts"))).rejects.toThrow();
+  });
+
+  it("removes a goal's worktrees and subtask branches and keeps its branch", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    await openDesk(places, "dice", "s1");
+    await openDesk(places, "dice", "s2");
+    await removeGoal(places, "dice");
+    expect(await branches()).toEqual(["openplan/dice/main"]);
+    const worktrees = await git({ cwd: repo }, ["worktree", "list", "--porcelain"]);
+    expect(worktrees.stdout.match(/^worktree /gm)).toHaveLength(1);
   });
 });
