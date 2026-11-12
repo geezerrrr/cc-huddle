@@ -1,0 +1,38 @@
+name: Bug report
+description: Something openplan does wrong
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: Where the team stood
+      description: The output of `/openplan status`, if the team was open.
+      render: text
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: openplan (`/plugin`), Claude Code (`claude --version`) and Node.js (`node --version`).
+      placeholder: openplan 0.1.0, Claude Code 2.1.322, Node.js 24.21.0
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Operating system
+      placeholder: macOS 26.1
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Debug log
+      description: Lines from `claude --debug` that mention openplan. Check them for keys before you paste.
+      render: text
