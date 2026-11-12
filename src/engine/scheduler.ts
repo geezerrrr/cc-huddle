@@ -48,7 +48,6 @@ import type {
 
 /** A reviewer's verdict on a delivery. */
 const verdictSchema = z.object({ pass: z.boolean(), notes: z.string().trim() });
-const VERDICT = z.toJSONSchema(verdictSchema);
 
 /** Sent back this many times, a delivery is yours to decide on. */
 const REVIEW_ROUNDS = 3;
@@ -675,7 +674,7 @@ export class Scheduler {
           cwd: desk,
         }),
         options: core.options(reviewer, "review", desk),
-        schema: VERDICT,
+        schema: verdictSchema,
         signal: abort.signal,
       });
       subtask.tokens += reply.tokens;

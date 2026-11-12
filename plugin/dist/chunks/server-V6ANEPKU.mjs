@@ -8123,7 +8123,7 @@ import {
   createSdkMcpServer,
   tool
 } from "@anthropic-ai/claude-agent-sdk";
-import { z as z2 } from "zod";
+import { z as z3 } from "zod";
 
 // src/engine/types.ts
 var isHalted = (status) => status === "failed" || status === "stopped";
@@ -8559,6 +8559,7 @@ import { spawn as spawn2 } from "node:child_process";
 import {
   query
 } from "@anthropic-ai/claude-agent-sdk";
+import { z as z2 } from "zod";
 
 // src/engine/processes.ts
 import { execFile } from "node:child_process";
@@ -8865,7 +8866,15 @@ async function askOnce(params) {
   let session = "";
   const outcome = await runTurn(
     prompt,
-    { ...options, ...schema && { outputFormat: { type: "json_schema", schema } } },
+    {
+      ...options,
+      ...schema && {
+        outputFormat: {
+          type: "json_schema",
+          schema: z2.toJSONSchema(schema, { target: "draft-7" })
+        }
+      }
+    },
     signal,
     turnDecoder({
       ...listener,
@@ -8896,8 +8905,8 @@ var handTool = (raise) => turnTool(
     "raise_hand",
     MEETING_TOOLS.raiseHand.what,
     {
-      point: z2.string().trim().min(1).describe(MEETING_TOOLS.raiseHand.point),
-      to: z2.string().trim().optional().describe(MEETING_TOOLS.raiseHand.to)
+      point: z3.string().trim().min(1).describe(MEETING_TOOLS.raiseHand.point),
+      to: z3.string().trim().optional().describe(MEETING_TOOLS.raiseHand.to)
     },
     ({ point, to }) => {
       raise({ point, ...to && { to } });
@@ -8910,8 +8919,8 @@ var floorTool = (others, give) => turnTool(
     "give_floor",
     MEETING_TOOLS.giveFloor.what,
     {
-      member: z2.enum(others.map((m) => m.name)).describe(MEETING_TOOLS.giveFloor.member),
-      quiet: z2.boolean().optional().describe(MEETING_TOOLS.giveFloor.quiet)
+      member: z3.enum(others.map((m) => m.name)).describe(MEETING_TOOLS.giveFloor.member),
+      quiet: z3.boolean().optional().describe(MEETING_TOOLS.giveFloor.quiet)
     },
     (floor) => {
       give(floor);
@@ -9215,7 +9224,7 @@ var Meetings = class {
       meeting2.hands = void 0;
       const names = ctx.attendees.map((m) => m.name);
       const closing = await speak(host, meetingClosing(ctx), {
-        schema: z2.toJSONSchema(hostPlanSchema(names))
+        schema: hostPlanSchema(names)
       });
       signal.throwIfAborted();
       meeting2.plan = parsePlan(closing.structured, names);
@@ -9526,14 +9535,14 @@ var Questions = class {
 import { randomUUID as randomUUID4 } from "node:crypto";
 import { stat as stat2 } from "node:fs/promises";
 import path6 from "node:path";
-import { z as z4 } from "zod";
+import { z as z5 } from "zod";
 
 // src/engine/run.ts
 import {
   createSdkMcpServer as createSdkMcpServer2,
   tool as tool2
 } from "@anthropic-ai/claude-agent-sdk";
-import { z as z3 } from "zod";
+import { z as z4 } from "zod";
 var OWN_TOOLS = /* @__PURE__ */ new Set([turnToolName("ask_teammate"), turnToolName("deliver")]);
 function teamServer(collaboration, delivered) {
   return createSdkMcpServer2({
@@ -9543,8 +9552,8 @@ function teamServer(collaboration, delivered) {
         "ask_teammate",
         "Asks a teammate a question and waits for the answer. Use it only when you need their information or decision.",
         {
-          teammate: z3.string().describe("The teammate's name"),
-          question: z3.string().describe("The question, with the context they need")
+          teammate: z4.string().describe("The teammate's name"),
+          question: z4.string().describe("The question, with the context they need")
         },
         async ({ teammate, question }) => toolText(await collaboration.askTeammate(teammate, question))
       ),
@@ -9552,8 +9561,8 @@ function teamServer(collaboration, delivered) {
         "deliver",
         "Hands over your finished work: your subtask is done only once you call it. Then end your turn. If you deliver again, the last delivery counts.",
         {
-          summary: z3.string().trim().min(1).describe("A few sentences: what you did, and anything to watch out for"),
-          files: z3.array(z3.string()).describe(
+          summary: z4.string().trim().min(1).describe("A few sentences: what you did, and anything to watch out for"),
+          files: z4.array(z4.string()).describe(
             "The files that are the result, as paths in your worktree (not scratch files); empty when the result is the summary itself"
           )
         },
@@ -9621,8 +9630,7 @@ async function runSubtask(params) {
 }
 
 // src/engine/scheduler.ts
-var verdictSchema = z4.object({ pass: z4.boolean(), notes: z4.string().trim() });
-var VERDICT = z4.toJSONSchema(verdictSchema);
+var verdictSchema = z5.object({ pass: z5.boolean(), notes: z5.string().trim() });
 var REVIEW_ROUNDS = 3;
 var REVIEW_CALLS = ["rereview", "skip", "sendBack"];
 var SIDE_CALLS = ["ours", "theirs", "retry"];
@@ -10173,7 +10181,7 @@ ${outcome.handover.summary}`
           cwd: desk
         }),
         options: core.options(reviewer, "review", desk),
-        schema: VERDICT,
+        schema: verdictSchema,
         signal: abort.signal
       });
       subtask2.tokens += reply.tokens;
@@ -10268,27 +10276,27 @@ var import_yaml = __toESM(require_dist(), 1);
 import { readdir as readdir2, readFile as readFile4 } from "node:fs/promises";
 import { homedir } from "node:os";
 import path7 from "node:path";
-import { z as z5 } from "zod";
+import { z as z6 } from "zod";
 var teamFolder = (top) => path7.join(top, ".claude", "openplan");
 var userTeamFolder = (env) => path7.join(env.CLAUDE_CONFIG_DIR ?? path7.join(homedir(), ".claude"), "openplan");
 var EFFORTS = ["low", "medium", "high", "xhigh", "max"];
-var roleSchema = z5.object({ title: z5.string().trim().min(1) });
-var memberSchema = z5.object({
-  role: z5.string().trim().min(1),
-  model: z5.string().trim().min(1).optional(),
-  effort: z5.enum(EFFORTS).optional(),
+var roleSchema = z6.object({ title: z6.string().trim().min(1) });
+var memberSchema = z6.object({
+  role: z6.string().trim().min(1),
+  model: z6.string().trim().min(1).optional(),
+  effort: z6.enum(EFFORTS).optional(),
   // As in `.mcp.json`, though YAML reads `API_TIMEOUT_MS: 3000000` as a number.
-  env: z5.record(z5.string(), z5.union([z5.string(), z5.number(), z5.boolean()]).transform(String)).default({})
+  env: z6.record(z6.string(), z6.union([z6.string(), z6.number(), z6.boolean()]).transform(String)).default({})
 });
-var teamSchema = z5.object({
-  review: z5.boolean().optional(),
-  meetingSize: z5.enum(MEETING_SIZES).optional()
+var teamSchema = z6.object({
+  review: z6.boolean().optional(),
+  meetingSize: z6.enum(MEETING_SIZES).optional()
 });
-var settingsSchema = z5.record(z5.string(), z5.unknown());
+var settingsSchema = z6.record(z6.string(), z6.unknown());
 function parsed(schema, data, file) {
   const result = schema.safeParse(data);
   if (!result.success) throw new Error(`${file}:
-${z5.prettifyError(result.error)}`);
+${z6.prettifyError(result.error)}`);
   return result.data;
 }
 var missing = (error) => error.code === "ENOENT";
@@ -10394,7 +10402,7 @@ function allowInTeam(top, rules) {
   return writing(file, async () => {
     const settings = parsed(settingsSchema, await jsonFile(file) ?? {}, file);
     const permissions = parsed(
-      z5.looseObject({ allow: z5.array(z5.string()).default([]) }),
+      z6.looseObject({ allow: z6.array(z6.string()).default([]) }),
       settings.permissions ?? {},
       file
     );
@@ -10617,7 +10625,7 @@ import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import path9 from "node:path";
 import { text } from "node:stream/consumers";
-import { z as z6 } from "zod";
+import { z as z7 } from "zod";
 
 // src/plugin/status.ts
 var MEETING_STATUS = {
@@ -10894,11 +10902,11 @@ function paneTeam(work, members) {
 }
 
 // src/plugin/pane-server.ts
-var viewSchema = z6.object({
+var viewSchema = z7.object({
   /** The revision the pane has. */
-  revision: z6.number().int().optional(),
+  revision: z7.number().int().optional(),
   /** The subtask whose record the pane follows, and the byte it read up to. */
-  record: z6.object({ subtask: z6.string(), from: z6.number().int().min(0) }).optional()
+  record: z7.object({ subtask: z7.string(), from: z7.number().int().min(0) }).optional()
 });
 async function paneView(engine2, { revision, record: record2 }) {
   const work = workOf(engine2);
@@ -10955,10 +10963,10 @@ async function servePane(team2) {
 }
 
 // src/plugin/pane-tools.ts
-import { z as z8 } from "zod";
+import { z as z9 } from "zod";
 
 // src/plugin/tools.ts
-import { z as z7 } from "zod";
+import { z as z8 } from "zod";
 var decisionOf = (decision, note, sentBack) => ({
   decision,
   ...note && { note },
@@ -10986,28 +10994,28 @@ var writtenPlan = (plan) => ({
     }))
   }))
 });
-var goal = z7.string().describe("The goal's id, or its name");
-var meeting = z7.string().describe("The meeting's id");
-var subtask = z7.string().describe("The subtask's id");
+var goal = z8.string().describe("The goal's id, or its name");
+var meeting = z8.string().describe("The meeting's id");
+var subtask = z8.string().describe("The subtask's id");
 function memberName(members) {
-  if (!members) return z7.string().describe("A member's name");
+  if (!members) return z8.string().describe("A member's name");
   const names = members.map((m) => m.name);
   const roster = members.map((m) => `${m.name} (${m.role.title})`).join(", ");
-  return z7.enum(names).describe(`One of the team: ${roster}`);
+  return z8.enum(names).describe(`One of the team: ${roster}`);
 }
 var meetingInput = (member) => ({
   goal,
-  agenda: z7.string().trim().min(1).describe("What to plan, with everything the user said about it"),
-  size: z7.enum(MEETING_SIZES).optional().describe("How long the discussion runs; the team's default when left out"),
-  attendees: z7.array(member).default([]).describe("The host first; everyone when empty")
+  agenda: z8.string().trim().min(1).describe("What to plan, with everything the user said about it"),
+  size: z8.enum(MEETING_SIZES).optional().describe("How long the discussion runs; the team's default when left out"),
+  attendees: z8.array(member).default([]).describe("The host first; everyone when empty")
 });
 var changePlanInput = (member) => ({ meeting, plan: planSchema(member) });
 var assignInput = (member) => ({
   goal,
   assignee: member,
-  title: z7.string().trim().min(1),
-  description: z7.string().trim().describe("Everything the user said about it"),
-  acceptance: z7.string().trim().default("").describe("When it counts as done")
+  title: z8.string().trim().min(1),
+  description: z8.string().trim().describe("Everything the user said about it"),
+  acceptance: z8.string().trim().default("").describe("When it counts as done")
 });
 function addTools(server2, team2) {
   server2.registerTool(
@@ -11025,7 +11033,7 @@ function addTools(server2, team2) {
     "start_goal",
     {
       description: "Start a goal: something the user wants done. It gets its own branch, cut from the repository's HEAD. Then hold a meeting to plan it, or assign work directly.",
-      inputSchema: { name: z7.string().trim().min(1).describe("A few words for what is wanted") }
+      inputSchema: { name: z8.string().trim().min(1).describe("A few words for what is wanted") }
     },
     async ({ name }) => {
       const started = await (await team2()).goals.start(name);
@@ -11128,7 +11136,7 @@ function addTools(server2, team2) {
     "goal_action",
     {
       description: "Pause a goal (its runs stop, to go on later in their sessions), resume it, archive it, or delete an archived one: its worktrees and subtask branches go, its own branch stays. Delete only when the user has confirmed it.",
-      inputSchema: { goal, action: z7.enum(GOAL_ACTIONS) },
+      inputSchema: { goal, action: z8.enum(GOAL_ACTIONS) },
       annotations: { destructiveHint: true }
     },
     async ({ goal: ref, action }) => {
@@ -11142,7 +11150,7 @@ function addTools(server2, team2) {
     "subtask_action",
     {
       description: "Stop a subtask; continue a stopped or failed one in its session and worktree; retry one from the start; or redo a done one whose upstream was redone.",
-      inputSchema: { subtask, action: z7.enum(SUBTASK_ACTIONS) }
+      inputSchema: { subtask, action: z8.enum(SUBTASK_ACTIONS) }
     },
     async ({ subtask: id, action }) => {
       const engine2 = await team2();
@@ -11158,7 +11166,7 @@ function addTools(server2, team2) {
     "message",
     {
       description: "Pass the user's words to the member working on a subtask: a running one takes them at once, in its session; one not started reads them first.",
-      inputSchema: { subtask, text: z7.string().trim().min(1) }
+      inputSchema: { subtask, text: z8.string().trim().min(1) }
     },
     async ({ subtask: id, text: text2 }) => {
       const went = (await team2()).scheduler.carry(id, text2);
@@ -11172,10 +11180,10 @@ function addTools(server2, team2) {
     {
       description: "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask), a stuck review (rereview, skip, sendBack), or a merge (ours, theirs, retry).",
       inputSchema: {
-        question: z7.string().describe("The id of what waits on the user"),
-        decision: z7.enum(DECISION_OPTIONS),
-        note: z7.string().trim().optional().describe("What to change, in the user's words"),
-        sent_back: z7.string().optional().describe("The subtask a revised task goes back to")
+        question: z8.string().describe("The id of what waits on the user"),
+        decision: z8.enum(DECISION_OPTIONS),
+        note: z8.string().trim().optional().describe("What to change, in the user's words"),
+        sent_back: z8.string().optional().describe("The subtask a revised task goes back to")
       }
     },
     async ({ question, decision, note, sent_back }) => {
@@ -11207,12 +11215,12 @@ function addPaneTools(server2, team2, pane2) {
     {
       description: `${PANE_ONLY} Answers what waits on the user, as they pressed it.`,
       inputSchema: {
-        question: z8.string(),
-        option: z8.enum(PERMISSION_OPTIONS).optional().describe("A permission's answer"),
-        picks: z8.array(z8.string()).optional().describe("One pick per question with choices"),
-        decision: z8.enum(DECISION_OPTIONS).optional(),
-        note: z8.string().trim().optional().describe("Why it is denied, or what to change"),
-        sent_back: z8.string().optional().describe("The subtask a revised task goes back to")
+        question: z9.string(),
+        option: z9.enum(PERMISSION_OPTIONS).optional().describe("A permission's answer"),
+        picks: z9.array(z9.string()).optional().describe("One pick per question with choices"),
+        decision: z9.enum(DECISION_OPTIONS).optional(),
+        note: z9.string().trim().optional().describe("Why it is denied, or what to change"),
+        sent_back: z9.string().optional().describe("The subtask a revised task goes back to")
       }
     },
     async ({ question, option, picks, decision, note, sent_back }) => {

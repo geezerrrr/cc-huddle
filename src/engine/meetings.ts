@@ -345,7 +345,7 @@ export class Meetings {
       turn: {
         heard?: number;
         tool?: TurnTool;
-        schema?: Record<string, unknown>;
+        schema?: z.ZodType;
         signal?: AbortSignal;
         listener?: TurnListener;
       } = {},
@@ -375,7 +375,7 @@ export class Meetings {
     const speak = (
       member: Member,
       prompt: string,
-      turn: { heard?: number; tool?: TurnTool; schema?: Record<string, unknown> } = {},
+      turn: { heard?: number; tool?: TurnTool; schema?: z.ZodType } = {},
     ) => {
       meeting.speaking = member.name;
       // The closing turn hands the plan back in its shape, with no words to stream.
@@ -486,7 +486,7 @@ export class Meetings {
       meeting.hands = undefined;
       const names = ctx.attendees.map((m) => m.name) as [string, ...string[]];
       const closing = await speak(host, meetingClosing(ctx), {
-        schema: z.toJSONSchema(hostPlanSchema(names)),
+        schema: hostPlanSchema(names),
       });
       // Stopped as the plan came in: there is no plan, and it ends as any stop does.
       signal.throwIfAborted();

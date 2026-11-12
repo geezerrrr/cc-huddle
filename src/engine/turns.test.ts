@@ -1,5 +1,6 @@
 import { query, type SDKMessage, type SDKResultMessage } from "@anthropic-ai/claude-agent-sdk";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { askOnce, claudeProcess, resultOutcome, turnDecoder, type TurnListener } from "./turns.ts";
 
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({ query: vi.fn() }));
@@ -249,7 +250,7 @@ describe("askOnce", () => {
     return close;
   };
   const init = msg({ type: "system", subtype: "init", session_id: "s1", model: "glm-5" });
-  const ask = (schema?: Record<string, unknown>, signal = new AbortController().signal) =>
+  const ask = (schema?: z.ZodType, signal = new AbortController().signal) =>
     askOnce({ prompt: "Review it", options: { cwd: "/desk" }, schema, signal });
 
   it("gives the turn's words, its session and its tokens, and closes the query", async () => {
@@ -261,13 +262,19 @@ describe("askOnce", () => {
     expect(close).toHaveBeenCalled();
   });
 
-  it("asks for the schema's shape, and fails a turn that answers in words instead", async () => {
+  it("asks for the schema's shape in draft-07, and fails a turn that answers in words instead", async () => {
     streams(init, result({ subtype: "success", is_error: false, result: "pass" }));
-    const schema = { type: "object" };
-    await expect(ask(schema)).rejects.toThrow("answered in words");
+    await expect(ask(z.object({ pass: z.boolean() }))).rejects.toThrow("answered in words");
     expect(vi.mocked(query).mock.lastCall?.[0].options).toMatchObject({
       cwd: "/desk",
-      outputFormat: { type: "json_schema", schema },
+      outputFormat: {
+        type: "json_schema",
+        schema: {
+          $schema: "http://json-schema.org/draft-07/schema#",
+          type: "object",
+          properties: { pass: { type: "boolean" } },
+        },
+      },
     });
   });
 

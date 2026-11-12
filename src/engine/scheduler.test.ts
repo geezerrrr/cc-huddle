@@ -326,7 +326,7 @@ describe("Scheduler", () => {
         model: "review",
       });
       expect(review?.prompt).toContain("Acceptance criteria: Shows both scores");
-      expect(review?.schema).toMatchObject({ type: "object", required: ["pass", "notes"] });
+      expect(review?.schema?.safeParse({ pass: true, notes: "Fine." }).success).toBe(true);
       expect(s1).toMatchObject({ tokens: 10, review: { rounds: 0, notes: "Fine." } });
     });
 

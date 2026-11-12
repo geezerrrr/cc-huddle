@@ -12,6 +12,7 @@ import {
   type SpawnOptions,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { TodoWriteInput } from "@anthropic-ai/claude-agent-sdk/sdk-tools";
+import { z } from "zod";
 import { errorText } from "./core.ts";
 import { watchMember } from "./processes.ts";
 
@@ -399,12 +400,13 @@ export interface Reply {
  * Runs one turn to its end (a meeting turn, a teammate's answer, a review)
  * and gives what it said, or throws why it failed. Given a `schema`, the turn
  * hands its result back in that shape, and one that answers in words instead
- * has failed too.
+ * has failed too. Claude Code checks a schema against draft-07, and refuses
+ * one that names a later draft, zod's own.
  */
 export async function askOnce(params: {
   prompt: string;
   options: Options;
-  schema?: Record<string, unknown>;
+  schema?: z.ZodType;
   signal: AbortSignal;
   listener?: TurnListener;
 }): Promise<Reply> {
@@ -412,7 +414,15 @@ export async function askOnce(params: {
   let session = "";
   const outcome = await runTurn(
     prompt,
-    { ...options, ...(schema && { outputFormat: { type: "json_schema", schema } }) },
+    {
+      ...options,
+      ...(schema && {
+        outputFormat: {
+          type: "json_schema",
+          schema: z.toJSONSchema(schema, { target: "draft-7" }),
+        },
+      }),
+    },
     signal,
     turnDecoder({
       ...listener,
