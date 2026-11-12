@@ -122,6 +122,8 @@ Pausing holds its running subtasks in their sessions and cancels its running mee
 
 The flow is Crewloft's (its `team.md` §4): the host opens with the questions to settle; everyone else answers independently; members raise a hand to speak; the host gives the floor, closes when every question is settled or the size's turn budget is spent, and writes the plan. Sizes (`small`, `discussion`, `large`) set only how many turns each member gets. Meeting sessions are read-only.
 
+You name who attends, and the first named hosts; with nobody named, everyone attends and the first member by name hosts. Each attendee keeps one session for the whole meeting, in the goal's worktree. An approved plan's document is saved in the data folder, and the first run of each of its subtasks gets it in its brief, since members work in their worktrees and not in the data folder.
+
 ### 4.3 Subtask
 
 | From                                                  | Event                                                           | To                                                      |
