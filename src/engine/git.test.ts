@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  abortMerge,
   commitDesk,
   git,
   GitError,
@@ -13,6 +14,7 @@ import {
   openDesk,
   openGoal,
   openRepository,
+  pickSide,
   slugFor,
   subtaskBranch,
   takenSlugs,
@@ -268,6 +270,31 @@ describe("mergeDesk", () => {
       text: [],
       other: ["README.md"],
     });
+  });
+
+  it("merges with your pick on a conflict that can't be resolved line by line", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    await deliver(places, "s1", "README.md", "changed\n");
+    const desk = await openDesk(places, "dice", "s2");
+    await rm(path.join(desk, "README.md"));
+    await commitDesk(places, "dice", "s2", glm, "Remove README");
+    await mergeDesk(places, "dice", "s1", glm);
+    await mergeDesk(places, "dice", "s2", glm);
+    await pickSide(places, "dice", "s2", ["README.md"], "theirs");
+    expect(await mergeDesk(places, "dice", "s2", glm)).toEqual({ kind: "merged" });
+    expect(await show(goalBranch("dice"), "README.md")).toBe("changed\n");
+  });
+
+  it("calls off a merge half done", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    await deliver(places, "s1", "README.md", "one\n");
+    const desk = await deliver(places, "s2", "README.md", "two\n");
+    await mergeDesk(places, "dice", "s1", glm);
+    await mergeDesk(places, "dice", "s2", glm);
+    await abortMerge(places, "dice", "s2");
+    expect(await readFile(path.join(desk, "README.md"), "utf8")).toBe("two\n");
   });
 
   it("leaves your checkout as it was", async () => {

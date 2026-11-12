@@ -373,3 +373,47 @@ export function mergeDesk(
     return { kind: "merged" };
   });
 }
+
+/** A file's path as a pathspec that means only that file (`[id]`, `*` in a name aren't patterns). */
+const literally = (file: string) => `:(literal)${file}`;
+
+/**
+ * Your pick for conflicts that can't be merged line by line: the subtask's
+ * version or the goal's, for each file (a file deleted on that side goes).
+ * Text conflicts stay for the member.
+ */
+export function pickSide(
+  places: Places,
+  slug: string,
+  subtaskId: string,
+  files: string[],
+  side: "ours" | "theirs",
+): Promise<void> {
+  return perGoal(places, slug, async () => {
+    const desk = await worktreeAt(places.repo, deskFolder(places, subtaskId));
+    const stages = await git(desk, ["ls-files", "-u", "-z", "--", ...files.map(literally)]);
+    const wanted = side === "ours" ? "2" : "3";
+    const kept = new Set(
+      stages.stdout
+        .split("\0")
+        .filter(Boolean)
+        .map((line) => line.split("\t"))
+        .filter(([meta]) => meta?.split(" ")[2] === wanted)
+        .map(([, file]) => file),
+    );
+    for (const file of files) {
+      if (kept.has(file)) {
+        await git(desk, ["checkout", `--${side}`, "--", literally(file)]);
+        await git(desk, ["add", "--", literally(file)]);
+      } else await git(desk, ["rm", "-q", "--", literally(file)]);
+    }
+  });
+}
+
+/** Calls off a merge a subtask's worktree is in the middle of, to try it again from scratch. */
+export function abortMerge(places: Places, slug: string, subtaskId: string): Promise<void> {
+  return perGoal(places, slug, async () => {
+    const desk = await worktreeAt(places.repo, deskFolder(places, subtaskId));
+    if (await merging(desk)) await git(desk, ["merge", "--abort"]);
+  });
+}
