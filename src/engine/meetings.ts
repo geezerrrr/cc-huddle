@@ -244,6 +244,12 @@ export class Meetings {
     return this.scheduler.assign(goal.id, plan.tasks, meeting.id);
   }
 
+  /** Settles once no meeting of a goal is under way: one being cancelled has ended. */
+  async settled(goalId: string) {
+    const ids = this.core.state.meetings.filter((m) => m.goalId === goalId).map((m) => m.id);
+    await Promise.all(ids.flatMap((id) => this.ongoing.get(id) ?? []));
+  }
+
   /** Stops every meeting under way, as cancelled; settles once they have ended. */
   async close() {
     for (const abort of this.aborts.values()) abort.abort();

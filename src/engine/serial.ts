@@ -5,7 +5,7 @@
  */
 export function serialBy() {
   const queues = new Map<string, Promise<unknown>>();
-  return function serial<T>(key: string, task: () => Promise<T>): Promise<T> {
+  return function serial<T>(key: string, task: () => T | Promise<T>): Promise<T> {
     const next = (queues.get(key) ?? Promise.resolve()).then(task, task);
     const settled = next.catch(() => undefined);
     queues.set(key, settled);
