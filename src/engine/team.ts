@@ -3,12 +3,13 @@
  * the repository: roles and members as Markdown files with front matter,
  * the Claude Code settings every member works under, and openplan's own.
  */
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import type { EffortLevel, Settings } from "@anthropic-ai/claude-agent-sdk";
 import { parse } from "yaml";
 import { z } from "zod";
 import { errorText, type Team } from "./core.ts";
+import { writeWhole } from "./files.ts";
 import { serialBy } from "./serial.ts";
 import { MEETING_SIZES, type MeetingSize, type Member, type Role } from "./types.ts";
 
@@ -148,8 +149,7 @@ export function allowInTeam(top: string, rules: readonly string[]): Promise<void
       file,
     );
     const allow = [...new Set([...permissions.allow, ...rules])];
-    await mkdir(path.dirname(file), { recursive: true });
-    await writeFile(
+    await writeWhole(
       file,
       `${JSON.stringify({ ...settings, permissions: { ...permissions, allow } }, null, 2)}\n`,
     );

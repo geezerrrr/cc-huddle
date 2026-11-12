@@ -7518,7 +7518,7 @@ var serial = serialBy();
 
 // src/engine/team.ts
 var import_yaml = __toESM(require_dist(), 1);
-import { mkdir as mkdir2, readdir as readdir2, readFile as readFile3, writeFile as writeFile2 } from "node:fs/promises";
+import { readdir as readdir2, readFile as readFile3 } from "node:fs/promises";
 import path3 from "node:path";
 
 // node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/external.js

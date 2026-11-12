@@ -8,6 +8,7 @@ import { link, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { readFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
 import { errorText } from "./core.ts";
+import { writeWhole } from "./files.ts";
 import type { Repository } from "./git.ts";
 import { running } from "./running.ts";
 import type { TeamState } from "./types.ts";
@@ -82,12 +83,7 @@ export function stateWriter(
   const write = () => {
     timer = undefined;
     writing = writing
-      .then(async () => {
-        await mkdir(path.dirname(file), { recursive: true });
-        const fresh = `${file}.new`;
-        await writeFile(fresh, JSON.stringify({ version: STATE_VERSION, state: state() }));
-        await rename(fresh, file);
-      })
+      .then(() => writeWhole(file, JSON.stringify({ version: STATE_VERSION, state: state() })))
       .catch(failed);
   };
   return {

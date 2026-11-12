@@ -7364,20 +7364,37 @@ var errorText = (error) => error instanceof Error ? error.message : String(error
 
 // src/engine/data.ts
 import { createHash } from "node:crypto";
-import { link, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { link, mkdir as mkdir2, readFile, rename as rename2, rm, writeFile as writeFile2 } from "node:fs/promises";
 import { readFileSync, unlinkSync } from "node:fs";
+import path2 from "node:path";
+
+// src/engine/files.ts
+import { renameSync, writeFileSync } from "node:fs";
+import { mkdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
+var fresh = (file) => `${file}.${String(process.pid)}.new`;
+async function writeWhole(file, text, mode) {
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(fresh(file), text, { mode });
+  await rename(fresh(file), file);
+}
+function writeWholeSync(file, text) {
+  writeFileSync(fresh(file), text);
+  renameSync(fresh(file), file);
+}
+
+// src/engine/data.ts
 function repoFolder(dataFolder2, repo) {
-  const name = path.basename(repo.top).replace(/[^\w.-]+/g, "-");
+  const name = path2.basename(repo.top).replace(/[^\w.-]+/g, "-");
   const hash = createHash("sha256").update(repo.common).digest("hex").slice(0, 12);
-  return path.join(dataFolder2, "repos", `${name}-${hash}`);
+  return path2.join(dataFolder2, "repos", `${name}-${hash}`);
 }
 var dataFiles = (folder) => ({
-  state: path.join(folder, "state.json"),
-  lock: path.join(folder, "lock"),
-  members: path.join(folder, "members.json"),
+  state: path2.join(folder, "state.json"),
+  lock: path2.join(folder, "lock"),
+  members: path2.join(folder, "members.json"),
   /** A member's settings file (policy.ts writeSettings). */
-  settings: (member) => path.join(folder, "settings", `${member}.json`)
+  settings: (member) => path2.join(folder, "settings", `${member}.json`)
 });
 var STATE_VERSION = 1;
 var SAVE_DELAY_MS = 200;
@@ -7406,12 +7423,7 @@ function stateWriter(file, state, failed) {
   let writing2 = Promise.resolve();
   const write = () => {
     timer = void 0;
-    writing2 = writing2.then(async () => {
-      await mkdir(path.dirname(file), { recursive: true });
-      const fresh = `${file}.new`;
-      await writeFile(fresh, JSON.stringify({ version: STATE_VERSION, state: state() }));
-      await rename(fresh, file);
-    }).catch(failed);
+    writing2 = writing2.then(() => writeWhole(file, JSON.stringify({ version: STATE_VERSION, state: state() }))).catch(failed);
   };
   return {
     changed() {
@@ -7441,10 +7453,10 @@ var busy = (lock, holder) => new Error(
   `Another Claude Code session runs this repository's team (pid ${String(holder.session)}). If it has ended, delete ${lock}`
 );
 async function holding(lock, session, open2) {
-  await mkdir(path.dirname(lock), { recursive: true });
+  await mkdir2(path2.dirname(lock), { recursive: true });
   const file = `${lock}.${String(process.pid)}`;
   const holder = { pid: process.pid, session, open: open2 };
-  await writeFile(file, JSON.stringify(holder));
+  await writeFile2(file, JSON.stringify(holder));
   return file;
 }
 var code = (error) => error.code;
@@ -7461,12 +7473,12 @@ async function takeTeam(lock, session) {
       const holder = readHolder(lock);
       if (holder && running(holder.pid)) {
         if (holder.pid !== process.pid) throw busy(lock, holder);
-        await rename(mine, lock);
+        await rename2(mine, lock);
         return;
       }
       const aside = `${lock}.${String(process.pid)}.ended`;
       try {
-        await rename(lock, aside);
+        await rename2(lock, aside);
       } catch (error) {
         if (code(error) === "ENOENT") continue;
         throw error;
@@ -7486,7 +7498,7 @@ async function takeTeam(lock, session) {
   }
 }
 async function openedTeam(lock, session) {
-  await rename(await holding(lock, session, true), lock);
+  await rename2(await holding(lock, session, true), lock);
 }
 function releaseTeam(lock) {
   if (holderOf(lock)?.pid === process.pid) unlinkSync(lock);
@@ -7495,7 +7507,7 @@ function releaseTeam(lock) {
 // src/engine/git.ts
 import { spawn } from "node:child_process";
 import { readdir, readFile as readFile2, realpath, rm as rm2, stat } from "node:fs/promises";
-import path2 from "node:path";
+import path3 from "node:path";
 
 // src/engine/serial.ts
 function serialBy() {
@@ -7576,10 +7588,10 @@ async function openRepository(folder) {
   const head = await git(at, ["rev-parse", "--verify", "-q", "HEAD"], { allow: [1] });
   if (head.code !== 0)
     throw new GitError(["rev-parse"], head.code, `${top} has no commit to start from yet`);
-  return { top: await realpath(top), common: await realpath(path2.resolve(folder, common)) };
+  return { top: await realpath(top), common: await realpath(path3.resolve(folder, common)) };
 }
 var goalBranch = (slug) => `openplan/${slug}/main`;
-var goalFolder = (places, slug) => path2.join(places.root, "goals", slug);
+var goalFolder = (places, slug) => path3.join(places.root, "goals", slug);
 async function takenSlugs(repo) {
   const refs = await git({ cwd: repo.top }, [
     "for-each-ref",
@@ -7623,7 +7635,7 @@ async function openGoal(places, slug) {
   return folder;
 }
 var subtaskBranch = (slug, subtaskId) => `openplan/${slug}/${subtaskId}`;
-var deskFolder = (places, subtaskId) => path2.join(places.root, "desks", subtaskId);
+var deskFolder = (places, subtaskId) => path3.join(places.root, "desks", subtaskId);
 var serial = serialBy();
 var perGoal = (places, slug, task) => serial(goalFolder(places, slug), task);
 function openDesk(places, slug, subtaskId) {
@@ -7631,7 +7643,7 @@ function openDesk(places, slug, subtaskId) {
     const { repo } = places;
     const desk = deskFolder(places, subtaskId);
     await openGoal(places, slug);
-    if (await exists(path2.join(desk, ".git"))) return desk;
+    if (await exists(path3.join(desk, ".git"))) return desk;
     await rm2(desk, { recursive: true, force: true });
     const branch = subtaskBranch(slug, subtaskId);
     await checkOut(
@@ -7644,14 +7656,14 @@ function openDesk(places, slug, subtaskId) {
   });
 }
 async function worktreeAt(repo, tree) {
-  const real = (file) => realpath(file).catch(() => path2.resolve(file));
+  const real = (file) => realpath(file).catch(() => path3.resolve(file));
   const here = await real(tree);
-  const entries = path2.join(repo.common, "worktrees");
+  const entries = path3.join(repo.common, "worktrees");
   const find = async () => {
     for (const name of await readdir(entries).catch(() => [])) {
-      const gitdir = await readFile2(path2.join(entries, name, "gitdir"), "utf8").catch(() => "");
-      if (gitdir && await real(path2.dirname(gitdir.trim())) === here)
-        return path2.join(entries, name);
+      const gitdir = await readFile2(path3.join(entries, name, "gitdir"), "utf8").catch(() => "");
+      if (gitdir && await real(path3.dirname(gitdir.trim())) === here)
+        return path3.join(entries, name);
     }
   };
   const entry = await find() ?? await git({ cwd: repo.top }, ["worktree", "repair", tree], { allow: [128] }).then(find);
@@ -7674,7 +7686,7 @@ async function unresolved(places, subtaskId, files) {
   const desk = deskFolder(places, subtaskId);
   const marked = await Promise.all(
     files.map(
-      (file) => readFile2(path2.join(desk, file), "utf8").then(
+      (file) => readFile2(path3.join(desk, file), "utf8").then(
         (text) => MARKERS.test(text),
         () => false
       )
@@ -7834,10 +7846,10 @@ function step(machine, state, event) {
 }
 
 // src/engine/records.ts
-import { appendFile, mkdir as mkdir2, open } from "node:fs/promises";
-import path3 from "node:path";
+import { appendFile, mkdir as mkdir3, open } from "node:fs/promises";
+import path4 from "node:path";
 var OUTPUT_MAX = 4e3;
-var recordFile = (places, subtaskId) => path3.join(places.root, "records", `${subtaskId}.jsonl`);
+var recordFile = (places, subtaskId) => path4.join(places.root, "records", `${subtaskId}.jsonl`);
 var Records = class {
   constructor(places, failed) {
     this.places = places;
@@ -7857,7 +7869,7 @@ var Records = class {
     const file = recordFile(this.places, subtaskId);
     const write = (entry) => {
       this.writing = this.writing.then(async () => {
-        await mkdir2(path3.dirname(file), { recursive: true });
+        await mkdir3(path4.dirname(file), { recursive: true });
         await appendFile(file, `${JSON.stringify(entry)}
 `);
       }).catch(this.failed);
@@ -7869,8 +7881,8 @@ var Records = class {
       thinking: (delta) => {
         now.streaming = delta === "" || now.streaming?.kind !== "thinking" ? { kind: "thinking", text: delta } : { kind: "thinking", text: now.streaming.text + delta };
       },
-      text: (delta, fresh) => {
-        now.streaming = fresh || now.streaming?.kind !== "text" ? { kind: "text", text: delta } : { kind: "text", text: now.streaming.text + delta };
+      text: (delta, fresh2) => {
+        now.streaming = fresh2 || now.streaming?.kind !== "text" ? { kind: "text", text: delta } : { kind: "text", text: now.streaming.text + delta };
       },
       toolStarting: (name) => {
         now.starting = name;
@@ -7938,8 +7950,8 @@ var Records = class {
     this.spoken.set(meeting2.id, spoken);
     return {
       // What a turn says before it looks something up isn't what it ends up saying.
-      text: (delta, fresh) => {
-        spoken.text = fresh ? delta : spoken.text + delta;
+      text: (delta, fresh2) => {
+        spoken.text = fresh2 ? delta : spoken.text + delta;
       }
     };
   }
@@ -8086,8 +8098,8 @@ var Goals = class {
 
 // src/engine/meetings.ts
 import { randomUUID as randomUUID2 } from "node:crypto";
-import { mkdir as mkdir3, writeFile as writeFile2 } from "node:fs/promises";
-import path4 from "node:path";
+import { mkdir as mkdir4, writeFile as writeFile3 } from "node:fs/promises";
+import path5 from "node:path";
 import {
   createSdkMcpServer,
   tool
@@ -8414,8 +8426,8 @@ Look up only what the answer needs, then answer briefly from your role. Where yo
 }
 function news({ meeting: meeting2 }, member) {
   const heard = meeting2.seats?.[member.name]?.heard ?? 0;
-  const fresh = meeting2.turns.slice(heard).filter((t) => t.speaker !== member.name);
-  return fresh.map((t) => `[${t.speaker}] ${t.text}`).join("\n\n") || "(nothing new)";
+  const fresh2 = meeting2.turns.slice(heard).filter((t) => t.speaker !== member.name);
+  return fresh2.map((t) => `[${t.speaker}] ${t.text}`).join("\n\n") || "(nothing new)";
 }
 var SPOKEN = "Say it as you would out loud in a meeting: a few sentences, no headings or lists.";
 var MEETING_KINDS = {
@@ -8532,13 +8544,12 @@ import {
 // src/engine/processes.ts
 import { execFile } from "node:child_process";
 import { readFile as readFile3 } from "node:fs/promises";
-import { writeFileSync } from "node:fs";
 var running2 = /* @__PURE__ */ new Map();
 var record;
 function save() {
   if (record === void 0) return;
   const written2 = [...running2].map(([pid, { settings }]) => ({ pid, settings }));
-  writeFileSync(record, JSON.stringify(written2));
+  writeWholeSync(record, JSON.stringify(written2));
 }
 function watchMember(child, args) {
   const { pid } = child;
@@ -8618,7 +8629,7 @@ function turnDecoder(listener) {
   const calls = /* @__PURE__ */ new Map();
   const tasks = /* @__PURE__ */ new Map();
   let subagentTokens = 0;
-  let fresh = true;
+  let fresh2 = true;
   let blockOpen = false;
   const held = [];
   const notify = (notice) => {
@@ -8708,7 +8719,7 @@ function turnDecoder(listener) {
         if (message.parent_tool_use_id) return;
         const { event } = message;
         if (event.type === "message_start") {
-          fresh = true;
+          fresh2 = true;
           blockOpen = false;
           flush();
         } else if (event.type === "content_block_start") {
@@ -8719,8 +8730,8 @@ function turnDecoder(listener) {
         } else if (event.type === "content_block_delta") {
           if (event.delta.type === "thinking_delta") listener.thinking?.(event.delta.thinking);
           else if (event.delta.type === "text_delta") {
-            listener.text?.(event.delta.text, fresh);
-            fresh = false;
+            listener.text?.(event.delta.text, fresh2);
+            fresh2 = false;
           }
         }
         return;
@@ -8990,9 +9001,9 @@ var Meetings = class {
     const { core } = this;
     const { meeting: meeting2, plan } = this.underReview(id, "approve");
     const goal2 = this.activeGoal(meeting2.goalId);
-    const file = path4.join(core.places.root, "plans", `${goal2.slug}-${meeting2.id}.md`);
-    await mkdir3(path4.dirname(file), { recursive: true });
-    await writeFile2(file, plan.markdown);
+    const file = path5.join(core.places.root, "plans", `${goal2.slug}-${meeting2.id}.md`);
+    await mkdir4(path5.dirname(file), { recursive: true });
+    await writeFile3(file, plan.markdown);
     if (meeting2.plan !== plan || !can(MEETING_MACHINE, meeting2.status, "approve"))
       throw new Error("The plan changed while it was being approved");
     this.activeGoal(goal2.id);
@@ -9206,8 +9217,6 @@ var Meetings = class {
 };
 
 // src/engine/policy.ts
-import { chmod, mkdir as mkdir4, writeFile as writeFile3 } from "node:fs/promises";
-import path5 from "node:path";
 var SESSION_VARS = [
   "AI_AGENT",
   "CLAUDECODE",
@@ -9254,9 +9263,7 @@ function memberSettings(team2, member, from, plugin) {
   };
 }
 async function writeSettings(file, settings) {
-  await mkdir4(path5.dirname(file), { recursive: true });
-  await writeFile3(file, JSON.stringify(settings), { mode: 384 });
-  await chmod(file, 384);
+  await writeWhole(file, JSON.stringify(settings), 384);
   return file;
 }
 function workOptions(seat, from) {
@@ -10230,7 +10237,7 @@ ${outcome.handover.summary}`
 
 // src/engine/team.ts
 var import_yaml = __toESM(require_dist(), 1);
-import { mkdir as mkdir5, readdir as readdir2, readFile as readFile4, writeFile as writeFile4 } from "node:fs/promises";
+import { readdir as readdir2, readFile as readFile4 } from "node:fs/promises";
 import path7 from "node:path";
 import { z as z5 } from "zod";
 var teamFolder = (top) => path7.join(top, ".claude", "openplan");
@@ -10339,8 +10346,7 @@ function allowInTeam(top, rules) {
       file
     );
     const allow = [.../* @__PURE__ */ new Set([...permissions.allow, ...rules])];
-    await mkdir5(path7.dirname(file), { recursive: true });
-    await writeFile4(
+    await writeWhole(
       file,
       `${JSON.stringify({ ...settings, permissions: { ...permissions, allow } }, null, 2)}
 `

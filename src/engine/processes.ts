@@ -7,7 +7,7 @@
  */
 import { execFile, type ChildProcess } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { writeFileSync } from "node:fs";
+import { writeWholeSync } from "./files.ts";
 
 /** A member process as written down: its settings file tells it from another that got its pid. */
 interface Written {
@@ -25,7 +25,7 @@ let record: string | undefined;
 function save() {
   if (record === undefined) return;
   const written: Written[] = [...running].map(([pid, { settings }]) => ({ pid, settings }));
-  writeFileSync(record, JSON.stringify(written));
+  writeWholeSync(record, JSON.stringify(written));
 }
 
 /** Keeps a member's Claude Code while it runs. `args`: its command line, naming its settings file. */

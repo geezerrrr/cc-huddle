@@ -4,9 +4,8 @@
  * repository: it loads your user and project settings like any session, and
  * runs under flag settings on top, which outrank both.
  */
-import { chmod, mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 import type { Options, Settings } from "@anthropic-ai/claude-agent-sdk";
+import { writeWhole } from "./files.ts";
 import { authorEnv, memberSigner } from "./git.ts";
 import type { Member } from "./types.ts";
 
@@ -89,10 +88,7 @@ export function memberSettings(
  * settings passed inline end up on a command line, keys and all.
  */
 export async function writeSettings(file: string, settings: Settings): Promise<string> {
-  await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, JSON.stringify(settings), { mode: 0o600 });
-  // A file written before keeps its mode: set it each time.
-  await chmod(file, 0o600);
+  await writeWhole(file, JSON.stringify(settings), 0o600);
   return file;
 }
 
