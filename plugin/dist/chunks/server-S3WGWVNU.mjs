@@ -7600,16 +7600,25 @@ var exists = (file) => stat(file).then(
   () => false
 );
 var unlist = (repo, folder) => git({ cwd: repo.top }, ["worktree", "remove", "--force", folder], { allow: [128] });
+async function hasBranch(repo, branch) {
+  const found = await git({ cwd: repo.top }, ["rev-parse", "--verify", "-q", branch], {
+    allow: [1]
+  });
+  return found.code === 0;
+}
+async function checkOut(repo, folder, branch, from) {
+  await unlist(repo, folder);
+  await git(
+    { cwd: repo.top },
+    from ? ["worktree", "add", "-q", "-b", branch, folder, from] : ["worktree", "add", "-q", folder, branch]
+  );
+}
 async function openGoal(places, slug) {
   const { repo } = places;
   const branch = goalBranch(slug);
   const folder = goalFolder(places, slug);
-  const cut = await git({ cwd: repo.top }, ["rev-parse", "--verify", "-q", branch], { allow: [1] });
-  if (cut.code !== 0) await git({ cwd: repo.top }, ["branch", branch, "HEAD"]);
-  if (!await exists(folder)) {
-    await unlist(repo, folder);
-    await git({ cwd: repo.top }, ["worktree", "add", "-q", folder, branch]);
-  }
+  if (!await hasBranch(repo, branch)) await git({ cwd: repo.top }, ["branch", branch, "HEAD"]);
+  if (!await exists(folder)) await checkOut(repo, folder, branch);
   return folder;
 }
 var subtaskBranch = (slug, subtaskId) => `openplan/${slug}/${subtaskId}`;
@@ -7623,14 +7632,12 @@ function openDesk(places, slug, subtaskId) {
     await openGoal(places, slug);
     if (await exists(path2.join(desk, ".git"))) return desk;
     await rm2(desk, { recursive: true, force: true });
-    await unlist(repo, desk);
     const branch = subtaskBranch(slug, subtaskId);
-    const kept = await git({ cwd: repo.top }, ["rev-parse", "--verify", "-q", branch], {
-      allow: [1]
-    });
-    await git(
-      { cwd: repo.top },
-      kept.code === 0 ? ["worktree", "add", "-q", desk, branch] : ["worktree", "add", "-q", "-b", branch, desk, goalBranch(slug)]
+    await checkOut(
+      repo,
+      desk,
+      branch,
+      await hasBranch(repo, branch) ? void 0 : goalBranch(slug)
     );
     return desk;
   });
@@ -7677,8 +7684,9 @@ async function unresolved(places, subtaskId, files) {
 async function conflicts(places, subtaskId, at) {
   const list = await git(at, ["diff", "--name-only", "-z", "--diff-filter=U"]);
   const files = list.stdout.split("\0").filter(Boolean);
+  if (!files.length) return void 0;
   const text2 = await unresolved(places, subtaskId, files);
-  return { text: text2, other: files.filter((file) => !text2.includes(file)) };
+  return { kind: "conflict", text: text2, other: files.filter((file) => !text2.includes(file)) };
 }
 async function removeDesk(places, slug, subtaskId) {
   const desk = deskFolder(places, subtaskId);
@@ -7694,18 +7702,14 @@ function mergeDesk(places, slug, subtaskId, by) {
     const folder = deskFolder(places, subtaskId);
     if (!await exists(folder)) {
       const branch = subtaskBranch(slug, subtaskId);
-      const kept = await git({ cwd: repo.top }, ["rev-parse", "--verify", "-q", branch], {
-        allow: [1]
-      });
-      if (kept.code !== 0) return { kind: "merged" };
-      await unlist(repo, folder);
-      await git({ cwd: repo.top }, ["worktree", "add", "-q", folder, branch]);
+      if (!await hasBranch(repo, branch)) return { kind: "merged" };
+      await checkOut(repo, folder, branch);
     }
     const at = await worktreeAt(repo, folder);
     const desk = { ...at, env: { ...at.env, ...authorEnv(by) } };
     if (await merging(desk)) {
       const found = await conflicts(places, subtaskId, desk);
-      if (found.text.length || found.other.length) return { kind: "conflict", ...found };
+      if (found) return found;
       await git(desk, ["commit", "-q", "--no-edit"]);
     } else {
       const merge = await git(
@@ -7715,7 +7719,7 @@ function mergeDesk(places, slug, subtaskId, by) {
       );
       if (merge.code === 1) {
         const found = await conflicts(places, subtaskId, desk);
-        if (found.text.length || found.other.length) return { kind: "conflict", ...found };
+        if (found) return found;
         throw new GitError(["merge"], 1, (merge.stderr || merge.stdout).trim());
       }
     }

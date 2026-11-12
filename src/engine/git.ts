@@ -171,6 +171,25 @@ const exists = (file: string) =>
 const unlist = (repo: Repository, folder: string) =>
   git({ cwd: repo.top }, ["worktree", "remove", "--force", folder], { allow: [128] });
 
+/** Whether the repository has a branch. */
+async function hasBranch(repo: Repository, branch: string): Promise<boolean> {
+  const found = await git({ cwd: repo.top }, ["rev-parse", "--verify", "-q", branch], {
+    allow: [1],
+  });
+  return found.code === 0;
+}
+
+/** Checks a branch out in a worktree at `folder`, listed afresh: a new branch from `from`, if given. */
+async function checkOut(repo: Repository, folder: string, branch: string, from?: string) {
+  await unlist(repo, folder);
+  await git(
+    { cwd: repo.top },
+    from
+      ? ["worktree", "add", "-q", "-b", branch, folder, from]
+      : ["worktree", "add", "-q", folder, branch],
+  );
+}
+
 /**
  * Sets a goal up in git, or again what of it is missing: its branch cut from
  * your HEAD, checked out in its own worktree (again, if the folder was
@@ -180,12 +199,8 @@ export async function openGoal(places: Places, slug: string): Promise<string> {
   const { repo } = places;
   const branch = goalBranch(slug);
   const folder = goalFolder(places, slug);
-  const cut = await git({ cwd: repo.top }, ["rev-parse", "--verify", "-q", branch], { allow: [1] });
-  if (cut.code !== 0) await git({ cwd: repo.top }, ["branch", branch, "HEAD"]);
-  if (!(await exists(folder))) {
-    await unlist(repo, folder);
-    await git({ cwd: repo.top }, ["worktree", "add", "-q", folder, branch]);
-  }
+  if (!(await hasBranch(repo, branch))) await git({ cwd: repo.top }, ["branch", branch, "HEAD"]);
+  if (!(await exists(folder))) await checkOut(repo, folder, branch);
   return folder;
 }
 
@@ -213,16 +228,12 @@ export function openDesk(places: Places, slug: string, subtaskId: string): Promi
     await openGoal(places, slug);
     if (await exists(path.join(desk, ".git"))) return desk;
     await rm(desk, { recursive: true, force: true });
-    await unlist(repo, desk);
     const branch = subtaskBranch(slug, subtaskId);
-    const kept = await git({ cwd: repo.top }, ["rev-parse", "--verify", "-q", branch], {
-      allow: [1],
-    });
-    await git(
-      { cwd: repo.top },
-      kept.code === 0
-        ? ["worktree", "add", "-q", desk, branch]
-        : ["worktree", "add", "-q", "-b", branch, desk, goalBranch(slug)],
+    await checkOut(
+      repo,
+      desk,
+      branch,
+      (await hasBranch(repo, branch)) ? undefined : goalBranch(slug),
     );
     return desk;
   });
@@ -305,12 +316,20 @@ export async function unresolved(
   return files.filter((_, i) => marked[i]);
 }
 
-/** The files a worktree has in conflict: text ones (markers in them) apart from the rest (binary, deleted on one side). */
-async function conflicts(places: Places, subtaskId: string, at: At) {
+/**
+ * The conflicts a subtask's worktree has, if any: text ones (markers in them)
+ * apart from the rest (binary, deleted on one side).
+ */
+async function conflicts(
+  places: Places,
+  subtaskId: string,
+  at: At,
+): Promise<Extract<MergeOutcome, { kind: "conflict" }> | undefined> {
   const list = await git(at, ["diff", "--name-only", "-z", "--diff-filter=U"]);
   const files = list.stdout.split("\0").filter(Boolean);
+  if (!files.length) return undefined;
   const text = await unresolved(places, subtaskId, files);
-  return { text, other: files.filter((file) => !text.includes(file)) };
+  return { kind: "conflict", text, other: files.filter((file) => !text.includes(file)) };
 }
 
 /** Takes a subtask's worktree and its branch away. */
@@ -341,18 +360,14 @@ export function mergeDesk(
     const folder = deskFolder(places, subtaskId);
     if (!(await exists(folder))) {
       const branch = subtaskBranch(slug, subtaskId);
-      const kept = await git({ cwd: repo.top }, ["rev-parse", "--verify", "-q", branch], {
-        allow: [1],
-      });
-      if (kept.code !== 0) return { kind: "merged" };
-      await unlist(repo, folder);
-      await git({ cwd: repo.top }, ["worktree", "add", "-q", folder, branch]);
+      if (!(await hasBranch(repo, branch))) return { kind: "merged" };
+      await checkOut(repo, folder, branch);
     }
     const at = await worktreeAt(repo, folder);
     const desk = { ...at, env: { ...at.env, ...authorEnv(by) } };
     if (await merging(desk)) {
       const found = await conflicts(places, subtaskId, desk);
-      if (found.text.length || found.other.length) return { kind: "conflict", ...found };
+      if (found) return found;
       await git(desk, ["commit", "-q", "--no-edit"]);
     } else {
       // As git does by default, whatever your own setup says (merge.ff=only would refuse it).
@@ -363,7 +378,7 @@ export function mergeDesk(
       );
       if (merge.code === 1) {
         const found = await conflicts(places, subtaskId, desk);
-        if (found.text.length || found.other.length) return { kind: "conflict", ...found };
+        if (found) return found;
         throw new GitError(["merge"], 1, (merge.stderr || merge.stdout).trim());
       }
     }
