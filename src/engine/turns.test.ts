@@ -1,6 +1,6 @@
 import type { SDKMessage, SDKResultMessage } from "@anthropic-ai/claude-agent-sdk";
 import { describe, expect, it, vi } from "vitest";
-import { resultOutcome, turnDecoder, type TurnListener } from "./turns.ts";
+import { claudeProcess, resultOutcome, turnDecoder, type TurnListener } from "./turns.ts";
 
 const usage = {
   input_tokens: 10,
@@ -178,5 +178,34 @@ describe("turnDecoder", () => {
       ok: true,
       tokens: 107,
     });
+  });
+});
+
+describe("claudeProcess", () => {
+  const run = (script: string) => {
+    const claude = claudeProcess();
+    const child = claude.spawn({
+      command: process.execPath,
+      args: ["-e", script],
+      env: process.env,
+      signal: new AbortController().signal,
+    });
+    child.stdin.end();
+    child.stdout.resume();
+    return claude;
+  };
+
+  it("waits until the process has exited", async () => {
+    const claude = run("setTimeout(() => {}, 50)");
+    await claude.gone();
+    expect(claude.failure(new Error("stopped"))).toBe("stopped");
+  });
+
+  it("adds the end of what it wrote to stderr to a failure", async () => {
+    const claude = run('process.stderr.write("x".repeat(3000) + "boom"); process.exit(1)');
+    await claude.gone();
+    const failure = claude.failure(new Error("Claude Code exited with code 1"));
+    expect(failure).toMatch(/^Claude Code exited with code 1\. stderr: x+boom$/);
+    expect(failure.length).toBeLessThan(2100);
   });
 });

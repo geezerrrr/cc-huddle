@@ -2,7 +2,13 @@
  * Turns: one Agent SDK query each (docs/design.md §3.1). This is the one place
  * that reads what a turn's message stream says and judges how a turn ended.
  */
-import type { SDKMessage, SDKResultMessage } from "@anthropic-ai/claude-agent-sdk";
+import { spawn } from "node:child_process";
+import type {
+  SDKMessage,
+  SDKResultMessage,
+  SpawnedProcess,
+  SpawnOptions,
+} from "@anthropic-ai/claude-agent-sdk";
 
 /** How a turn ended: its final text, or why it failed, and the tokens it used. */
 export type TurnOutcome = (
@@ -270,5 +276,44 @@ export function turnDecoder(listener: TurnListener) {
       default:
         return;
     }
+  };
+}
+
+/** How much of the end of Claude Code's stderr a failed turn's error carries. */
+const STDERR_TAIL = 2000;
+
+/**
+ * Starts a turn's Claude Code here (pass `spawn` as the query's
+ * `spawnClaudeCodeProcess`; it does what the SDK's own spawn does), so a
+ * stopped turn can be waited on until its process has exited (`gone`), and a
+ * failed one says what Claude Code last wrote to stderr (`failure`).
+ */
+export function claudeProcess() {
+  let exited = Promise.resolve();
+  let stderr = "";
+  return {
+    spawn: ({ command, args, cwd, env, signal }: SpawnOptions): SpawnedProcess => {
+      // The SDK's signal fires only after Claude Code had its chance to shut down on its own.
+      const child = spawn(command, args, { cwd, env, signal, stdio: "pipe", windowsHide: true });
+      exited = new Promise((resolve) => {
+        child.once("close", () => {
+          resolve();
+        });
+        child.once("error", () => {
+          resolve();
+        });
+      });
+      child.stderr.setEncoding("utf8").on("data", (chunk: string) => {
+        stderr = (stderr + chunk).slice(-STDERR_TAIL);
+      });
+      return child;
+    },
+    gone: () => exited,
+    /** A turn's error in words, with the end of Claude Code's stderr. */
+    failure: (error: unknown) => {
+      const words = error instanceof Error ? error.message : String(error);
+      const tail = stderr.trim();
+      return tail ? `${words}. stderr: ${tail}` : words;
+    },
   };
 }
