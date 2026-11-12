@@ -3,7 +3,9 @@
  * member's calls outside its rules and its questions with choices
  * (AskUserQuestion) come here through the Agent SDK's `canUseTool`, wait in
  * "Needs you" until you answer, and are called off when the member's turn
- * ends first. Answered and called-off questions leave the state.
+ * ends first. Decisions on a subtask wait there too, with no turn behind
+ * them: the scheduler acts on your answer. Answered and called-off questions
+ * leave the state; nothing here changes a subtask.
  */
 import { randomUUID } from "node:crypto";
 import type {
@@ -13,7 +15,15 @@ import type {
 } from "@anthropic-ai/claude-agent-sdk";
 import type { AskUserQuestionInput } from "@anthropic-ai/claude-agent-sdk/sdk-tools";
 import { QUESTION_MACHINE, step } from "./machines.ts";
-import { YOU, type Choice, type PermissionOption, type Question, type TeamState } from "./types.ts";
+import {
+  YOU,
+  type Choice,
+  type DecisionOption,
+  type PermissionOption,
+  type Question,
+  type Subtask,
+  type TeamState,
+} from "./types.ts";
 
 /** Claude Code's own tool for questions with choices. */
 const ASK_TOOL = "AskUserQuestion";
@@ -28,12 +38,20 @@ export interface Asker {
   signal: AbortSignal;
 }
 
-/** Your answer: one of a permission request's options, or one pick per question with choices. */
-export type Answer = { option: PermissionOption; note?: string } | { picks: string[] };
+/**
+ * Your answer: one of a permission request's options (denying, with a
+ * note), one pick per question with choices, or one of a decision's options
+ * (sending a task back, what to change in `note`, and which of its done
+ * subtasks goes back in `sentBack`).
+ */
+export type Answer =
+  | { option: PermissionOption; note?: string }
+  | { picks: string[] }
+  | { decision: DecisionOption; note?: string; sentBack?: string };
 
 /** What questions need from the engine. */
 export interface Inbox {
-  state: Pick<TeamState, "questions">;
+  state: Pick<TeamState, "questions" | "subtasks">;
   /** The state changed. */
   changed(): void;
   /** Adds allow rules to the team's `settings.json` (§6), for every member's next turns. */
@@ -79,19 +97,51 @@ export class Questions {
   }
 
   /**
-   * Answers a question put to you. Throws when it is no longer open, or the
-   * answer doesn't fit it: not one of its options, or not one pick per question.
+   * Answers a question put to you, and gives it back: a decision is the
+   * scheduler's to act on. Throws when it is no longer open, or the answer
+   * doesn't fit it: not one of its options, not one pick per question, a
+   * task sent back without what to change, or with a subtask not done in it.
    */
-  answer(id: string, answer: Answer) {
+  answer(id: string, answer: Answer): Question {
     const question = this.inbox.state.questions.find(
       (q) => q.id === id && q.to === YOU && q.status === "open",
     );
     if (!question) throw new Error("That question is no longer open.");
     const fits = question.permission
       ? "option" in answer && question.permission.options.includes(answer.option)
-      : "picks" in answer && answer.picks.length === question.choices?.length;
+      : question.decision
+        ? "decision" in answer &&
+          question.decision.options.includes(answer.decision) &&
+          (answer.decision !== "revise" || this.revisable(question, answer))
+        : "picks" in answer && answer.picks.length === question.choices?.length;
     if (!fits) throw new Error("That answer doesn't fit the question.");
     this.close(question, "answer", answer);
+    return question;
+  }
+
+  /**
+   * A stuck review, a merge that needs you, or a task done (with why, or
+   * what, in `text`): it waits for your answer, no turn behind it.
+   */
+  openDecision(subtask: Subtask, decision: NonNullable<Question["decision"]>, text: string) {
+    this.open({ from: subtask.assignee, subtaskId: subtask.id }, { text, options: [], decision });
+  }
+
+  /**
+   * Calls off what a subtask's run waits on (the run ended or was stopped);
+   * with `decisions`, also your decisions on its review or merge (it left
+   * that stage).
+   */
+  cancelFor(subtaskId: string, decisions = false) {
+    this.cancelAll((q) => q.subtaskId === subtaskId && (decisions || !q.decision));
+  }
+
+  /** Calls off a task's delivery waiting on you: work in it is being done again. */
+  cancelDelivery(taskId: string) {
+    const inTask = new Set(
+      this.inbox.state.subtasks.filter((s) => s.taskId === taskId).map((s) => s.id),
+    );
+    this.cancelAll((q) => q.decision?.kind === "delivery" && inTask.has(q.subtaskId ?? ""));
   }
 
   /** A call the member's rules don't cover: allowed once, always, or denied. */
@@ -159,6 +209,16 @@ export class Questions {
     return { behavior: "allow", updatedInput: { ...input, answers } };
   }
 
+  /** Sending a task back says what to change, and sends back only one of its subtasks that is done. */
+  private revisable(question: Question, answer: Extract<Answer, { decision: DecisionOption }>) {
+    if (!answer.note) return false;
+    if (answer.sentBack === undefined) return true;
+    const { subtasks } = this.inbox.state;
+    const taskId = subtasks.find((s) => s.id === question.subtaskId)?.taskId;
+    const target = subtasks.find((s) => s.id === answer.sentBack);
+    return target !== undefined && target.taskId === taskId && target.status === "done";
+  }
+
   /**
    * Puts a question to you and waits for your answer (answer() checks it
    * fits). Undefined when the asker stops waiting first.
@@ -169,6 +229,23 @@ export class Questions {
   ): Promise<A | undefined> {
     // Stopped before it got here: an abort listener would never fire.
     if (asker.signal.aborted) return Promise.resolve(undefined);
+    const question = this.open(asker, ask);
+    return new Promise((resolve) => {
+      const callOff = () => {
+        this.close(question, "cancel");
+      };
+      asker.signal.addEventListener("abort", callOff, { once: true });
+      this.waiting.set(question.id, (answer) => {
+        asker.signal.removeEventListener("abort", callOff);
+        resolve(answer as A | undefined);
+      });
+    });
+  }
+
+  private open(
+    asker: Omit<Asker, "signal">,
+    ask: Pick<Question, "text" | "options" | "choices" | "permission" | "decision">,
+  ): Question {
     const question: Question = {
       id: randomUUID(),
       ...(asker.subtaskId !== undefined && { subtaskId: asker.subtaskId }),
@@ -180,16 +257,14 @@ export class Questions {
     };
     this.inbox.state.questions.push(question);
     this.inbox.changed();
-    return new Promise((resolve) => {
-      const callOff = () => {
-        this.close(question, "cancel");
-      };
-      asker.signal.addEventListener("abort", callOff, { once: true });
-      this.waiting.set(question.id, (answer) => {
-        asker.signal.removeEventListener("abort", callOff);
-        resolve(answer as A | undefined);
-      });
-    });
+    return question;
+  }
+
+  /** Calls off every open question that `which` picks. */
+  private cancelAll(which: (question: Question) => boolean) {
+    // Picked out first: each one called off leaves the list.
+    const picked = this.inbox.state.questions.filter((q) => q.status === "open" && which(q));
+    for (const question of picked) this.close(question, "cancel");
   }
 
   /** Answers or calls off a question: it leaves the state, and whoever waits on it hears. */

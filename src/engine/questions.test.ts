@@ -1,13 +1,13 @@
 import type { CanUseTool, PermissionUpdate } from "@anthropic-ai/claude-agent-sdk";
 import { describe, expect, it, vi } from "vitest";
 import { Questions, type Inbox } from "./questions.ts";
-import type { Question } from "./types.ts";
+import type { Question, Subtask } from "./types.ts";
 
 /** An inbox over an empty state, recording the rules allowed always. */
 function inbox() {
   const allowed: string[][] = [];
   const box: Inbox = {
-    state: { questions: [] },
+    state: { questions: [], subtasks: [] as Subtask[] },
     changed: vi.fn(),
     allowAlways: (rules) => {
       allowed.push(rules);
@@ -196,5 +196,93 @@ describe("answer", () => {
     expect(() => {
       questions.answer(question.id, { option: "always" });
     }).toThrow("doesn't fit");
+  });
+});
+
+const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
+  id,
+  taskId: "t1",
+  goalId: "g1",
+  title: id,
+  description: "",
+  acceptance: "",
+  assignee: "glm",
+  dependsOn: [],
+  status: "done",
+  createdAt: 0,
+  progress: { done: 0, total: 0 },
+  tokens: 0,
+  ...fields,
+});
+
+describe("decisions", () => {
+  it("wait for you with no turn behind them, and come back answered", async () => {
+    const { box, questions } = inbox();
+    questions.openDecision(
+      subtask("s1", { status: "reviewing" }),
+      { kind: "review", options: ["rereview", "skip", "sendBack"] },
+      "Sent back three times",
+    );
+    const question = await opened(box);
+    expect(question).toMatchObject({ from: "glm", to: "you", subtaskId: "s1" });
+    expect(() => questions.answer(question.id, { option: "once" })).toThrow("doesn't fit");
+    expect(questions.answer(question.id, { decision: "skip" })).toBe(question);
+    expect(box.state.questions).toEqual([]);
+  });
+
+  it("send a task back only with what to change, and only a subtask done in it", async () => {
+    const { box, questions } = inbox();
+    box.state.subtasks.push(
+      subtask("s1"),
+      subtask("s2"),
+      subtask("s3", { status: "pending" }),
+      subtask("x", { taskId: "t2" }),
+    );
+    questions.openDecision(
+      subtask("s1"),
+      { kind: "delivery", options: ["accept", "revise"] },
+      "Dice game",
+    );
+    const { id } = await opened(box);
+    for (const answer of [
+      { decision: "revise" as const },
+      { decision: "revise" as const, note: "Bigger dice", sentBack: "s3" },
+      { decision: "revise" as const, note: "Bigger dice", sentBack: "x" },
+    ])
+      expect(() => questions.answer(id, answer)).toThrow("doesn't fit");
+    questions.answer(id, { decision: "revise", note: "Bigger dice", sentBack: "s2" });
+  });
+});
+
+describe("calling off", () => {
+  it("a subtask's questions frees its waiting turn, and its decisions only when asked to", async () => {
+    const { box, questions } = inbox();
+    const asked = questions.gate({
+      from: "glm",
+      subtaskId: "s1",
+      signal: new AbortController().signal,
+    })("Bash", command, request());
+    questions.openDecision(subtask("s1"), { kind: "merge", options: ["retry"] }, "git failed");
+    await vi.waitFor(() => {
+      expect(box.state.questions).toHaveLength(2);
+    });
+    questions.cancelFor("s1");
+    expect(await asked).toEqual({ behavior: "deny", message: "Stopped." });
+    expect(box.state.questions.map((q) => q.decision?.kind)).toEqual(["merge"]);
+    questions.cancelFor("s1", true);
+    expect(box.state.questions).toEqual([]);
+  });
+
+  it("a task's delivery leaves its other decisions", () => {
+    const { box, questions } = inbox();
+    box.state.subtasks.push(subtask("s1"), subtask("x", { taskId: "t2" }));
+    questions.openDecision(subtask("s1"), { kind: "delivery", options: ["accept", "revise"] }, "");
+    questions.openDecision(
+      subtask("x", { taskId: "t2" }),
+      { kind: "delivery", options: ["accept", "revise"] },
+      "",
+    );
+    questions.cancelDelivery("t1");
+    expect(box.state.questions.map((q) => q.subtaskId)).toEqual(["x"]);
   });
 });
