@@ -4,6 +4,18 @@
  * by that name. What anything waits on is never stored: derive.ts works it
  * out from this.
  */
+import type { EffortLevel } from "@anthropic-ai/claude-agent-sdk";
+
+/** Someone on the team, from their file in the team folder (§6). */
+export interface Member {
+  /** The file's name. */
+  name: string;
+  role: string;
+  model?: string;
+  effort?: EffortLevel;
+  /** Their Claude Code's environment, `${VAR}` not filled in yet. */
+  env: Record<string, string>;
+}
 
 export const GOAL_STATUSES = ["active", "paused", "archived"] as const;
 export type GoalStatus = (typeof GOAL_STATUSES)[number];

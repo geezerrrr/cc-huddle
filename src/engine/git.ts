@@ -87,7 +87,8 @@ export const memberSigner = (member: string): Signer => ({
   email: `${member}@openplan.local`,
 });
 
-const authorEnv = (by: Signer): Record<string, string> => ({
+/** Git's variables for who a commit is by: the engine's commits, and those members make themselves. */
+export const authorEnv = (by: Signer): Record<string, string> => ({
   GIT_AUTHOR_NAME: by.name,
   GIT_AUTHOR_EMAIL: by.email,
   GIT_COMMITTER_NAME: by.name,
