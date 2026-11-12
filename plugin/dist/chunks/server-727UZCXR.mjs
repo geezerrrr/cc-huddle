@@ -9285,7 +9285,12 @@ function workOptions(seat, from) {
   };
 }
 function readOnlyOptions(seat, from) {
-  return { ...workOptions(seat, from), tools: READ_ONLY_TOOLS, permissionMode: "dontAsk" };
+  return {
+    ...workOptions(seat, from),
+    tools: READ_ONLY_TOOLS,
+    permissionMode: "dontAsk",
+    strictMcpConfig: true
+  };
 }
 
 // src/engine/questions.ts

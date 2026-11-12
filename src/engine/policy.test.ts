@@ -129,10 +129,11 @@ describe("session options", () => {
     });
   });
 
-  it("keeps a read-only turn to the read-only tools and asks nobody", () => {
+  it("keeps a read-only turn to the read-only tools and its own MCP server, and asks nobody", () => {
     expect(readOnlyOptions(seat, from)).toMatchObject({
       tools: ["Read", "Glob", "Grep", "WebSearch", "WebFetch"],
       permissionMode: "dontAsk",
+      strictMcpConfig: true,
     });
   });
 });

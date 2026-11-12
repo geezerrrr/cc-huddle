@@ -135,7 +135,17 @@ export function workOptions(seat: Seat, from: Env): Options {
  * rules don't allow is refused (dontAsk). Not plan mode: it brings Claude
  * Code's planning workflow, which ends a turn with ExitPlanMode, at odds with
  * a turn that has to end in structured output (a meeting's plan).
+ *
+ * No MCP server but the turn's own (strictMcpConfig): yours would offer tools
+ * that do more than read, and as a resumed session connects them partway
+ * through each turn, its tools change and the conversation's prompt cache is
+ * written again whole, turn after turn.
  */
 export function readOnlyOptions(seat: Seat, from: Env): Options {
-  return { ...workOptions(seat, from), tools: READ_ONLY_TOOLS, permissionMode: "dontAsk" };
+  return {
+    ...workOptions(seat, from),
+    tools: READ_ONLY_TOOLS,
+    permissionMode: "dontAsk",
+    strictMcpConfig: true,
+  };
 }
