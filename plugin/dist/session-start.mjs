@@ -7381,6 +7381,16 @@ import path from "node:path";
 // src/engine/core.ts
 var errorText = (error62) => error62 instanceof Error ? error62.message : String(error62);
 
+// src/engine/running.ts
+function running(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error62) {
+    return error62.code === "EPERM";
+  }
+}
+
 // src/engine/data.ts
 function repoFolder(dataFolder2, repo) {
   const name = path.basename(repo.top).replace(/[^\w.-]+/g, "-");
@@ -7414,14 +7424,6 @@ async function readState(file2) {
   if (saved.version > STATE_VERSION)
     throw new Error(`${file2} was written by a newer openplan: update openplan to go on`);
   return saved.state;
-}
-function running(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error62) {
-    return error62.code === "EPERM";
-  }
 }
 function readHolder(file2) {
   try {

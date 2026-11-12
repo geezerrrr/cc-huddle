@@ -9,6 +9,7 @@ import { readFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
 import { errorText } from "./core.ts";
 import type { Repository } from "./git.ts";
+import { running } from "./running.ts";
 import type { TeamState } from "./types.ts";
 
 /**
@@ -101,17 +102,6 @@ export function stateWriter(
       await writing;
     },
   };
-}
-
-/** Whether a process is running. */
-function running(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    // There, but not ours to signal.
-    return (error as NodeJS.ErrnoException).code === "EPERM";
-  }
 }
 
 /**

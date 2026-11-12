@@ -1,4 +1,7 @@
 import { createRequire } from "node:module"; const require = createRequire(import.meta.url);
+import {
+  running
+} from "./chunks/chunk-57CQPYHZ.mjs";
 
 // src/plugin/bootstrap.ts
 import { execFile } from "node:child_process";
@@ -19,14 +22,6 @@ var exists = (file) => stat(file).then(
   () => true,
   () => false
 );
-function running(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return error.code === "EPERM";
-  }
-}
 if (!await exists(path.join(home, "node_modules"))) {
   const draft = `${home}.${String(process.pid)}`;
   await mkdir(draft, { recursive: true });
@@ -62,4 +57,4 @@ registerHooks({
     return bare && context.parentURL?.startsWith(ours) ? next(specifier, { ...context, parentURL: from }) : next(specifier, context);
   }
 });
-await import("./chunks/server-EKARYC3S.mjs");
+await import("./chunks/server-6KBNISL6.mjs");

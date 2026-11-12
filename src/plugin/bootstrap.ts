@@ -12,6 +12,7 @@ import { registerHooks } from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+import { running } from "../engine/running.ts";
 
 const dataFolder = process.env.CLAUDE_PLUGIN_DATA;
 if (!dataFolder)
@@ -28,17 +29,6 @@ const exists = (file: string) =>
     () => true,
     () => false,
   );
-
-/** Whether process `pid` runs. */
-function running(pid: number) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    // It runs as someone else.
-    return (error as NodeJS.ErrnoException).code === "EPERM";
-  }
-}
 
 if (!(await exists(path.join(home, "node_modules")))) {
   // Installed beside, then moved in whole: two sessions starting at once don't share a half install.
