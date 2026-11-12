@@ -1,6 +1,8 @@
-import type { SDKMessage, SDKResultMessage } from "@anthropic-ai/claude-agent-sdk";
+import { query, type SDKMessage, type SDKResultMessage } from "@anthropic-ai/claude-agent-sdk";
 import { describe, expect, it, vi } from "vitest";
-import { claudeProcess, resultOutcome, turnDecoder, type TurnListener } from "./turns.ts";
+import { askOnce, claudeProcess, resultOutcome, turnDecoder, type TurnListener } from "./turns.ts";
+
+vi.mock("@anthropic-ai/claude-agent-sdk", () => ({ query: vi.fn() }));
 
 const usage = {
   input_tokens: 10,
@@ -207,5 +209,55 @@ describe("claudeProcess", () => {
     const failure = claude.failure(new Error("Claude Code exited with code 1"));
     expect(failure).toMatch(/^Claude Code exited with code 1\. stderr: x+boom$/);
     expect(failure.length).toBeLessThan(2100);
+  });
+});
+
+describe("askOnce", () => {
+  /** The next query streams these messages. */
+  const streams = (...messages: SDKMessage[]) => {
+    const close = vi.fn();
+    vi.mocked(query).mockReturnValueOnce(
+      Object.assign(
+        (async function* () {
+          await Promise.resolve();
+          yield* messages;
+        })(),
+        { close },
+      ) as unknown as ReturnType<typeof query>,
+    );
+    return close;
+  };
+  const init = msg({ type: "system", subtype: "init", session_id: "s1", model: "glm-5" });
+  const ask = (schema?: Record<string, unknown>, signal = new AbortController().signal) =>
+    askOnce({ prompt: "Review it", options: { cwd: "/desk" }, schema, signal });
+
+  it("gives the turn's words, its session and its tokens, and closes the query", async () => {
+    const close = streams(
+      init,
+      result({ subtype: "success", is_error: false, result: "Looks good" }),
+    );
+    expect(await ask()).toEqual({ text: "Looks good", session: "s1", tokens: 100 });
+    expect(close).toHaveBeenCalled();
+  });
+
+  it("asks for the schema's shape, and fails a turn that answers in words instead", async () => {
+    streams(init, result({ subtype: "success", is_error: false, result: "pass" }));
+    const schema = { type: "object" };
+    await expect(ask(schema)).rejects.toThrow("answered in words");
+    expect(vi.mocked(query).mock.lastCall?.[0].options).toMatchObject({
+      cwd: "/desk",
+      outputFormat: { type: "json_schema", schema },
+    });
+  });
+
+  it("throws why the turn failed", async () => {
+    streams(init, result({ subtype: "success", is_error: true, result: "API Error: 529" }));
+    await expect(ask()).rejects.toThrow("API Error: 529");
+  });
+
+  it("starts nothing once stopped", async () => {
+    vi.mocked(query).mockClear();
+    await expect(ask(undefined, AbortSignal.abort())).rejects.toThrow();
+    expect(query).not.toHaveBeenCalled();
   });
 });

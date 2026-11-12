@@ -3,11 +3,13 @@
  * that reads what a turn's message stream says and judges how a turn ended.
  */
 import { spawn } from "node:child_process";
-import type {
-  SDKMessage,
-  SDKResultMessage,
-  SpawnedProcess,
-  SpawnOptions,
+import {
+  query,
+  type Options,
+  type SDKMessage,
+  type SDKResultMessage,
+  type SpawnedProcess,
+  type SpawnOptions,
 } from "@anthropic-ai/claude-agent-sdk";
 
 /** How a turn ended: its final text, or why it failed, and the tokens it used. */
@@ -316,4 +318,75 @@ export function claudeProcess() {
       return tail ? `${words}. stderr: ${tail}` : words;
     },
   };
+}
+
+/** What a turn run to its end gave: its words, its structured output if asked for, its session. */
+export interface Reply {
+  text: string;
+  structured?: unknown;
+  session: string;
+  tokens: number;
+}
+
+/**
+ * Runs one turn to its end (a meeting turn, a teammate's answer, a review)
+ * and gives what it said, or throws why it failed. Given a `schema`, the turn
+ * hands its result back in that shape, and one that answers in words instead
+ * has failed too. Stopped by `signal`, it waits until Claude Code has exited.
+ */
+export async function askOnce(params: {
+  prompt: string;
+  options: Options;
+  schema?: Record<string, unknown>;
+  signal: AbortSignal;
+  listener?: TurnListener;
+}): Promise<Reply> {
+  const { prompt, options, schema, signal, listener = {} } = params;
+  signal.throwIfAborted();
+  const abortController = new AbortController();
+  // Removed again when the turn ends: the caller's signal outlives many turns.
+  const stop = () => {
+    abortController.abort();
+  };
+  signal.addEventListener("abort", stop, { once: true });
+  const claude = claudeProcess();
+  let session = "";
+  const decode = turnDecoder({
+    ...listener,
+    session: (id, model) => {
+      session = id;
+      listener.session?.(id, model);
+    },
+  });
+  const run = query({
+    prompt,
+    options: {
+      ...options,
+      ...(schema && { outputFormat: { type: "json_schema", schema } }),
+      abortController,
+      spawnClaudeCodeProcess: claude.spawn,
+    },
+  });
+  try {
+    for await (const message of run) {
+      const outcome = decode(message);
+      if (!outcome) continue;
+      if (!outcome.ok) throw new Error(outcome.error);
+      if (schema && outcome.structured === undefined)
+        throw new Error("The model answered in words instead of the result asked for");
+      return {
+        text: outcome.text,
+        structured: outcome.structured,
+        session,
+        tokens: outcome.tokens,
+      };
+    }
+    throw new Error("The session ended without a result");
+  } catch (error) {
+    throw new Error(claude.failure(error), { cause: error });
+  } finally {
+    signal.removeEventListener("abort", stop);
+    run.close();
+    await claude.gone();
+  }
 }
