@@ -7,5 +7,6 @@
   },
   "repository": "https://github.com/geezerrrr/openplan",
   "license": "MIT",
-  "keywords": ["team", "multi-agent", "planning", "worktrees"]
+  "keywords": ["team", "multi-agent", "planning", "worktrees"],
+  "types": "./types/index.d.ts"
 }

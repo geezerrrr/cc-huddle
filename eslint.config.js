@@ -11,4 +11,6 @@ export default tseslint.config(
     },
   },
   { files: ["**/*.js"], ...tseslint.configs.disableTypeChecked },
+  // The mod runs in Claude Code, not Node: `pnpm check:mod` checks it there.
+  { files: ["plugin/**/*.tsx"], ...tseslint.configs.disableTypeChecked },
 );

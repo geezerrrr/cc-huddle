@@ -111,6 +111,8 @@ declare module "claude-code" {
       /** Why there is no team to show. */
       problem: string | null;
       tab: OpenplanTab;
+      /** Picks made on a need not answered yet, by its id. */
+      picks: Record<string, string[]>;
     };
   }
 }
