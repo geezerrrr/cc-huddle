@@ -6,7 +6,7 @@
  * kept from both.
  */
 import { atom, read, update } from "claude-code";
-import type { Elements, EngineInterface, Register } from "claude-code";
+import type { Elements, EngineInterface, Register, Timer } from "claude-code";
 
 import type {
   OpenplanEntry,
@@ -22,6 +22,8 @@ type $ = EngineInterface;
 type Ui = Pick<Elements["terminal"], "Box" | "Button" | "Input" | "Markdown" | "Select" | "Text">;
 
 const PANE = "openplan";
+/** The server's tools, as the model names them. */
+const TOOLS = /^mcp__plugin_openplan_openplan__/;
 /** The tools only the pane calls, as the model would name them. */
 const PANE_ONLY = /^mcp__plugin_openplan_openplan__(view|answer)$/;
 const PANE_ONLY_REASON = "This tool is openplan's pane's: the user answers there, in /openplan.";
@@ -64,6 +66,15 @@ let revision: number | undefined;
 /** Needs and milestones told already; those there at the first look are not news. */
 let told: Set<string> | undefined;
 let polling = false;
+/**
+ * The poll, while it runs. It stops when the server can't open the team (no
+ * team in the repository, another session's), and starts again when you or
+ * your session turn to openplan.
+ */
+let ticking: Timer | undefined;
+
+/** What the server answered with an error: the team can't be opened, or refused what was asked. */
+class Refused extends Error {}
 
 const clip = (text: string) => (text.length > ROW_TEXT ? `${text.slice(0, ROW_TEXT)}…` : text);
 
@@ -99,8 +110,13 @@ async function call($: $, tool: string, args: Record<string, unknown> = {}): Pro
   }
   const result = await $.mcp.call(server, tool, args);
   const text = result.content.find((block) => block.type === "text")?.text ?? "";
-  if (result.isError) throw new Error(text);
+  if (result.isError) throw new Refused(text);
   return text;
+}
+
+/** Polls the team, unless it does already. */
+function watch($: $) {
+  ticking ??= $.clock.every(POLL_MS, () => void poll($));
 }
 
 function openPane($: $) {
@@ -171,6 +187,11 @@ async function poll($: $) {
     await update($, speaking, (was) => (JSON.stringify(was) === JSON.stringify(said) ? was : said));
     await update($, record, (was) => followed(was, view));
   } catch (error) {
+    // A server still starting is asked again; a team it can't open waits for you.
+    if (error instanceof Refused) {
+      ticking?.cancel();
+      ticking = undefined;
+    }
     const why = words(error);
     revision = undefined;
     await update($, problem, (was) => (was === why ? was : why));
@@ -463,11 +484,12 @@ export const register: Register = (on) => {
       description: "Show openplan's team in a pane; `/openplan status` prints where it stands",
       argumentHint: "[status]",
     });
-    $.clock.every(POLL_MS, () => void poll($));
+    watch($);
     return next(e);
   });
 
   on("command.run", { command: "openplan" }, async ($, e) => {
+    watch($);
     if (e.args.trim() !== "status") {
       await openPane($);
       return {};
@@ -477,6 +499,13 @@ export const register: Register = (on) => {
     } catch (error) {
       return { text: `openplan: ${words(error)}` };
     }
+  });
+
+  // Your session at the team: it may have one to open now.
+  on("tool.call", { tool: TOOLS }, async ($, e, next) => {
+    const result = await next(e);
+    watch($);
+    return result;
   });
 
   // The pane's tools are the person's: the model never answers a permission for them.

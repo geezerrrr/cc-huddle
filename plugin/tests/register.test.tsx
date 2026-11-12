@@ -174,6 +174,35 @@ test("a new need is a toast, a new milestone a transcript row; what was there be
   expect(rows).toEqual(['openplan: "Rules" by glm is merged']);
 });
 
+test("the pane stops asking a team that can't be opened, until you or your session turn to it", async ($, on) => {
+  const clock = mock.clock(on);
+  let views = 0;
+  on("mcp.connect", () => ({ value: { isConnected: true, server: SERVER } }));
+  on("mcp.call", (_, e) => {
+    if (e.tool === "view") views++;
+    const text = e.tool === "view" ? "The team has no members" : "Started.";
+    return { value: { content: [{ type: "text", text }], isError: e.tool === "view" } };
+  });
+  on("command.register", (_, e) => ({ value: { command: e.name } }));
+  on("ui.open", () => ({ value: { isPlaced: true } }));
+  on("session.start", (_, e) => ({ cwd: e.cwd }));
+  on("tool.call", () => ({ result: "Started." }));
+  await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
+  await clock.advance(2000);
+  expect(views).toBe(1);
+  await $.command.run({
+    command: "openplan",
+    args: "",
+    origin: { kind: "composer" },
+    presentation: { isFullscreen: true, columns: 120 },
+  });
+  await clock.advance(2000);
+  expect(views).toBe(2);
+  await $.tool.call({ tool: "mcp__plugin_openplan_openplan__start_goal", name: "Dice" });
+  await clock.advance(2000);
+  expect(views).toBe(3);
+});
+
 test("the model can't call the pane's tools", async ($) => {
   const { decision } = await $.tool.check({
     tool: "mcp__plugin_openplan_openplan__answer",
