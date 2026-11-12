@@ -8889,6 +8889,12 @@ var floorTool = (others, give) => turnTool(
     }
   )
 );
+var quiet = (meeting2) => Object.assign(meeting2, {
+  speaking: void 0,
+  planning: void 0,
+  weighing: void 0,
+  hands: void 0
+});
 function nextMove({
   turns,
   participants,
@@ -9009,12 +9015,7 @@ var Meetings = class {
     for (const meeting2 of this.core.state.meetings) {
       if (meeting2.status !== "running") continue;
       meeting2.status = step(MEETING_MACHINE, meeting2.status, "cancel");
-      Object.assign(meeting2, {
-        speaking: void 0,
-        planning: void 0,
-        weighing: void 0,
-        hands: void 0
-      });
+      quiet(meeting2);
     }
   }
   /**
@@ -9194,12 +9195,7 @@ var Meetings = class {
         if (!signal.aborted) meeting2.error = errorText(error);
       }
     } finally {
-      Object.assign(meeting2, {
-        speaking: void 0,
-        planning: void 0,
-        weighing: void 0,
-        hands: void 0
-      });
+      quiet(meeting2);
       core.changed();
       this.scheduler.pump();
     }

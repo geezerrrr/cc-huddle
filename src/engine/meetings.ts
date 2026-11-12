@@ -109,6 +109,15 @@ const floorTool = (
     ),
   );
 
+/** A meeting no longer under way: nobody speaks, writes the plan, weighs it or has a hand up. */
+const quiet = (meeting: Meeting) =>
+  Object.assign(meeting, {
+    speaking: undefined,
+    planning: undefined,
+    weighing: undefined,
+    hands: undefined,
+  });
+
 type Move =
   | { kind: "open" }
   | { kind: "round"; member: string }
@@ -263,12 +272,7 @@ export class Meetings {
     for (const meeting of this.core.state.meetings) {
       if (meeting.status !== "running") continue;
       meeting.status = step(MEETING_MACHINE, meeting.status, "cancel");
-      Object.assign(meeting, {
-        speaking: undefined,
-        planning: undefined,
-        weighing: undefined,
-        hands: undefined,
-      });
+      quiet(meeting);
     }
   }
 
@@ -494,12 +498,7 @@ export class Meetings {
         if (!signal.aborted) meeting.error = errorText(error);
       }
     } finally {
-      Object.assign(meeting, {
-        speaking: undefined,
-        planning: undefined,
-        weighing: undefined,
-        hands: undefined,
-      });
+      quiet(meeting);
       core.changed();
       // Its attendees are free again.
       this.scheduler.pump();
