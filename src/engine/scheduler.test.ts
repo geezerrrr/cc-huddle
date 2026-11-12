@@ -385,6 +385,28 @@ describe("Scheduler", () => {
       });
     });
 
+    it("go on with a failed subtask in its session and worktree", async () => {
+      const s1 = subtask("s1");
+      core.state.subtasks.push(s1);
+      vi.mocked(runSubtask)
+        .mockImplementationOnce(async (run) => {
+          run.listener.session?.("glm-1", "m");
+          await writeFile(path.join(run.options.cwd ?? "", "half.txt"), "half\n");
+          return { status: "failed", error: "API Error: 529", tokens: 0 };
+        })
+        .mockImplementationOnce(async (run) => {
+          expect(await readFile(path.join(run.options.cwd ?? "", "half.txt"), "utf8")).toBe(
+            "half\n",
+          );
+          return delivering({ "score.txt": "1\n" })(run);
+        });
+      scheduler.pump();
+      await settled(s1, "failed");
+      scheduler.continue("s1");
+      await settled(s1, "done");
+      expect(runs()[1]?.resume).toBe("glm-1");
+    });
+
     it("retry a failed subtask from the start", async () => {
       const s1 = subtask("s1");
       core.state.subtasks.push(s1);
