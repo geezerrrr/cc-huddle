@@ -12,6 +12,7 @@ import {
   type SpawnOptions,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { TodoWriteInput } from "@anthropic-ai/claude-agent-sdk/sdk-tools";
+import { watchMember } from "./processes.ts";
 
 /** How a turn ended: its final text, or why it failed, and the tokens it used. */
 export type TurnOutcome = (
@@ -303,8 +304,9 @@ const STDERR_TAIL = 2000;
 /**
  * Starts a turn's Claude Code here (pass `spawn` as the query's
  * `spawnClaudeCodeProcess`; it does what the SDK's own spawn does), so a
- * stopped turn can be waited on until its process has exited (`gone`), and a
- * failed one says what Claude Code last wrote to stderr (`failure`).
+ * stopped turn can be waited on until its process has exited (`gone`), a
+ * failed one says what Claude Code last wrote to stderr (`failure`), and the
+ * process is kept with the others (processes.ts).
  */
 export function claudeProcess() {
   let exited = Promise.resolve();
@@ -313,6 +315,7 @@ export function claudeProcess() {
     spawn: ({ command, args, cwd, env, signal }: SpawnOptions): SpawnedProcess => {
       // The SDK's signal fires only after Claude Code had its chance to shut down on its own.
       const child = spawn(command, args, { cwd, env, signal, stdio: "pipe", windowsHide: true });
+      watchMember(child, args);
       exited = new Promise((resolve) => {
         child.once("close", () => {
           resolve();
