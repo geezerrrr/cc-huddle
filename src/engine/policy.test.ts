@@ -76,19 +76,23 @@ describe("memberSettings", () => {
 });
 
 describe("writeSettings", () => {
-  it("writes the settings where only you can read them, also over an older file", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "openplan-policy-"));
-    try {
-      const file = path.join(dir, "members", "glm.json");
-      await writeSettings(file, {});
-      await writeFile(file, "{}", { mode: 0o644 });
-      await writeSettings(file, { crossSessionInbound: "refuse" });
-      expect((await stat(file)).mode & 0o777).toBe(0o600);
-      expect(JSON.parse(await readFile(file, "utf8"))).toEqual({ crossSessionInbound: "refuse" });
-    } finally {
-      await rm(dir, { recursive: true, force: true });
-    }
-  });
+  // Windows keeps who may read a file in its ACL, not in mode bits.
+  it.skipIf(process.platform === "win32")(
+    "writes the settings where only you can read them, also over an older file",
+    async () => {
+      const dir = await mkdtemp(path.join(tmpdir(), "openplan-policy-"));
+      try {
+        const file = path.join(dir, "members", "glm.json");
+        await writeSettings(file, {});
+        await writeFile(file, "{}", { mode: 0o644 });
+        await writeSettings(file, { crossSessionInbound: "refuse" });
+        expect((await stat(file)).mode & 0o777).toBe(0o600);
+        expect(JSON.parse(await readFile(file, "utf8"))).toEqual({ crossSessionInbound: "refuse" });
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    },
+  );
 });
 
 describe("session options", () => {

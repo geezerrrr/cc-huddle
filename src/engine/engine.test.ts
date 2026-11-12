@@ -66,13 +66,11 @@ afterEach(async () => {
 const saved = async (): Promise<unknown> => JSON.parse(await readFile(files.state, "utf8"));
 
 describe("Engine", () => {
-  it("opens the team for one session, with each member's settings written for them alone", async () => {
+  it("opens the team for one session, with each member's settings written", async () => {
     const engine = await open();
     expect(engine.team.members.map((m) => m.name)).toEqual(["glm"]);
     expect(engine.meetingSize).toBe("discussion");
-    const settings = files.settings("glm");
-    expect((await stat(settings)).mode & 0o777).toBe(0o600);
-    expect(JSON.parse(await readFile(settings, "utf8"))).toMatchObject({
+    expect(JSON.parse(await readFile(files.settings("glm"), "utf8"))).toMatchObject({
       env: { ANTHROPIC_AUTH_TOKEN: "key-1" },
       enabledPlugins: { "openplan@inline": false },
     });
