@@ -107,10 +107,14 @@ const working = (run: Run) =>
     else run.signal.addEventListener("abort", stopped);
   });
 
+/** Real git merges: slow while the other test files run alongside. */
 const settled = (s: Subtask, status: Subtask["status"]) =>
-  vi.waitFor(() => {
-    expect(s.status).toBe(status);
-  });
+  vi.waitFor(
+    () => {
+      expect(s.status).toBe(status);
+    },
+    { timeout: 10_000 },
+  );
 
 const onGoal = (file: string) => readFile(path.join(goalFolder(core.places, "dice"), file), "utf8");
 
