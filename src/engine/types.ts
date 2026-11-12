@@ -217,8 +217,17 @@ export interface Choice {
 }
 
 /** What you can decide on a stuck review, a merge that needs you, or a finished task. */
-export type DecisionOption =
-  "rereview" | "skip" | "sendBack" | "ours" | "theirs" | "retry" | "accept" | "revise";
+export const DECISION_OPTIONS = [
+  "rereview",
+  "skip",
+  "sendBack",
+  "ours",
+  "theirs",
+  "retry",
+  "accept",
+  "revise",
+] as const;
+export type DecisionOption = (typeof DECISION_OPTIONS)[number];
 
 export type DecisionKind = "review" | "merge" | "delivery";
 
