@@ -4,7 +4,7 @@
  * and where everything else in that folder goes.
  */
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { link, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { readFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
 import { errorText } from "./core.ts";
@@ -124,38 +124,87 @@ export interface Holder {
   open: boolean;
 }
 
-/** Who holds a lock, while they run; undefined when nobody does. */
-export function holderOf(lock: string): Holder | undefined {
-  let holder: Holder;
+/** The holder a lock file names; undefined when there is none or it can't be read. */
+function readHolder(file: string): Holder | undefined {
   try {
-    holder = JSON.parse(readFileSync(lock, "utf8")) as Holder;
+    return JSON.parse(readFileSync(file, "utf8")) as Holder;
   } catch {
     return undefined;
   }
-  return running(holder.pid) ? holder : undefined;
 }
 
-const hold = async (lock: string, open: boolean) => {
+/** Who holds a lock, while they run; undefined when nobody does. */
+export function holderOf(lock: string): Holder | undefined {
+  const holder = readHolder(lock);
+  return holder && running(holder.pid) ? holder : undefined;
+}
+
+const busy = (lock: string, holder: Holder) =>
+  new Error(
+    `Another Claude Code session runs this repository's team (pid ${String(holder.session)}). If it has ended, delete ${lock}`,
+  );
+
+/** This process as the holder, in a file of its own beside the lock, to be put in place whole. */
+async function holding(lock: string, open: boolean): Promise<string> {
   await mkdir(path.dirname(lock), { recursive: true });
+  const file = `${lock}.${String(process.pid)}`;
   const holder: Holder = { pid: process.pid, session: process.ppid, open };
-  await writeFile(lock, JSON.stringify(holder));
-};
+  await writeFile(file, JSON.stringify(holder));
+  return file;
+}
+
+const code = (error: unknown) => (error as NodeJS.ErrnoException).code;
 
 /**
  * Takes a repository's team for this process and the session that started
- * it, or throws which session holds it. One that has ended holds nothing.
+ * it, or throws which session holds it. The lock is made whole or not at
+ * all, so two sessions starting at once can't both take it; one whose holder
+ * has ended is moved aside first, by one taker only.
  */
 export async function takeTeam(lock: string): Promise<void> {
-  const holder = holderOf(lock);
-  if (holder && holder.pid !== process.pid)
-    throw new Error(
-      `Another Claude Code session runs this repository's team (pid ${String(holder.session)}). If it has ended, delete ${lock}`,
-    );
-  await hold(lock, false);
+  const mine = await holding(lock, false);
+  try {
+    for (;;) {
+      try {
+        await link(mine, lock);
+        return;
+      } catch (error) {
+        if (code(error) !== "EEXIST") throw error;
+      }
+      const holder = readHolder(lock);
+      if (holder && running(holder.pid)) {
+        if (holder.pid !== process.pid) throw busy(lock, holder);
+        await rename(mine, lock);
+        return;
+      }
+      const aside = `${lock}.${String(process.pid)}.ended`;
+      try {
+        await rename(lock, aside);
+      } catch (error) {
+        // Another taker moved it first: try again.
+        if (code(error) === "ENOENT") continue;
+        throw error;
+      }
+      const moved = readHolder(aside);
+      if (moved && running(moved.pid)) {
+        // It was taken between the look and the move: it goes back.
+        await link(aside, lock).catch((error: unknown) => {
+          if (code(error) !== "EEXIST") throw error;
+        });
+        await rm(aside, { force: true });
+        throw busy(lock, moved);
+      }
+      await rm(aside, { force: true });
+    }
+  } finally {
+    await rm(mine, { force: true });
+  }
 }
 
 /** Tells the lock that this process has opened the team: its state is the team's as it goes on. */
-export const openedTeam = (lock: string) => hold(lock, true);
+export async function openedTeam(lock: string): Promise<void> {
+  await rename(await holding(lock, true), lock);
+}
 
 /** Lets the team go, as this process ends: at once, since it may be exiting. */
 export function releaseTeam(lock: string) {

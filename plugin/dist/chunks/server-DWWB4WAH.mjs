@@ -1182,8 +1182,8 @@ var require_stringifyString = __commonJS({
             case "u":
               {
                 str += json2.slice(start, i);
-                const code = json2.substr(i + 2, 4);
-                switch (code) {
+                const code2 = json2.substr(i + 2, 4);
+                switch (code2) {
                   case "0000":
                     str += "\\0";
                     break;
@@ -1209,8 +1209,8 @@ var require_stringifyString = __commonJS({
                     str += "\\P";
                     break;
                   default:
-                    if (code.substr(0, 2) === "00")
-                      str += "\\x" + code.substr(2);
+                    if (code2.substr(0, 2) === "00")
+                      str += "\\x" + code2.substr(2);
                     else
                       str += json2.substr(i, 6);
                 }
@@ -3709,22 +3709,22 @@ var require_errors = __commonJS({
   "node_modules/.pnpm/yaml@2.9.1/node_modules/yaml/dist/errors.js"(exports) {
     "use strict";
     var YAMLError = class extends Error {
-      constructor(name, pos, code, message) {
+      constructor(name, pos, code2, message) {
         super();
         this.name = name;
-        this.code = code;
+        this.code = code2;
         this.message = message;
         this.pos = pos;
       }
     };
     var YAMLParseError = class extends YAMLError {
-      constructor(pos, code, message) {
-        super("YAMLParseError", pos, code, message);
+      constructor(pos, code2, message) {
+        super("YAMLParseError", pos, code2, message);
       }
     };
     var YAMLWarning = class extends YAMLError {
-      constructor(pos, code, message) {
-        super("YAMLWarning", pos, code, message);
+      constructor(pos, code2, message) {
+        super("YAMLWarning", pos, code2, message);
       }
     };
     var prettifyError = (src, lc) => (error) => {
@@ -4633,7 +4633,7 @@ var require_resolve_flow_scalar = __commonJS({
       const { offset, type, source, end: end2 } = scalar;
       let _type;
       let value;
-      const _onError = (rel, code, msg) => onError(offset + rel, code, msg);
+      const _onError = (rel, code2, msg) => onError(offset + rel, code2, msg);
       switch (type) {
         case "scalar":
           _type = Scalar.Scalar.PLAIN;
@@ -4831,9 +4831,9 @@ var require_resolve_flow_scalar = __commonJS({
     function parseCharCode(source, offset, length, onError) {
       const cc = source.substr(offset, length);
       const ok = cc.length === length && /^[0-9a-fA-F]+$/.test(cc);
-      const code = ok ? parseInt(cc, 16) : NaN;
+      const code2 = ok ? parseInt(cc, 16) : NaN;
       try {
-        return String.fromCodePoint(code);
+        return String.fromCodePoint(code2);
       } catch {
         const raw = source.substr(offset - 2, length + 2);
         onError(offset - 2, "BAD_DQ_ESCAPE", `Invalid escape sequence ${raw}`);
@@ -5155,12 +5155,12 @@ var require_composer = __commonJS({
         this.prelude = [];
         this.errors = [];
         this.warnings = [];
-        this.onError = (source, code, message, warning) => {
+        this.onError = (source, code2, message, warning) => {
           const pos = getErrorPos(source);
           if (warning)
-            this.warnings.push(new errors.YAMLWarning(pos, code, message));
+            this.warnings.push(new errors.YAMLWarning(pos, code2, message));
           else
-            this.errors.push(new errors.YAMLParseError(pos, code, message));
+            this.errors.push(new errors.YAMLParseError(pos, code2, message));
         };
         this.directives = new directives.Directives({ version: options.version || "1.2" });
         this.options = options;
@@ -5322,12 +5322,12 @@ var require_cst_scalar = __commonJS({
     var stringifyString = require_stringifyString();
     function resolveAsScalar(token, strict = true, onError) {
       if (token) {
-        const _onError = (pos, code, message) => {
+        const _onError = (pos, code2, message) => {
           const offset = typeof pos === "number" ? pos : Array.isArray(pos) ? pos[0] : pos.offset;
           if (onError)
-            onError(offset, code, message);
+            onError(offset, code2, message);
           else
-            throw new errors.YAMLParseError([offset, offset + 1], code, message);
+            throw new errors.YAMLParseError([offset, offset + 1], code2, message);
         };
         switch (token.type) {
           case "scalar":
@@ -7392,7 +7392,7 @@ var errorText = (error) => error instanceof Error ? error.message : String(error
 
 // src/engine/data.ts
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { link, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { readFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
 function repoFolder(dataFolder2, repo) {
@@ -7462,36 +7462,75 @@ function running(pid) {
     return error.code === "EPERM";
   }
 }
-function holderOf(lock) {
-  let holder;
+function readHolder(file) {
   try {
-    holder = JSON.parse(readFileSync(lock, "utf8"));
+    return JSON.parse(readFileSync(file, "utf8"));
   } catch {
     return void 0;
   }
-  return running(holder.pid) ? holder : void 0;
 }
-var hold = async (lock, open2) => {
+function holderOf(lock) {
+  const holder = readHolder(lock);
+  return holder && running(holder.pid) ? holder : void 0;
+}
+var busy = (lock, holder) => new Error(
+  `Another Claude Code session runs this repository's team (pid ${String(holder.session)}). If it has ended, delete ${lock}`
+);
+async function holding(lock, open2) {
   await mkdir(path.dirname(lock), { recursive: true });
+  const file = `${lock}.${String(process.pid)}`;
   const holder = { pid: process.pid, session: process.ppid, open: open2 };
-  await writeFile(lock, JSON.stringify(holder));
-};
-async function takeTeam(lock) {
-  const holder = holderOf(lock);
-  if (holder && holder.pid !== process.pid)
-    throw new Error(
-      `Another Claude Code session runs this repository's team (pid ${String(holder.session)}). If it has ended, delete ${lock}`
-    );
-  await hold(lock, false);
+  await writeFile(file, JSON.stringify(holder));
+  return file;
 }
-var openedTeam = (lock) => hold(lock, true);
+var code = (error) => error.code;
+async function takeTeam(lock) {
+  const mine = await holding(lock, false);
+  try {
+    for (; ; ) {
+      try {
+        await link(mine, lock);
+        return;
+      } catch (error) {
+        if (code(error) !== "EEXIST") throw error;
+      }
+      const holder = readHolder(lock);
+      if (holder && running(holder.pid)) {
+        if (holder.pid !== process.pid) throw busy(lock, holder);
+        await rename(mine, lock);
+        return;
+      }
+      const aside = `${lock}.${String(process.pid)}.ended`;
+      try {
+        await rename(lock, aside);
+      } catch (error) {
+        if (code(error) === "ENOENT") continue;
+        throw error;
+      }
+      const moved = readHolder(aside);
+      if (moved && running(moved.pid)) {
+        await link(aside, lock).catch((error) => {
+          if (code(error) !== "EEXIST") throw error;
+        });
+        await rm(aside, { force: true });
+        throw busy(lock, moved);
+      }
+      await rm(aside, { force: true });
+    }
+  } finally {
+    await rm(mine, { force: true });
+  }
+}
+async function openedTeam(lock) {
+  await rename(await holding(lock, true), lock);
+}
 function releaseTeam(lock) {
   if (holderOf(lock)?.pid === process.pid) unlinkSync(lock);
 }
 
 // src/engine/git.ts
 import { spawn } from "node:child_process";
-import { readdir, readFile as readFile2, realpath, rm, stat } from "node:fs/promises";
+import { readdir, readFile as readFile2, realpath, rm as rm2, stat } from "node:fs/promises";
 import path2 from "node:path";
 
 // src/engine/serial.ts
@@ -7522,10 +7561,10 @@ var FLAGS = [
   "core.longpaths=true"
 ];
 var GitError = class extends Error {
-  constructor(args, code, output) {
+  constructor(args, code2, output) {
     super(`git ${args[0] ?? ""}: ${output}`);
     this.args = args;
-    this.code = code;
+    this.code = code2;
     this.output = output;
     this.name = "GitError";
   }
@@ -7544,8 +7583,8 @@ function git(at, args, options = {}) {
     child.stdout.setEncoding("utf8").on("data", (chunk) => stdout += chunk);
     child.stderr.setEncoding("utf8").on("data", (chunk) => stderr += chunk);
     child.on("error", reject);
-    child.on("close", (code) => {
-      const exit = code ?? -1;
+    child.on("close", (code2) => {
+      const exit = code2 ?? -1;
       if (exit === 0 || options.allow?.includes(exit)) resolve({ code: exit, stdout, stderr });
       else reject(new GitError(args, exit, (stderr || stdout).trim()));
     });
@@ -7620,7 +7659,7 @@ function openDesk(places, slug, subtaskId) {
     const desk = deskFolder(places, subtaskId);
     await openGoal(places, slug);
     if (await exists(path2.join(desk, ".git"))) return desk;
-    await rm(desk, { recursive: true, force: true });
+    await rm2(desk, { recursive: true, force: true });
     await unlist(repo, desk);
     const branch = subtaskBranch(slug, subtaskId);
     const kept = await git({ cwd: repo.top }, ["rev-parse", "--verify", "-q", branch], {
@@ -7681,7 +7720,7 @@ async function conflicts(places, subtaskId, at) {
 async function removeDesk(places, slug, subtaskId) {
   const desk = deskFolder(places, subtaskId);
   await unlist(places.repo, desk);
-  await rm(desk, { recursive: true, force: true });
+  await rm2(desk, { recursive: true, force: true });
   await git({ cwd: places.repo.top }, ["branch", "-q", "-D", subtaskBranch(slug, subtaskId)], {
     allow: [1]
   });
@@ -7763,13 +7802,13 @@ function removeGoal(places, slug) {
     }
     const folder = goalFolder(places, slug);
     await unlist(repo, folder);
-    await rm(folder, { recursive: true, force: true });
+    await rm2(folder, { recursive: true, force: true });
   });
 }
 
 // src/engine/goals.ts
 import { randomUUID } from "node:crypto";
-import { rm as rm2 } from "node:fs/promises";
+import { rm as rm3 } from "node:fs/promises";
 
 // src/engine/machines.ts
 var GOAL_MACHINE = {
@@ -8031,9 +8070,9 @@ var Goals = class {
       await removeGoal(core.places, goal2.slug);
       await Promise.all([
         ...core.state.meetings.flatMap(
-          (m) => m.goalId === id && m.planFile ? [rm2(m.planFile, { force: true })] : []
+          (m) => m.goalId === id && m.planFile ? [rm3(m.planFile, { force: true })] : []
         ),
-        ...subtasks.map((s) => rm2(recordFile(core.places, s.id), { force: true }))
+        ...subtasks.map((s) => rm3(recordFile(core.places, s.id), { force: true }))
       ]);
       const gone = new Set(subtasks.map((s) => s.id));
       const { state } = core;
@@ -8120,14 +8159,14 @@ function acceptanceOf(state, taskId) {
 }
 var underReview = (state, subtask2) => subtask2.status === "reviewing" && isActive(state, subtask2.goalId) && !openQuestions(state, subtask2.id).some((q) => q.decision);
 function busyMembers(state) {
-  const busy = /* @__PURE__ */ new Set();
+  const busy2 = /* @__PURE__ */ new Set();
   for (const s of state.subtasks) {
-    if (s.status === "running") busy.add(s.assignee);
-    if (underReview(state, s)) busy.add(s.assignee).add(reviewerOf(state, s));
+    if (s.status === "running") busy2.add(s.assignee);
+    if (underReview(state, s)) busy2.add(s.assignee).add(reviewerOf(state, s));
   }
   for (const m of state.meetings)
-    if (m.status === "running") for (const id of m.participants) busy.add(id);
-  return busy;
+    if (m.status === "running") for (const id of m.participants) busy2.add(id);
+  return busy2;
 }
 function reviewerAway(state, subtask2) {
   const reviewer = reviewerOf(state, subtask2);
@@ -8144,7 +8183,7 @@ function reviewerAway(state, subtask2) {
   });
   return working || meeting2 || earlier ? reviewer : void 0;
 }
-function waitsIn(state, subtask2, busy) {
+function waitsIn(state, subtask2, busy2) {
   const goal2 = state.goals.find((p) => p.id === subtask2.goalId);
   const held = goal2 && goal2.status !== "active" ? [{ kind: "goal", status: goal2.status }] : [];
   const asked = () => openQuestions(state, subtask2.id).map(
@@ -8171,7 +8210,7 @@ function waitsIn(state, subtask2, busy) {
       });
       if (upstream.length)
         return [...new Map(upstream.map((w) => [JSON.stringify(w), w])).values()];
-      return busy.has(subtask2.assignee) ? [{ kind: "busy", by: subtask2.assignee }] : [];
+      return busy2.has(subtask2.assignee) ? [{ kind: "busy", by: subtask2.assignee }] : [];
     }
     // A done subtask, the last of its task, carries the task's acceptance waiting on you.
     case "running":
@@ -8213,17 +8252,17 @@ function meetingResumes(state, meeting2) {
   return can(MEETING_MACHINE, meeting2.status, "resume") && !meeting2.plan && isActive(state, meeting2.goalId) && meeting2.participants.every((m) => state.members.includes(m));
 }
 function derive(state) {
-  const busy = busyMembers(state);
+  const busy2 = busyMembers(state);
   return {
     subtasks: Object.fromEntries(
       state.subtasks.map((s) => {
         const redone = redoneUpstream(state, s).map((d) => d.id);
         const actions = subtaskActions(s, redone.length > 0, openQuestions(state, s.id).length > 0);
-        return [s.id, { waits: waitsIn(state, s, busy), actions, redone }];
+        return [s.id, { waits: waitsIn(state, s, busy2), actions, redone }];
       })
     ),
     goals: Object.fromEntries(state.goals.map((p) => [p.id, goalActions(p)])),
-    busy: [...busy],
+    busy: [...busy2],
     resumable: state.meetings.filter((m) => meetingResumes(state, m)).map((m) => m.id)
   };
 }
@@ -9028,8 +9067,8 @@ var Meetings = class {
     const names2 = new Set(core.team.members.map((m) => m.name));
     const stranger = attendees.find((name) => !names2.has(name));
     if (stranger) throw new Error(`There is no member called "${stranger}"`);
-    const busy = busyMembers(workOf(core));
-    const taken = attendees.find((name) => busy.has(name));
+    const busy2 = busyMembers(workOf(core));
+    const taken = attendees.find((name) => busy2.has(name));
     if (taken) throw new Error(`${taken} is busy: working, reviewing, or at another meeting`);
   }
   /** A goal that is active, or throws why it isn't. */
@@ -9869,7 +9908,7 @@ var Scheduler = class {
     if (this.closed) return;
     const { state } = this.core;
     const work = workOf(this.core);
-    const busy = busyMembers(work);
+    const busy2 = busyMembers(work);
     const reviews = new Set(
       state.subtasks.filter((s) => this.live.get(s.id)?.kind === "review").map((s) => reviewerOf(work, s))
     );
@@ -9882,16 +9921,16 @@ var Scheduler = class {
     for (const subtask2 of order) {
       if (this.live.has(subtask2.id)) continue;
       if (subtask2.status === "pending") {
-        if (waitsIn(work, subtask2, busy).length) continue;
-        busy.add(subtask2.assignee);
+        if (waitsIn(work, subtask2, busy2).length) continue;
+        busy2.add(subtask2.assignee);
         void this.startRun(subtask2);
       } else if (subtask2.status === "reviewing") {
         const reviewer = reviewerOf(work, subtask2);
-        if (reviews.has(reviewer) || waitsIn(work, subtask2, busy).length) continue;
+        if (reviews.has(reviewer) || waitsIn(work, subtask2, busy2).length) continue;
         reviews.add(reviewer);
         void this.startReview(subtask2);
       } else if (subtask2.status === "merging") {
-        if (waitsIn(work, subtask2, busy).length || merging2.has(subtask2.goalId)) continue;
+        if (waitsIn(work, subtask2, busy2).length || merging2.has(subtask2.goalId)) continue;
         merging2.add(subtask2.goalId);
         void this.startMerge(subtask2);
       }
@@ -10619,8 +10658,8 @@ function questionLine(question, work) {
 }
 function statusText(work) {
   const derived = derive(work);
-  const busy = new Set(derived.busy);
-  const lines = [`Team: ${work.members.map((m) => busy.has(m) ? `${m} (busy)` : m).join(", ")}`];
+  const busy2 = new Set(derived.busy);
+  const lines = [`Team: ${work.members.map((m) => busy2.has(m) ? `${m} (busy)` : m).join(", ")}`];
   for (const goal2 of work.goals) {
     lines.push(
       "",

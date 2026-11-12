@@ -106,4 +106,36 @@ describe("the lock", () => {
     releaseTeam(lock);
     await expect(stat(lock)).rejects.toThrow();
   });
+
+  it("goes to one of several sessions starting at once, also over one that has ended", async () => {
+    const lock = path.join(dir, "repo", "lock");
+    const take = `
+      import { takeTeam } from ${JSON.stringify(path.join(import.meta.dirname, "data.ts"))};
+      takeTeam(process.argv[1]).then(() => console.log("took"), () => console.log("refused"));
+      setTimeout(() => {}, 2000);
+    `;
+    const race = async () => {
+      const takers = Array.from({ length: 6 }, () =>
+        spawn(process.execPath, [
+          "--experimental-transform-types",
+          "--no-warnings",
+          "--input-type=module",
+          "-e",
+          take,
+          lock,
+        ]),
+      );
+      const said = await Promise.all(
+        takers.map(async (taker) => {
+          const [line] = (await once(taker.stdout, "data")) as [Buffer];
+          return line.toString().trim();
+        }),
+      );
+      // Ended once all have tried, the taker leaves the lock behind.
+      for (const taker of takers) taker.kill();
+      await Promise.all(takers.map((taker) => once(taker, "exit")));
+      return said.filter((word) => word === "took").length;
+    };
+    expect([await race(), await race()]).toEqual([1, 1]);
+  });
 });

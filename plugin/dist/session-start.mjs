@@ -7374,7 +7374,7 @@ import { text } from "node:stream/consumers";
 
 // src/engine/data.ts
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { link, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { readFileSync, unlinkSync } from "node:fs";
 import path from "node:path";
 
@@ -7423,19 +7423,21 @@ function running(pid) {
     return error62.code === "EPERM";
   }
 }
-function holderOf(lock) {
-  let holder;
+function readHolder(file2) {
   try {
-    holder = JSON.parse(readFileSync(lock, "utf8"));
+    return JSON.parse(readFileSync(file2, "utf8"));
   } catch {
     return void 0;
   }
-  return running(holder.pid) ? holder : void 0;
+}
+function holderOf(lock) {
+  const holder = readHolder(lock);
+  return holder && running(holder.pid) ? holder : void 0;
 }
 
 // src/engine/git.ts
 import { spawn } from "node:child_process";
-import { readdir, readFile as readFile2, realpath, rm, stat } from "node:fs/promises";
+import { readdir, readFile as readFile2, realpath, rm as rm2, stat } from "node:fs/promises";
 import path2 from "node:path";
 
 // src/engine/serial.ts
