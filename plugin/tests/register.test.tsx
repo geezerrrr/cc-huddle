@@ -59,7 +59,7 @@ const TEAM: OpenplanTeam = {
   prompts: [],
 };
 
-/** The server as the mod reaches it: `view` answers with `views` in turn, the rest is kept. */
+/** The server as the mod reaches it: `view` answers with `views` in turn, the rest is kept, with each pane opened. */
 function serve(on: On, views: OpenplanView[]) {
   const calls: { tool: string; args: Record<string, unknown> }[] = [];
   on("mcp.connect", () => ({ value: { isConnected: true, server: SERVER } }));
@@ -70,7 +70,10 @@ function serve(on: On, views: OpenplanView[]) {
     return { value: { content: [{ type: "text", text }], isError: false } };
   });
   on("command.register", (_, e) => ({ value: { command: e.name } }));
-  on("ui.open", () => ({ value: { isPlaced: true } }));
+  on("ui.open", (_, e) => {
+    calls.push({ tool: "ui.open", args: { id: e.id } });
+    return { value: { isPlaced: true } };
+  });
   on("session.start", (_, e) => ({ cwd: e.cwd }));
   return calls;
 }
@@ -187,6 +190,31 @@ test("a new need is a toast, a new milestone a transcript row, a new prompt your
   expect(toasts).toEqual(["openplan: glm asks to use Bash: rm -rf dist. Answer it in /openplan."]);
   expect(rows).toEqual(['openplan: "Rules" by glm is merged']);
   expect(prompts).toEqual(["A task to accept"]);
+});
+
+test("a new need opens the pane where it docks beside the transcript, not over it", async ($, on) => {
+  const clock = mock.clock(on);
+  const calls = serve(on, [
+    { revision: 1, team: { ...TEAM, needs: [] } },
+    { revision: 2, team: TEAM },
+    { revision: 3, team: { ...TEAM, needs: [] } },
+    { revision: 4, team: { ...TEAM, needs: [{ ...NEED, id: "q2" }] } },
+  ]);
+  const opened = () => calls.filter((c) => c.tool === "ui.open").length;
+  await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
+  await clock.advance(500);
+  const band = (isFullscreen: boolean) =>
+    $.ui.mount({
+      ...BAND,
+      surface: "terminal",
+      viewport: { columns: 120, rows: 40, isFullscreen },
+    });
+  await (await band(false)).unmount();
+  await clock.advance(500);
+  expect(opened()).toBe(0);
+  await (await band(true)).unmount();
+  await clock.advance(1000);
+  expect(opened()).toBe(1);
 });
 
 test("the pane stops asking a team that can't be opened, until you or your session turn to it", async ($, on) => {

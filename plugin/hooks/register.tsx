@@ -67,6 +67,11 @@ let revision: number | undefined;
 let told: Set<string> | undefined;
 let polling = false;
 /**
+ * Whether the surface docks a pane beside the transcript, as the band was
+ * last drawn: only there does a pane opened unasked not take the screen over.
+ */
+let docks = false;
+/**
  * The poll, while it runs. It stops when the server can't open the team (no
  * team in the repository, another session's), and starts again when you or
  * your session turn to openplan.
@@ -146,7 +151,7 @@ function tell($: $, now: OpenplanTeam) {
     for (const need of now.needs)
       if (!told.has(`need:${need.id}`)) {
         $.ui.toast(`openplan: ${needLine(need)}. Answer it in /openplan.`);
-        void openPane($);
+        if (docks) void openPane($);
       }
     for (const milestone of now.milestones)
       if (!told.has(milestone.key)) $.ui.log(`openplan: ${milestone.text}`);
@@ -531,6 +536,7 @@ export const register: Register = (on) => {
   }));
 
   on("ui.render", { component: "AbovePrompt" }, async ($, e, next) => {
+    docks = e.viewport?.isFullscreen === true;
     const now = await read($, team);
     if (!now?.band || e.props.hasSurvey) return next(e);
     const { Box, Button, Text } = $.ui.resolve(e);
