@@ -71,6 +71,7 @@ beforeEach(async () => {
     allowAlways: vi.fn(),
     options: (_, kind, cwd) => Promise.resolve({ cwd, model: kind }),
     recorder: () => ({}),
+    speech: () => ({}),
   };
   questions = new Questions(core);
   scheduler = new Scheduler(core, questions);

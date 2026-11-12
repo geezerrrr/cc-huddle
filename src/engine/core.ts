@@ -9,7 +9,7 @@ import type { Places } from "./git.ts";
 import type { SessionKind } from "./prompts.ts";
 import type { Inbox } from "./questions.ts";
 import type { TurnListener } from "./turns.ts";
-import type { Member, Subtask, TeamState } from "./types.ts";
+import type { Meeting, Member, Subtask, TeamState } from "./types.ts";
 
 /** The team as configured (§6): its members in order, and openplan's own settings. */
 export interface Team {
@@ -26,6 +26,8 @@ export interface Core extends Inbox {
   options(member: Member, kind: SessionKind, cwd: string): Promise<Options>;
   /** Where what a subtask's runs do is told: its record and the pane. */
   recorder(subtask: Subtask): TurnListener;
+  /** Where what is said at a meeting is told as it is said: the pane. */
+  speech(meeting: Meeting, speaker: string): TurnListener;
 }
 
 /** The state as the rules read it (derive.ts). */
