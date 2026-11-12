@@ -19,7 +19,7 @@ import {
   type QuestionToYou,
   type Subtask,
 } from "../engine/types.ts";
-import { waitText } from "./status.ts";
+import { stepText, waitText } from "./status.ts";
 
 const plural = (n: number, one: string, many: string) => `${String(n)} ${n === 1 ? one : many}`;
 
@@ -65,14 +65,6 @@ const meetingOf = (meeting: Meeting): OpenplanMeeting => ({
   ...(meeting.plan && { plan: meeting.plan.summary }),
 });
 
-/** Where a running subtask is, in words. */
-function stepText(subtask: Subtask): string {
-  const { done, total, current } = subtask.progress;
-  if (!total) return "";
-  const step = `step ${String(Math.min(done + 1, total))} of ${String(total)}`;
-  return current ? `, ${step}: ${current}` : `, ${step}`;
-}
-
 function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>): OpenplanMember {
   const own = work.subtasks.filter((s) => s.assignee === member.name);
   const at = (status: Subtask["status"]) => own.find((s) => s.status === status);
@@ -89,8 +81,10 @@ function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>
   const next = at("pending");
   const running = at("running");
   let doing: string;
-  if (running) doing = `works on "${running.title}"${stepText(running)}`;
-  else if (meeting) doing = `at the meeting on "${meeting.agenda}"`;
+  if (running) {
+    const step = stepText(running.progress);
+    doing = `works on "${running.title}"${step ? `, ${step}` : ""}`;
+  } else if (meeting) doing = `at the meeting on "${meeting.agenda}"`;
   else if (reviewing) doing = `reviews "${reviewing.title}" by ${reviewing.assignee}`;
   else if (at("reviewing")) doing = `"${at("reviewing")?.title ?? ""}" is in review`;
   else if (at("merging")) doing = `"${at("merging")?.title ?? ""}" is being merged`;
@@ -119,7 +113,8 @@ function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>
 function callText(permission: Permission): string {
   if (permission.title) return permission.title;
   const { input } = permission;
-  const main = ["command", "file_path", "path", "url", "pattern"]
+  // As the mod's callLine reads a call in a member's record.
+  const main = ["command", "file_path", "path", "pattern", "url", "description"]
     .map((key) => input[key])
     .find((value) => typeof value === "string");
   return main ? `${permission.tool}: ${main}` : permission.tool;

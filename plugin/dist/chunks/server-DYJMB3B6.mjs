@@ -8357,7 +8357,7 @@ ${note ?? ""}`);
   return lines.join("\n");
 }
 function goOnMessage(reasons, subtask2) {
-  const said2 = ({ why, note = "" }) => {
+  const said = ({ why, note = "" }) => {
     switch (why) {
       case "held":
         return "Your work was paused and now goes on. Pick up where you left off.";
@@ -8379,7 +8379,7 @@ ${note}
 Make those changes, then deliver again.`;
     }
   };
-  return [...new Set(reasons.map(said2))].join("\n\n");
+  return [...new Set(reasons.map(said))].join("\n\n");
 }
 var DELIVER_REMINDER = "You haven't delivered yet. If the work is finished, call deliver now with a summary and the files that are the result. If you can't finish it, say what stands in the way.";
 var SESSION_ONLY = "Only the session that started you asks teammates and delivers this subtask: do your own part and report back to it.";
@@ -8971,8 +8971,8 @@ var Meetings = class {
   change(id, raw) {
     const { core } = this;
     const { meeting: meeting2 } = this.underReview(id, "change");
-    const names2 = core.team.members.map((m) => m.name);
-    meeting2.plan = parsePlan(raw, names2);
+    const names = core.team.members.map((m) => m.name);
+    meeting2.plan = parsePlan(raw, names);
     core.changed();
   }
   /**
@@ -9027,8 +9027,8 @@ var Meetings = class {
     const { core } = this;
     this.activeGoal(goalId);
     if (!attendees.length) throw new Error("The team has no members");
-    const names2 = new Set(core.team.members.map((m) => m.name));
-    const stranger = attendees.find((name) => !names2.has(name));
+    const names = new Set(core.team.members.map((m) => m.name));
+    const stranger = attendees.find((name) => !names.has(name));
     if (stranger) throw new Error(`There is no member called "${stranger}"`);
     const busy2 = busyMembers(workOf(core));
     const taken = attendees.find((name) => busy2.has(name));
@@ -9094,7 +9094,7 @@ var Meetings = class {
       core.changed();
       return ask(member, prompt, { ...turn, listener: core.speech(meeting2, member.name) });
     };
-    const said2 = (speaker, { text, tokens }, phase, calls) => {
+    const said = (speaker, { text, tokens }, phase, calls) => {
       meeting2.turns.push({
         speaker: speaker.name,
         text,
@@ -9116,7 +9116,7 @@ var Meetings = class {
         const member = attendee(name);
         const point = meeting2.hands?.find((hand) => hand.member === name)?.point;
         meeting2.hands = void 0;
-        said2(member, await speak(member, meetingAnswer(ctx, member, point)), "answer");
+        said(member, await speak(member, meetingAnswer(ctx, member, point)), "answer");
       };
       const weigh = async (who) => {
         meeting2.weighing = true;
@@ -9155,7 +9155,7 @@ var Meetings = class {
         });
         const called2 = floor?.member ?? meeting2.hands?.[0]?.member;
         const text = steer.text.trim();
-        if (text && !floor?.quiet) said2(host, { text, tokens: steer.tokens }, "steer", called2);
+        if (text && !floor?.quiet) said(host, { text, tokens: steer.tokens }, "steer", called2);
         else if (called2) await answer(called2);
         else return false;
         return true;
@@ -9164,11 +9164,11 @@ var Meetings = class {
       for (let move = nextMove(meeting2); talking && move.kind !== "close"; move = nextMove(meeting2)) {
         switch (move.kind) {
           case "open":
-            said2(host, await speak(host, meetingOpening(ctx)), "opening");
+            said(host, await speak(host, meetingOpening(ctx)), "opening");
             break;
           case "round": {
             const member = attendee(move.member);
-            said2(member, await speak(member, meetingRound(ctx, member), { heard: 1 }), "round");
+            said(member, await speak(member, meetingRound(ctx, member), { heard: 1 }), "round");
             break;
           }
           case "answer":
@@ -9179,13 +9179,13 @@ var Meetings = class {
         }
       }
       meeting2.hands = void 0;
-      const names2 = ctx.attendees.map((m) => m.name);
+      const names = ctx.attendees.map((m) => m.name);
       const closing = await speak(host, meetingClosing(ctx), {
-        schema: z2.toJSONSchema(hostPlanSchema(names2))
+        schema: z2.toJSONSchema(hostPlanSchema(names))
       });
       signal.throwIfAborted();
-      meeting2.plan = parsePlan(closing.structured, names2);
-      said2(host, { text: meeting2.plan.summary, tokens: closing.tokens }, "summary");
+      meeting2.plan = parsePlan(closing.structured, names);
+      said(host, { text: meeting2.plan.summary, tokens: closing.tokens }, "summary");
       meeting2.status = step(MEETING_MACHINE, meeting2.status, "plan");
       meeting2.seats = void 0;
     } catch (error) {
@@ -10272,15 +10272,15 @@ async function jsonFile(file) {
   }
 }
 async function markdownFiles(folder) {
-  let names2;
+  let names;
   try {
-    names2 = (await readdir2(folder)).filter((name) => name.endsWith(".md")).sort();
+    names = (await readdir2(folder)).filter((name) => name.endsWith(".md")).sort();
   } catch (error) {
     if (missing(error)) return [];
     throw error;
   }
   return Promise.all(
-    names2.map(async (name) => {
+    names.map(async (name) => {
       const file = path7.join(folder, name);
       const text = await readFile4(file, "utf8");
       const front = /^---\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(text);
@@ -10546,7 +10546,7 @@ function pluginId(dataFolder2) {
 }
 
 // src/plugin/pane-tools.ts
-import { z as z6 } from "zod";
+import { z as z7 } from "zod";
 
 // src/plugin/status.ts
 var MEETING_STATUS = {
@@ -10574,13 +10574,15 @@ function waitText(wait, work) {
       return "waits until you accept the task it builds on";
   }
 }
+function stepText({ done, total, current }) {
+  if (!total) return void 0;
+  const step2 = `step ${String(Math.min(done + 1, total))} of ${String(total)}`;
+  return current ? `${step2}: ${current}` : step2;
+}
 function subtaskLine(subtask2, waits, work) {
-  const { progress } = subtask2;
   const parts = [subtask2.status];
-  if (subtask2.status === "running" && progress.total)
-    parts.push(
-      `step ${String(Math.min(progress.done + 1, progress.total))} of ${String(progress.total)}${progress.current ? `: ${progress.current}` : ""}`
-    );
+  const step2 = subtask2.status === "running" && stepText(subtask2.progress);
+  if (step2) parts.push(step2);
   parts.push(...waits.map((w) => waitText(w, work)));
   if (subtask2.error) parts.push(`error: ${subtask2.error}`);
   return `    - ${subtask2.title} [${subtask2.id}], ${subtask2.assignee}: ${parts.join(", ")}`;
@@ -10661,12 +10663,6 @@ var meetingOf = (meeting2) => ({
   hands: (meeting2.hands ?? []).map((h) => ({ member: h.member, point: h.point })),
   ...meeting2.plan && { plan: meeting2.plan.summary }
 });
-function stepText(subtask2) {
-  const { done, total, current } = subtask2.progress;
-  if (!total) return "";
-  const step2 = `step ${String(Math.min(done + 1, total))} of ${String(total)}`;
-  return current ? `, ${step2}: ${current}` : `, ${step2}`;
-}
 function memberOf(member, work, derived) {
   const own = work.subtasks.filter((s) => s.assignee === member.name);
   const at = (status) => own.find((s) => s.status === status);
@@ -10679,8 +10675,10 @@ function memberOf(member, work, derived) {
   const next = at("pending");
   const running3 = at("running");
   let doing;
-  if (running3) doing = `works on "${running3.title}"${stepText(running3)}`;
-  else if (meeting2) doing = `at the meeting on "${meeting2.agenda}"`;
+  if (running3) {
+    const step2 = stepText(running3.progress);
+    doing = `works on "${running3.title}"${step2 ? `, ${step2}` : ""}`;
+  } else if (meeting2) doing = `at the meeting on "${meeting2.agenda}"`;
   else if (reviewing) doing = `reviews "${reviewing.title}" by ${reviewing.assignee}`;
   else if (at("reviewing")) doing = `"${at("reviewing")?.title ?? ""}" is in review`;
   else if (at("merging")) doing = `"${at("merging")?.title ?? ""}" is being merged`;
@@ -10702,7 +10700,7 @@ function memberOf(member, work, derived) {
 function callText(permission) {
   if (permission.title) return permission.title;
   const { input } = permission;
-  const main = ["command", "file_path", "path", "url", "pattern"].map((key) => input[key]).find((value) => typeof value === "string");
+  const main = ["command", "file_path", "path", "pattern", "url", "description"].map((key) => input[key]).find((value) => typeof value === "string");
   return main ? `${permission.tool}: ${main}` : permission.tool;
 }
 function needOf(question, work) {
@@ -10746,25 +10744,25 @@ function needOf(question, work) {
   }
 }
 function milestones(work) {
-  const said2 = [];
+  const said = [];
   for (const meeting2 of work.meetings)
     if (meeting2.status === "approved")
-      said2.push({ key: `plan:${meeting2.id}`, text: `Plan approved: "${meeting2.agenda}"` });
+      said.push({ key: `plan:${meeting2.id}`, text: `Plan approved: "${meeting2.agenda}"` });
   for (const s of work.subtasks) {
     if (s.review?.rounds)
-      said2.push({
+      said.push({
         key: `back:${s.id}:${String(s.review.rounds)}`,
         text: `"${s.title}" went back to ${s.assignee}${s.review.notes ? `: ${s.review.notes}` : ""}`
       });
     if (s.status === "done")
-      said2.push({ key: `done:${s.id}`, text: `"${s.title}" by ${s.assignee} is merged` });
+      said.push({ key: `done:${s.id}`, text: `"${s.title}" by ${s.assignee} is merged` });
     if (s.status === "failed")
-      said2.push({
+      said.push({
         key: `failed:${s.id}:${String(s.startedAt ?? 0)}`,
         text: `"${s.title}" by ${s.assignee} failed${s.error ? `: ${s.error}` : ""}`
       });
   }
-  return said2;
+  return said;
 }
 function prompts(work) {
   const asked = [];
@@ -10818,6 +10816,228 @@ function paneTeam(work, members) {
   };
 }
 
+// src/plugin/tools.ts
+import { z as z6 } from "zod";
+var decisionOf = (decision, note, sentBack) => ({
+  decision,
+  ...note && { note },
+  ...sentBack !== void 0 && { sentBack }
+});
+function goalOf(engine2, ref) {
+  const { goals } = engine2.state;
+  const byId = goals.find((g) => g.id === ref);
+  if (byId) return byId;
+  const named = goals.filter((g) => g.name.toLowerCase() === ref.trim().toLowerCase());
+  if (named.length === 1 && named[0]) return named[0];
+  throw new Error(
+    named.length ? `More than one goal is called "${ref}": give its id` : `There is no goal "${ref}"`
+  );
+}
+var writtenPlan = (plan) => ({
+  summary: plan.summary,
+  plan_markdown: plan.markdown,
+  tasks: plan.tasks.map((task) => ({
+    title: task.title,
+    outcome: task.outcome,
+    subtasks: task.subtasks.map(({ dependsOn, ...subtask2 }) => ({
+      ...subtask2,
+      depends_on: dependsOn
+    }))
+  }))
+});
+var goal = z6.string().describe("The goal's id, or its name");
+var meeting = z6.string().describe("The meeting's id");
+var subtask = z6.string().describe("The subtask's id");
+function addTools(server2, team2) {
+  server2.registerTool(
+    "status",
+    {
+      description: "Where the team stands: each goal with its meetings, tasks and subtasks, who is busy, and what waits on the user. Ids are in brackets.",
+      annotations: { readOnlyHint: true }
+    },
+    async () => {
+      const engine2 = await team2();
+      return toolText(statusText(workOf(engine2)));
+    }
+  );
+  server2.registerTool(
+    "start_goal",
+    {
+      description: "Start a goal: something the user wants done. It gets its own branch, cut from the repository's HEAD. Then hold a meeting to plan it, or assign work directly.",
+      inputSchema: { name: z6.string().trim().min(1).describe("A few words for what is wanted") }
+    },
+    async ({ name }) => {
+      const started = await (await team2()).goals.start(name);
+      return toolText(
+        `Started the goal "${started.name}" [${started.id}] on branch ${goalBranch(started.slug)}.`
+      );
+    }
+  );
+  server2.registerTool(
+    "hold_meeting",
+    {
+      description: "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and the session is told when its plan waits for the user.",
+      inputSchema: {
+        goal,
+        agenda: z6.string().trim().min(1).describe("What to plan, with everything the user said about it"),
+        size: z6.enum(MEETING_SIZES).optional().describe("How long the discussion runs; the team's default when left out"),
+        attendees: z6.array(z6.string()).default([]).describe("Member names, the host first; everyone when empty")
+      }
+    },
+    async ({ goal: ref, agenda, size, attendees }) => {
+      const engine2 = await team2();
+      const held = engine2.meetings.start({
+        goalId: goalOf(engine2, ref).id,
+        agenda,
+        size: size ?? engine2.meetingSize,
+        attendees
+      });
+      return toolText(
+        `The meeting [${held.id}] has begun: ${listOf(held.participants)}, hosted by ${held.host}.`
+      );
+    }
+  );
+  server2.registerTool(
+    "show_plan",
+    {
+      description: "A meeting's plan in full: its document and its tasks and subtasks, in the shape change_plan takes.",
+      inputSchema: { meeting },
+      annotations: { readOnlyHint: true }
+    },
+    async ({ meeting: id }) => {
+      const found = (await team2()).state.meetings.find((m) => m.id === id);
+      if (!found?.plan) throw new Error("That meeting has no plan");
+      return toolText(JSON.stringify(writtenPlan(found.plan), null, 2));
+    }
+  );
+  server2.registerTool(
+    "change_plan",
+    {
+      description: "Replace a plan under review with the user's changes: the whole plan, as show_plan gives it, changed. Any member can be given work.",
+      inputSchema: {
+        meeting,
+        plan: planSchema(z6.string().describe("The name of the member it goes to"))
+      }
+    },
+    async ({ meeting: id, plan }) => {
+      (await team2()).meetings.change(id, plan);
+      return toolText("The plan is changed. It waits for the user's approval.");
+    }
+  );
+  server2.registerTool(
+    "approve_plan",
+    {
+      description: "Approve a plan under review, as the user said: its tasks and subtasks go to work, each starting once what it builds on is merged and its member is free.",
+      inputSchema: { meeting }
+    },
+    async ({ meeting: id }) => {
+      const added = await (await team2()).meetings.approve(id);
+      return toolText(
+        `Approved: ${String(added.length)} ${added.length === 1 ? "subtask goes" : "subtasks go"} to work.`
+      );
+    }
+  );
+  server2.registerTool(
+    "cancel_meeting",
+    {
+      description: "Stop a meeting under way, or drop a plan the user doesn't want.",
+      inputSchema: { meeting }
+    },
+    async ({ meeting: id }) => {
+      await (await team2()).meetings.cancel(id);
+      return toolText("Cancelled.");
+    }
+  );
+  server2.registerTool(
+    "resume_meeting",
+    {
+      description: "Go on with a meeting that failed or was cancelled before its plan, from where it stopped.",
+      inputSchema: { meeting }
+    },
+    async ({ meeting: id }) => {
+      (await team2()).meetings.resume(id);
+      return toolText("The meeting goes on.");
+    }
+  );
+  server2.registerTool(
+    "assign",
+    {
+      description: "Give a member one subtask directly, without a meeting. It starts once they are free.",
+      inputSchema: {
+        goal,
+        assignee: z6.string().describe("The member's name"),
+        title: z6.string().trim().min(1),
+        description: z6.string().trim().describe("Everything the user said about it"),
+        acceptance: z6.string().trim().default("").describe("When it counts as done")
+      }
+    },
+    async ({ goal: ref, ...work }) => {
+      const engine2 = await team2();
+      const [added] = engine2.goals.assign(goalOf(engine2, ref).id, work);
+      return toolText(`Assigned "${work.title}" [${added?.id ?? ""}] to ${work.assignee}.`);
+    }
+  );
+  server2.registerTool(
+    "goal_action",
+    {
+      description: "Pause a goal (its runs stop, to go on later in their sessions), resume it, archive it, or delete an archived one: its worktrees and subtask branches go, its own branch stays. Delete only when the user has confirmed it.",
+      inputSchema: { goal, action: z6.enum(GOAL_ACTIONS) },
+      annotations: { destructiveHint: true }
+    },
+    async ({ goal: ref, action }) => {
+      const engine2 = await team2();
+      const { id, name } = goalOf(engine2, ref);
+      await engine2.goals[action](id);
+      return toolText(`The goal "${name}": ${action} done.`);
+    }
+  );
+  server2.registerTool(
+    "subtask_action",
+    {
+      description: "Stop a subtask; continue a stopped or failed one in its session and worktree; retry one from the start; or redo a done one whose upstream was redone.",
+      inputSchema: { subtask, action: z6.enum(SUBTASK_ACTIONS) }
+    },
+    async ({ subtask: id, action }) => {
+      const engine2 = await team2();
+      const found = engine2.state.subtasks.find((s) => s.id === id);
+      if (!found) throw new Error("There is no such subtask");
+      if (!derive(workOf(engine2)).subtasks[id]?.actions.includes(action))
+        throw new Error(`"${found.title}" can't ${action} while ${found.status}`);
+      await engine2.scheduler[action](id);
+      return toolText(`"${found.title}" is ${found.status} now.`);
+    }
+  );
+  server2.registerTool(
+    "message",
+    {
+      description: "Pass the user's words to the member working on a subtask: a running one takes them at once, in its session; one not started reads them first.",
+      inputSchema: { subtask, text: z6.string().trim().min(1) }
+    },
+    async ({ subtask: id, text }) => {
+      const went = (await team2()).scheduler.carry(id, text);
+      return toolText(
+        went === "goes" ? "Passed on." : went === "handedOver" ? "Not passed on: it is delivered and in review or being merged. Send its task back once it is done." : "Not passed on: its goal is paused or archived."
+      );
+    }
+  );
+  server2.registerTool(
+    "decide",
+    {
+      description: "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask), a stuck review (rereview, skip, sendBack), or a merge (ours, theirs, retry).",
+      inputSchema: {
+        question: z6.string().describe("The id of what waits on the user"),
+        decision: z6.enum(DECISION_OPTIONS),
+        note: z6.string().trim().optional().describe("What to change, in the user's words"),
+        sent_back: z6.string().optional().describe("The subtask a revised task goes back to")
+      }
+    },
+    async ({ question, decision, note, sent_back }) => {
+      await (await team2()).answer(question, decisionOf(decision, note, sent_back));
+      return toolText("Done.");
+    }
+  );
+}
+
 // src/plugin/pane-tools.ts
 var json = (value) => ({
   content: [{ type: "text", text: JSON.stringify(value) }]
@@ -10829,8 +11049,8 @@ function addPaneTools(server2, team2) {
     {
       description: `${PANE_ONLY} The team as the pane draws it.`,
       inputSchema: {
-        revision: z6.number().int().optional().describe("The revision the pane has"),
-        record: z6.object({ subtask: z6.string(), from: z6.number().int().min(0) }).optional().describe("The subtask whose record the pane follows, and the byte it read up to")
+        revision: z7.number().int().optional().describe("The revision the pane has"),
+        record: z7.object({ subtask: z7.string(), from: z7.number().int().min(0) }).optional().describe("The subtask whose record the pane follows, and the byte it read up to")
       },
       annotations: { readOnlyHint: true }
     },
@@ -10858,242 +11078,18 @@ function addPaneTools(server2, team2) {
     {
       description: `${PANE_ONLY} Answers what waits on the user, as they pressed it.`,
       inputSchema: {
-        question: z6.string(),
-        option: z6.enum(PERMISSION_OPTIONS).optional().describe("A permission's answer"),
-        picks: z6.array(z6.string()).optional().describe("One pick per question with choices"),
-        decision: z6.enum(DECISION_OPTIONS).optional(),
-        note: z6.string().trim().optional().describe("Why it is denied, or what to change"),
-        sent_back: z6.string().optional().describe("The subtask a revised task goes back to")
-      }
-    },
-    async ({ question, option, picks, decision, note, sent_back }) => {
-      const words = note ? { note } : {};
-      const answer = option ? { option, ...words } : decision ? { decision, ...words, ...sent_back !== void 0 && { sentBack: sent_back } } : { picks: picks ?? [] };
-      await (await team2()).answer(question, answer);
-      return json({ answered: question });
-    }
-  );
-}
-
-// src/plugin/tools.ts
-import { z as z7 } from "zod";
-var said = (text) => ({ content: [{ type: "text", text }] });
-var names = (items) => new Intl.ListFormat("en", { type: "conjunction" }).format(items);
-function goalOf(engine2, ref) {
-  const { goals } = engine2.state;
-  const byId = goals.find((g) => g.id === ref);
-  if (byId) return byId;
-  const named = goals.filter((g) => g.name.toLowerCase() === ref.trim().toLowerCase());
-  if (named.length === 1 && named[0]) return named[0];
-  throw new Error(
-    named.length ? `More than one goal is called "${ref}": give its id` : `There is no goal "${ref}"`
-  );
-}
-var writtenPlan = (plan) => ({
-  summary: plan.summary,
-  plan_markdown: plan.markdown,
-  tasks: plan.tasks.map((task) => ({
-    title: task.title,
-    outcome: task.outcome,
-    subtasks: task.subtasks.map(({ dependsOn, ...subtask2 }) => ({
-      ...subtask2,
-      depends_on: dependsOn
-    }))
-  }))
-});
-var goal = z7.string().describe("The goal's id, or its name");
-var meeting = z7.string().describe("The meeting's id");
-var subtask = z7.string().describe("The subtask's id");
-function addTools(server2, team2) {
-  server2.registerTool(
-    "status",
-    {
-      description: "Where the team stands: each goal with its meetings, tasks and subtasks, who is busy, and what waits on the user. Ids are in brackets.",
-      annotations: { readOnlyHint: true }
-    },
-    async () => {
-      const engine2 = await team2();
-      return said(statusText(workOf(engine2)));
-    }
-  );
-  server2.registerTool(
-    "start_goal",
-    {
-      description: "Start a goal: something the user wants done. It gets its own branch, cut from the repository's HEAD. Then hold a meeting to plan it, or assign work directly.",
-      inputSchema: { name: z7.string().trim().min(1).describe("A few words for what is wanted") }
-    },
-    async ({ name }) => {
-      const started = await (await team2()).goals.start(name);
-      return said(
-        `Started the goal "${started.name}" [${started.id}] on branch ${goalBranch(started.slug)}.`
-      );
-    }
-  );
-  server2.registerTool(
-    "hold_meeting",
-    {
-      description: "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and the session is told when its plan waits for the user.",
-      inputSchema: {
-        goal,
-        agenda: z7.string().trim().min(1).describe("What to plan, with everything the user said about it"),
-        size: z7.enum(MEETING_SIZES).optional().describe("How long the discussion runs; the team's default when left out"),
-        attendees: z7.array(z7.string()).default([]).describe("Member names, the host first; everyone when empty")
-      }
-    },
-    async ({ goal: ref, agenda, size, attendees }) => {
-      const engine2 = await team2();
-      const held = engine2.meetings.start({
-        goalId: goalOf(engine2, ref).id,
-        agenda,
-        size: size ?? engine2.meetingSize,
-        attendees
-      });
-      return said(
-        `The meeting [${held.id}] has begun: ${names(held.participants)}, hosted by ${held.host}.`
-      );
-    }
-  );
-  server2.registerTool(
-    "show_plan",
-    {
-      description: "A meeting's plan in full: its document and its tasks and subtasks, in the shape change_plan takes.",
-      inputSchema: { meeting },
-      annotations: { readOnlyHint: true }
-    },
-    async ({ meeting: id }) => {
-      const found = (await team2()).state.meetings.find((m) => m.id === id);
-      if (!found?.plan) throw new Error("That meeting has no plan");
-      return said(JSON.stringify(writtenPlan(found.plan), null, 2));
-    }
-  );
-  server2.registerTool(
-    "change_plan",
-    {
-      description: "Replace a plan under review with the user's changes: the whole plan, as show_plan gives it, changed. Any member can be given work.",
-      inputSchema: {
-        meeting,
-        plan: planSchema(z7.string().describe("The name of the member it goes to"))
-      }
-    },
-    async ({ meeting: id, plan }) => {
-      (await team2()).meetings.change(id, plan);
-      return said("The plan is changed. It waits for the user's approval.");
-    }
-  );
-  server2.registerTool(
-    "approve_plan",
-    {
-      description: "Approve a plan under review, as the user said: its tasks and subtasks go to work, each starting once what it builds on is merged and its member is free.",
-      inputSchema: { meeting }
-    },
-    async ({ meeting: id }) => {
-      const added = await (await team2()).meetings.approve(id);
-      return said(
-        `Approved: ${String(added.length)} ${added.length === 1 ? "subtask goes" : "subtasks go"} to work.`
-      );
-    }
-  );
-  server2.registerTool(
-    "cancel_meeting",
-    {
-      description: "Stop a meeting under way, or drop a plan the user doesn't want.",
-      inputSchema: { meeting }
-    },
-    async ({ meeting: id }) => {
-      await (await team2()).meetings.cancel(id);
-      return said("Cancelled.");
-    }
-  );
-  server2.registerTool(
-    "resume_meeting",
-    {
-      description: "Go on with a meeting that failed or was cancelled before its plan, from where it stopped.",
-      inputSchema: { meeting }
-    },
-    async ({ meeting: id }) => {
-      (await team2()).meetings.resume(id);
-      return said("The meeting goes on.");
-    }
-  );
-  server2.registerTool(
-    "assign",
-    {
-      description: "Give a member one subtask directly, without a meeting. It starts once they are free.",
-      inputSchema: {
-        goal,
-        assignee: z7.string().describe("The member's name"),
-        title: z7.string().trim().min(1),
-        description: z7.string().trim().describe("Everything the user said about it"),
-        acceptance: z7.string().trim().default("").describe("When it counts as done")
-      }
-    },
-    async ({ goal: ref, ...work }) => {
-      const engine2 = await team2();
-      const [added] = engine2.goals.assign(goalOf(engine2, ref).id, work);
-      return said(`Assigned "${work.title}" [${added?.id ?? ""}] to ${work.assignee}.`);
-    }
-  );
-  server2.registerTool(
-    "goal_action",
-    {
-      description: "Pause a goal (its runs stop, to go on later in their sessions), resume it, archive it, or delete an archived one: its worktrees and subtask branches go, its own branch stays. Delete only when the user has confirmed it.",
-      inputSchema: { goal, action: z7.enum(GOAL_ACTIONS) },
-      annotations: { destructiveHint: true }
-    },
-    async ({ goal: ref, action }) => {
-      const engine2 = await team2();
-      const { id, name } = goalOf(engine2, ref);
-      await engine2.goals[action](id);
-      return said(`The goal "${name}": ${action} done.`);
-    }
-  );
-  server2.registerTool(
-    "subtask_action",
-    {
-      description: "Stop a subtask; continue a stopped or failed one in its session and worktree; retry one from the start; or redo a done one whose upstream was redone.",
-      inputSchema: { subtask, action: z7.enum(SUBTASK_ACTIONS) }
-    },
-    async ({ subtask: id, action }) => {
-      const engine2 = await team2();
-      const found = engine2.state.subtasks.find((s) => s.id === id);
-      if (!found) throw new Error("There is no such subtask");
-      if (!derive(workOf(engine2)).subtasks[id]?.actions.includes(action))
-        throw new Error(`"${found.title}" can't ${action} while ${found.status}`);
-      await engine2.scheduler[action](id);
-      return said(`"${found.title}" is ${found.status} now.`);
-    }
-  );
-  server2.registerTool(
-    "message",
-    {
-      description: "Pass the user's words to the member working on a subtask: a running one takes them at once, in its session; one not started reads them first.",
-      inputSchema: { subtask, text: z7.string().trim().min(1) }
-    },
-    async ({ subtask: id, text }) => {
-      const went = (await team2()).scheduler.carry(id, text);
-      return said(
-        went === "goes" ? "Passed on." : went === "handedOver" ? "Not passed on: it is delivered and in review or being merged. Send its task back once it is done." : "Not passed on: its goal is paused or archived."
-      );
-    }
-  );
-  server2.registerTool(
-    "decide",
-    {
-      description: "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask), a stuck review (rereview, skip, sendBack), or a merge (ours, theirs, retry).",
-      inputSchema: {
-        question: z7.string().describe("The id of what waits on the user"),
-        decision: z7.enum(DECISION_OPTIONS),
-        note: z7.string().trim().optional().describe("What to change, in the user's words"),
+        question: z7.string(),
+        option: z7.enum(PERMISSION_OPTIONS).optional().describe("A permission's answer"),
+        picks: z7.array(z7.string()).optional().describe("One pick per question with choices"),
+        decision: z7.enum(DECISION_OPTIONS).optional(),
+        note: z7.string().trim().optional().describe("Why it is denied, or what to change"),
         sent_back: z7.string().optional().describe("The subtask a revised task goes back to")
       }
     },
-    async ({ question, decision, note, sent_back }) => {
-      await (await team2()).answer(question, {
-        decision,
-        ...note !== void 0 && { note },
-        ...sent_back !== void 0 && { sentBack: sent_back }
-      });
-      return said("Done.");
+    async ({ question, option, picks, decision, note, sent_back }) => {
+      const answer = option ? { option, ...note && { note } } : decision ? decisionOf(decision, note, sent_back) : { picks: picks ?? [] };
+      await (await team2()).answer(question, answer);
+      return json({ answered: question });
     }
   );
 }

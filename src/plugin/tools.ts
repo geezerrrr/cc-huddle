@@ -12,20 +12,26 @@ import type { Engine } from "../engine/engine.ts";
 import { goalBranch } from "../engine/git.ts";
 import { planSchema } from "../engine/plan.ts";
 import { derive } from "../engine/derive.ts";
+import { listOf } from "../engine/prompts.ts";
+import type { Answer } from "../engine/questions.ts";
+import { toolText } from "../engine/turns.ts";
 import {
   DECISION_OPTIONS,
   GOAL_ACTIONS,
   MEETING_SIZES,
   SUBTASK_ACTIONS,
+  type DecisionOption,
   type Goal,
   type Plan,
 } from "../engine/types.ts";
 import { statusText } from "./status.ts";
 
-const said = (text: string) => ({ content: [{ type: "text" as const, text }] });
-
-const names = (items: readonly string[]) =>
-  new Intl.ListFormat("en", { type: "conjunction" }).format(items);
+/** A decision as the tools take it: `sentBack`, the subtask a revised task goes back to. */
+export const decisionOf = (decision: DecisionOption, note?: string, sentBack?: string): Answer => ({
+  decision,
+  ...(note && { note }),
+  ...(sentBack !== undefined && { sentBack }),
+});
 
 /** A goal by its id, or by its name when no other goal has it. */
 function goalOf(engine: Engine, ref: string): Goal {
@@ -70,7 +76,7 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
     },
     async () => {
       const engine = await team();
-      return said(statusText(workOf(engine)));
+      return toolText(statusText(workOf(engine)));
     },
   );
 
@@ -83,7 +89,7 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
     },
     async ({ name }) => {
       const started = await (await team()).goals.start(name);
-      return said(
+      return toolText(
         `Started the goal "${started.name}" [${started.id}] on branch ${goalBranch(started.slug)}.`,
       );
     },
@@ -119,8 +125,8 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
         size: size ?? engine.meetingSize,
         attendees,
       });
-      return said(
-        `The meeting [${held.id}] has begun: ${names(held.participants)}, hosted by ${held.host}.`,
+      return toolText(
+        `The meeting [${held.id}] has begun: ${listOf(held.participants)}, hosted by ${held.host}.`,
       );
     },
   );
@@ -136,7 +142,7 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
     async ({ meeting: id }) => {
       const found = (await team()).state.meetings.find((m) => m.id === id);
       if (!found?.plan) throw new Error("That meeting has no plan");
-      return said(JSON.stringify(writtenPlan(found.plan), null, 2));
+      return toolText(JSON.stringify(writtenPlan(found.plan), null, 2));
     },
   );
 
@@ -152,7 +158,7 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
     },
     async ({ meeting: id, plan }) => {
       (await team()).meetings.change(id, plan);
-      return said("The plan is changed. It waits for the user's approval.");
+      return toolText("The plan is changed. It waits for the user's approval.");
     },
   );
 
@@ -165,7 +171,7 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
     },
     async ({ meeting: id }) => {
       const added = await (await team()).meetings.approve(id);
-      return said(
+      return toolText(
         `Approved: ${String(added.length)} ${added.length === 1 ? "subtask goes" : "subtasks go"} to work.`,
       );
     },
@@ -179,7 +185,7 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
     },
     async ({ meeting: id }) => {
       await (await team()).meetings.cancel(id);
-      return said("Cancelled.");
+      return toolText("Cancelled.");
     },
   );
 
@@ -192,7 +198,7 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
     },
     async ({ meeting: id }) => {
       (await team()).meetings.resume(id);
-      return said("The meeting goes on.");
+      return toolText("The meeting goes on.");
     },
   );
 
@@ -212,7 +218,7 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
     async ({ goal: ref, ...work }) => {
       const engine = await team();
       const [added] = engine.goals.assign(goalOf(engine, ref).id, work);
-      return said(`Assigned "${work.title}" [${added?.id ?? ""}] to ${work.assignee}.`);
+      return toolText(`Assigned "${work.title}" [${added?.id ?? ""}] to ${work.assignee}.`);
     },
   );
 
@@ -228,7 +234,7 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
       const engine = await team();
       const { id, name } = goalOf(engine, ref);
       await engine.goals[action](id);
-      return said(`The goal "${name}": ${action} done.`);
+      return toolText(`The goal "${name}": ${action} done.`);
     },
   );
 
@@ -246,7 +252,7 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
       if (!derive(workOf(engine)).subtasks[id]?.actions.includes(action))
         throw new Error(`"${found.title}" can't ${action} while ${found.status}`);
       await engine.scheduler[action](id);
-      return said(`"${found.title}" is ${found.status} now.`);
+      return toolText(`"${found.title}" is ${found.status} now.`);
     },
   );
 
@@ -259,7 +265,7 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
     },
     async ({ subtask: id, text }) => {
       const went = (await team()).scheduler.carry(id, text);
-      return said(
+      return toolText(
         went === "goes"
           ? "Passed on."
           : went === "handedOver"
@@ -282,14 +288,8 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
       },
     },
     async ({ question, decision, note, sent_back }) => {
-      await (
-        await team()
-      ).answer(question, {
-        decision,
-        ...(note !== undefined && { note }),
-        ...(sent_back !== undefined && { sentBack: sent_back }),
-      });
-      return said("Done.");
+      await (await team()).answer(question, decisionOf(decision, note, sent_back));
+      return toolText("Done.");
     },
   );
 }

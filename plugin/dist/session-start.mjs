@@ -27535,13 +27535,15 @@ function waitText(wait, work) {
       return "waits until you accept the task it builds on";
   }
 }
+function stepText({ done, total, current }) {
+  if (!total) return void 0;
+  const step = `step ${String(Math.min(done + 1, total))} of ${String(total)}`;
+  return current ? `${step}: ${current}` : step;
+}
 function subtaskLine(subtask, waits, work) {
-  const { progress } = subtask;
   const parts = [subtask.status];
-  if (subtask.status === "running" && progress.total)
-    parts.push(
-      `step ${String(Math.min(progress.done + 1, progress.total))} of ${String(progress.total)}${progress.current ? `: ${progress.current}` : ""}`
-    );
+  const step = subtask.status === "running" && stepText(subtask.progress);
+  if (step) parts.push(step);
   parts.push(...waits.map((w) => waitText(w, work)));
   if (subtask.error) parts.push(`error: ${subtask.error}`);
   return `    - ${subtask.title} [${subtask.id}], ${subtask.assignee}: ${parts.join(", ")}`;

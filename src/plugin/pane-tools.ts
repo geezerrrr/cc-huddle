@@ -12,6 +12,7 @@ import type { Engine } from "../engine/engine.ts";
 import type { Answer } from "../engine/questions.ts";
 import { DECISION_OPTIONS, PERMISSION_OPTIONS } from "../engine/types.ts";
 import { paneTeam, shownMeeting } from "./pane.ts";
+import { decisionOf } from "./tools.ts";
 
 const json = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value) }],
@@ -68,11 +69,10 @@ export function addPaneTools(server: McpServer, team: () => Promise<Engine>) {
       },
     },
     async ({ question, option, picks, decision, note, sent_back }) => {
-      const words = note ? { note } : {};
       const answer: Answer = option
-        ? { option, ...words }
+        ? { option, ...(note && { note }) }
         : decision
-          ? { decision, ...words, ...(sent_back !== undefined && { sentBack: sent_back }) }
+          ? decisionOf(decision, note, sent_back)
           : { picks: picks ?? [] };
       await (await team()).answer(question, answer);
       return json({ answered: question });

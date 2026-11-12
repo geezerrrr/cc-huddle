@@ -41,14 +41,18 @@ export function waitText(wait: Wait, work: Work): string {
   }
 }
 
+/** Where a running subtask is: "step 2 of 3: Write the reroll"; nothing before its steps are known. */
+export function stepText({ done, total, current }: Subtask["progress"]): string | undefined {
+  if (!total) return undefined;
+  const step = `step ${String(Math.min(done + 1, total))} of ${String(total)}`;
+  return current ? `${step}: ${current}` : step;
+}
+
 /** A subtask on one line: its status, how far it is, what it waits on, what went wrong. */
 function subtaskLine(subtask: Subtask, waits: Wait[], work: Work): string {
-  const { progress } = subtask;
   const parts: string[] = [subtask.status];
-  if (subtask.status === "running" && progress.total)
-    parts.push(
-      `step ${String(Math.min(progress.done + 1, progress.total))} of ${String(progress.total)}${progress.current ? `: ${progress.current}` : ""}`,
-    );
+  const step = subtask.status === "running" && stepText(subtask.progress);
+  if (step) parts.push(step);
   parts.push(...waits.map((w) => waitText(w, work)));
   if (subtask.error) parts.push(`error: ${subtask.error}`);
   return `    - ${subtask.title} [${subtask.id}], ${subtask.assignee}: ${parts.join(", ")}`;

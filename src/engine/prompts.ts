@@ -8,7 +8,7 @@ import type { Delivery, Goal, GoOn, Meeting, MeetingSize, Member, Subtask, Task 
 export type SessionKind = "task" | "meeting" | "answer" | "review";
 
 /** Names in a sentence: "a, b and c". */
-const listOf = (items: readonly string[]) =>
+export const listOf = (items: readonly string[]) =>
   new Intl.ListFormat("en", { type: "conjunction" }).format(items);
 
 /** A member by name and role, as their teammates know them. */
