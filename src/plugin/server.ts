@@ -10,6 +10,7 @@ import { errorText } from "../engine/core.ts";
 import { Engine } from "../engine/engine.ts";
 import { stopMembers } from "../engine/processes.ts";
 import { addTools } from "./tools.ts";
+import { NewForYou, wakeSession } from "./wake.ts";
 
 const dataFolder = process.env.CLAUDE_PLUGIN_DATA;
 if (!dataFolder)
@@ -21,6 +22,8 @@ const say = (text: string) => {
 
 let engine: Engine | undefined;
 let opening: Promise<Engine> | undefined;
+/** What needs a conversation, since the team opened. */
+let news: NewForYou | undefined;
 
 /** The team, opened on first need: again after it failed, as its files may have been fixed since. */
 const team = (): Promise<Engine> => {
@@ -29,7 +32,13 @@ const team = (): Promise<Engine> => {
     dataFolder,
     env: process.env,
     host: {
-      changed() {},
+      changed() {
+        if (!engine || !news) return;
+        for (const message of news.news(engine.state))
+          wakeSession(message).catch((error: unknown) => {
+            say(`your session couldn't be told: ${errorText(error)}`);
+          });
+      },
       recorder: () => ({}),
       speech: () => ({}),
       failed(error) {
@@ -37,7 +46,10 @@ const team = (): Promise<Engine> => {
       },
     },
   }).then(
-    (opened) => (engine = opened),
+    (opened) => {
+      news = new NewForYou(opened.state);
+      return (engine = opened);
+    },
     (error: unknown) => {
       opening = undefined;
       throw error;
