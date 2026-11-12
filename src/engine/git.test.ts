@@ -7,13 +7,17 @@ import {
   git,
   GitError,
   goalBranch,
+  goalFolder,
   memberSigner,
+  mergeDesk,
   openDesk,
   openGoal,
   openRepository,
   slugFor,
   subtaskBranch,
   takenSlugs,
+  unresolved,
+  type Places,
 } from "./git.ts";
 
 const ME = {
@@ -195,5 +199,84 @@ describe("commitDesk", () => {
     await writeFile(path.join(desk, "dice.ts"), "roll\n");
     await commitDesk(places, "dice", "s1", memberSigner("glm"), "Roll the dice");
     expect(await log(repo, subtaskBranch("dice", "s1"))).toContain("Roll the dice");
+  });
+});
+
+describe("mergeDesk", () => {
+  const placesOf = async () => ({ repo: await openRepository(repo), root: path.join(dir, "data") });
+  const glm = memberSigner("glm");
+  const show = (ref: string, file: string) =>
+    git({ cwd: repo }, ["show", `${ref}:${file}`]).then((r) => r.stdout);
+  const deliver = async (places: Places, id: string, file: string, text: string) => {
+    const desk = await openDesk(places, "dice", id);
+    await writeFile(path.join(desk, file), text);
+    await commitDesk(places, "dice", id, glm, `Write ${file}`);
+    return desk;
+  };
+
+  it("merges a delivery into the goal and clears its worktree and branch", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    const desk = await deliver(places, "s1", "dice.ts", "roll\n");
+    expect(await mergeDesk(places, "dice", "s1", glm)).toEqual({ kind: "merged" });
+    expect(await show(goalBranch("dice"), "dice.ts")).toBe("roll\n");
+    expect(await readFile(path.join(goalFolder(places, "dice"), "dice.ts"), "utf8")).toBe("roll\n");
+    await expect(readFile(path.join(desk, "dice.ts"))).rejects.toThrow();
+    const branch = await git({ cwd: repo }, ["branch", "--list", subtaskBranch("dice", "s1")]);
+    expect(branch.stdout).toBe("");
+  });
+
+  it("merges two deliveries that touch different files", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    await deliver(places, "s1", "dice.ts", "roll\n");
+    await deliver(places, "s2", "score.ts", "score\n");
+    await mergeDesk(places, "dice", "s1", glm);
+    expect(await mergeDesk(places, "dice", "s2", glm)).toEqual({ kind: "merged" });
+    expect(await show(goalBranch("dice"), "dice.ts")).toBe("roll\n");
+    expect(await show(goalBranch("dice"), "score.ts")).toBe("score\n");
+  });
+
+  it("leaves a text conflict for the member, then merges once it is resolved", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    await deliver(places, "s1", "README.md", "one\n");
+    const desk = await deliver(places, "s2", "README.md", "two\n");
+    await mergeDesk(places, "dice", "s1", glm);
+    expect(await mergeDesk(places, "dice", "s2", glm)).toEqual({
+      kind: "conflict",
+      text: ["README.md"],
+      other: [],
+    });
+    expect(await unresolved(places, "s2", ["README.md"])).toEqual(["README.md"]);
+    await writeFile(path.join(desk, "README.md"), "one and two\n");
+    await commitDesk(places, "dice", "s2", glm, "Resolve README");
+    expect(await mergeDesk(places, "dice", "s2", glm)).toEqual({ kind: "merged" });
+    expect(await show(goalBranch("dice"), "README.md")).toBe("one and two\n");
+  });
+
+  it("sets apart conflicts that can't be resolved line by line", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    await deliver(places, "s1", "README.md", "changed\n");
+    const desk = await openDesk(places, "dice", "s2");
+    await rm(path.join(desk, "README.md"));
+    await commitDesk(places, "dice", "s2", glm, "Remove README");
+    await mergeDesk(places, "dice", "s1", glm);
+    expect(await mergeDesk(places, "dice", "s2", glm)).toEqual({
+      kind: "conflict",
+      text: [],
+      other: ["README.md"],
+    });
+  });
+
+  it("leaves your checkout as it was", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    await deliver(places, "s1", "dice.ts", "roll\n");
+    await mergeDesk(places, "dice", "s1", glm);
+    const status = await git({ cwd: repo }, ["status", "--porcelain"]);
+    const current = await git({ cwd: repo }, ["branch", "--show-current"]);
+    expect([status.stdout, current.stdout.trim()]).toEqual(["", "main"]);
   });
 });

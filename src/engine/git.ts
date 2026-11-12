@@ -278,3 +278,98 @@ export function commitDesk(
       await git(signed, ["commit", "-q", "--allow-empty", "-m", message]);
   });
 }
+
+/** What merging a delivery came to: merged into the goal, or conflicts (text ones for the member, the rest for you). */
+export type MergeOutcome =
+  { kind: "merged" } | { kind: "conflict"; text: string[]; other: string[] };
+
+/** A conflict git wrote into a text file (its lines may end in \r\n). */
+const MARKERS = /^<{7} [\s\S]*?^={7}\r?$[\s\S]*?^>{7} /m;
+
+/** Of the files a merge left in conflict in a subtask's worktree, those still holding conflict markers. */
+export async function unresolved(
+  places: Places,
+  subtaskId: string,
+  files: string[],
+): Promise<string[]> {
+  const desk = deskFolder(places, subtaskId);
+  const marked = await Promise.all(
+    files.map((file) =>
+      readFile(path.join(desk, file), "utf8").then(
+        (text) => MARKERS.test(text),
+        () => false,
+      ),
+    ),
+  );
+  return files.filter((_, i) => marked[i]);
+}
+
+/** The files a worktree has in conflict: text ones (markers in them) apart from the rest (binary, deleted on one side). */
+async function conflicts(places: Places, subtaskId: string, at: At) {
+  const list = await git(at, ["diff", "--name-only", "-z", "--diff-filter=U"]);
+  const files = list.stdout.split("\0").filter(Boolean);
+  const text = await unresolved(places, subtaskId, files);
+  return { text, other: files.filter((file) => !text.includes(file)) };
+}
+
+/** Takes a subtask's worktree and its branch away. */
+async function removeDesk(places: Places, slug: string, subtaskId: string) {
+  const desk = deskFolder(places, subtaskId);
+  await unlist(places.repo, desk);
+  await rm(desk, { recursive: true, force: true });
+  await git({ cwd: places.repo.top }, ["branch", "-q", "-D", subtaskBranch(slug, subtaskId)], {
+    allow: [1],
+  });
+}
+
+/**
+ * Merges a delivered subtask into its goal: the goal's branch is merged into
+ * the subtask's worktree, and when that is clean the goal's branch moves up
+ * to it and the worktree goes with its branch. Conflicts stay in the
+ * worktree, the merge half done. Safe to run again: a subtask merged already
+ * is gone with its branch.
+ */
+export function mergeDesk(
+  places: Places,
+  slug: string,
+  subtaskId: string,
+  by: Signer,
+): Promise<MergeOutcome> {
+  return perGoal(places, slug, async () => {
+    const { repo } = places;
+    const folder = deskFolder(places, subtaskId);
+    if (!(await exists(folder))) {
+      const branch = subtaskBranch(slug, subtaskId);
+      const kept = await git({ cwd: repo.top }, ["rev-parse", "--verify", "-q", branch], {
+        allow: [1],
+      });
+      if (kept.code !== 0) return { kind: "merged" };
+      await unlist(repo, folder);
+      await git({ cwd: repo.top }, ["worktree", "add", "-q", folder, branch]);
+    }
+    const at = await worktreeAt(repo, folder);
+    const desk = { ...at, env: { ...at.env, ...authorEnv(by) } };
+    if (await merging(desk)) {
+      const found = await conflicts(places, subtaskId, desk);
+      if (found.text.length || found.other.length) return { kind: "conflict", ...found };
+      await git(desk, ["commit", "-q", "--no-edit"]);
+    } else {
+      // As git does by default, whatever your own setup says (merge.ff=only would refuse it).
+      const merge = await git(
+        desk,
+        ["-c", "merge.ff=true", "merge", "-q", "--no-edit", goalBranch(slug)],
+        { allow: [1] },
+      );
+      if (merge.code === 1) {
+        const found = await conflicts(places, subtaskId, desk);
+        if (found.text.length || found.other.length) return { kind: "conflict", ...found };
+        throw new GitError(["merge"], 1, (merge.stderr || merge.stdout).trim());
+      }
+    }
+    const head = (await git(desk, ["rev-parse", "HEAD"])).stdout.trim();
+    const goal = await worktreeAt(repo, await openGoal(places, slug));
+    await git(goal, ["merge", "-q", "--ff-only", head]);
+    await removeDesk(places, slug, subtaskId);
+    return { kind: "merged" };
+  });
+}
