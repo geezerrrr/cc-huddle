@@ -169,7 +169,8 @@ export class Engine {
    */
   async answer(id: string, answer: Answer): Promise<Question> {
     const question = this.questions.answer(id, answer);
-    if ("decision" in answer) await this.scheduler.decide(question, answer);
+    if (question.kind === "decision" && "decision" in answer)
+      await this.scheduler.decide(question, answer);
     return question;
   }
 

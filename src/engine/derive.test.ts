@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { busyMembers, derive, meetingResumes, reviewerOf, waitsIn, type Work } from "./derive.ts";
-import type { Meeting, Question, Subtask } from "./types.ts";
+import type { Ask, Meeting, Question, Subtask } from "./types.ts";
 
 const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
   id,
@@ -32,11 +32,9 @@ const meeting = (fields: Partial<Meeting> = {}): Meeting => ({
   ...fields,
 });
 
-const question = (fields: Partial<Question> & Pick<Question, "id">): Question => ({
+const question = (fields: Pick<Question, "id" | "subtaskId"> & Ask): Question => ({
   from: "ann",
-  to: "you",
   text: "",
-  options: [],
   status: "open",
   createdAt: 0,
   ...fields,
@@ -94,6 +92,7 @@ describe("waitsIn", () => {
     const accept = question({
       id: "q1",
       subtaskId: "up",
+      kind: "decision",
       decision: { kind: "delivery", options: ["accept", "revise"] },
     });
     const state = work({ subtasks: [up, down], questions: [accept] });
@@ -131,8 +130,8 @@ describe("waitsIn", () => {
     const state = work({
       subtasks: [running],
       questions: [
-        question({ id: "q1", subtaskId: "s1", to: "bob" }),
-        question({ id: "q2", subtaskId: "s1" }),
+        question({ id: "q1", subtaskId: "s1", kind: "teammate", to: "bob" }),
+        question({ id: "q2", subtaskId: "s1", kind: "choices", choices: [] }),
       ],
     });
     expect(waitsIn(state, running, busyMembers(state))).toEqual([
@@ -157,7 +156,12 @@ describe("derive", () => {
     const deciding = work({
       subtasks: [merging],
       questions: [
-        question({ id: "q1", subtaskId: "s1", decision: { kind: "merge", options: ["retry"] } }),
+        question({
+          id: "q1",
+          subtaskId: "s1",
+          kind: "decision",
+          decision: { kind: "merge", options: ["retry"] },
+        }),
       ],
     });
     expect(derive(deciding).subtasks.s1?.actions).toEqual(["stop"]);

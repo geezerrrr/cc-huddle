@@ -309,11 +309,14 @@ export class Scheduler {
    * start; or send one of its subtasks, `sentBack` or else the last one done,
    * back with what to change).
    */
-  async decide(question: Question, answer: Extract<Answer, { decision: DecisionOption }>) {
+  async decide(
+    question: Extract<Question, { kind: "decision" }>,
+    answer: Extract<Answer, { decision: DecisionOption }>,
+  ) {
     const subtask = this.subtask(question.subtaskId ?? "");
     if (!subtask) return;
     const { decision: pick, note = "" } = answer;
-    if (question.decision?.kind === "delivery") {
+    if (question.decision.kind === "delivery") {
       const sentBack = this.subtask(answer.sentBack ?? subtask.id);
       if (pick === "revise" && sentBack) {
         this.move(sentBack, "redo");
@@ -331,7 +334,7 @@ export class Scheduler {
       const { slug } = this.goalOf(subtask);
       if (pick === "retry") await abortMerge(this.core.places, slug, subtask.id);
       else if (pick === "ours" || pick === "theirs")
-        await pickSide(this.core.places, slug, subtask.id, question.decision?.files ?? [], pick);
+        await pickSide(this.core.places, slug, subtask.id, question.decision.files ?? [], pick);
     }
     this.core.changed();
     this.pump();

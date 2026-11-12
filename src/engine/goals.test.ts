@@ -164,11 +164,11 @@ describe("Goals", () => {
       id: "q1",
       subtaskId: "s1",
       from: "glm",
-      to: "you",
       text: "",
-      options: [],
       status: "open",
       createdAt: 0,
+      kind: "choices",
+      choices: [],
     });
 
     await expect(goals.delete(goal.id)).rejects.toThrow("isn't archived");

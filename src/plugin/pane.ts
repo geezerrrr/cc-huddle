@@ -11,8 +11,14 @@ import type {
   OpenplanTeam,
 } from "../../plugin/types/index.d.ts";
 import { derive, reviewerOf, type Work } from "../engine/derive.ts";
-import type { Member, Meeting, Question, Subtask } from "../engine/types.ts";
-import { YOU } from "../engine/types.ts";
+import {
+  toYou,
+  type Member,
+  type Meeting,
+  type Permission,
+  type QuestionToYou,
+  type Subtask,
+} from "../engine/types.ts";
 import { waitText } from "./status.ts";
 
 const plural = (n: number, one: string, many: string) => `${String(n)} ${n === 1 ? one : many}`;
@@ -110,7 +116,7 @@ function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>
 }
 
 /** A tool call in a line: Claude Code's own sentence for it, else the tool and its main argument. */
-function callText(permission: NonNullable<Question["permission"]>): string {
+function callText(permission: Permission): string {
   if (permission.title) return permission.title;
   const { input } = permission;
   const main = ["command", "file_path", "path", "url", "pattern"]
@@ -119,7 +125,7 @@ function callText(permission: NonNullable<Question["permission"]>): string {
   return main ? `${permission.tool}: ${main}` : permission.tool;
 }
 
-function needOf(question: Question, work: Work): OpenplanNeed | undefined {
+function needOf(question: QuestionToYou, work: Work): OpenplanNeed {
   const subtask = work.subtasks.find((s) => s.id === question.subtaskId);
   const head = {
     id: question.id,
@@ -127,36 +133,37 @@ function needOf(question: Question, work: Work): OpenplanNeed | undefined {
     about: subtask?.title ?? "",
     text: question.text,
   };
-  if (question.permission)
-    return {
-      ...head,
-      kind: "permission",
-      call: callText(question.permission),
-      options: question.permission.options,
-    };
-  if (question.choices)
-    return {
-      ...head,
-      kind: "choices",
-      choices: question.choices.map((c) => ({
-        question: c.question,
-        header: c.header,
-        options: c.options.map((o) => o.label),
-        multiSelect: c.multiSelect,
-      })),
-    };
-  if (question.decision) {
-    const done = work.subtasks.filter((s) => s.taskId === subtask?.taskId && s.status === "done");
-    return {
-      ...head,
-      kind: "decision",
-      options: question.decision.options,
-      ...(question.decision.kind === "delivery" && {
-        sendBack: done.map((s) => ({ id: s.id, title: s.title })),
-      }),
-    };
+  switch (question.kind) {
+    case "permission":
+      return {
+        ...head,
+        kind: "permission",
+        call: callText(question.permission),
+        options: question.permission.options,
+      };
+    case "choices":
+      return {
+        ...head,
+        kind: "choices",
+        choices: question.choices.map((c) => ({
+          question: c.question,
+          header: c.header,
+          options: c.options.map((o) => o.label),
+          multiSelect: c.multiSelect,
+        })),
+      };
+    case "decision": {
+      const done = work.subtasks.filter((s) => s.taskId === subtask?.taskId && s.status === "done");
+      return {
+        ...head,
+        kind: "decision",
+        options: question.decision.options,
+        ...(question.decision.kind === "delivery" && {
+          sendBack: done.map((s) => ({ id: s.id, title: s.title })),
+        }),
+      };
+    }
   }
-  return undefined;
 }
 
 /** What the transcript keeps a line of, each once. */
@@ -202,8 +209,9 @@ function bandText(work: Work, needs: number): string | undefined {
 export function paneTeam(work: Work, members: readonly Member[]): OpenplanTeam {
   const derived = derive(work);
   const needs = work.questions
-    .filter((q) => q.to === YOU && q.status === "open")
-    .flatMap((q) => needOf(q, work) ?? []);
+    .filter(toYou)
+    .filter((q) => q.status === "open")
+    .map((q) => needOf(q, work));
   const meeting = shownMeeting(work);
   const band = bandText(work, needs.length);
   return {

@@ -27239,7 +27239,7 @@ function date4(params) {
 // src/engine/types.ts
 var isHalted = (status) => status === "failed" || status === "stopped";
 var MEETING_SIZES = ["small", "discussion", "large"];
-var YOU = "you";
+var toYou = (question) => question.kind !== "teammate";
 var GOAL_ACTIONS = ["pause", "resume", "archive", "delete"];
 
 // src/engine/team.ts
@@ -27397,10 +27397,10 @@ function reviewerOf(state, subtask) {
 }
 function acceptanceOf(state, taskId) {
   return state.questions.find(
-    (q) => q.status === "open" && q.decision?.kind === "delivery" && state.subtasks.find((s) => s.id === q.subtaskId)?.taskId === taskId
+    (q) => q.status === "open" && q.kind === "decision" && q.decision.kind === "delivery" && state.subtasks.find((s) => s.id === q.subtaskId)?.taskId === taskId
   );
 }
-var underReview = (state, subtask) => subtask.status === "reviewing" && isActive(state, subtask.goalId) && !openQuestions(state, subtask.id).some((q) => q.decision);
+var underReview = (state, subtask) => subtask.status === "reviewing" && isActive(state, subtask.goalId) && !openQuestions(state, subtask.id).some((q) => q.kind === "decision");
 function busyMembers(state) {
   const busy = /* @__PURE__ */ new Set();
   for (const s of state.subtasks) {
@@ -27430,7 +27430,7 @@ function waitsIn(state, subtask, busy) {
   const goal = state.goals.find((p) => p.id === subtask.goalId);
   const held = goal && goal.status !== "active" ? [{ kind: "goal", status: goal.status }] : [];
   const asked = () => openQuestions(state, subtask.id).map(
-    (q) => q.to === YOU ? q.decision ? { kind: "you", questionId: q.id, decision: q.decision.kind } : { kind: "you", questionId: q.id } : { kind: "teammate", by: q.to, questionId: q.id }
+    (q) => q.kind === "teammate" ? { kind: "teammate", by: q.to, questionId: q.id } : q.kind === "decision" ? { kind: "you", questionId: q.id, decision: q.decision.kind } : { kind: "you", questionId: q.id }
   );
   switch (subtask.status) {
     case "pending": {
@@ -27547,20 +27547,18 @@ function subtaskLine(subtask, waits, work) {
 function questionLine(question, work) {
   const about = work.subtasks.find((s) => s.id === question.subtaskId);
   const head = `  - [${question.id}] `;
-  if (question.permission)
+  if (question.kind === "permission")
     return `${head}${question.from} asks to use ${question.permission.tool}${question.permission.title ? `: ${question.permission.title}` : ""}. Answer it in /openplan.`;
-  if (question.choices)
+  if (question.kind === "choices")
     return `${head}${question.from} asks: ${question.choices.map((c) => c.question).join(" ")} Answer it in /openplan.`;
-  const options = question.decision?.options.join(", ") ?? "";
-  switch (question.decision?.kind) {
+  const options = question.decision.options.join(", ");
+  switch (question.decision.kind) {
     case "delivery":
       return `${head}The task "${question.text}" is done: ${options}.`;
     case "review":
       return `${head}The review of "${about?.title ?? ""}" is stuck (${question.text}): ${options}.`;
     case "merge":
       return `${head}Merging "${about?.title ?? ""}" needs you (${question.text.split("\n").join(", ")}): ${options}.`;
-    default:
-      return `${head}${question.from} asks: ${question.text}`;
   }
 }
 function statusText(work) {
@@ -27584,7 +27582,7 @@ function statusText(work) {
         lines.push(subtaskLine(subtask, derived2.subtasks[subtask.id]?.waits ?? [], work));
     }
   }
-  const open2 = work.questions.filter((q) => q.to === YOU && q.status === "open");
+  const open2 = work.questions.filter(toYou).filter((q) => q.status === "open");
   if (open2.length) lines.push("", "Waiting on you:", ...open2.map((q) => questionLine(q, work)));
   return lines.join("\n");
 }

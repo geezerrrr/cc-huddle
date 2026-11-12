@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Question, Subtask } from "../engine/types.ts";
+import type { Ask, Question, Subtask } from "../engine/types.ts";
 import { statusText } from "./status.ts";
 
 const subtask = (id: string, fields: Partial<Subtask>): Subtask => ({
@@ -18,12 +18,13 @@ const subtask = (id: string, fields: Partial<Subtask>): Subtask => ({
   ...fields,
 });
 
-const question = (id: string, fields: Partial<Question>): Question => ({
+const question = (
+  id: string,
+  fields: Partial<Pick<Question, "subtaskId" | "status" | "text">> & Ask,
+): Question => ({
   id,
   from: "glm",
-  to: "you",
   text: "",
-  options: [],
   status: "open",
   createdAt: 0,
   ...fields,
@@ -60,14 +61,16 @@ describe("statusText", () => {
       questions: [
         question("q1", {
           subtaskId: "Rules",
+          kind: "permission",
           permission: { tool: "Bash", input: {}, title: "Run the tests", options: ["once"] },
         }),
         question("q2", {
           subtaskId: "Score",
           text: "Game",
+          kind: "decision",
           decision: { kind: "delivery", options: ["accept", "revise"] },
         }),
-        question("q3", { status: "answered", text: "Old" }),
+        question("q3", { status: "answered", text: "Old", kind: "choices", choices: [] }),
       ],
     });
     expect(text).toBe(`Team: glm (busy), sonnet

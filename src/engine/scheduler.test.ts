@@ -4,11 +4,11 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Core } from "./core.ts";
 import { git, goalBranch, goalFolder, openRepository } from "./git.ts";
-import { Questions } from "./questions.ts";
+import { Questions, type Answer } from "./questions.ts";
 import { runSubtask, type RunOutcome } from "./run.ts";
 import { Scheduler } from "./scheduler.ts";
 import { askOnce } from "./turns.ts";
-import type { Member, Subtask } from "./types.ts";
+import type { DecisionOption, Member, Subtask } from "./types.ts";
 
 vi.mock("./run.ts", () => ({ runSubtask: vi.fn() }));
 vi.mock("./turns.ts", async (original) => ({
@@ -114,6 +114,13 @@ const settled = (s: Subtask, status: Subtask["status"]) =>
   eventually(() => {
     expect(s.status).toBe(status);
   });
+
+/** Answers a decision as Engine.answer does: the question closes, and the scheduler acts on it. */
+async function decide(id: string, answer: Extract<Answer, { decision: DecisionOption }>) {
+  const question = questions.answer(id, answer);
+  if (question.kind !== "decision") throw new Error(`${id} is not a decision`);
+  await scheduler.decide(question, answer);
+}
 
 const onGoal = (file: string) => readFile(path.join(goalFolder(core.places, "dice"), file), "utf8");
 
@@ -458,7 +465,7 @@ describe("Scheduler", () => {
       scheduler.continue("s1");
       await settled(s1, "done");
       expect(runSubtask).toHaveBeenCalledTimes(1);
-      expect(core.state.questions.map((q) => q.decision?.kind)).toEqual(["delivery"]);
+      expect(core.state.questions).toMatchObject([{ decision: { kind: "delivery" } }]);
     });
 
     it("decide a stuck review: skip it, and it is merged", async () => {
@@ -472,8 +479,7 @@ describe("Scheduler", () => {
         expect(core.state.questions).toHaveLength(1);
       });
       const [stuck] = core.state.questions;
-      const question = questions.answer(stuck?.id ?? "", { decision: "skip" });
-      await scheduler.decide(question, { decision: "skip" });
+      await decide(stuck?.id ?? "", { decision: "skip" });
       await settled(s1, "done");
     });
 
@@ -485,9 +491,10 @@ describe("Scheduler", () => {
       await eventually(() => {
         expect(core.state.questions).toHaveLength(1);
       });
-      const answer = { decision: "revise" as const, note: "Bigger numbers" };
-      const question = questions.answer(core.state.questions[0]?.id ?? "", answer);
-      await scheduler.decide(question, answer);
+      await decide(core.state.questions[0]?.id ?? "", {
+        decision: "revise",
+        note: "Bigger numbers",
+      });
       await eventually(() => {
         expect(runs()).toHaveLength(2);
       });
@@ -511,16 +518,14 @@ describe("Scheduler", () => {
         });
       scheduler.pump();
       await eventually(() => {
-        expect(core.state.questions.map((q) => q.decision?.kind)).toContain("merge");
+        expect(core.state.questions).toMatchObject([
+          {
+            kind: "decision",
+            decision: { kind: "merge", options: ["ours", "theirs", "retry"], files: ["logo.bin"] },
+          },
+        ]);
       });
-      const conflict = core.state.questions.find((q) => q.decision?.kind === "merge");
-      expect(conflict?.decision).toEqual({
-        kind: "merge",
-        options: ["ours", "theirs", "retry"],
-        files: ["logo.bin"],
-      });
-      const question = questions.answer(conflict?.id ?? "", { decision: "ours" });
-      await scheduler.decide(question, { decision: "ours" });
+      await decide(core.state.questions[0]?.id ?? "", { decision: "ours" });
       await settled(s2, "done");
       expect(await onGoal("logo.bin")).toBe("sonnet\0\n");
     });

@@ -5,7 +5,7 @@
  * the pane.
  */
 import { connect } from "node:net";
-import { YOU, type TeamState } from "../engine/types.ts";
+import type { TeamState } from "../engine/types.ts";
 
 /**
  * Posts `text` to your session's inbox, as Claude Code's own sessions post
@@ -58,9 +58,9 @@ export class NewForYou {
         );
     for (const question of state.questions) {
       if (
-        question.to !== YOU ||
         question.status !== "open" ||
-        question.decision?.kind !== "delivery" ||
+        question.kind !== "decision" ||
+        question.decision.kind !== "delivery" ||
         !fresh(question.id)
       )
         continue;

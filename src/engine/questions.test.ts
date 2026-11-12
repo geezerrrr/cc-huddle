@@ -54,9 +54,9 @@ describe("a call outside the rules", () => {
     const question = await opened(box);
     expect(question).toMatchObject({
       from: "glm",
-      to: "you",
       subtaskId: "s1",
       text: "Run the tests",
+      kind: "permission",
       permission: { tool: "Bash", input: command, options: ["once", "deny"] },
     });
     questions.answer(question.id, { option: "once" });
@@ -69,7 +69,7 @@ describe("a call outside the rules", () => {
     const gate = questions.gate({ from: "glm", signal: new AbortController().signal });
     const result = gate("Bash", command, request({ suggestions: [ruleFor] }));
     const question = await opened(box);
-    expect(question.permission?.options).toEqual(["once", "always", "deny"]);
+    expect(question).toMatchObject({ permission: { options: ["once", "always", "deny"] } });
     questions.answer(question.id, { option: "always" });
     expect(await result).toEqual({
       behavior: "allow",
@@ -94,7 +94,8 @@ describe("a call outside the rules", () => {
     await vi.waitFor(() => {
       expect(box.state.questions).toHaveLength(2);
     });
-    for (const q of box.state.questions) expect(q.permission?.options).toEqual(["once", "deny"]);
+    for (const q of box.state.questions)
+      expect(q).toMatchObject({ permission: { options: ["once", "deny"] } });
   });
 
   it("denied, tells the member what you said", async () => {
@@ -149,7 +150,7 @@ describe("questions with choices", () => {
     const result = gate("AskUserQuestion", input, request());
     const question = await opened(box);
     expect(question.text).toBe("Where does the score go?\nWhich sounds?");
-    expect(question.choices).toEqual(input.questions);
+    expect(question).toMatchObject({ choices: input.questions });
     questions.answer(question.id, { picks: ["Center", "Roll, Win"] });
     expect(await result).toEqual({
       behavior: "allow",
@@ -224,7 +225,7 @@ describe("decisions", () => {
       "Sent back three times",
     );
     const question = await opened(box);
-    expect(question).toMatchObject({ from: "glm", to: "you", subtaskId: "s1" });
+    expect(question).toMatchObject({ from: "glm", subtaskId: "s1", kind: "decision" });
     expect(() => questions.answer(question.id, { option: "once" })).toThrow("doesn't fit");
     expect(questions.answer(question.id, { decision: "skip" })).toBe(question);
     expect(box.state.questions).toEqual([]);
@@ -268,7 +269,7 @@ describe("calling off", () => {
     });
     questions.cancelFor("s1");
     expect(await asked).toEqual({ behavior: "deny", message: "Stopped." });
-    expect(box.state.questions.map((q) => q.decision?.kind)).toEqual(["merge"]);
+    expect(box.state.questions).toMatchObject([{ decision: { kind: "merge" } }]);
     questions.cancelFor("s1", true);
     expect(box.state.questions).toEqual([]);
   });
@@ -279,25 +280,25 @@ describe("calling off", () => {
       {
         id: "q1",
         from: "glm",
-        to: "you",
         text: "Allow?",
-        options: [],
         status: "open",
         createdAt: 0,
+        kind: "permission",
+        permission: { tool: "Bash", input: {}, options: ["once", "deny"] },
       },
       {
         id: "q2",
         from: "glm",
-        to: "sonnet",
         text: "Font?",
-        options: [],
         status: "open",
         createdAt: 0,
+        kind: "teammate",
+        to: "sonnet",
       },
     );
     questions.openDecision(subtask("s1"), { kind: "merge", options: ["retry"] }, "git failed");
     questions.recover();
-    expect(box.state.questions.map((q) => q.decision?.kind)).toEqual(["merge"]);
+    expect(box.state.questions).toMatchObject([{ decision: { kind: "merge" } }]);
   });
 
   it("a task's delivery leaves its other decisions", () => {

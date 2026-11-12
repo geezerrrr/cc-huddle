@@ -8,7 +8,6 @@ import { can, MEETING_MACHINE, GOAL_MACHINE, SUBTASK_MACHINE } from "./machines.
 import {
   GOAL_ACTIONS,
   isHalted,
-  YOU,
   type Derived,
   type Meeting,
   type Goal,
@@ -49,7 +48,8 @@ function acceptanceOf(state: Pick<TeamState, "questions" | "subtasks">, taskId: 
   return state.questions.find(
     (q) =>
       q.status === "open" &&
-      q.decision?.kind === "delivery" &&
+      q.kind === "decision" &&
+      q.decision.kind === "delivery" &&
       state.subtasks.find((s) => s.id === q.subtaskId)?.taskId === taskId,
   );
 }
@@ -58,7 +58,7 @@ function acceptanceOf(state: Pick<TeamState, "questions" | "subtasks">, taskId: 
 const underReview = (state: Pick<TeamState, "goals" | "questions">, subtask: Subtask) =>
   subtask.status === "reviewing" &&
   isActive(state, subtask.goalId) &&
-  !openQuestions(state, subtask.id).some((q) => q.decision);
+  !openQuestions(state, subtask.id).some((q) => q.kind === "decision");
 
 /**
  * Who is busy, and so starts nothing new and can't join a meeting: whoever
@@ -104,11 +104,11 @@ export function waitsIn(state: Work, subtask: Subtask, busy: Set<string>): Wait[
     goal && goal.status !== "active" ? [{ kind: "goal", status: goal.status }] : [];
   const asked = (): Wait[] =>
     openQuestions(state, subtask.id).map((q) =>
-      q.to === YOU
-        ? q.decision
+      q.kind === "teammate"
+        ? { kind: "teammate", by: q.to, questionId: q.id }
+        : q.kind === "decision"
           ? { kind: "you", questionId: q.id, decision: q.decision.kind }
-          : { kind: "you", questionId: q.id }
-        : { kind: "teammate", by: q.to, questionId: q.id },
+          : { kind: "you", questionId: q.id },
     );
   switch (subtask.status) {
     case "pending": {

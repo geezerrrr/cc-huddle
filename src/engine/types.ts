@@ -235,36 +235,51 @@ export type DecisionKind = "review" | "merge" | "delivery";
 export const PERMISSION_OPTIONS = ["once", "always", "deny"] as const;
 export type PermissionOption = (typeof PERMISSION_OPTIONS)[number];
 
-/** Something a member waits on, or a decision that waits on you (§4.4). */
-export interface Question {
+/** A decision on a subtask. `files`: conflicts that can't be merged line by line. */
+export interface Decision {
+  kind: DecisionKind;
+  options: DecisionOption[];
+  files?: string[];
+}
+
+/**
+ * A tool call waiting to be allowed: the tool, its input as the member gave
+ * it, and Claude Code's own sentence for the call when it has one.
+ */
+export interface Permission {
+  tool: string;
+  input: Record<string, unknown>;
+  title?: string;
+  options: PermissionOption[];
+}
+
+/**
+ * Something a member waits on, or a decision that waits on you (§4.4): a
+ * teammate's answer, or, put to you, your picks among choices, your leave for
+ * a tool call, or a call the scheduler acts on, with no run waiting on it.
+ */
+export type Question = {
   id: string;
   subtaskId?: string;
   /** Who asks. */
   from: string;
-  /** A member's name, or "you". */
-  to: string;
   text: string;
-  /** Answers the asker suggested for a reply in words. */
-  options: string[];
-  choices?: Choice[];
   status: QuestionStatus;
   createdAt: number;
-  /** A call the scheduler acts on; no run waits on it. `files`: conflicts that can't be merged line by line. */
-  decision?: { kind: DecisionKind; options: DecisionOption[]; files?: string[] };
-  /**
-   * A tool call waiting to be allowed: the tool, its input as the member gave
-   * it, and Claude Code's own sentence for the call when it has one.
-   */
-  permission?: {
-    tool: string;
-    input: Record<string, unknown>;
-    title?: string;
-    options: PermissionOption[];
-  };
-}
+} & Ask;
 
-/** The addressee of a question put to you. */
-export const YOU = "you";
+/** What a question asks for. */
+export type Ask =
+  | { kind: "teammate"; to: string }
+  | { kind: "choices"; choices: Choice[] }
+  | { kind: "permission"; permission: Permission }
+  | { kind: "decision"; decision: Decision };
+
+/** A question put to you: every kind but a teammate's. */
+export type QuestionToYou = Exclude<Question, { kind: "teammate" }>;
+
+export const toYou = (question: Question): question is QuestionToYou =>
+  question.kind !== "teammate";
 
 /** The state the engine saves. */
 export interface TeamState {

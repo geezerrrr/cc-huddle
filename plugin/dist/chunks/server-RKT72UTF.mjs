@@ -8140,7 +8140,7 @@ var DECISION_OPTIONS = [
   "revise"
 ];
 var PERMISSION_OPTIONS = ["once", "always", "deny"];
-var YOU = "you";
+var toYou = (question) => question.kind !== "teammate";
 var SUBTASK_ACTIONS = ["stop", "continue", "retry", "redo"];
 var GOAL_ACTIONS = ["pause", "resume", "archive", "delete"];
 
@@ -8155,10 +8155,10 @@ function reviewerOf(state, subtask2) {
 }
 function acceptanceOf(state, taskId) {
   return state.questions.find(
-    (q) => q.status === "open" && q.decision?.kind === "delivery" && state.subtasks.find((s) => s.id === q.subtaskId)?.taskId === taskId
+    (q) => q.status === "open" && q.kind === "decision" && q.decision.kind === "delivery" && state.subtasks.find((s) => s.id === q.subtaskId)?.taskId === taskId
   );
 }
-var underReview = (state, subtask2) => subtask2.status === "reviewing" && isActive(state, subtask2.goalId) && !openQuestions(state, subtask2.id).some((q) => q.decision);
+var underReview = (state, subtask2) => subtask2.status === "reviewing" && isActive(state, subtask2.goalId) && !openQuestions(state, subtask2.id).some((q) => q.kind === "decision");
 function busyMembers(state) {
   const busy2 = /* @__PURE__ */ new Set();
   for (const s of state.subtasks) {
@@ -8188,7 +8188,7 @@ function waitsIn(state, subtask2, busy2) {
   const goal2 = state.goals.find((p) => p.id === subtask2.goalId);
   const held = goal2 && goal2.status !== "active" ? [{ kind: "goal", status: goal2.status }] : [];
   const asked = () => openQuestions(state, subtask2.id).map(
-    (q) => q.to === YOU ? q.decision ? { kind: "you", questionId: q.id, decision: q.decision.kind } : { kind: "you", questionId: q.id } : { kind: "teammate", by: q.to, questionId: q.id }
+    (q) => q.kind === "teammate" ? { kind: "teammate", by: q.to, questionId: q.id } : q.kind === "decision" ? { kind: "you", questionId: q.id, decision: q.decision.kind } : { kind: "you", questionId: q.id }
   );
   switch (subtask2.status) {
     case "pending": {
@@ -9349,11 +9349,10 @@ var Questions = class {
    */
   answer(id, answer) {
     const question = this.inbox.state.questions.find(
-      (q) => q.id === id && q.to === YOU && q.status === "open"
+      (q) => q.id === id && q.kind !== "teammate" && q.status === "open"
     );
     if (!question) throw new Error("That question is no longer open.");
-    const fits = question.permission ? "option" in answer && question.permission.options.includes(answer.option) : question.decision ? "decision" in answer && question.decision.options.includes(answer.decision) && (answer.decision !== "revise" || this.revisable(question, answer)) : "picks" in answer && answer.picks.length === question.choices?.length;
-    if (!fits) throw new Error("That answer doesn't fit the question.");
+    if (!this.fits(question, answer)) throw new Error("That answer doesn't fit the question.");
     this.close(question, "answer", answer);
     return question;
   }
@@ -9364,7 +9363,7 @@ var Questions = class {
    * off (cancelFor) and should stop `answering` too.
    */
   async toTeammate(asker, to, text2, answering) {
-    const question = this.open(asker, { text: text2, options: [] }, to);
+    const question = this.open(asker, { text: text2, kind: "teammate", to });
     try {
       return await answering();
     } finally {
@@ -9376,7 +9375,10 @@ var Questions = class {
    * what, in `text`): it waits for your answer, no turn behind it.
    */
   openDecision(subtask2, decision, text2) {
-    this.open({ from: subtask2.assignee, subtaskId: subtask2.id }, { text: text2, options: [], decision });
+    this.open(
+      { from: subtask2.assignee, subtaskId: subtask2.id },
+      { text: text2, kind: "decision", decision }
+    );
   }
   /**
    * Calls off what a subtask's run waits on (the run ended or was stopped);
@@ -9384,18 +9386,20 @@ var Questions = class {
    * that stage).
    */
   cancelFor(subtaskId, decisions = false) {
-    this.cancelAll((q) => q.subtaskId === subtaskId && (decisions || !q.decision));
+    this.cancelAll((q) => q.subtaskId === subtaskId && (decisions || q.kind !== "decision"));
   }
   /** After a restart no turn waits on anything: what members asked is called off; your decisions stand. */
   recover() {
-    this.cancelAll((q) => !q.decision);
+    this.cancelAll((q) => q.kind !== "decision");
   }
   /** Calls off a task's delivery waiting on you: work in it is being done again. */
   cancelDelivery(taskId) {
     const inTask = new Set(
       this.inbox.state.subtasks.filter((s) => s.taskId === taskId).map((s) => s.id)
     );
-    this.cancelAll((q) => q.decision?.kind === "delivery" && inTask.has(q.subtaskId ?? ""));
+    this.cancelAll(
+      (q) => q.kind === "decision" && q.decision.kind === "delivery" && inTask.has(q.subtaskId ?? "")
+    );
   }
   /** A call the member's rules don't cover: allowed once, always, or denied. */
   async permit(asker, tool3, input, request) {
@@ -9403,7 +9407,7 @@ var Questions = class {
     const answer = await this.wait(asker, {
       // A command comes with the member's own words for what it does.
       text: request.description ?? "",
-      options: [],
+      kind: "permission",
       permission: {
         tool: tool3,
         input,
@@ -9445,12 +9449,25 @@ var Questions = class {
     }));
     const answer = await this.wait(asker, {
       text: choices.map((c) => c.question).join("\n"),
-      options: [],
+      kind: "choices",
       choices
     });
     if (!answer) return { behavior: "deny", message: CALLED_OFF };
     const answers = Object.fromEntries(choices.map((c, i) => [c.question, answer.picks[i]]));
     return { behavior: "allow", updatedInput: { ...input, answers } };
+  }
+  /** Whether `answer` is one `question` can take. */
+  fits(question, answer) {
+    switch (question.kind) {
+      case "permission":
+        return "option" in answer && question.permission.options.includes(answer.option);
+      case "choices":
+        return "picks" in answer && answer.picks.length === question.choices.length;
+      case "decision":
+        return "decision" in answer && question.decision.options.includes(answer.decision) && (answer.decision !== "revise" || this.revisable(question, answer));
+      case "teammate":
+        return false;
+    }
   }
   /** Sending a task back says what to change, and sends back only one of its subtasks that is done. */
   revisable(question, answer) {
@@ -9479,13 +9496,12 @@ var Questions = class {
       });
     });
   }
-  /** Puts a question to `to`: you, unless a teammate is asked. */
-  open(asker, ask, to = YOU) {
+  /** Puts a question: to a teammate, or to you. */
+  open(asker, ask) {
     const question = {
       id: randomUUID3(),
       ...asker.subtaskId !== void 0 && { subtaskId: asker.subtaskId },
       from: asker.from,
-      to,
       status: "open",
       createdAt: Date.now(),
       ...ask
@@ -9842,7 +9858,7 @@ var Scheduler = class {
     const subtask2 = this.subtask(question.subtaskId ?? "");
     if (!subtask2) return;
     const { decision: pick, note = "" } = answer;
-    if (question.decision?.kind === "delivery") {
+    if (question.decision.kind === "delivery") {
       const sentBack = this.subtask(answer.sentBack ?? subtask2.id);
       if (pick === "revise" && sentBack) {
         this.move(sentBack, "redo");
@@ -9859,7 +9875,7 @@ var Scheduler = class {
       const { slug } = this.goalOf(subtask2);
       if (pick === "retry") await abortMerge(this.core.places, slug, subtask2.id);
       else if (pick === "ours" || pick === "theirs")
-        await pickSide(this.core.places, slug, subtask2.id, question.decision?.files ?? [], pick);
+        await pickSide(this.core.places, slug, subtask2.id, question.decision.files ?? [], pick);
     }
     this.core.changed();
     this.pump();
@@ -10482,7 +10498,8 @@ var Engine = class _Engine {
    */
   async answer(id, answer) {
     const question = this.questions.answer(id, answer);
-    if ("decision" in answer) await this.scheduler.decide(question, answer);
+    if (question.kind === "decision" && "decision" in answer)
+      await this.scheduler.decide(question, answer);
     return question;
   }
   /**
@@ -10615,20 +10632,18 @@ function subtaskLine(subtask2, waits, work) {
 function questionLine(question, work) {
   const about = work.subtasks.find((s) => s.id === question.subtaskId);
   const head = `  - [${question.id}] `;
-  if (question.permission)
+  if (question.kind === "permission")
     return `${head}${question.from} asks to use ${question.permission.tool}${question.permission.title ? `: ${question.permission.title}` : ""}. Answer it in /openplan.`;
-  if (question.choices)
+  if (question.kind === "choices")
     return `${head}${question.from} asks: ${question.choices.map((c) => c.question).join(" ")} Answer it in /openplan.`;
-  const options = question.decision?.options.join(", ") ?? "";
-  switch (question.decision?.kind) {
+  const options = question.decision.options.join(", ");
+  switch (question.decision.kind) {
     case "delivery":
       return `${head}The task "${question.text}" is done: ${options}.`;
     case "review":
       return `${head}The review of "${about?.title ?? ""}" is stuck (${question.text}): ${options}.`;
     case "merge":
       return `${head}Merging "${about?.title ?? ""}" needs you (${question.text.split("\n").join(", ")}): ${options}.`;
-    default:
-      return `${head}${question.from} asks: ${question.text}`;
   }
 }
 function statusText(work) {
@@ -10652,7 +10667,7 @@ function statusText(work) {
         lines.push(subtaskLine(subtask2, derived.subtasks[subtask2.id]?.waits ?? [], work));
     }
   }
-  const open2 = work.questions.filter((q) => q.to === YOU && q.status === "open");
+  const open2 = work.questions.filter(toYou).filter((q) => q.status === "open");
   if (open2.length) lines.push("", "Waiting on you:", ...open2.map((q) => questionLine(q, work)));
   return lines.join("\n");
 }
@@ -10742,36 +10757,37 @@ function needOf(question, work) {
     about: subtask2?.title ?? "",
     text: question.text
   };
-  if (question.permission)
-    return {
-      ...head,
-      kind: "permission",
-      call: callText(question.permission),
-      options: question.permission.options
-    };
-  if (question.choices)
-    return {
-      ...head,
-      kind: "choices",
-      choices: question.choices.map((c) => ({
-        question: c.question,
-        header: c.header,
-        options: c.options.map((o) => o.label),
-        multiSelect: c.multiSelect
-      }))
-    };
-  if (question.decision) {
-    const done = work.subtasks.filter((s) => s.taskId === subtask2?.taskId && s.status === "done");
-    return {
-      ...head,
-      kind: "decision",
-      options: question.decision.options,
-      ...question.decision.kind === "delivery" && {
-        sendBack: done.map((s) => ({ id: s.id, title: s.title }))
-      }
-    };
+  switch (question.kind) {
+    case "permission":
+      return {
+        ...head,
+        kind: "permission",
+        call: callText(question.permission),
+        options: question.permission.options
+      };
+    case "choices":
+      return {
+        ...head,
+        kind: "choices",
+        choices: question.choices.map((c) => ({
+          question: c.question,
+          header: c.header,
+          options: c.options.map((o) => o.label),
+          multiSelect: c.multiSelect
+        }))
+      };
+    case "decision": {
+      const done = work.subtasks.filter((s) => s.taskId === subtask2?.taskId && s.status === "done");
+      return {
+        ...head,
+        kind: "decision",
+        options: question.decision.options,
+        ...question.decision.kind === "delivery" && {
+          sendBack: done.map((s) => ({ id: s.id, title: s.title }))
+        }
+      };
+    }
   }
-  return void 0;
 }
 function milestones(work) {
   const said2 = [];
@@ -10810,7 +10826,7 @@ function bandText(work, needs) {
 }
 function paneTeam(work, members) {
   const derived = derive(work);
-  const needs = work.questions.filter((q) => q.to === YOU && q.status === "open").flatMap((q) => needOf(q, work) ?? []);
+  const needs = work.questions.filter(toYou).filter((q) => q.status === "open").map((q) => needOf(q, work));
   const meeting2 = shownMeeting(work);
   const band = bandText(work, needs.length);
   return {
@@ -11142,7 +11158,7 @@ var NewForYou = class {
           `openplan: the meeting [${meeting2.id}] on "${meeting2.agenda}" has a plan: ${meeting2.plan.summary}. Show it to the user with show_plan, and ask whether to approve it, change it, or cancel it.`
         );
     for (const question of state.questions) {
-      if (question.to !== YOU || question.status !== "open" || question.decision?.kind !== "delivery" || !fresh(question.id))
+      if (question.status !== "open" || question.kind !== "decision" || question.decision.kind !== "delivery" || !fresh(question.id))
         continue;
       const subtask2 = state.subtasks.find((s) => s.id === question.subtaskId);
       const delivered = state.subtasks.filter((s) => s.taskId === subtask2?.taskId && s.delivery).map((s) => `- ${s.title}, by ${s.assignee}: ${s.delivery?.summary ?? ""}`);

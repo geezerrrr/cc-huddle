@@ -100,11 +100,10 @@ describe("NewForYou", () => {
       id: "q1",
       subtaskId: "s1",
       from: "glm",
-      to: "you",
       text: "Game",
-      options: [],
       status: "open",
       createdAt: 0,
+      kind: "decision",
       decision: { kind: "delivery", options: ["accept", "revise"] },
     });
     expect(news.news(now)).toEqual([

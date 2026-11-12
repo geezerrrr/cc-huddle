@@ -5,7 +5,13 @@
  */
 import { derive, type Work } from "../engine/derive.ts";
 import { goalBranch } from "../engine/git.ts";
-import { YOU, type Meeting, type Question, type Subtask, type Wait } from "../engine/types.ts";
+import {
+  toYou,
+  type Meeting,
+  type QuestionToYou,
+  type Subtask,
+  type Wait,
+} from "../engine/types.ts";
 
 const MEETING_STATUS: Record<Meeting["status"], string> = {
   running: "under way",
@@ -49,23 +55,21 @@ function subtaskLine(subtask: Subtask, waits: Wait[], work: Work): string {
 }
 
 /** A question put to you, in words. */
-function questionLine(question: Question, work: Work): string {
+function questionLine(question: QuestionToYou, work: Work): string {
   const about = work.subtasks.find((s) => s.id === question.subtaskId);
   const head = `  - [${question.id}] `;
-  if (question.permission)
+  if (question.kind === "permission")
     return `${head}${question.from} asks to use ${question.permission.tool}${question.permission.title ? `: ${question.permission.title}` : ""}. Answer it in /openplan.`;
-  if (question.choices)
+  if (question.kind === "choices")
     return `${head}${question.from} asks: ${question.choices.map((c) => c.question).join(" ")} Answer it in /openplan.`;
-  const options = question.decision?.options.join(", ") ?? "";
-  switch (question.decision?.kind) {
+  const options = question.decision.options.join(", ");
+  switch (question.decision.kind) {
     case "delivery":
       return `${head}The task "${question.text}" is done: ${options}.`;
     case "review":
       return `${head}The review of "${about?.title ?? ""}" is stuck (${question.text}): ${options}.`;
     case "merge":
       return `${head}Merging "${about?.title ?? ""}" needs you (${question.text.split("\n").join(", ")}): ${options}.`;
-    default:
-      return `${head}${question.from} asks: ${question.text}`;
   }
 }
 
@@ -91,7 +95,7 @@ export function statusText(work: Work): string {
         lines.push(subtaskLine(subtask, derived.subtasks[subtask.id]?.waits ?? [], work));
     }
   }
-  const open = work.questions.filter((q) => q.to === YOU && q.status === "open");
+  const open = work.questions.filter(toYou).filter((q) => q.status === "open");
   if (open.length) lines.push("", "Waiting on you:", ...open.map((q) => questionLine(q, work)));
   return lines.join("\n");
 }

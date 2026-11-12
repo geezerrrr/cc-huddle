@@ -16,8 +16,9 @@ import type {
 import type { AskUserQuestionInput } from "@anthropic-ai/claude-agent-sdk/sdk-tools";
 import { QUESTION_MACHINE, step } from "./machines.ts";
 import {
-  YOU,
+  type Ask,
   type Choice,
+  type Decision,
   type DecisionOption,
   type PermissionOption,
   type Question,
@@ -104,17 +105,10 @@ export class Questions {
    */
   answer(id: string, answer: Answer): Question {
     const question = this.inbox.state.questions.find(
-      (q) => q.id === id && q.to === YOU && q.status === "open",
+      (q) => q.id === id && q.kind !== "teammate" && q.status === "open",
     );
     if (!question) throw new Error("That question is no longer open.");
-    const fits = question.permission
-      ? "option" in answer && question.permission.options.includes(answer.option)
-      : question.decision
-        ? "decision" in answer &&
-          question.decision.options.includes(answer.decision) &&
-          (answer.decision !== "revise" || this.revisable(question, answer))
-        : "picks" in answer && answer.picks.length === question.choices?.length;
-    if (!fits) throw new Error("That answer doesn't fit the question.");
+    if (!this.fits(question, answer)) throw new Error("That answer doesn't fit the question.");
     this.close(question, "answer", answer);
     return question;
   }
@@ -131,7 +125,7 @@ export class Questions {
     text: string,
     answering: () => Promise<T>,
   ): Promise<T> {
-    const question = this.open(asker, { text, options: [] }, to);
+    const question = this.open(asker, { text, kind: "teammate", to });
     try {
       return await answering();
     } finally {
@@ -143,8 +137,11 @@ export class Questions {
    * A stuck review, a merge that needs you, or a task done (with why, or
    * what, in `text`): it waits for your answer, no turn behind it.
    */
-  openDecision(subtask: Subtask, decision: NonNullable<Question["decision"]>, text: string) {
-    this.open({ from: subtask.assignee, subtaskId: subtask.id }, { text, options: [], decision });
+  openDecision(subtask: Subtask, decision: Decision, text: string) {
+    this.open(
+      { from: subtask.assignee, subtaskId: subtask.id },
+      { text, kind: "decision", decision },
+    );
   }
 
   /**
@@ -153,12 +150,12 @@ export class Questions {
    * that stage).
    */
   cancelFor(subtaskId: string, decisions = false) {
-    this.cancelAll((q) => q.subtaskId === subtaskId && (decisions || !q.decision));
+    this.cancelAll((q) => q.subtaskId === subtaskId && (decisions || q.kind !== "decision"));
   }
 
   /** After a restart no turn waits on anything: what members asked is called off; your decisions stand. */
   recover() {
-    this.cancelAll((q) => !q.decision);
+    this.cancelAll((q) => q.kind !== "decision");
   }
 
   /** Calls off a task's delivery waiting on you: work in it is being done again. */
@@ -166,7 +163,10 @@ export class Questions {
     const inTask = new Set(
       this.inbox.state.subtasks.filter((s) => s.taskId === taskId).map((s) => s.id),
     );
-    this.cancelAll((q) => q.decision?.kind === "delivery" && inTask.has(q.subtaskId ?? ""));
+    this.cancelAll(
+      (q) =>
+        q.kind === "decision" && q.decision.kind === "delivery" && inTask.has(q.subtaskId ?? ""),
+    );
   }
 
   /** A call the member's rules don't cover: allowed once, always, or denied. */
@@ -180,7 +180,7 @@ export class Questions {
     const answer = await this.wait<Extract<Answer, { option: PermissionOption }>>(asker, {
       // A command comes with the member's own words for what it does.
       text: request.description ?? "",
-      options: [],
+      kind: "permission",
       permission: {
         tool,
         input,
@@ -226,12 +226,30 @@ export class Questions {
     }));
     const answer = await this.wait<Extract<Answer, { picks: string[] }>>(asker, {
       text: choices.map((c) => c.question).join("\n"),
-      options: [],
+      kind: "choices",
       choices,
     });
     if (!answer) return { behavior: "deny", message: CALLED_OFF };
     const answers = Object.fromEntries(choices.map((c, i) => [c.question, answer.picks[i]]));
     return { behavior: "allow", updatedInput: { ...input, answers } };
+  }
+
+  /** Whether `answer` is one `question` can take. */
+  private fits(question: Question, answer: Answer): boolean {
+    switch (question.kind) {
+      case "permission":
+        return "option" in answer && question.permission.options.includes(answer.option);
+      case "choices":
+        return "picks" in answer && answer.picks.length === question.choices.length;
+      case "decision":
+        return (
+          "decision" in answer &&
+          question.decision.options.includes(answer.decision) &&
+          (answer.decision !== "revise" || this.revisable(question, answer))
+        );
+      case "teammate":
+        return false;
+    }
   }
 
   /** Sending a task back says what to change, and sends back only one of its subtasks that is done. */
@@ -250,7 +268,7 @@ export class Questions {
    */
   private wait<A extends Answer>(
     asker: Asker,
-    ask: Pick<Question, "text" | "options" | "choices" | "permission">,
+    ask: { text: string } & Exclude<Ask, { kind: "teammate" | "decision" }>,
   ): Promise<A | undefined> {
     // Stopped before it got here: an abort listener would never fire.
     if (asker.signal.aborted) return Promise.resolve(undefined);
@@ -267,17 +285,12 @@ export class Questions {
     });
   }
 
-  /** Puts a question to `to`: you, unless a teammate is asked. */
-  private open(
-    asker: Omit<Asker, "signal">,
-    ask: Pick<Question, "text" | "options" | "choices" | "permission" | "decision">,
-    to = YOU,
-  ): Question {
+  /** Puts a question: to a teammate, or to you. */
+  private open(asker: Omit<Asker, "signal">, ask: { text: string } & Ask): Question {
     const question: Question = {
       id: randomUUID(),
       ...(asker.subtaskId !== undefined && { subtaskId: asker.subtaskId }),
       from: asker.from,
-      to,
       status: "open",
       createdAt: Date.now(),
       ...ask,

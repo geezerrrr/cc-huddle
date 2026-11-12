@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Work } from "../engine/derive.ts";
-import type { Member, Meeting, Question, Subtask } from "../engine/types.ts";
+import type { Ask, Member, Meeting, Question, Subtask } from "../engine/types.ts";
 import { paneTeam } from "./pane.ts";
 
 const role = { id: "dev", title: "Developer", duties: "" };
@@ -39,13 +39,14 @@ const meeting: Meeting = {
   createdAt: 0,
 };
 
-const question = (id: string, fields: Partial<Question>): Question => ({
+const question = (
+  id: string,
+  fields: Partial<Pick<Question, "subtaskId" | "from" | "text">> & Ask,
+): Question => ({
   id,
   subtaskId: "rules",
   from: "glm",
-  to: "you",
   text: "",
-  options: [],
   status: "open",
   createdAt: 0,
   ...fields,
@@ -73,6 +74,7 @@ const work = (): Work => ({
   ],
   questions: [
     question("q1", {
+      kind: "permission",
       permission: {
         tool: "Bash",
         input: { command: "npm test" },
@@ -81,6 +83,7 @@ const work = (): Work => ({
     }),
     question("q2", {
       text: "Which board?",
+      kind: "choices",
       choices: [
         {
           question: "Which board?",
@@ -94,9 +97,10 @@ const work = (): Work => ({
       subtaskId: "board",
       from: "sonnet",
       text: "Game",
+      kind: "decision",
       decision: { kind: "delivery", options: ["accept", "revise"] },
     }),
-    question("q4", { to: "sonnet", text: "Which colour?" }),
+    question("q4", { kind: "teammate", to: "sonnet", text: "Which colour?" }),
   ],
 });
 

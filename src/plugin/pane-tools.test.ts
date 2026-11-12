@@ -102,9 +102,8 @@ describe("the pane's tools", () => {
     const question: Question = {
       id: "q1",
       from: "glm",
-      to: "you",
       text: "Which board?",
-      options: [],
+      kind: "choices",
       choices: [
         {
           question: "Which board?",
