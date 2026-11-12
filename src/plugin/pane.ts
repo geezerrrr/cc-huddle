@@ -187,6 +187,7 @@ function bandText(work: Work, needs: number): string | undefined {
   if (!work.goals.length) return undefined;
   const parts: string[] = [];
   if (work.meetings.some((m) => m.status === "running")) parts.push("meeting");
+  if (work.meetings.some((m) => m.status === "review")) parts.push("plan to review");
   const working = work.subtasks.filter((s) => s.status === "running").length;
   if (working) parts.push(`${String(working)} working`);
   if (needs) parts.push(`${plural(needs, "needs", "need")} you`);

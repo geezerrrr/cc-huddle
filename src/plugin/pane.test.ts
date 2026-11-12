@@ -167,7 +167,7 @@ describe("paneTeam", () => {
     ]);
   });
 
-  it("says who speaks at a meeting under way, and nothing before the first goal", () => {
+  it("says who speaks at a meeting under way, a plan to review, and nothing before the first goal", () => {
     const now = work();
     now.meetings = [{ ...meeting, status: "running", speaking: "glm" }];
     now.subtasks = [];
@@ -180,5 +180,7 @@ describe("paneTeam", () => {
       'at the meeting on "Dice"',
     ]);
     expect(paneTeam({ ...now, goals: [] }, members).band).toBeUndefined();
+    now.meetings = [{ ...meeting, status: "review" }];
+    expect(paneTeam(now, members).band).toBe("plan to review");
   });
 });
