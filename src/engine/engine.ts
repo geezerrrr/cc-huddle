@@ -18,7 +18,7 @@ import { openRepository, type Places } from "./git.ts";
 import { Goals } from "./goals.ts";
 import { Meetings } from "./meetings.ts";
 import { memberSettings, pluginId, readOnlyOptions, workOptions, writeSettings } from "./policy.ts";
-import { recordMembersIn } from "./processes.ts";
+import { recordMembersIn, stopMembers } from "./processes.ts";
 import { systemPrompt } from "./prompts.ts";
 import { Questions, type Answer } from "./questions.ts";
 import { Scheduler } from "./scheduler.ts";
@@ -165,6 +165,16 @@ export class Engine {
     await Promise.all([this.scheduler.close(), this.meetings.close()]);
     this.writer.changed();
     await this.writer.flush();
+    releaseTeam(this.files.lock);
+  }
+
+  /**
+   * Lets the team go at once, as the process dies of an error: its members
+   * are stopped and the lock released. The state stays as last written, and
+   * the next session pauses what it left active.
+   */
+  abandon() {
+    stopMembers();
     releaseTeam(this.files.lock);
   }
 

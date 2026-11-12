@@ -87,6 +87,13 @@ describe("Engine", () => {
     expect(again.state.goals).toMatchObject([{ id: goal.id, status: "paused" }]);
   });
 
+  it("lets the team go at once as the process dies", async () => {
+    const engine = await open();
+    engine.abandon();
+    opened.splice(0);
+    await expect(stat(files.lock)).rejects.toThrow();
+  });
+
   it("pauses what a session killed outright left active, its runs to go on in their sessions", async () => {
     const goal = { id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 };
     const subtask = {
