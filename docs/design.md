@@ -22,7 +22,7 @@ openplan comes out of [Crewloft](https://playcrewloft.com), a game in which the 
 | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Role          | A job and its duties, e.g. `gameplay-programmer`. A file in the team folder.                                                                               |
 | Member        | Someone on the team: a name, a role, a provider, a model and an effort. A file in the team folder.                                                         |
-| Goal          | What you want done, with its own branch `openplan/<goal>` cut from your `HEAD` when it starts.                                                             |
+| Goal          | What you want done, with its own branch `openplan/<goal>/main` cut from your `HEAD` when it starts.                                                        |
 | Meeting       | A read-only discussion among chosen members that ends in a plan for a goal.                                                                                |
 | Plan          | The host's document plus a tree: tasks, their subtasks, an owner, dependencies and acceptance criteria for each.                                           |
 | Task, subtask | A task groups subtasks; a subtask is one member's piece of work, done in one worktree.                                                                     |
@@ -82,11 +82,11 @@ One session runs a repository's team at a time, held by a lock in the repository
 
 ### 3.4 Where things live
 
-| What                                        | Where                                                    | In git          |
-| ------------------------------------------- | -------------------------------------------------------- | --------------- |
-| Team: roles, members, settings              | `.claude/openplan/` in the repository                    | Yours to commit |
-| State, meeting records, plans, logs, events | `${CLAUDE_PLUGIN_DATA}/repos/<repo-id>/`                 | No              |
-| Worktrees                                   | `${CLAUDE_PLUGIN_DATA}/repos/<repo-id>/desks/<subtask>/` | Branches only   |
+| What                                        | Where                                                                        | In git          |
+| ------------------------------------------- | ---------------------------------------------------------------------------- | --------------- |
+| Team: roles, members, settings              | `.claude/openplan/` in the repository                                        | Yours to commit |
+| State, meeting records, plans, logs, events | `${CLAUDE_PLUGIN_DATA}/repos/<repo-id>/`                                     | No              |
+| Worktrees                                   | `${CLAUDE_PLUGIN_DATA}/repos/<repo-id>/goals/<goal>/` and `desks/<subtask>/` | Branches only   |
 
 `${CLAUDE_PLUGIN_DATA}` is the data folder Claude Code gives each plugin (`~/.claude/plugins/data/<plugin-id>/`). It is passed to the MCP server and the hooks. It survives plugin updates and is removed on uninstall, worktrees included; their branches stay in your repository, and git prunes the stale worktree entries on its own. `claude plugin uninstall --keep-data` keeps it.
 
@@ -106,7 +106,7 @@ Each machine is one table in code (`src/engine/machines.ts`), moved only by its 
 | paused, archived | resume             | active   |
 | archived         | delete (confirmed) | removed  |
 
-Pausing holds its running subtasks in their sessions and cancels its running meeting. Deleting removes its worktrees and subtask branches; its branch `openplan/<goal>` stays.
+Pausing holds its running subtasks in their sessions and cancels its running meeting. Deleting removes its worktrees and subtask branches; its branch `openplan/<goal>/main` stays.
 
 ### 4.2 Meeting
 
@@ -162,8 +162,8 @@ Kinds: a teammate's question (answered by that teammate in a read-only session),
 
 ## 5. Git
 
-- A goal's branch `openplan/<goal>` is cut from your `HEAD` when it starts. If the name is taken (a deleted goal's branch, another clone's), the goal takes `<goal>-2` and so on.
-- Each subtask works in its own worktree on branch `openplan/<goal>/<subtask>`, cut from the goal branch when it first starts, kept through send-backs, conflicts and pauses, removed when merged.
+- A goal's branch `openplan/<goal>/main` is cut from your `HEAD` when it starts and checked out in the goal's own worktree in the data folder. Meetings and reviews read the goal there, and merges land there. While the goal has that worktree, git keeps the branch from being checked out anywhere else, so nothing moves under a checkout of yours; diff it, merge it, or open the goal's folder. If the name is taken (any branch under `openplan/<goal>/`, from a deleted goal or another clone), the goal takes `<goal>-2` and so on.
+- Each subtask works in its own worktree on branch `openplan/<goal>/<subtask>` (a goal's branches share one folder of refs, since git can't hold both `openplan/<goal>` and `openplan/<goal>/<subtask>`), cut from the goal branch when it first starts, kept through send-backs, conflicts and pauses, removed when merged.
 - Delivering commits what is uncommitted in the worktree as the member (`<name> <member-id>@openplan.local`). Members may also commit themselves.
 - Merges run one at a time per goal, in delivery order: the goal branch is merged into the worktree, then the goal branch fast-forwards to it. Text conflicts go back to the member who delivered last, in their session. Binary and delete/modify conflicts and git errors become your decision.
 - Git runs with hooks, fsmonitor and signing off for the engine's own commands. It is the `git` on your `PATH`; members use it as they would anywhere.
