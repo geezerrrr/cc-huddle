@@ -5,7 +5,7 @@
  * signing. Members use git in their worktrees as they would anywhere.
  */
 import { spawn } from "node:child_process";
-import { realpath, rm, stat } from "node:fs/promises";
+import { readdir, readFile, realpath, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { serialBy } from "./serial.ts";
 
@@ -74,6 +74,25 @@ export function git(at: At, args: string[], options: GitOptions = {}): Promise<R
     child.stdin.end(options.input);
   });
 }
+
+/** Who a commit is by. */
+export interface Signer {
+  name: string;
+  email: string;
+}
+
+/** A member as the author of their commits. */
+export const memberSigner = (member: string): Signer => ({
+  name: member,
+  email: `${member}@openplan.local`,
+});
+
+const authorEnv = (by: Signer): Record<string, string> => ({
+  GIT_AUTHOR_NAME: by.name,
+  GIT_AUTHOR_EMAIL: by.email,
+  GIT_COMMITTER_NAME: by.name,
+  GIT_COMMITTER_EMAIL: by.email,
+});
 
 /** A repository the team works on: its top folder, and the git folder its worktrees share. */
 export interface Repository {
@@ -205,5 +224,57 @@ export function openDesk(places: Places, slug: string, subtaskId: string): Promi
         : ["worktree", "add", "-q", "-b", branch, desk, goalBranch(slug)],
     );
     return desk;
+  });
+}
+
+/**
+ * How git runs in one of openplan's worktrees: pinned to its entry in the
+ * repository's own `worktrees/` (the one whose `gitdir` names this folder),
+ * never found through the `.git` file in the tree. A member can rewrite that
+ * file; pointed at a repository of its own making, the engine would run what
+ * that one's config says (core.fsmonitor, filters). A worktree whose entry
+ * lost track of it is repaired from the repository's side first.
+ */
+async function worktreeAt(repo: Repository, tree: string): Promise<At> {
+  const real = (file: string) => realpath(file).catch(() => path.resolve(file));
+  const here = await real(tree);
+  const entries = path.join(repo.common, "worktrees");
+  const find = async () => {
+    for (const name of await readdir(entries).catch(() => [] as string[])) {
+      const gitdir = await readFile(path.join(entries, name, "gitdir"), "utf8").catch(() => "");
+      if (gitdir && (await real(path.dirname(gitdir.trim()))) === here)
+        return path.join(entries, name);
+    }
+  };
+  const entry =
+    (await find()) ??
+    (await git({ cwd: repo.top }, ["worktree", "repair", tree], { allow: [128] }).then(find));
+  if (!entry) throw new GitError(["worktree"], 128, `${tree} isn't a worktree of ${repo.top}`);
+  return { cwd: tree, env: { GIT_DIR: entry, GIT_WORK_TREE: tree } };
+}
+
+/** Whether a worktree is in the middle of a merge. */
+const merging = async (at: At) =>
+  (await git(at, ["rev-parse", "-q", "--verify", "MERGE_HEAD"], { allow: [1] })).code === 0;
+
+/**
+ * Commits what a subtask's worktree holds and its member left uncommitted, in
+ * the name of whoever delivered it, finishing a merge it was in: a delivery
+ * is the worktree as it stands.
+ */
+export function commitDesk(
+  places: Places,
+  slug: string,
+  subtaskId: string,
+  by: Signer,
+  message: string,
+): Promise<void> {
+  return perGoal(places, slug, async () => {
+    const at = await worktreeAt(places.repo, deskFolder(places, subtaskId));
+    const signed = { ...at, env: { ...at.env, ...authorEnv(by) } };
+    await git(signed, ["add", "-A"]);
+    const staged = await git(signed, ["diff", "--cached", "--quiet"], { allow: [1] });
+    if (staged.code === 1 || (await merging(signed)))
+      await git(signed, ["commit", "-q", "--allow-empty", "-m", message]);
   });
 }

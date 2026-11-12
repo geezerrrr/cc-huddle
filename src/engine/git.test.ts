@@ -3,9 +3,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  commitDesk,
   git,
   GitError,
   goalBranch,
+  memberSigner,
   openDesk,
   openGoal,
   openRepository,
@@ -155,5 +157,43 @@ describe("desks", () => {
     await rm(desk, { recursive: true });
     await openDesk(places, "dice", "s1");
     expect(await readFile(path.join(desk, "work.txt"), "utf8")).toBe("done\n");
+  });
+});
+
+describe("commitDesk", () => {
+  const placesOf = async () => ({ repo: await openRepository(repo), root: path.join(dir, "data") });
+  const log = (at: string, ref: string) =>
+    git({ cwd: at }, ["log", "-1", "--format=%an <%ae> %s", ref]).then((r) => r.stdout.trim());
+
+  it("commits what the member left uncommitted, in their name", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    const desk = await openDesk(places, "dice", "s1");
+    await writeFile(path.join(desk, "dice.ts"), "roll\n");
+    await commitDesk(places, "dice", "s1", memberSigner("glm"), "Roll the dice");
+    expect(await log(repo, subtaskBranch("dice", "s1"))).toBe(
+      "glm <glm@openplan.local> Roll the dice",
+    );
+  });
+
+  it("makes no commit when nothing changed", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    await openDesk(places, "dice", "s1");
+    await commitDesk(places, "dice", "s1", memberSigner("glm"), "Nothing");
+    expect(await log(repo, subtaskBranch("dice", "s1"))).toBe("you <you@example.com> start");
+  });
+
+  it("commits to the real worktree even when its .git file was pointed elsewhere", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    const desk = await openDesk(places, "dice", "s1");
+    const other = path.join(dir, "other");
+    await mkdir(other);
+    await git({ cwd: other }, ["init", "-q"]);
+    await writeFile(path.join(desk, ".git"), `gitdir: ${path.join(other, ".git")}\n`);
+    await writeFile(path.join(desk, "dice.ts"), "roll\n");
+    await commitDesk(places, "dice", "s1", memberSigner("glm"), "Roll the dice");
+    expect(await log(repo, subtaskBranch("dice", "s1"))).toContain("Roll the dice");
   });
 });
