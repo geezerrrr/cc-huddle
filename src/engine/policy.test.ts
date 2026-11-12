@@ -14,7 +14,7 @@ import type { Member } from "./types.ts";
 
 const glm: Member = {
   name: "glm",
-  role: "ui-designer",
+  role: { id: "ui-designer", title: "UI designer", duties: "" },
   model: "glm-5.3-flashx",
   effort: "max",
   env: { ANTHROPIC_BASE_URL: "https://glm.example", ANTHROPIC_AUTH_TOKEN: "${GLM_KEY}" },

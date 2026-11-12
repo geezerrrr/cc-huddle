@@ -6,11 +6,20 @@
  */
 import type { EffortLevel } from "@anthropic-ai/claude-agent-sdk";
 
+/** A job and its duties, from its file in the team folder (§6). */
+export interface Role {
+  /** The file's name. */
+  id: string;
+  title: string;
+  /** The file's Markdown. */
+  duties: string;
+}
+
 /** Someone on the team, from their file in the team folder (§6). */
 export interface Member {
   /** The file's name. */
   name: string;
-  role: string;
+  role: Role;
   model?: string;
   effort?: EffortLevel;
   /** Their Claude Code's environment, `${VAR}` not filled in yet. */
