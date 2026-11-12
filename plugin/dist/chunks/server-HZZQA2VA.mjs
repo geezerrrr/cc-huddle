@@ -10394,10 +10394,10 @@ var Engine = class _Engine {
     const repo = await openRepository(options.cwd);
     const root = repoFolder(options.dataFolder, repo);
     const files = dataFiles(root);
+    const { team: team2, settings, meetingSize } = await loadTeam(repo.top);
     await takeTeam(files.lock);
     try {
       await recordMembersIn(files.members);
-      const { team: team2, settings, meetingSize } = await loadTeam(repo.top);
       const state = await readState(files.state);
       const { host } = options;
       const writer = stateWriter(

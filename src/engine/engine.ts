@@ -78,10 +78,11 @@ export class Engine {
     const repo = await openRepository(options.cwd);
     const root = repoFolder(options.dataFolder, repo);
     const files = dataFiles(root);
+    // A repository without a team gets no lock or folder of openplan's.
+    const { team, settings, meetingSize } = await loadTeam(repo.top);
     await takeTeam(files.lock);
     try {
       await recordMembersIn(files.members);
-      const { team, settings, meetingSize } = await loadTeam(repo.top);
       const state = await readState(files.state);
       const { host } = options;
       const writer = stateWriter(

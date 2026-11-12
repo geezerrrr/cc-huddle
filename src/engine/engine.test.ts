@@ -77,6 +77,12 @@ describe("Engine", () => {
     expect(holderOf(files.lock)).toEqual({ pid: process.pid, session: process.ppid, open: true });
   });
 
+  it("leaves a repository without a team as it is", async () => {
+    await rm(teamFolder(repo), { recursive: true });
+    await expect(open()).rejects.toThrow("The team has no members");
+    await expect(stat(path.dirname(files.lock))).rejects.toThrow();
+  });
+
   it("pauses every active goal as it closes, writes the state, and lets the team go", async () => {
     const engine = await open();
     const goal = await engine.goals.start("Dice");
