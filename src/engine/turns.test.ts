@@ -125,6 +125,28 @@ describe("turnDecoder", () => {
     ]);
   });
 
+  it("tells the turn's todo list when it writes one", () => {
+    const { decode, heard } = decoding();
+    const todos = [
+      { content: "Draw the board", status: "completed", activeForm: "Drawing the board" },
+      { content: "Add scores", status: "in_progress", activeForm: "Adding scores" },
+    ];
+    decode(
+      msg({
+        type: "assistant",
+        parent_tool_use_id: null,
+        message: { content: [{ type: "tool_use", id: "t1", name: "TodoWrite", input: { todos } }] },
+      }),
+    );
+    expect(heard.at(-1)).toEqual([
+      "steps",
+      [
+        { content: "Draw the board", status: "completed" },
+        { content: "Add scores", status: "in_progress" },
+      ],
+    ]);
+  });
+
   it("leaves out what a subagent does inside its tool call", () => {
     const { decode, heard } = decoding();
     decode(textDelta("inside"));

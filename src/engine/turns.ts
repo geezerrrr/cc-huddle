@@ -11,6 +11,7 @@ import {
   type SpawnedProcess,
   type SpawnOptions,
 } from "@anthropic-ai/claude-agent-sdk";
+import type { TodoWriteInput } from "@anthropic-ai/claude-agent-sdk/sdk-tools";
 
 /** How a turn ended: its final text, or why it failed, and the tokens it used. */
 export type TurnOutcome = (
@@ -77,6 +78,12 @@ export type Notice =
   | { kind: "rate-limit"; status: "warning" | "rejected"; resetsAt?: number }
   | { kind: "subagent-retry"; attempt: number; max: number; delayMs: number };
 
+/** One item of a turn's todo list. */
+export interface Step {
+  content: string;
+  status: "pending" | "in_progress" | "completed";
+}
+
 /**
  * What a turn reports as it streams. Only the turn's own work: a subagent's
  * shows as the tool call that started it.
@@ -93,6 +100,8 @@ export interface TurnListener {
   block?(block: Block): void;
   /** A tool call came back, done or failed, with what it gave. */
   toolDone?(call: ToolCall): void;
+  /** The turn wrote its todo list (TodoWrite): the whole list as it stands. */
+  steps?(steps: Step[]): void;
   notice?(notice: Notice): void;
 }
 
@@ -253,6 +262,13 @@ export function turnDecoder(listener: TurnListener) {
             };
             calls.set(call.id, call);
             listener.block?.(call);
+            if (block.name === "TodoWrite")
+              listener.steps?.(
+                (block.input as TodoWriteInput).todos.map(({ content, status }) => ({
+                  content,
+                  status,
+                })),
+              );
           }
         }
         // The block just finished, so a notice held back for it comes after its words.
