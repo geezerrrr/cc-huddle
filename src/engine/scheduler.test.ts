@@ -285,4 +285,173 @@ describe("Scheduler", () => {
       });
     });
   });
+
+  describe("your actions", () => {
+    /** A run that goes on until it is stopped. */
+    const working = (run: Run) =>
+      new Promise<RunOutcome>((resolve) => {
+        run.signal.addEventListener("abort", () => {
+          resolve({ status: "stopped", tokens: 0 });
+        });
+      });
+    const runs = () => vi.mocked(runSubtask).mock.calls.map(([run]) => run);
+
+    it("stop a run, which then goes on in its session", async () => {
+      const s1 = subtask("s1", { session: "glm-1" });
+      core.state.subtasks.push(s1);
+      vi.mocked(runSubtask)
+        .mockImplementationOnce(working)
+        .mockImplementationOnce(delivering({ "score.txt": "1\n" }));
+      scheduler.pump();
+      await vi.waitFor(() => {
+        expect(runs()).toHaveLength(1);
+      });
+      await scheduler.stop("s1");
+      await settled(s1, "stopped");
+      scheduler.continue("s1");
+      await settled(s1, "done");
+      expect(runs()[1]).toMatchObject({
+        resume: "glm-1",
+        opening: "The user asks you to go on from where you stopped.",
+      });
+    });
+
+    it("retry a failed subtask from the start", async () => {
+      const s1 = subtask("s1");
+      core.state.subtasks.push(s1);
+      vi.mocked(runSubtask)
+        .mockImplementationOnce(async (run) => {
+          run.listener.session?.("glm-1", "m");
+          await writeFile(path.join(run.options.cwd ?? "", "half.txt"), "half\n");
+          return { status: "failed", error: "API Error: 529", tokens: 0 };
+        })
+        .mockImplementationOnce(async (run) => {
+          await expect(readFile(path.join(run.options.cwd ?? "", "half.txt"))).rejects.toThrow();
+          return delivering({ "score.txt": "1\n" })(run);
+        });
+      scheduler.pump();
+      await settled(s1, "failed");
+      expect(s1).toMatchObject({ session: "glm-1", error: "API Error: 529" });
+      await scheduler.retry("s1");
+      await settled(s1, "done");
+      expect(runs()[1]?.resume).toBeUndefined();
+      expect(runs()[1]?.opening).toContain("Your subtask: Make s1");
+    });
+
+    it("stop a review, which goes on later with the delivery standing", async () => {
+      core.team = { ...core.team, review: true };
+      const s1 = subtask("s1");
+      core.state.subtasks.push(s1);
+      vi.mocked(runSubtask).mockImplementation(delivering({ "score.txt": "1\n" }));
+      vi.mocked(askOnce)
+        .mockImplementationOnce(
+          ({ signal }) =>
+            new Promise((_, reject) => {
+              signal.addEventListener("abort", () => {
+                reject(new Error("stopped"));
+              });
+            }),
+        )
+        .mockResolvedValueOnce({
+          text: "",
+          structured: { pass: true, notes: "" },
+          session: "r",
+          tokens: 0,
+        });
+      scheduler.pump();
+      await vi.waitFor(() => {
+        expect(askOnce).toHaveBeenCalledTimes(1);
+      });
+      await scheduler.stop("s1");
+      expect(s1).toMatchObject({ status: "stopped", stoppedIn: "reviewing" });
+      scheduler.continue("s1");
+      await settled(s1, "done");
+      expect(runSubtask).toHaveBeenCalledTimes(1);
+      expect(core.state.questions.map((q) => q.decision?.kind)).toEqual(["delivery"]);
+    });
+
+    it("decide a stuck review: skip it, and it is merged", async () => {
+      core.team = { ...core.team, review: true };
+      const s1 = subtask("s1");
+      core.state.subtasks.push(s1);
+      vi.mocked(runSubtask).mockImplementation(delivering({ "score.txt": "1\n" }));
+      vi.mocked(askOnce).mockRejectedValue(new Error("API Error: 529"));
+      scheduler.pump();
+      await vi.waitFor(() => {
+        expect(core.state.questions).toHaveLength(1);
+      });
+      const [stuck] = core.state.questions;
+      const question = questions.answer(stuck?.id ?? "", { decision: "skip" });
+      await scheduler.decide(question, { decision: "skip" });
+      await settled(s1, "done");
+    });
+
+    it("send a task back, its subtask going on in its session with what you want changed", async () => {
+      const s1 = subtask("s1", { session: "glm-1" });
+      core.state.subtasks.push(s1);
+      vi.mocked(runSubtask).mockImplementation(delivering({ "score.txt": "1\n" }));
+      scheduler.pump();
+      await vi.waitFor(() => {
+        expect(core.state.questions).toHaveLength(1);
+      });
+      const answer = { decision: "revise" as const, note: "Bigger numbers" };
+      const question = questions.answer(core.state.questions[0]?.id ?? "", answer);
+      await scheduler.decide(question, answer);
+      await vi.waitFor(() => {
+        expect(runs()).toHaveLength(2);
+      });
+      expect(runs()[1]).toMatchObject({
+        resume: "glm-1",
+        opening:
+          "The user sent your task back, asking for:\nBigger numbers\nMake those changes, then deliver again.",
+      });
+      await settled(s1, "done");
+    });
+
+    it("keep one side of a file that can't be merged line by line", async () => {
+      const s1 = subtask("s1");
+      const s2 = subtask("s2", { assignee: "sonnet" });
+      core.state.subtasks.push(s1, s2);
+      vi.mocked(runSubtask)
+        .mockImplementationOnce(delivering({ "logo.bin": "glm\0\n" }))
+        .mockImplementationOnce(async (run) => {
+          await settled(s1, "done");
+          return delivering({ "logo.bin": "sonnet\0\n" })(run);
+        });
+      scheduler.pump();
+      await vi.waitFor(() => {
+        expect(core.state.questions.map((q) => q.decision?.kind)).toContain("merge");
+      });
+      const conflict = core.state.questions.find((q) => q.decision?.kind === "merge");
+      expect(conflict?.decision).toEqual({
+        kind: "merge",
+        options: ["ours", "theirs", "retry"],
+        files: ["logo.bin"],
+      });
+      const question = questions.answer(conflict?.id ?? "", { decision: "ours" });
+      await scheduler.decide(question, { decision: "ours" });
+      await settled(s2, "done");
+      expect(await onGoal("logo.bin")).toBe("sonnet\0\n");
+    });
+
+    it("redo work whose upstream was redone, in its session", async () => {
+      const s1 = subtask("s1", { status: "done", finishedAt: 20 });
+      const s2 = subtask("s2", {
+        status: "done",
+        dependsOn: ["s1"],
+        startedAt: 10,
+        session: "glm-2",
+      });
+      core.state.subtasks.push(s1, s2);
+      vi.mocked(runSubtask).mockImplementation(delivering({ "board.txt": "2\n" }));
+      scheduler.redo("s2");
+      await settled(s2, "done");
+      expect(runs()[0]).toMatchObject({
+        resume: "glm-2",
+        opening: expect.stringContaining(
+          "Work you build on was redone after you delivered: Make s1.",
+        ) as string,
+      });
+    });
+  });
 });

@@ -8,18 +8,21 @@
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { busyMembers, reviewerOf, waitsIn } from "./derive.ts";
+import { busyMembers, redoneUpstream, reviewerOf, waitsIn } from "./derive.ts";
 import { errorText, workOf, type Core } from "./core.ts";
 import {
+  abortMerge,
   commitDesk,
+  dropDesk,
   memberSigner,
   mergeDesk,
   openDesk,
   openGoal,
+  pickSide,
   subtaskBranch,
   unresolved,
 } from "./git.ts";
-import { step, SUBTASK_MACHINE } from "./machines.ts";
+import { can, step, SUBTASK_MACHINE } from "./machines.ts";
 import {
   goOnMessage,
   reviewPrompt,
@@ -27,10 +30,19 @@ import {
   teammateQuestion,
   type Upstream,
 } from "./prompts.ts";
-import type { Questions } from "./questions.ts";
+import type { Answer, Questions } from "./questions.ts";
 import { runSubtask, type RunOutcome } from "./run.ts";
 import { askOnce, type Step } from "./turns.ts";
-import type { DecisionOption, Goal, GoOn, Member, Progress, Subtask, Task } from "./types.ts";
+import type {
+  DecisionOption,
+  Goal,
+  GoOn,
+  Member,
+  Progress,
+  Question,
+  Subtask,
+  Task,
+} from "./types.ts";
 
 /** A reviewer's verdict on a delivery. */
 const verdictSchema = z.object({ pass: z.boolean(), notes: z.string().trim() });
@@ -89,6 +101,122 @@ export class Scheduler {
   }
 
   /**
+   * You stop a subtask: one not started, a run (it ends as stopped), a
+   * review, a merge waiting on your decision (its half-done merge undone). One
+   * handed over keeps its delivery and the stage it stopped in, to go on from.
+   */
+  async stop(subtaskId: string) {
+    const subtask = this.subtask(subtaskId);
+    const live = this.live.get(subtaskId);
+    if (live?.kind === "run") {
+      live.abort.abort();
+      return;
+    }
+    if (!subtask || !can(SUBTASK_MACHINE, subtask.status, "stop")) return;
+    if (subtask.status === "merging") {
+      // A merge under way finishes; one waiting on you is undone, its worktree back as delivered.
+      if (live) return;
+      await abortMerge(this.core.places, this.goalOf(subtask).slug, subtask.id);
+      // Stopped meanwhile: that stop did it.
+      if (!can(SUBTASK_MACHINE, subtask.status, "stop")) return;
+    }
+    live?.abort.abort();
+    const stage = subtask.status;
+    this.move(subtask, "stop");
+    if (stage === "reviewing" || stage === "merging") subtask.stoppedIn = stage;
+    subtask.finishedAt = Date.now();
+    this.core.changed();
+    this.pump();
+  }
+
+  /** You retry a failed or stopped subtask from the start: its session, delivery, review and worktree go. */
+  async retry(subtaskId: string) {
+    const subtask = this.subtask(subtaskId);
+    if (!subtask || !can(SUBTASK_MACHINE, subtask.status, "retry")) return;
+    await dropDesk(this.core.places, this.goalOf(subtask).slug, subtask.id);
+    // Retried meanwhile: that one did it.
+    if (!can(SUBTASK_MACHINE, subtask.status, "retry")) return;
+    this.move(subtask, "retry");
+    Object.assign(subtask, {
+      error: undefined,
+      progress: { done: 0, total: 0 },
+      session: undefined,
+      goOn: undefined,
+      delivery: undefined,
+      review: undefined,
+      conflict: undefined,
+    });
+    this.core.changed();
+    this.pump();
+  }
+
+  /**
+   * You have a failed or stopped subtask go on from where it stopped: its
+   * session and worktree, or, stopped once handed over, its review or merge,
+   * its delivery standing.
+   */
+  continue(subtaskId: string) {
+    const subtask = this.subtask(subtaskId);
+    if (!subtask || !can(SUBTASK_MACHINE, subtask.status, "continue")) return;
+    const stage = subtask.stoppedIn;
+    this.move(
+      subtask,
+      stage === "reviewing" ? "reviewAgain" : stage === "merging" ? "mergeAgain" : "continue",
+    );
+    subtask.error = undefined;
+    if (!stage && subtask.session) goOnWith(subtask, { why: "continued" });
+    this.core.changed();
+    this.pump();
+  }
+
+  /** You redo a done subtask whose upstream was redone since: in its session, from the goal's branch. */
+  redo(subtaskId: string) {
+    const subtask = this.subtask(subtaskId);
+    if (!subtask || !can(SUBTASK_MACHINE, subtask.status, "redo")) return;
+    const redone = redoneUpstream(this.core.state, subtask).map((s) => s.title);
+    this.move(subtask, "redo");
+    if (subtask.session) goOnWith(subtask, { why: "redo", note: redone.join(", ") });
+    this.core.changed();
+    this.pump();
+  }
+
+  /**
+   * Carries out your decision, answered already (Questions.answer): on a
+   * stuck review (review again, skip it, send it back), on a merge (keep one
+   * side of the files that can't be merged line by line, or try again), on a
+   * task done (accept it, which is all it takes for work built on it to
+   * start; or send one of its subtasks, `sentBack` or else the last one done,
+   * back with what to change).
+   */
+  async decide(question: Question, answer: Extract<Answer, { decision: DecisionOption }>) {
+    const subtask = this.subtask(question.subtaskId ?? "");
+    if (!subtask) return;
+    const { decision: pick, note = "" } = answer;
+    if (question.decision?.kind === "delivery") {
+      const sentBack = this.subtask(answer.sentBack ?? subtask.id);
+      if (pick === "revise" && sentBack) {
+        this.move(sentBack, "redo");
+        goOnWith(sentBack, { why: "revised", note });
+      }
+    } else if (subtask.status === "reviewing") {
+      // You decided: the count of times sent back starts over.
+      subtask.review = { ...subtask.review, rounds: 0 };
+      if (pick === "skip") this.move(subtask, "merge");
+      else if (pick === "sendBack") {
+        this.move(subtask, "reject");
+        if (subtask.session) goOnWith(subtask, { why: "rejected" });
+      }
+    } else if (subtask.status === "merging") {
+      const { slug } = this.goalOf(subtask);
+      if (pick === "retry") await abortMerge(this.core.places, slug, subtask.id);
+      else if (pick === "ours" || pick === "theirs")
+        await pickSide(this.core.places, slug, subtask.id, question.decision?.files ?? [], pick);
+    }
+    this.core.changed();
+    this.pump();
+  }
+
+  /**
    * Takes up whatever can go on: what goes on in its session first, then new
    * work, and delivered work reviewed and merged in the order it was
    * delivered. A pending subtask starts, and one in review is reviewed, when
@@ -132,12 +260,22 @@ export class Scheduler {
     }
   }
 
-  /** Moves a subtask by its machine. Leaving review or a merge calls off your decision on it. */
+  /**
+   * Moves a subtask by its machine. Leaving review or a merge calls off your
+   * decision on it; done again, its task's delivery waits until it is done
+   * again; leaving where it stopped, where it was handed over stands no more.
+   */
   private move(subtask: Subtask, event: keyof typeof SUBTASK_MACHINE) {
     const from = subtask.status;
     subtask.status = step(SUBTASK_MACHINE, from, event);
     if ((from === "reviewing" || from === "merging") && subtask.status !== from)
       this.questions.cancelFor(subtask.id, true);
+    if (from === "done") this.questions.cancelDelivery(subtask.taskId);
+    if (from === "stopped") subtask.stoppedIn = undefined;
+  }
+
+  private subtask(id: string): Subtask | undefined {
+    return this.core.state.subtasks.find((s) => s.id === id);
   }
 
   private goalOf(subtask: Subtask): Goal {
