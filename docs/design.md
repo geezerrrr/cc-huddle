@@ -65,7 +65,7 @@ It is ported from Crewloft's engine without the game: no economy, life, seats, a
 
 ### 3.2 Lifetime
 
-The team belongs to the session it runs in, like everything else that session starts. The engine runs inside the session's MCP server, which Claude Code starts with the session and ends with it, and the member processes are its children. There is no process of openplan's own outside a session.
+The team belongs to the session it runs in, like everything else that session starts. The engine runs inside the session's MCP server, which Claude Code starts with the session and ends with it, and the member processes are its children. There is no process of openplan's own outside a session. A member never outlives the MCP server either: an orphaned Claude Code process goes on with its turn, calling the model, until the turn ends. The MCP server stops its members when the session ends and when it exits for any reason it can catch, a crash included. Each member's pid is recorded in the data folder with its settings file, so a start after a server that was killed outright stops what it left, once the process's command line shows that file.
 
 Closing the session pauses every active goal, as if you had paused each one (§4.1): running subtasks are held in their sessions (a merge under way finishes first), a running meeting is cancelled, open questions stay open, sessions and worktrees are kept. Resuming the session brings back its context and shows the paused goals; nothing starts again until you resume one. To keep the team working while you are away, keep the session running, in the background if you like, the way Claude Code already offers.
 
@@ -253,6 +253,9 @@ Checked on Claude Code 2.1.322 and Agent SDK 0.3.322, with a probe plugin and a 
 
 - The MCP server gets `CLAUDE_CODE_MESSAGING_SOCKET`, `CLAUDE_CODE_MESSAGING_TOKEN` and `CLAUDE_PLUGIN_DATA` in its environment. A `{"type":"user",...}` line it posts to the socket starts a turn in the idle session at once; the session shows it as a message from another session.
 - When Claude Code is killed, the MCP server's stdin ends at once, in time to stop its children.
+- A member whose parent is killed outright keeps calling the model through its turn (five requests, up to its turn limit, in the probe).
+- Your user settings' `env` overrides the environment a member is started with; flag settings override both. Inline flag settings appear on the member's command line.
+- The MCP server inherits the session's own variables (`CLAUDE_CODE_MESSAGING_SOCKET` and `_TOKEN`, `CLAUDE_CODE_SESSION_ID`, `CLAUDE_PID`, `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `AI_AGENT`, `CLAUDE_EFFORT`, `CLAUDE_PLUGIN_ROOT`, `CLAUDE_PLUGIN_DATA`, `CLAUDE_PROJECT_DIR`); members are started without them.
 - `/clear` keeps the MCP server running: it ends one session id and starts another (SessionEnd `clear`, SessionStart `clear`) in the same process, and posts to the socket still wake the new conversation.
 - In `bypassPermissions` mode the wake-up is delivered too, without approval: the MCP server is verified as the session's own child.
 - A member started with default options loads every enabled plugin, openplan included, and has `SendMessage` and `ListAgents`; the flag settings in §8 remove both. Every member binds an inbox socket and is listed by `claude agents` as an interactive session, under its `--name`.
