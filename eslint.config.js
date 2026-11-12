@@ -2,7 +2,7 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["plugin/dist"] },
+  { ignores: ["plugin/dist", "plugin/.claude-plugin/types"] },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   {
