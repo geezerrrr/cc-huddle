@@ -8803,7 +8803,7 @@ async function askOnce(params) {
     abortController.abort();
   };
   signal.addEventListener("abort", stop, { once: true });
-  const claude = claudeProcess();
+  const claude2 = claudeProcess();
   let session = "";
   const decode = turnDecoder({
     ...listener,
@@ -8818,7 +8818,7 @@ async function askOnce(params) {
       ...options,
       ...schema && { outputFormat: { type: "json_schema", schema } },
       abortController,
-      spawnClaudeCodeProcess: claude.spawn
+      spawnClaudeCodeProcess: claude2.spawn
     }
   });
   try {
@@ -8837,11 +8837,11 @@ async function askOnce(params) {
     }
     throw new Error("The session ended without a result");
   } catch (error) {
-    throw new Error(claude.failure(error), { cause: error });
+    throw new Error(claude2.failure(error), { cause: error });
   } finally {
     signal.removeEventListener("abort", stop);
     run2.close();
-    await claude.gone();
+    await claude2.gone();
   }
 }
 
@@ -9548,7 +9548,7 @@ async function runSubtask(params) {
       abortController.abort();
     };
     signal.addEventListener("abort", stop, { once: true });
-    const claude = claudeProcess();
+    const claude2 = claudeProcess();
     const run2 = query2({
       prompt,
       options: {
@@ -9560,7 +9560,7 @@ async function runSubtask(params) {
         },
         canUseTool,
         abortController,
-        spawnClaudeCodeProcess: claude.spawn
+        spawnClaudeCodeProcess: claude2.spawn
       }
     });
     try {
@@ -9570,11 +9570,11 @@ async function runSubtask(params) {
       }
       return { ok: false, error: "The session ended without a result", tokens: 0 };
     } catch (error) {
-      throw new Error(claude.failure(error), { cause: error });
+      throw new Error(claude2.failure(error), { cause: error });
     } finally {
       signal.removeEventListener("abort", stop);
       run2.close();
-      await claude.gone();
+      await claude2.gone();
     }
   };
   let tokens = 0;
@@ -11152,11 +11152,11 @@ var say = (text2) => {
 var engine;
 var opening;
 var news2;
+var claude;
 var openTeam = async () => Engine.open({
   cwd: process.env.CLAUDE_PROJECT_DIR ?? process.cwd(),
   dataFolder,
-  // Members run the Claude Code your session runs: the process that started this one.
-  claude: await executableOf(process.ppid),
+  claude: await (claude ??= executableOf(process.ppid)),
   env: process.env,
   host: {
     changed() {

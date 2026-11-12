@@ -27,13 +27,15 @@ let opening: Promise<Engine> | undefined;
 /** What needs a conversation, since the team opened. */
 let news: NewForYou | undefined;
 
+/** The Claude Code your session runs, which members run too: the process that started this one. */
+let claude: Promise<string> | undefined;
+
 /** Opens the team of the repository the session is in. */
 const openTeam = async () =>
   Engine.open({
     cwd: process.env.CLAUDE_PROJECT_DIR ?? process.cwd(),
     dataFolder,
-    // Members run the Claude Code your session runs: the process that started this one.
-    claude: await executableOf(process.ppid),
+    claude: await (claude ??= executableOf(process.ppid)),
     env: process.env,
     host: {
       changed() {
