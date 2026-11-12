@@ -232,7 +232,8 @@ export type DecisionOption = (typeof DECISION_OPTIONS)[number];
 export type DecisionKind = "review" | "merge" | "delivery";
 
 /** The answers a permission request offers. */
-export type PermissionOption = "once" | "always" | "deny";
+export const PERMISSION_OPTIONS = ["once", "always", "deny"] as const;
+export type PermissionOption = (typeof PERMISSION_OPTIONS)[number];
 
 /** Something a member waits on, or a decision that waits on you (§4.4). */
 export interface Question {

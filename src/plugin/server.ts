@@ -9,6 +9,7 @@ import packageJson from "../../package.json" with { type: "json" };
 import { errorText } from "../engine/core.ts";
 import { Engine } from "../engine/engine.ts";
 import { stopMembers } from "../engine/processes.ts";
+import { addPaneTools } from "./pane-tools.ts";
 import { addTools } from "./tools.ts";
 import { NewForYou, wakeSession } from "./wake.ts";
 
@@ -82,6 +83,7 @@ process.once("exit", stopMembers);
 
 const server = new McpServer({ name: "openplan", version: packageJson.version });
 addTools(server, team);
+addPaneTools(server, team);
 await server.connect(new StdioServerTransport());
 // Opened now, so the session finds its team as it stands; a tool says why, if it can't be.
 team().catch((error: unknown) => {

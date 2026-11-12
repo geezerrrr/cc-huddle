@@ -1,0 +1,126 @@
+import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Engine } from "../engine/engine.ts";
+import { git } from "../engine/git.ts";
+import { teamFolder } from "../engine/team.ts";
+import type { Question } from "../engine/types.ts";
+import { addPaneTools, type PaneView } from "./pane-tools.ts";
+
+let dir: string;
+let engine: Engine;
+let client: Client;
+
+beforeEach(async () => {
+  dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-pane-")));
+  const repo = path.join(dir, "repo");
+  const me = {
+    GIT_AUTHOR_NAME: "you",
+    GIT_AUTHOR_EMAIL: "y@x",
+    GIT_COMMITTER_NAME: "you",
+    GIT_COMMITTER_EMAIL: "y@x",
+  };
+  await git({ cwd: dir }, ["init", "-q", "--initial-branch=main", repo]);
+  await writeFile(path.join(repo, "README.md"), "hello\n");
+  await git({ cwd: repo, env: me }, ["add", "-A"]);
+  await git({ cwd: repo, env: me }, ["commit", "-q", "-m", "start"]);
+  for (const [name, text] of [
+    ["roles/dev.md", "---\ntitle: Developer\n---\n"],
+    ["members/glm.md", "---\nrole: dev\nmodel: glm-5\n---\n"],
+  ] as const) {
+    const file = path.join(teamFolder(repo), name);
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, text);
+  }
+  engine = await Engine.open({
+    cwd: repo,
+    dataFolder: path.join(dir, "openplan-inline"),
+    env: {},
+    host: { changed: vi.fn(), failed: vi.fn() },
+  });
+  const server = new McpServer({ name: "openplan", version: "0.0.0" });
+  addPaneTools(server, () => Promise.resolve(engine));
+  const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
+  await server.connect(serverSide);
+  client = new Client({ name: "test", version: "0.0.0" });
+  await client.connect(clientSide);
+});
+
+afterEach(async () => {
+  await client.close();
+  await engine.close();
+  await rm(dir, { recursive: true, force: true });
+});
+
+async function call(name: string, args: Record<string, unknown> = {}) {
+  const result = await client.callTool({ name, arguments: args });
+  const [first] = result.content as { text: string }[];
+  return { text: first?.text ?? "", error: result.isError === true };
+}
+
+const view = async (args: Record<string, unknown> = {}) =>
+  JSON.parse((await call("view", args)).text) as PaneView;
+
+describe("the pane's tools", () => {
+  it("give the team only when it changed since the pane's revision", async () => {
+    const first = await view();
+    expect(first.team?.members).toEqual([{ name: "glm", role: "Developer", model: "glm-5" }]);
+    expect(first.team?.derived).toMatchObject({ busy: [] });
+    expect(first.speaking).toEqual({});
+    expect(await view({ revision: first.revision })).toEqual({
+      revision: first.revision,
+      speaking: {},
+    });
+    await engine.goals.start("Dice");
+    const next = await view({ revision: first.revision });
+    expect(next.revision).toBeGreaterThan(first.revision);
+    expect(next.team?.state.goals).toMatchObject([{ name: "Dice" }]);
+  });
+
+  it("follow a subtask's record from where the pane read up to", async () => {
+    engine.records.recorder("s1").block?.({ kind: "text", text: "Done." });
+    await engine.records.flush();
+    const { record } = await view({ record: { subtask: "s1", from: 0 } });
+    expect(record).toMatchObject({
+      subtask: "s1",
+      entries: [{ kind: "text", text: "Done." }],
+      live: { running: [] },
+    });
+    expect((await view({ record: { subtask: "s1", from: record?.next } })).record?.entries).toEqual(
+      [],
+    );
+  });
+
+  it("answer what waits on you as it was pressed, and refuse what doesn't fit", async () => {
+    const question: Question = {
+      id: "q1",
+      from: "glm",
+      to: "you",
+      text: "Which board?",
+      options: [],
+      choices: [
+        {
+          question: "Which board?",
+          header: "Board",
+          options: [{ label: "Grid", description: "" }],
+          multiSelect: false,
+        },
+      ],
+      status: "open",
+      createdAt: 0,
+    };
+    engine.state.questions.push(question);
+    expect(await call("answer", { question: "q1", option: "once" })).toEqual({
+      text: "That answer doesn't fit the question.",
+      error: true,
+    });
+    expect(await call("answer", { question: "q1", picks: ["Grid"] })).toMatchObject({
+      error: false,
+    });
+    expect(question.status).toBe("answered");
+  });
+});
