@@ -14,7 +14,10 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
   tool: (name: string, _: string, __: unknown, handler: unknown) => ({ name, handler }),
   createSdkMcpServer: (server: unknown) => server,
 }));
-vi.mock("./turns.ts", () => ({ askOnce: vi.fn() }));
+vi.mock("./turns.ts", async (original) => ({
+  ...(await original<typeof import("./turns.ts")>()),
+  askOnce: vi.fn(),
+}));
 
 const member = (name: string, title: string): Member => ({
   name,

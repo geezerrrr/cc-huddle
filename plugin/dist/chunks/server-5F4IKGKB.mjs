@@ -973,14 +973,14 @@ var require_foldFlowLines = __commonJS({
     var FOLD_FLOW = "flow";
     var FOLD_BLOCK = "block";
     var FOLD_QUOTED = "quoted";
-    function foldFlowLines(text2, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
+    function foldFlowLines(text, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
       if (!lineWidth || lineWidth < 0)
-        return text2;
+        return text;
       if (lineWidth < minContentWidth)
         minContentWidth = 0;
       const endStep = Math.max(1 + minContentWidth, 1 + lineWidth - indent.length);
-      if (text2.length <= endStep)
-        return text2;
+      if (text.length <= endStep)
+        return text;
       const folds = [];
       const escapedFolds = {};
       let end2 = lineWidth - indent.length;
@@ -997,14 +997,14 @@ var require_foldFlowLines = __commonJS({
       let escStart = -1;
       let escEnd = -1;
       if (mode === FOLD_BLOCK) {
-        i = consumeMoreIndentedLines(text2, i, indent.length);
+        i = consumeMoreIndentedLines(text, i, indent.length);
         if (i !== -1)
           end2 = i + endStep;
       }
-      for (let ch; ch = text2[i += 1]; ) {
+      for (let ch; ch = text[i += 1]; ) {
         if (mode === FOLD_QUOTED && ch === "\\") {
           escStart = i;
-          switch (text2[i + 1]) {
+          switch (text[i + 1]) {
             case "x":
               i += 3;
               break;
@@ -1021,12 +1021,12 @@ var require_foldFlowLines = __commonJS({
         }
         if (ch === "\n") {
           if (mode === FOLD_BLOCK)
-            i = consumeMoreIndentedLines(text2, i, indent.length);
+            i = consumeMoreIndentedLines(text, i, indent.length);
           end2 = i + indent.length + endStep;
           split = void 0;
         } else {
           if (ch === " " && prev && prev !== " " && prev !== "\n" && prev !== "	") {
-            const next = text2[i + 1];
+            const next = text[i + 1];
             if (next && next !== " " && next !== "\n" && next !== "	")
               split = i;
           }
@@ -1038,12 +1038,12 @@ var require_foldFlowLines = __commonJS({
             } else if (mode === FOLD_QUOTED) {
               while (prev === " " || prev === "	") {
                 prev = ch;
-                ch = text2[i += 1];
+                ch = text[i += 1];
                 overflow = true;
               }
               const j = i > escEnd + 1 ? i - 2 : escStart - 1;
               if (escapedFolds[j])
-                return text2;
+                return text;
               folds.push(j);
               escapedFolds[j] = true;
               end2 = j + endStep;
@@ -1058,39 +1058,39 @@ var require_foldFlowLines = __commonJS({
       if (overflow && onOverflow)
         onOverflow();
       if (folds.length === 0)
-        return text2;
+        return text;
       if (onFold)
         onFold();
-      let res = text2.slice(0, folds[0]);
+      let res = text.slice(0, folds[0]);
       for (let i2 = 0; i2 < folds.length; ++i2) {
         const fold = folds[i2];
-        const end3 = folds[i2 + 1] || text2.length;
+        const end3 = folds[i2 + 1] || text.length;
         if (fold === 0)
           res = `
-${indent}${text2.slice(0, end3)}`;
+${indent}${text.slice(0, end3)}`;
         else {
           if (mode === FOLD_QUOTED && escapedFolds[fold])
-            res += `${text2[fold]}\\`;
+            res += `${text[fold]}\\`;
           res += `
-${indent}${text2.slice(fold + 1, end3)}`;
+${indent}${text.slice(fold + 1, end3)}`;
         }
       }
       return res;
     }
-    function consumeMoreIndentedLines(text2, i, indent) {
+    function consumeMoreIndentedLines(text, i, indent) {
       let end2 = i;
       let start = i + 1;
-      let ch = text2[start];
+      let ch = text[start];
       while (ch === " " || ch === "	") {
         if (i < start + indent) {
-          ch = text2[++i];
+          ch = text[++i];
         } else {
           do {
-            ch = text2[++i];
+            ch = text[++i];
           } while (ch && ch !== "\n");
           end2 = i;
           start = i + 1;
-          ch = text2[start];
+          ch = text[start];
         }
       }
       return end2;
@@ -7381,16 +7381,16 @@ var dataFiles = (folder) => ({
 var STATE_VERSION = 1;
 var SAVE_DELAY_MS = 200;
 async function readState(file) {
-  let text2;
+  let text;
   try {
-    text2 = await readFile(file, "utf8");
+    text = await readFile(file, "utf8");
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
     return { goals: [], tasks: [], subtasks: [], meetings: [], questions: [] };
   }
   let saved;
   try {
-    saved = JSON.parse(text2);
+    saved = JSON.parse(text);
   } catch (error) {
     throw new Error(`${file} can't be read (${errorText(error)}): move it away to start over`, {
       cause: error
@@ -7674,7 +7674,7 @@ async function unresolved(places, subtaskId, files) {
   const marked = await Promise.all(
     files.map(
       (file) => readFile2(path2.join(desk, file), "utf8").then(
-        (text2) => MARKERS.test(text2),
+        (text) => MARKERS.test(text),
         () => false
       )
     )
@@ -7685,8 +7685,8 @@ async function conflicts(places, subtaskId, at) {
   const list = await git(at, ["diff", "--name-only", "-z", "--diff-filter=U"]);
   const files = list.stdout.split("\0").filter(Boolean);
   if (!files.length) return void 0;
-  const text2 = await unresolved(places, subtaskId, files);
-  return { kind: "conflict", text: text2, other: files.filter((file) => !text2.includes(file)) };
+  const text = await unresolved(places, subtaskId, files);
+  return { kind: "conflict", text, other: files.filter((file) => !text.includes(file)) };
 }
 async function removeDesk(places, slug, subtaskId) {
   const desk = deskFolder(places, subtaskId);
@@ -8590,6 +8590,9 @@ async function recordMembersIn(file) {
 }
 
 // src/engine/turns.ts
+var TURN_SERVER = "openplan";
+var turnToolName = (name) => `mcp__${TURN_SERVER}__${name}`;
+var toolText = (text) => ({ content: [{ type: "text", text }] });
 var tokensOf = (usage) => usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens + usage.output_tokens;
 function resultOutcome(message, subagentTokens = 0) {
   const tokens = tokensOf(message.usage) + subagentTokens;
@@ -8795,7 +8798,7 @@ function claudeProcess() {
     gone: () => exited,
     /** A turn's error in words, with the end of Claude Code's stderr. */
     failure: (error) => {
-      const words = error instanceof Error ? error.message : String(error);
+      const words = errorText(error);
       const tail = stderr.trim();
       return tail ? `${words}. stderr: ${tail}` : words;
     }
@@ -8854,12 +8857,10 @@ var MEETING_TURNS_EACH = {
   discussion: 2,
   large: 4
 };
-var SERVER = "openplan";
 var turnTool = (meetingTool) => ({
-  server: createSdkMcpServer({ name: SERVER, tools: [meetingTool] }),
-  name: `mcp__${SERVER}__${meetingTool.name}`
+  server: createSdkMcpServer({ name: TURN_SERVER, tools: [meetingTool] }),
+  name: turnToolName(meetingTool.name)
 });
-var answered = (text2) => ({ content: [{ type: "text", text: text2 }] });
 var handTool = (raise) => turnTool(
   tool(
     "raise_hand",
@@ -8870,7 +8871,7 @@ var handTool = (raise) => turnTool(
     },
     ({ point, to }) => {
       raise({ point, ...to && { to } });
-      return Promise.resolve(answered(MEETING_TOOLS.raiseHand.done));
+      return Promise.resolve(toolText(MEETING_TOOLS.raiseHand.done));
     }
   )
 );
@@ -8884,7 +8885,7 @@ var floorTool = (others, give) => turnTool(
     },
     (floor) => {
       give(floor);
-      return Promise.resolve(answered(MEETING_TOOLS.giveFloor.done));
+      return Promise.resolve(toolText(MEETING_TOOLS.giveFloor.done));
     }
   )
 );
@@ -9075,7 +9076,7 @@ var Meetings = class {
           ...options,
           ...seat && { resume: seat.session },
           ...turn.tool && {
-            mcpServers: { ...options.mcpServers, [SERVER]: turn.tool.server },
+            mcpServers: { ...options.mcpServers, [TURN_SERVER]: turn.tool.server },
             allowedTools: [...options.allowedTools ?? [], turn.tool.name]
           }
         },
@@ -9093,10 +9094,10 @@ var Meetings = class {
       core.changed();
       return ask(member, prompt, { ...turn, listener: core.speech(meeting2, member.name) });
     };
-    const said2 = (speaker, { text: text2, tokens }, phase, calls) => {
+    const said2 = (speaker, { text, tokens }, phase, calls) => {
       meeting2.turns.push({
         speaker: speaker.name,
-        text: text2,
+        text,
         at: Date.now(),
         phase,
         tokens,
@@ -9153,8 +9154,8 @@ var Meetings = class {
           tool: floorTool(others, (given) => floor = given)
         });
         const called2 = floor?.member ?? meeting2.hands?.[0]?.member;
-        const text2 = steer.text.trim();
-        if (text2 && !floor?.quiet) said2(host, { text: text2, tokens: steer.tokens }, "steer", called2);
+        const text = steer.text.trim();
+        if (text && !floor?.quiet) said2(host, { text, tokens: steer.tokens }, "steer", called2);
         else if (called2) await answer(called2);
         else return false;
         return true;
@@ -9329,8 +9330,8 @@ var Questions = class {
    * and leaves the state when it settles. Its subtask's run stopping calls it
    * off (cancelFor) and should stop `answering` too.
    */
-  async toTeammate(asker, to, text2, answering) {
-    const question = this.open(asker, { text: text2, kind: "teammate", to });
+  async toTeammate(asker, to, text, answering) {
+    const question = this.open(asker, { text, kind: "teammate", to });
     try {
       return await answering();
     } finally {
@@ -9341,10 +9342,10 @@ var Questions = class {
    * A stuck review, a merge that needs you, or a task done (with why, or
    * what, in `text`): it waits for your answer, no turn behind it.
    */
-  openDecision(subtask2, decision, text2) {
+  openDecision(subtask2, decision, text) {
     this.open(
       { from: subtask2.assignee, subtaskId: subtask2.id },
-      { text: text2, kind: "decision", decision }
+      { text, kind: "decision", decision }
     );
   }
   /**
@@ -9504,12 +9505,10 @@ import {
   tool as tool2
 } from "@anthropic-ai/claude-agent-sdk";
 import { z as z3 } from "zod";
-var SERVER2 = "openplan";
-var OWN_TOOLS = /* @__PURE__ */ new Set([`mcp__${SERVER2}__ask_teammate`, `mcp__${SERVER2}__deliver`]);
-var text = (words) => ({ content: [{ type: "text", text: words }] });
+var OWN_TOOLS = /* @__PURE__ */ new Set([turnToolName("ask_teammate"), turnToolName("deliver")]);
 function teamServer(collaboration, delivered) {
   return createSdkMcpServer2({
-    name: SERVER2,
+    name: TURN_SERVER,
     tools: [
       tool2(
         "ask_teammate",
@@ -9518,7 +9517,7 @@ function teamServer(collaboration, delivered) {
           teammate: z3.string().describe("The teammate's name"),
           question: z3.string().describe("The question, with the context they need")
         },
-        async ({ teammate, question }) => text(await collaboration.askTeammate(teammate, question))
+        async ({ teammate, question }) => toolText(await collaboration.askTeammate(teammate, question))
       ),
       tool2(
         "deliver",
@@ -9531,9 +9530,9 @@ function teamServer(collaboration, delivered) {
         },
         async ({ summary, files }) => {
           const checked = await collaboration.checkDelivery(files);
-          if ("refused" in checked) return text(checked.refused);
+          if ("refused" in checked) return toolText(checked.refused);
           delivered({ summary, files: checked.files });
-          return text("Delivered. End your turn now.");
+          return toolText("Delivered. End your turn now.");
         }
       )
     ]
@@ -9563,7 +9562,7 @@ async function runSubtask(params) {
       ...session !== void 0 && { resume: session },
       mcpServers: {
         ...options.mcpServers,
-        [SERVER2]: teamServer(params.collaboration, (given) => handover = given)
+        [TURN_SERVER]: teamServer(params.collaboration, (given) => handover = given)
       },
       canUseTool
     },
@@ -10259,15 +10258,15 @@ ${z5.prettifyError(result.error)}`);
 }
 var missing = (error) => error.code === "ENOENT";
 async function jsonFile(file) {
-  let text2;
+  let text;
   try {
-    text2 = await readFile4(file, "utf8");
+    text = await readFile4(file, "utf8");
   } catch (error) {
     if (missing(error)) return void 0;
     throw error;
   }
   try {
-    return JSON.parse(text2);
+    return JSON.parse(text);
   } catch (error) {
     throw new Error(`${file}: ${errorText(error)}`, { cause: error });
   }
@@ -10283,8 +10282,8 @@ async function markdownFiles(folder) {
   return Promise.all(
     names2.map(async (name) => {
       const file = path7.join(folder, name);
-      const text2 = await readFile4(file, "utf8");
-      const front = /^---\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(text2);
+      const text = await readFile4(file, "utf8");
+      const front = /^---\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(text);
       let data;
       try {
         data = (0, import_yaml.parse)(front?.[1] ?? "") ?? {};
@@ -10295,7 +10294,7 @@ async function markdownFiles(folder) {
         name: name.slice(0, -".md".length),
         file,
         data,
-        body: text2.slice(front?.[0].length ?? 0)
+        body: text.slice(front?.[0].length ?? 0)
       };
     })
   );
@@ -10878,7 +10877,7 @@ function addPaneTools(server2, team2) {
 
 // src/plugin/tools.ts
 import { z as z7 } from "zod";
-var said = (text2) => ({ content: [{ type: "text", text: text2 }] });
+var said = (text) => ({ content: [{ type: "text", text }] });
 var names = (items) => new Intl.ListFormat("en", { type: "conjunction" }).format(items);
 function goalOf(engine2, ref) {
   const { goals } = engine2.state;
@@ -11070,8 +11069,8 @@ function addTools(server2, team2) {
       description: "Pass the user's words to the member working on a subtask: a running one takes them at once, in its session; one not started reads them first.",
       inputSchema: { subtask, text: z7.string().trim().min(1) }
     },
-    async ({ subtask: id, text: text2 }) => {
-      const went = (await team2()).scheduler.carry(id, text2);
+    async ({ subtask: id, text }) => {
+      const went = (await team2()).scheduler.carry(id, text);
       return said(
         went === "goes" ? "Passed on." : went === "handedOver" ? "Not passed on: it is delivered and in review or being merged. Send its task back once it is done." : "Not passed on: its goal is paused or archived."
       );
@@ -11103,8 +11102,8 @@ function addTools(server2, team2) {
 var dataFolder = process.env.CLAUDE_PLUGIN_DATA;
 if (!dataFolder)
   throw new Error("openplan's MCP server runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA");
-var say = (text2) => {
-  console.error(`openplan: ${text2}`);
+var say = (text) => {
+  console.error(`openplan: ${text}`);
 };
 var engine;
 var opening;

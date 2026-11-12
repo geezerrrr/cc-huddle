@@ -12,11 +12,16 @@ import {
 import { z } from "zod";
 import { errorText } from "./core.ts";
 import { DELIVER_REMINDER, SESSION_ONLY } from "./prompts.ts";
-import { runTurn, turnDecoder, type TurnListener } from "./turns.ts";
+import {
+  runTurn,
+  toolText,
+  TURN_SERVER,
+  turnDecoder,
+  turnToolName,
+  type TurnListener,
+} from "./turns.ts";
 
-/** The in-process MCP server a run's turns have: its tools are `mcp__openplan__<name>`. */
-const SERVER = "openplan";
-const OWN_TOOLS = new Set([`mcp__${SERVER}__ask_teammate`, `mcp__${SERVER}__deliver`]);
+const OWN_TOOLS = new Set([turnToolName("ask_teammate"), turnToolName("deliver")]);
 
 /** The work handed over: what was done, and its files, relative to the worktree. */
 export interface Handover {
@@ -38,11 +43,9 @@ export type RunOutcome =
   | { status: "failed"; error: string; tokens: number }
   | { status: "stopped"; tokens: number };
 
-const text = (words: string) => ({ content: [{ type: "text" as const, text: words }] });
-
 function teamServer(collaboration: Collaboration, delivered: (handover: Handover) => void) {
   return createSdkMcpServer({
-    name: SERVER,
+    name: TURN_SERVER,
     tools: [
       tool(
         "ask_teammate",
@@ -51,7 +54,8 @@ function teamServer(collaboration: Collaboration, delivered: (handover: Handover
           teammate: z.string().describe("The teammate's name"),
           question: z.string().describe("The question, with the context they need"),
         },
-        async ({ teammate, question }) => text(await collaboration.askTeammate(teammate, question)),
+        async ({ teammate, question }) =>
+          toolText(await collaboration.askTeammate(teammate, question)),
       ),
       tool(
         "deliver",
@@ -70,9 +74,9 @@ function teamServer(collaboration: Collaboration, delivered: (handover: Handover
         },
         async ({ summary, files }) => {
           const checked = await collaboration.checkDelivery(files);
-          if ("refused" in checked) return text(checked.refused);
+          if ("refused" in checked) return toolText(checked.refused);
           delivered({ summary, files: checked.files });
-          return text("Delivered. End your turn now.");
+          return toolText("Delivered. End your turn now.");
         },
       ),
     ],
@@ -122,7 +126,7 @@ export async function runSubtask(params: {
         ...(session !== undefined && { resume: session }),
         mcpServers: {
           ...options.mcpServers,
-          [SERVER]: teamServer(params.collaboration, (given) => (handover = given)),
+          [TURN_SERVER]: teamServer(params.collaboration, (given) => (handover = given)),
         },
         canUseTool,
       },

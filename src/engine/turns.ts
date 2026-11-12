@@ -12,7 +12,17 @@ import {
   type SpawnOptions,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { TodoWriteInput } from "@anthropic-ai/claude-agent-sdk/sdk-tools";
+import { errorText } from "./core.ts";
 import { watchMember } from "./processes.ts";
+
+/** The in-process MCP server that gives a member's turn openplan's tools. */
+export const TURN_SERVER = "openplan";
+
+/** One of openplan's tools as a turn's rules name it: `mcp__openplan__<name>`. */
+export const turnToolName = (name: string) => `mcp__${TURN_SERVER}__${name}`;
+
+/** What one of openplan's tools answers a member, in words. */
+export const toolText = (text: string) => ({ content: [{ type: "text" as const, text }] });
 
 /** How a turn ended: its final text, or why it failed, and the tokens it used. */
 export type TurnOutcome = (
@@ -332,7 +342,7 @@ export function claudeProcess() {
     gone: () => exited,
     /** A turn's error in words, with the end of Claude Code's stderr. */
     failure: (error: unknown) => {
-      const words = error instanceof Error ? error.message : String(error);
+      const words = errorText(error);
       const tail = stderr.trim();
       return tail ? `${words}. stderr: ${tail}` : words;
     },

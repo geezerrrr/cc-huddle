@@ -33,7 +33,14 @@ import {
   type MeetingBrief,
 } from "./prompts.ts";
 import type { Scheduler } from "./scheduler.ts";
-import { askOnce, type Reply, type TurnListener } from "./turns.ts";
+import {
+  askOnce,
+  toolText,
+  TURN_SERVER,
+  turnToolName,
+  type Reply,
+  type TurnListener,
+} from "./turns.ts";
 import type {
   Goal,
   Meeting,
@@ -52,9 +59,6 @@ export const MEETING_TURNS_EACH: Record<MeetingSize, number> = {
   large: 4,
 };
 
-/** The in-process MCP server of a meeting turn: its one tool is `mcp__openplan__<name>`. */
-const SERVER = "openplan";
-
 /** A turn's one meeting tool: its server, and its name as the turn's rules allow it. */
 interface TurnTool {
   server: McpServerConfig;
@@ -62,11 +66,9 @@ interface TurnTool {
 }
 
 const turnTool = <S extends AnyZodRawShape>(meetingTool: SdkMcpToolDefinition<S>): TurnTool => ({
-  server: createSdkMcpServer({ name: SERVER, tools: [meetingTool] }),
-  name: `mcp__${SERVER}__${meetingTool.name}`,
+  server: createSdkMcpServer({ name: TURN_SERVER, tools: [meetingTool] }),
+  name: turnToolName(meetingTool.name),
 });
-
-const answered = (text: string) => ({ content: [{ type: "text" as const, text }] });
 
 /** The turn's raise_hand: calling it puts the hand up, not calling it leaves it down. */
 const handTool = (raise: (hand: Omit<MeetingHand, "member">) => void) =>
@@ -80,7 +82,7 @@ const handTool = (raise: (hand: Omit<MeetingHand, "member">) => void) =>
       },
       ({ point, to }) => {
         raise({ point, ...(to && { to }) });
-        return Promise.resolve(answered(MEETING_TOOLS.raiseHand.done));
+        return Promise.resolve(toolText(MEETING_TOOLS.raiseHand.done));
       },
     ),
   );
@@ -102,7 +104,7 @@ const floorTool = (
       },
       (floor) => {
         give(floor);
-        return Promise.resolve(answered(MEETING_TOOLS.giveFloor.done));
+        return Promise.resolve(toolText(MEETING_TOOLS.giveFloor.done));
       },
     ),
   );
@@ -350,7 +352,7 @@ export class Meetings {
           ...options,
           ...(seat && { resume: seat.session }),
           ...(turn.tool && {
-            mcpServers: { ...options.mcpServers, [SERVER]: turn.tool.server },
+            mcpServers: { ...options.mcpServers, [TURN_SERVER]: turn.tool.server },
             allowedTools: [...(options.allowedTools ?? []), turn.tool.name],
           }),
         },
