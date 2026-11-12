@@ -8,7 +8,7 @@ import { randomUUID } from "node:crypto";
 import { rm } from "node:fs/promises";
 import type { Core } from "./core.ts";
 import { openGoal, removeGoal, slugFor, takenSlugs } from "./git.ts";
-import { GOAL_MACHINE, step } from "./machines.ts";
+import { can, GOAL_MACHINE, step } from "./machines.ts";
 import type { Meetings } from "./meetings.ts";
 import { recordFile } from "./records.ts";
 import type { Scheduler } from "./scheduler.ts";
@@ -105,7 +105,7 @@ export class Goals {
       const goal = core.state.goals.find((g) => g.id === id);
       // Gone already: what you asked for holds.
       if (!goal) return;
-      if (goal.status !== "archived")
+      if (!can(GOAL_MACHINE, goal.status, "delete"))
         throw new Error(`The goal "${goal.name}" isn't archived: archive it before deleting it`);
       const subtasks = core.state.subtasks.filter((s) => s.goalId === id);
       // A merge under way finishes first, and so does a meeting being cancelled.

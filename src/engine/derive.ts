@@ -6,6 +6,7 @@
  */
 import { can, MEETING_MACHINE, GOAL_MACHINE, SUBTASK_MACHINE } from "./machines.ts";
 import {
+  GOAL_ACTIONS,
   isHalted,
   YOU,
   type Derived,
@@ -175,12 +176,9 @@ function subtaskActions(subtask: Subtask, redone: boolean, deciding: boolean): S
   return redone && can(SUBTASK_MACHINE, subtask.status, "redo") ? [...moves, "redo"] : moves;
 }
 
-/** What can be done to a goal where it stands; an archived one can also be deleted. */
+/** What can be done to a goal where it stands. */
 function goalActions(goal: Goal): GoalAction[] {
-  const moves = (["pause", "resume", "archive"] as const).filter((event) =>
-    can(GOAL_MACHINE, goal.status, event),
-  );
-  return goal.status === "archived" ? [...moves, "delete"] : moves;
+  return GOAL_ACTIONS.filter((event) => can(GOAL_MACHINE, goal.status, event));
 }
 
 /**

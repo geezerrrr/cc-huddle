@@ -7814,7 +7814,8 @@ import { rm as rm3 } from "node:fs/promises";
 var GOAL_MACHINE = {
   pause: { from: ["active"], to: "paused" },
   archive: { from: ["active", "paused"], to: "archived" },
-  resume: { from: ["paused", "archived"], to: "active" }
+  resume: { from: ["paused", "archived"], to: "active" },
+  delete: { from: ["archived"], to: "removed" }
 };
 var MEETING_MACHINE = {
   plan: { from: ["running"], to: "review" },
@@ -8062,7 +8063,7 @@ var Goals = class {
       const { core } = this;
       const goal2 = core.state.goals.find((g) => g.id === id);
       if (!goal2) return;
-      if (goal2.status !== "archived")
+      if (!can(GOAL_MACHINE, goal2.status, "delete"))
         throw new Error(`The goal "${goal2.name}" isn't archived: archive it before deleting it`);
       const subtasks = core.state.subtasks.filter((s) => s.goalId === id);
       await this.scheduler.release(subtasks.map((s) => s.id));
@@ -8243,10 +8244,7 @@ function subtaskActions(subtask2, redone, deciding) {
   return redone && can(SUBTASK_MACHINE, subtask2.status, "redo") ? [...moves, "redo"] : moves;
 }
 function goalActions(goal2) {
-  const moves = ["pause", "resume", "archive"].filter(
-    (event) => can(GOAL_MACHINE, goal2.status, event)
-  );
-  return goal2.status === "archived" ? [...moves, "delete"] : moves;
+  return GOAL_ACTIONS.filter((event) => can(GOAL_MACHINE, goal2.status, event));
 }
 function meetingResumes(state, meeting2) {
   return can(MEETING_MACHINE, meeting2.status, "resume") && !meeting2.plan && isActive(state, meeting2.goalId) && meeting2.participants.every((m) => state.members.includes(m));

@@ -10,11 +10,13 @@ import type { MeetingStatus, GoalStatus, QuestionStatus, SubtaskStatus } from ".
 /** Each event: the states it may happen in, and the state it leads to. */
 type Machine<S extends string> = Record<string, { from: readonly S[]; to: S }>;
 
+/** A deleted goal is removed from the state, not kept as `removed`. */
 export const GOAL_MACHINE = {
   pause: { from: ["active"], to: "paused" },
   archive: { from: ["active", "paused"], to: "archived" },
   resume: { from: ["paused", "archived"], to: "active" },
-} as const satisfies Machine<GoalStatus>;
+  delete: { from: ["archived"], to: "removed" },
+} as const satisfies Machine<GoalStatus | "removed">;
 
 export const MEETING_MACHINE = {
   plan: { from: ["running"], to: "review" },
@@ -75,11 +77,11 @@ export function can<M extends Machine<string>>(
 }
 
 /** The state `event` leads to from `state`; throws when the table has no such move. */
-export function step<M extends Machine<string>>(
+export function step<M extends Machine<string>, E extends keyof M & string>(
   machine: M,
   state: StateOf<M>,
-  event: keyof M & string,
-): M[keyof M]["to"] {
+  event: E,
+): M[E]["to"] {
   const move = machine[event];
   if (!move?.from.includes(state)) throw new Error(`No "${event}" from "${state}"`);
   return move.to;

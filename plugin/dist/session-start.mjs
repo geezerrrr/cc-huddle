@@ -27240,6 +27240,7 @@ function date4(params) {
 var isHalted = (status) => status === "failed" || status === "stopped";
 var MEETING_SIZES = ["small", "discussion", "large"];
 var YOU = "you";
+var GOAL_ACTIONS = ["pause", "resume", "archive", "delete"];
 
 // src/engine/team.ts
 var teamFolder = (top) => path3.join(top, ".claude", "openplan");
@@ -27343,7 +27344,8 @@ var writing = serialBy();
 var GOAL_MACHINE = {
   pause: { from: ["active"], to: "paused" },
   archive: { from: ["active", "paused"], to: "archived" },
-  resume: { from: ["paused", "archived"], to: "active" }
+  resume: { from: ["paused", "archived"], to: "active" },
+  delete: { from: ["archived"], to: "removed" }
 };
 var MEETING_MACHINE = {
   plan: { from: ["running"], to: "review" },
@@ -27484,10 +27486,7 @@ function subtaskActions(subtask, redone, deciding) {
   return redone && can(SUBTASK_MACHINE, subtask.status, "redo") ? [...moves, "redo"] : moves;
 }
 function goalActions(goal) {
-  const moves = ["pause", "resume", "archive"].filter(
-    (event) => can(GOAL_MACHINE, goal.status, event)
-  );
-  return goal.status === "archived" ? [...moves, "delete"] : moves;
+  return GOAL_ACTIONS.filter((event) => can(GOAL_MACHINE, goal.status, event));
 }
 function meetingResumes(state, meeting) {
   return can(MEETING_MACHINE, meeting.status, "resume") && !meeting.plan && isActive(state, meeting.goalId) && meeting.participants.every((m) => state.members.includes(m));
