@@ -38,7 +38,7 @@ Two layers. The engine knows nothing of the plugin.
 ```
 ┌─────────────────── Claude Code (your session) ───────────────────┐
 │  mod: pane, band, toasts, /openplan          skill               │
-│        │ loopback HTTP                                            │
+│        │ $.mcp.call: view, answer                                 │
 │  MCP server `openplan`: tools ── engine: state machines ·         │
 │                                  scheduler · meetings · questions │
 │                                  · worktrees and merges           │
@@ -75,10 +75,12 @@ One session runs a repository's team at a time, held by a lock in the repository
 
 ### 3.3 Plugin
 
-- **MCP server `openplan`**: the engine and the tools your session uses (§7.3). It serves the mod over loopback HTTP, with a token in the data folder: a mod has no network or file access of its own beyond `$.http.fetch` and `$.fs.read`.
+- **MCP server `openplan`**: the engine and the tools your session uses (§7.3). Two more tools serve the mod, which calls them with `$.mcp.call`: `view` (the team as the pane draws it, a member's record from where it left off) and `answer`. The mod keeps both from your session's model, so an answer comes only from you.
 - **Mod**: the pane, the band, toasts, transcript rows and the `/openplan` commands (§7.2). Commands run without a model turn.
 - **Skill**: tells your session what it is for: relay and act, never do the work itself.
 - **SessionStart hook**: tells your session what stopped or waits on you, as context. The mod shows you the same in the band.
+
+The repository's `plugin/` folder is the plugin, listed by the marketplace at the repository's top, so it installs with `/plugin install`. The MCP server and the hook are bundled into `plugin/dist/`, committed so an install needs no build. The Agent SDK isn't openplan's to ship: the server's npm dependencies are installed into the data folder the first time a version starts (`dist/package.json` names them, with exact versions), without their optional platform binaries, since members run your session's Claude Code.
 
 ### 3.4 Where things live
 
@@ -87,6 +89,7 @@ One session runs a repository's team at a time, held by a lock in the repository
 | Team: roles, members, settings              | `.claude/openplan/` in the repository                                        | Yours to commit |
 | State, meeting records, plans, logs, events | `${CLAUDE_PLUGIN_DATA}/repos/<repo-id>/`                                     | No              |
 | Worktrees                                   | `${CLAUDE_PLUGIN_DATA}/repos/<repo-id>/goals/<goal>/` and `desks/<subtask>/` | Branches only   |
+| The MCP server's npm dependencies           | `${CLAUDE_PLUGIN_DATA}/deps/<version-hash>/`                                 | No              |
 
 `${CLAUDE_PLUGIN_DATA}` is the data folder Claude Code gives each plugin (`~/.claude/plugins/data/<plugin-id>/`). It is passed to the MCP server and the hooks. It survives plugin updates and is removed on uninstall, worktrees included; their branches stay in your repository, and git prunes the stale worktree entries on its own. `claude plugin uninstall --keep-data` keeps it.
 
@@ -265,4 +268,8 @@ Checked on Claude Code 2.1.322 and Agent SDK 0.3.322, with a probe plugin and a 
 - In `bypassPermissions` mode the wake-up is delivered too, without approval: the MCP server is verified as the session's own child.
 - A member started with default options loads every enabled plugin, openplan included, and has `SendMessage` and `ListAgents`; the flag settings in §8 remove both. Every member binds an inbox socket and is listed by `claude agents` as an interactive session, under its `--name`.
 
-Left: whether the pane redraws smoothly polling the MCP server over `$.http.fetch` at the rate a streaming meeting needs.
+- An MCP server is not given `CLAUDE_PID` (hooks are); its parent process is the session. A command-form hook is the session's child too.
+- A plugin's skill takes the plugin's name as its short command: a skill named `openplan` in the plugin `openplan` keeps the mod from registering `/openplan`, `user-invocable: false` or not.
+- Loaded with `--plugin-dir` against the mock: the first start installs the dependencies and connects in about 5 s, later ones at once; the band, `/openplan`, `/openplan status`, the pane and the SessionStart context all show the team as its state file has it.
+
+Left: whether the pane redraws smoothly, polling the MCP server every 500 ms with `$.mcp.call`, while a meeting streams.
