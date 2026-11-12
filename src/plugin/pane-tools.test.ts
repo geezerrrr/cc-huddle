@@ -44,7 +44,7 @@ beforeEach(async () => {
     session: 41,
     plugin: "openplan@inline",
     env: {},
-    host: { changed: vi.fn(), failed: vi.fn() },
+    failed: vi.fn(),
   });
   const server = new McpServer({ name: "openplan", version: "0.0.0" });
   addPaneTools(server, () => Promise.resolve(engine));
@@ -76,6 +76,7 @@ describe("the pane's tools", () => {
       members: [{ name: "glm", role: "Developer", model: "glm-5", doing: "free", tokens: 0 }],
       needs: [],
       milestones: [],
+      prompts: [],
     });
     expect(await view({ revision: first.revision })).toEqual({ revision: first.revision });
     await engine.goals.start("Dice");

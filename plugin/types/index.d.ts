@@ -12,6 +12,8 @@ export type OpenplanTeam = {
   needs: OpenplanNeed[];
   /** Milestones so far, each told once, by a key that names it. */
   milestones: { key: string; text: string }[];
+  /** What needs a conversation with you, by a key that names it: your session is prompted with each new one. */
+  prompts: { key: string; text: string }[];
 };
 
 export type OpenplanMeeting = {

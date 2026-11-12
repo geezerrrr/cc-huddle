@@ -47,7 +47,7 @@ beforeEach(async () => {
     session: 41,
     plugin: "openplan@inline",
     env: {},
-    host: { changed: vi.fn(), failed: vi.fn() },
+    failed: vi.fn(),
   });
   // A run goes on until it is stopped.
   vi.mocked(runSubtask).mockImplementation(

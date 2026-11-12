@@ -10424,18 +10424,9 @@ var Engine = class _Engine {
     try {
       await recordMembersIn(files.members);
       const state = await readState(files.state);
-      const { host } = options;
-      const writer = stateWriter(
-        files.state,
-        () => state,
-        (error) => {
-          host.failed(error);
-        }
-      );
+      const writer = stateWriter(files.state, () => state, options.failed);
       const places = { repo, root };
-      const records = new Records(places, (error) => {
-        host.failed(error);
-      });
+      const records = new Records(places, options.failed);
       const core = {
         state,
         team: team2,
@@ -10443,7 +10434,6 @@ var Engine = class _Engine {
         changed: () => {
           engine2.changes++;
           writer.changed();
-          host.changed();
         },
         allowAlways: (rules) => engine2.allow(rules),
         options: (member, kind, cwd) => Promise.resolve(engine2.turnOptions(member, kind, cwd)),
@@ -10810,6 +10800,29 @@ function milestones(work) {
   }
   return said2;
 }
+function prompts(work) {
+  const asked = [];
+  for (const meeting2 of work.meetings)
+    if (meeting2.status === "review" && meeting2.plan)
+      asked.push({
+        key: `review:${meeting2.id}`,
+        text: `The meeting [${meeting2.id}] on "${meeting2.agenda}" has a plan: ${meeting2.plan.summary}. Show it to the user with show_plan, and ask whether to approve it, change it, or cancel it.`
+      });
+  for (const question of work.questions) {
+    if (question.kind !== "decision" || question.decision.kind !== "delivery") continue;
+    const subtask2 = work.subtasks.find((s) => s.id === question.subtaskId);
+    const delivered = work.subtasks.filter((s) => s.taskId === subtask2?.taskId && s.delivery).map((s) => `- ${s.title}, by ${s.assignee}: ${s.delivery?.summary ?? ""}`);
+    asked.push({
+      key: `accept:${question.id}`,
+      text: [
+        `The task "${question.text}" is done [${question.id}], merged into its goal's branch:`,
+        ...delivered,
+        "Tell the user what was done, and ask whether to accept it or send it back with what to change (decide)."
+      ].join("\n")
+    });
+  }
+  return asked;
+}
 function bandText(work, needs) {
   if (!work.goals.length) return void 0;
   const parts = [];
@@ -10834,7 +10847,8 @@ function paneTeam(work, members) {
     ...meeting2 && { meeting: meetingOf(meeting2) },
     members: members.map((m) => memberOf(m, work, derived)),
     needs,
-    milestones: milestones(work)
+    milestones: milestones(work),
+    prompts: prompts(work)
   };
 }
 
@@ -11118,62 +11132,6 @@ function addTools(server2, team2) {
   );
 }
 
-// src/plugin/wake.ts
-import { connect } from "node:net";
-function wakeSession(text2, env = process.env) {
-  const socket = env.CLAUDE_CODE_MESSAGING_SOCKET;
-  const token = env.CLAUDE_CODE_MESSAGING_TOKEN;
-  if (!socket) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const lines = [
-      ...token ? [{ type: "auth", token }] : [],
-      { type: "user", message: { role: "user", content: text2 } }
-    ];
-    const posting = connect(socket, () => {
-      posting.end(lines.map((line) => `${JSON.stringify(line)}
-`).join(""));
-    });
-    posting.on("error", reject).on("close", () => {
-      resolve();
-    });
-    posting.resume();
-  });
-}
-var NewForYou = class {
-  told = /* @__PURE__ */ new Set();
-  constructor(state) {
-    this.news(state);
-  }
-  /** The messages for what is new in `state`. */
-  news(state) {
-    const messages = [];
-    const fresh = (id) => {
-      if (this.told.has(id)) return false;
-      this.told.add(id);
-      return true;
-    };
-    for (const meeting2 of state.meetings)
-      if (meeting2.status === "review" && meeting2.plan && fresh(meeting2.id))
-        messages.push(
-          `openplan: the meeting [${meeting2.id}] on "${meeting2.agenda}" has a plan: ${meeting2.plan.summary}. Show it to the user with show_plan, and ask whether to approve it, change it, or cancel it.`
-        );
-    for (const question of state.questions) {
-      if (question.status !== "open" || question.kind !== "decision" || question.decision.kind !== "delivery" || !fresh(question.id))
-        continue;
-      const subtask2 = state.subtasks.find((s) => s.id === question.subtaskId);
-      const delivered = state.subtasks.filter((s) => s.taskId === subtask2?.taskId && s.delivery).map((s) => `- ${s.title}, by ${s.assignee}: ${s.delivery?.summary ?? ""}`);
-      messages.push(
-        [
-          `openplan: the task "${question.text}" is done [${question.id}], merged into its goal's branch:`,
-          ...delivered,
-          "Tell the user what was done, and ask whether to accept it or send it back with what to change (decide)."
-        ].join("\n")
-      );
-    }
-    return messages;
-  }
-};
-
 // src/plugin/server.ts
 var dataFolder = process.env.CLAUDE_PLUGIN_DATA;
 if (!dataFolder)
@@ -11183,7 +11141,6 @@ var say = (text2) => {
 };
 var engine;
 var opening;
-var news2;
 var claude;
 var openTeam = async () => Engine.open({
   cwd: process.env.CLAUDE_PROJECT_DIR ?? process.cwd(),
@@ -11192,25 +11149,13 @@ var openTeam = async () => Engine.open({
   session: process.ppid,
   plugin: pluginId(dataFolder),
   env: process.env,
-  host: {
-    changed() {
-      if (!engine || !news2) return;
-      for (const message of news2.news(engine.state))
-        wakeSession(message).catch((error) => {
-          say(`your session couldn't be told: ${errorText(error)}`);
-        });
-    },
-    failed(error) {
-      say(`the team's state or a record couldn't be written: ${errorText(error)}`);
-    }
+  failed(error) {
+    say(`the team's state or a record couldn't be written: ${errorText(error)}`);
   }
 });
 var team = () => {
   opening ??= openTeam().then(
-    (opened) => {
-      news2 = new NewForYou(opened.state);
-      return engine = opened;
-    },
+    (opened) => engine = opened,
     (error) => {
       opening = void 0;
       throw error;

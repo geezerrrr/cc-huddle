@@ -1,8 +1,8 @@
 /**
  * The team as openplan's pane shows it (docs/design.md §7.2), worked out here
  * from the state so the mod only draws: the band's words, the meeting, each
- * member at what they do, what waits on you with the answers it takes, and
- * the milestones the transcript keeps.
+ * member at what they do, what waits on you with the answers it takes, the
+ * milestones the transcript keeps, and what your session is asked to talk over.
  */
 import type {
   OpenplanMeeting,
@@ -189,6 +189,36 @@ function milestones(work: Work): OpenplanTeam["milestones"] {
   return said;
 }
 
+/**
+ * What needs a conversation (§7.3): each plan out for review, and each task
+ * done, waiting to be accepted. The mod submits each new one to your session.
+ */
+function prompts(work: Work): OpenplanTeam["prompts"] {
+  const asked: OpenplanTeam["prompts"] = [];
+  for (const meeting of work.meetings)
+    if (meeting.status === "review" && meeting.plan)
+      asked.push({
+        key: `review:${meeting.id}`,
+        text: `The meeting [${meeting.id}] on "${meeting.agenda}" has a plan: ${meeting.plan.summary}. Show it to the user with show_plan, and ask whether to approve it, change it, or cancel it.`,
+      });
+  for (const question of work.questions) {
+    if (question.kind !== "decision" || question.decision.kind !== "delivery") continue;
+    const subtask = work.subtasks.find((s) => s.id === question.subtaskId);
+    const delivered = work.subtasks
+      .filter((s) => s.taskId === subtask?.taskId && s.delivery)
+      .map((s) => `- ${s.title}, by ${s.assignee}: ${s.delivery?.summary ?? ""}`);
+    asked.push({
+      key: `accept:${question.id}`,
+      text: [
+        `The task "${question.text}" is done [${question.id}], merged into its goal's branch:`,
+        ...delivered,
+        "Tell the user what was done, and ask whether to accept it or send it back with what to change (decide).",
+      ].join("\n"),
+    });
+  }
+  return asked;
+}
+
 /** The band's words: what goes on and what waits on you; nothing before the first goal. */
 function bandText(work: Work, needs: number): string | undefined {
   if (!work.goals.length) return undefined;
@@ -220,5 +250,6 @@ export function paneTeam(work: Work, members: readonly Member[]): OpenplanTeam {
     members: members.map((m) => memberOf(m, work, derived)),
     needs,
     milestones: milestones(work),
+    prompts: prompts(work),
   };
 }

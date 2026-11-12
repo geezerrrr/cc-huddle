@@ -1,7 +1,7 @@
 /**
  * openplan's mod (docs/design.md §7.2): the pane, the band above the prompt,
- * toasts for what needs you, transcript rows for milestones, and the
- * `/openplan` command. It draws what the MCP server's `view` tool gives and
+ * toasts for what needs you, transcript rows for milestones, prompts to your
+ * session for what needs a conversation, and the `/openplan` command. It draws what the MCP server's `view` tool gives and
  * answers through its `answer` tool, with no model in between; the model is
  * kept from both.
  */
@@ -63,7 +63,7 @@ const PERMISSIONS = { once: "Allow once", always: "Always allow", deny: "Deny" }
 let server: string | undefined;
 /** The revision of the team the pane has. */
 let revision: number | undefined;
-/** Needs and milestones told already; those there at the first look are not news. */
+/** Needs, milestones and prompts told already; those there at the first look are not news. */
 let told: Set<string> | undefined;
 let polling = false;
 /**
@@ -132,9 +132,16 @@ async function answer($: $, need: OpenplanNeed, args: Record<string, unknown>) {
   }
 }
 
-/** Tells what is new since the last look: a toast for what needs you, a row for a milestone. */
+/**
+ * Tells what is new since the last look: a toast for what needs you, a row
+ * for a milestone, and a prompt to your session for what needs a conversation.
+ */
 function tell($: $, now: OpenplanTeam) {
-  const keys = [...now.needs.map((n) => `need:${n.id}`), ...now.milestones.map((m) => m.key)];
+  const keys = [
+    ...now.needs.map((n) => `need:${n.id}`),
+    ...now.milestones.map((m) => m.key),
+    ...now.prompts.map((p) => p.key),
+  ];
   if (told) {
     for (const need of now.needs)
       if (!told.has(`need:${need.id}`)) {
@@ -143,6 +150,11 @@ function tell($: $, now: OpenplanTeam) {
       }
     for (const milestone of now.milestones)
       if (!told.has(milestone.key)) $.ui.log(`openplan: ${milestone.text}`);
+    for (const prompt of now.prompts)
+      if (!told.has(prompt.key))
+        $.prompt.submit({ text: prompt.text }).catch((error: unknown) => {
+          $.ui.toast(`openplan: your session couldn't be told: ${words(error)}`);
+        });
   }
   told = new Set(keys);
 }

@@ -69,6 +69,7 @@ const work = (): Work => ({
       status: "done",
       startedAt: 1,
       review: { rounds: 1, notes: "Bigger" },
+      delivery: { summary: "A grid board.", files: [], at: 1 },
     }),
     subtask("score", { assignee: "sonnet", dependsOn: ["rules"] }),
   ],
@@ -169,6 +170,14 @@ describe("paneTeam", () => {
       { key: "back:board:1", text: '"board" went back to sonnet: Bigger' },
       { key: "done:board", text: '"board" by sonnet is merged' },
     ]);
+    expect(team.prompts).toEqual([
+      {
+        key: "accept:q3",
+        text: `The task "Game" is done [q3], merged into its goal's branch:
+- board, by sonnet: A grid board.
+Tell the user what was done, and ask whether to accept it or send it back with what to change (decide).`,
+      },
+    ]);
   });
 
   it("says who speaks at a meeting under way, a plan to review, and nothing before the first goal", () => {
@@ -185,6 +194,13 @@ describe("paneTeam", () => {
     ]);
     expect(paneTeam({ ...now, goals: [] }, members).band).toBeUndefined();
     now.meetings = [{ ...meeting, status: "review" }];
-    expect(paneTeam(now, members).band).toBe("plan to review");
+    const review = paneTeam(now, members);
+    expect(review.band).toBe("plan to review");
+    expect(review.prompts).toEqual([
+      {
+        key: "review:m1",
+        text: 'The meeting [m1] on "Dice" has a plan: A dice game. Show it to the user with show_plan, and ask whether to approve it, change it, or cancel it.',
+      },
+    ]);
   });
 });

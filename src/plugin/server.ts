@@ -13,7 +13,6 @@ import { executableOf } from "./claude.ts";
 import { pluginId } from "./plugin-id.ts";
 import { addPaneTools } from "./pane-tools.ts";
 import { addTools } from "./tools.ts";
-import { NewForYou, wakeSession } from "./wake.ts";
 
 const dataFolder = process.env.CLAUDE_PLUGIN_DATA;
 if (!dataFolder)
@@ -25,8 +24,6 @@ const say = (text: string) => {
 
 let engine: Engine | undefined;
 let opening: Promise<Engine> | undefined;
-/** What needs a conversation, since the team opened. */
-let news: NewForYou | undefined;
 
 /** The Claude Code your session runs, which members run too: the process that started this one. */
 let claude: Promise<string> | undefined;
@@ -40,27 +37,15 @@ const openTeam = async () =>
     session: process.ppid,
     plugin: pluginId(dataFolder),
     env: process.env,
-    host: {
-      changed() {
-        if (!engine || !news) return;
-        for (const message of news.news(engine.state))
-          wakeSession(message).catch((error: unknown) => {
-            say(`your session couldn't be told: ${errorText(error)}`);
-          });
-      },
-      failed(error) {
-        say(`the team's state or a record couldn't be written: ${errorText(error)}`);
-      },
+    failed(error) {
+      say(`the team's state or a record couldn't be written: ${errorText(error)}`);
     },
   });
 
 /** The team, opened on first need: again after it failed, as its files may have been fixed since. */
 const team = (): Promise<Engine> => {
   opening ??= openTeam().then(
-    (opened) => {
-      news = new NewForYou(opened.state);
-      return (engine = opened);
-    },
+    (opened) => (engine = opened),
     (error: unknown) => {
       opening = undefined;
       throw error;

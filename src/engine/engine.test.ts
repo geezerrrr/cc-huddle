@@ -53,7 +53,7 @@ beforeEach(async () => {
     session: 41,
     plugin: "openplan@inline",
     env: { GLM_KEY: "key-1" },
-    host: { changed: vi.fn(), failed: vi.fn() },
+    failed: vi.fn(),
   };
   files = dataFiles(repoFolder(dataFolder, await openRepository(repo)));
 });

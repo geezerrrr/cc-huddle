@@ -76,7 +76,7 @@ One session runs a repository's team at a time, held by a lock in the repository
 ### 3.3 Plugin
 
 - **MCP server `openplan`**: the engine and the tools your session uses (§7.3). Two more tools serve the mod, which calls them with `$.mcp.call`: `view` (the team as the pane draws it, a member's record from where it left off) and `answer`. The mod keeps both from your session's model, so an answer comes only from you.
-- **Mod**: the pane, the band, toasts, transcript rows and the `/openplan` commands (§7.2). Commands run without a model turn.
+- **Mod**: the pane, the band, toasts, transcript rows and the `/openplan` commands (§7.2), and the prompts that wake your session (§7.3). Commands run without a model turn.
 - **Skill**: tells your session what it is for: relay and act, never do the work itself.
 - **SessionStart hook**: tells your session what stopped or waits on you, as context. The mod shows you the same in the band.
 
@@ -234,7 +234,7 @@ A member session loads your user and project settings like any session of yours.
 
 Your session talks; the pane shows and answers. The tools your session has: start a goal, hold a meeting, assign a subtask directly, change a plan under review, approve or cancel it, pause, resume, archive or delete a goal, stop, go on, retry or redo a subtask, and pass a message to a member (`@GLM put the scoreboard top right`), which goes on in that member's session.
 
-The engine wakes your session only for what needs a conversation: a plan to review and a task to accept. It posts a short message to the session's inbox socket (`CLAUDE_CODE_MESSAGING_SOCKET`), and an idle session starts a turn with it.
+Your session is woken only for what needs a conversation: a plan to review and a task to accept. The `view` tool lists each, and the mod submits each new one to your session with `$.prompt.submit`, Claude Code's call for a plugin's prompt: an idle session starts a turn with it, read as a message from the openplan plugin. What waits already when the team opens is the SessionStart hook's to tell.
 
 ## 8. Permissions
 
@@ -259,13 +259,12 @@ Each row names the tests that show it, under `src/engine/`. They run the engine 
 
 Checked on Claude Code 2.1.322 and Agent SDK 0.3.322, with a probe plugin and a mock Messages API:
 
-- The MCP server gets `CLAUDE_CODE_MESSAGING_SOCKET`, `CLAUDE_CODE_MESSAGING_TOKEN` and `CLAUDE_PLUGIN_DATA` in its environment. A `{"type":"user",...}` line it posts to the socket starts a turn in the idle session at once; the session shows it as a message from another session.
 - When Claude Code is killed, the MCP server's stdin ends at once, in time to stop its children.
 - A member whose parent is killed outright keeps calling the model through its turn (five requests, up to its turn limit, in the probe).
 - Your user settings' `env` overrides the environment a member is started with; flag settings override both. Inline flag settings appear on the member's command line.
 - The MCP server inherits the session's own variables (`CLAUDE_CODE_MESSAGING_SOCKET` and `_TOKEN`, `CLAUDE_CODE_SESSION_ID`, `CLAUDECODE`, `CLAUDE_CODE_ENTRYPOINT`, `AI_AGENT`, `CLAUDE_EFFORT`, `CLAUDE_PLUGIN_ROOT`, `CLAUDE_PLUGIN_DATA`, `CLAUDE_PROJECT_DIR`); members are started without them.
-- `/clear` keeps the MCP server running: it ends one session id and starts another (SessionEnd `clear`, SessionStart `clear`) in the same process, and posts to the socket still wake the new conversation.
-- In `bypassPermissions` mode the wake-up is delivered too, without approval: the MCP server is verified as the session's own child.
+- A plugin's `$.prompt.submit` starts a turn in the idle session at once; the transcript shows it as a prompt from that plugin.
+- `/clear` keeps the MCP server running: it ends one session id and starts another (SessionEnd `clear`, SessionStart `clear`) in the same process.
 - A member started with default options loads every enabled plugin, openplan included, and has `SendMessage` and `ListAgents`; the flag settings in §8 remove both. Every member binds an inbox socket and is listed by `claude agents` as an interactive session, under its `--name`.
 
 - An MCP server is not given `CLAUDE_PID` (hooks are); its parent process is the session. A command-form hook is the session's child too.

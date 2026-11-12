@@ -56,6 +56,7 @@ const TEAM: OpenplanTeam = {
   ],
   needs: [NEED],
   milestones: [],
+  prompts: [],
 };
 
 /** The server as the mod reaches it: `view` answers with `views` in turn, the rest is kept. */
@@ -139,10 +140,15 @@ test("the pane follows a member's record as it grows", async ($, on) => {
   await pane.unmount();
 });
 
-test("a new need is a toast, a new milestone a transcript row; what was there before is not news", async ($, on) => {
+test("a new need is a toast, a new milestone a transcript row, a new prompt your session's; what was there before is not news", async ($, on) => {
   const clock = mock.clock(on);
   const toasts: string[] = [];
   const rows: string[] = [];
+  const prompts: string[] = [];
+  on("prompt.submit", (_, e) => {
+    prompts.push(e.text);
+    return { text: e.text };
+  });
   on("ui.toast", (_, e) => {
     toasts.push(e.text);
     return { value: undefined };
@@ -154,7 +160,11 @@ test("a new need is a toast, a new milestone a transcript row; what was there be
   serve(on, [
     {
       revision: 1,
-      team: { ...TEAM, milestones: [{ key: "plan:m1", text: 'Plan approved: "Dice"' }] },
+      team: {
+        ...TEAM,
+        milestones: [{ key: "plan:m1", text: 'Plan approved: "Dice"' }],
+        prompts: [{ key: "review:m1", text: "A plan to review" }],
+      },
     },
     {
       revision: 2,
@@ -165,6 +175,10 @@ test("a new need is a toast, a new milestone a transcript row; what was there be
           { key: "plan:m1", text: 'Plan approved: "Dice"' },
           { key: "done:s1", text: '"Rules" by glm is merged' },
         ],
+        prompts: [
+          { key: "review:m1", text: "A plan to review" },
+          { key: "accept:q2", text: "A task to accept" },
+        ],
       },
     },
   ]);
@@ -172,6 +186,7 @@ test("a new need is a toast, a new milestone a transcript row; what was there be
   await clock.advance(1000);
   expect(toasts).toEqual(["openplan: glm asks to use Bash: rm -rf dist. Answer it in /openplan."]);
   expect(rows).toEqual(['openplan: "Rules" by glm is merged']);
+  expect(prompts).toEqual(["A task to accept"]);
 });
 
 test("the pane stops asking a team that can't be opened, until you or your session turn to it", async ($, on) => {

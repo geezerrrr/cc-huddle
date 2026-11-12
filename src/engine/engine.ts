@@ -1,7 +1,7 @@
 /**
  * The engine for one repository (docs/design.md §3): its state, its team and
- * its parts, put together. It knows nothing of the plugin: what its turns say
- * goes where its host says.
+ * its parts, put together. It knows nothing of the plugin: what it is to run
+ * with, and where its failures go, come in its options.
  */
 import type { Settings } from "@anthropic-ai/claude-agent-sdk";
 import { errorText, type Core, type Team } from "./core.ts";
@@ -27,14 +27,6 @@ import { Scheduler } from "./scheduler.ts";
 import { allowInTeam, loadTeam } from "./team.ts";
 import type { MeetingSize, Question, TeamState } from "./types.ts";
 
-/** Where the engine tells what happens. */
-export interface Host {
-  /** The state changed. */
-  changed(): void;
-  /** Something went wrong that nobody waits on: the state or a record couldn't be written. */
-  failed(error: unknown): void;
-}
-
 export interface EngineOptions {
   /** A folder in the repository. */
   cwd: string;
@@ -48,7 +40,8 @@ export interface EngineOptions {
   plugin: string;
   /** The environment members' `${VAR}`s are filled in from. */
   env: Record<string, string | undefined>;
-  host: Host;
+  /** Something went wrong that nobody waits on: the state or a record couldn't be written. */
+  failed: (error: unknown) => void;
 }
 
 export class Engine {
@@ -88,18 +81,9 @@ export class Engine {
     try {
       await recordMembersIn(files.members);
       const state = await readState(files.state);
-      const { host } = options;
-      const writer = stateWriter(
-        files.state,
-        () => state,
-        (error) => {
-          host.failed(error);
-        },
-      );
+      const writer = stateWriter(files.state, () => state, options.failed);
       const places: Places = { repo, root };
-      const records = new Records(places, (error) => {
-        host.failed(error);
-      });
+      const records = new Records(places, options.failed);
       // Its calls reach into the engine, made just below.
       const core: Core = {
         state,
@@ -108,7 +92,6 @@ export class Engine {
         changed: () => {
           engine.changes++;
           writer.changed();
-          host.changed();
         },
         allowAlways: (rules) => engine.allow(rules),
         options: (member, kind, cwd) => Promise.resolve(engine.turnOptions(member, kind, cwd)),
