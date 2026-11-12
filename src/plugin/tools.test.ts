@@ -43,6 +43,7 @@ beforeEach(async () => {
   engine = await Engine.open({
     cwd: repo,
     dataFolder: path.join(dir, "openplan-inline"),
+    claude: "claude",
     env: {},
     host: { changed: vi.fn(), failed: vi.fn() },
   });

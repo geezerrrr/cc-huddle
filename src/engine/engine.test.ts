@@ -49,6 +49,7 @@ beforeEach(async () => {
   options = {
     cwd: repo,
     dataFolder,
+    claude: "claude",
     env: { GLM_KEY: "key-1" },
     host: { changed: vi.fn(), failed: vi.fn() },
   };

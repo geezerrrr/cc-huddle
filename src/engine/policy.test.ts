@@ -85,7 +85,13 @@ describe("writeSettings", () => {
 });
 
 describe("session options", () => {
-  const seat = { member: glm, cwd: "/desk", settings: "/data/glm.json", system: "Your duties" };
+  const seat = {
+    member: glm,
+    claude: "/bin/claude",
+    cwd: "/desk",
+    settings: "/data/glm.json",
+    system: "Your duties",
+  };
   const from = {
     PATH: "/bin",
     CLAUDE_CODE_MESSAGING_SOCKET: "/tmp/cc-socks/1.sock",
@@ -103,6 +109,7 @@ describe("session options", () => {
       settings: "/data/glm.json",
       systemPrompt: { type: "preset", preset: "claude_code", append: "Your duties" },
       extraArgs: { name: "openplan-glm" },
+      pathToClaudeCodeExecutable: "/bin/claude",
     });
     expect(options.env).toEqual({
       PATH: "/bin",

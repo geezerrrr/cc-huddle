@@ -39,6 +39,8 @@ export interface EngineOptions {
   cwd: string;
   /** openplan's data folder (`CLAUDE_PLUGIN_DATA`). */
   dataFolder: string;
+  /** The Claude Code members run. */
+  claude: string;
   /** The environment members' `${VAR}`s are filled in from. */
   env: Record<string, string | undefined>;
   host: Host;
@@ -212,6 +214,7 @@ export class Engine {
   private turnOptions(...[member, kind, cwd]: Parameters<Core["options"]>) {
     const seat = {
       member,
+      claude: this.options.claude,
       cwd,
       settings: this.files.settings(member.name),
       system: systemPrompt(kind, member, this.core.team.members),

@@ -107,6 +107,8 @@ export async function writeSettings(file: string, settings: Settings): Promise<s
 /** Where and as whom a member's turn runs. */
 export interface Seat {
   member: Member;
+  /** The Claude Code they run. */
+  claude: string;
   cwd: string;
   /** Their settings file (writeSettings). */
   settings: string;
@@ -138,6 +140,7 @@ export function workOptions(seat: Seat, from: Env): Options {
     includePartialMessages: true,
     toolConfig: { askUserQuestion: { previewFormat: "markdown" } },
     extraArgs: { name: `${PLUGIN}-${member.name}` },
+    pathToClaudeCodeExecutable: seat.claude,
   };
 }
 

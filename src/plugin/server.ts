@@ -9,13 +9,16 @@ import packageJson from "../../package.json" with { type: "json" };
 import { errorText } from "../engine/core.ts";
 import { Engine } from "../engine/engine.ts";
 import { stopMembers } from "../engine/processes.ts";
+import { executableOf } from "./claude.ts";
 import { addPaneTools } from "./pane-tools.ts";
 import { addTools } from "./tools.ts";
 import { NewForYou, wakeSession } from "./wake.ts";
 
-const dataFolder = process.env.CLAUDE_PLUGIN_DATA;
-if (!dataFolder)
-  throw new Error("openplan's MCP server runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA");
+const { CLAUDE_PLUGIN_DATA: dataFolder, CLAUDE_PID: sessionPid } = process.env;
+if (!dataFolder || !sessionPid)
+  throw new Error(
+    "openplan's MCP server runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA and CLAUDE_PID",
+  );
 
 const say = (text: string) => {
   console.error(`openplan: ${text}`);
@@ -26,11 +29,13 @@ let opening: Promise<Engine> | undefined;
 /** What needs a conversation, since the team opened. */
 let news: NewForYou | undefined;
 
-/** The team, opened on first need: again after it failed, as its files may have been fixed since. */
-const team = (): Promise<Engine> => {
-  opening ??= Engine.open({
+/** Opens the team of the repository the session is in. */
+const openTeam = async () =>
+  Engine.open({
     cwd: process.env.CLAUDE_PROJECT_DIR ?? process.cwd(),
     dataFolder,
+    // Members run the Claude Code your session runs.
+    claude: await executableOf(Number(sessionPid)),
     env: process.env,
     host: {
       changed() {
@@ -41,10 +46,14 @@ const team = (): Promise<Engine> => {
           });
       },
       failed(error) {
-        say(`the team's state couldn't be written: ${errorText(error)}`);
+        say(`the team's state or a record couldn't be written: ${errorText(error)}`);
       },
     },
-  }).then(
+  });
+
+/** The team, opened on first need: again after it failed, as its files may have been fixed since. */
+const team = (): Promise<Engine> => {
+  opening ??= openTeam().then(
     (opened) => {
       news = new NewForYou(opened.state);
       return (engine = opened);
