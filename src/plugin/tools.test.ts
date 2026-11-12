@@ -46,6 +46,7 @@ beforeEach(async () => {
     claude: "claude",
     session: 41,
     plugin: "openplan@inline",
+    userTeam: path.join(dir, "user-team"),
     env: {},
     failed: vi.fn(),
   });

@@ -5,20 +5,21 @@
  */
 import { dataFiles, holderOf, readState, repoFolder } from "../engine/data.ts";
 import { openRepository } from "../engine/git.ts";
-import { loadTeam } from "../engine/team.ts";
+import { loadTeam, teamFolder } from "../engine/team.ts";
 import { statusText } from "./status.ts";
 
-/** The context for session `session` (its pid) in `cwd`. */
+/** The context for session `session` (its pid) in `cwd`, with your own team's folder `userTeam`. */
 export async function sessionContext(
   cwd: string,
   dataFolder: string,
+  userTeam: string,
   session: number,
 ): Promise<string | undefined> {
   let repo;
   let team;
   try {
     repo = await openRepository(cwd);
-    ({ team } = await loadTeam(repo.top));
+    ({ team } = await loadTeam([userTeam, teamFolder(repo.top)]));
   } catch {
     // No repository, or no team in it: openplan has nothing to say here.
     return undefined;

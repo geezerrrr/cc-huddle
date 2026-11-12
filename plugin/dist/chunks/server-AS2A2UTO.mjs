@@ -10242,9 +10242,11 @@ ${outcome.handover.summary}`
 // src/engine/team.ts
 var import_yaml = __toESM(require_dist(), 1);
 import { readdir as readdir2, readFile as readFile4 } from "node:fs/promises";
+import { homedir } from "node:os";
 import path7 from "node:path";
 import { z as z5 } from "zod";
 var teamFolder = (top) => path7.join(top, ".claude", "openplan");
+var userTeamFolder = (env) => path7.join(env.CLAUDE_CONFIG_DIR ?? path7.join(homedir(), ".claude"), "openplan");
 var EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 var roleSchema = z5.object({ title: z5.string().trim().min(1) });
 var memberSchema = z5.object({
@@ -10255,8 +10257,8 @@ var memberSchema = z5.object({
   env: z5.record(z5.string(), z5.union([z5.string(), z5.number(), z5.boolean()]).transform(String)).default({})
 });
 var teamSchema = z5.object({
-  review: z5.boolean().default(true),
-  meetingSize: z5.enum(MEETING_SIZES).default("discussion")
+  review: z5.boolean().optional(),
+  meetingSize: z5.enum(MEETING_SIZES).optional()
 });
 var settingsSchema = z5.record(z5.string(), z5.unknown());
 function parsed(schema, data, file) {
@@ -10308,36 +10310,59 @@ async function markdownFiles(folder) {
     })
   );
 }
-async function loadTeam(top) {
-  const folder = teamFolder(top);
-  const roles = new Map(
-    (await markdownFiles(path7.join(folder, "roles"))).map(({ name, file, data, body }) => [
+function mergeSettings(under, over) {
+  const merged = { ...under };
+  for (const [key, value] of Object.entries(over)) {
+    const was = merged[key];
+    merged[key] = Array.isArray(was) && Array.isArray(value) ? [.../* @__PURE__ */ new Set([...was, ...value])] : isObject(was) && isObject(value) ? mergeSettings(was, value) : value;
+  }
+  return merged;
+}
+var isObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+async function loadTeam(folders) {
+  const roles = /* @__PURE__ */ new Map();
+  const written2 = /* @__PURE__ */ new Map();
+  let own = {};
+  let settings = {};
+  for (const folder of folders) {
+    for (const { name, file, data, body } of await markdownFiles(path7.join(folder, "roles")))
+      roles.set(name, {
+        id: name,
+        title: parsed(roleSchema, data, file).title,
+        duties: body.trim()
+      });
+    for (const { name, file, data } of await markdownFiles(path7.join(folder, "members")))
+      written2.set(name, { file, data });
+    const teamFile = path7.join(folder, "team.json");
+    own = { ...own, ...parsed(teamSchema, await jsonFile(teamFile) ?? {}, teamFile) };
+    const settingsFile = path7.join(folder, "settings.json");
+    settings = mergeSettings(
+      settings,
+      parsed(settingsSchema, await jsonFile(settingsFile) ?? {}, settingsFile)
+    );
+  }
+  const byName = [...written2].sort(([a], [b]) => a < b ? -1 : 1);
+  const members = byName.map(([name, { file, data }]) => {
+    const { role, model, effort, env } = parsed(memberSchema, data, file);
+    const found = roles.get(role);
+    if (!found) throw new Error(`${file}: there is no role "${role}" in the team's roles/`);
+    return {
       name,
-      { id: name, title: parsed(roleSchema, data, file).title, duties: body.trim() }
-    ])
-  );
-  const members = (await markdownFiles(path7.join(folder, "members"))).map(
-    ({ name, file, data }) => {
-      const { role, model, effort, env } = parsed(memberSchema, data, file);
-      const found = roles.get(role);
-      if (!found)
-        throw new Error(`${file}: there is no role "${role}" in ${path7.join(folder, "roles")}`);
-      return {
-        name,
-        role: found,
-        ...model !== void 0 && { model },
-        ...effort !== void 0 && { effort },
-        env
-      };
-    }
-  );
+      role: found,
+      ...model !== void 0 && { model },
+      ...effort !== void 0 && { effort },
+      env
+    };
+  });
   if (!members.length)
-    throw new Error(`The team has no members: add them in ${path7.join(folder, "members")}`);
-  const teamFile = path7.join(folder, "team.json");
-  const { review, meetingSize } = parsed(teamSchema, await jsonFile(teamFile) ?? {}, teamFile);
-  const settingsFile = path7.join(folder, "settings.json");
-  const settings = parsed(settingsSchema, await jsonFile(settingsFile) ?? {}, settingsFile);
-  return { team: { members, review }, settings, meetingSize };
+    throw new Error(
+      `The team has no members: add them in ${folders.map((f) => path7.join(f, "members")).join(" or ")}`
+    );
+  return {
+    team: { members, review: own.review ?? true },
+    settings,
+    meetingSize: own.meetingSize ?? "discussion"
+  };
 }
 var writing = serialBy();
 function allowInTeam(top, rules) {
@@ -10393,7 +10418,10 @@ var Engine = class _Engine {
     const repo = await openRepository(options.cwd);
     const root = repoFolder(options.dataFolder, repo);
     const files = dataFiles(root);
-    const { team: team2, settings, meetingSize } = await loadTeam(repo.top);
+    const { team: team2, settings, meetingSize } = await loadTeam([
+      options.userTeam,
+      teamFolder(repo.top)
+    ]);
     await takeTeam(files.lock, options.session);
     try {
       await recordMembersIn(files.members);
@@ -10448,7 +10476,10 @@ var Engine = class _Engine {
    * own. When they can't be read, the team stays as it was.
    */
   async reloadTeam() {
-    const { team: team2, settings, meetingSize } = await loadTeam(this.core.places.repo.top);
+    const { team: team2, settings, meetingSize } = await loadTeam([
+      this.options.userTeam,
+      teamFolder(this.core.places.repo.top)
+    ]);
     await this.writeMemberSettings(team2, settings);
     this.core.team = team2;
     this.size = meetingSize;
@@ -11115,6 +11146,7 @@ var openTeam = async () => Engine.open({
   claude: await (claude ??= executableOf(process.ppid)),
   session: process.ppid,
   plugin: pluginId(dataFolder),
+  userTeam: userTeamFolder(process.env),
   env: process.env,
   failed(error) {
     say(`the team's state or a record couldn't be written: ${errorText(error)}`);

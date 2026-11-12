@@ -43,7 +43,10 @@ describe("loadTeam", () => {
         "Notes for me.",
       ].join("\n"),
     });
-    const { team, settings, meetingSize } = await loadTeam(top);
+    const { team, settings, meetingSize } = await loadTeam([
+      path.join(top, "user"),
+      teamFolder(top),
+    ]);
     expect(team).toEqual({
       members: [
         {
@@ -72,7 +75,10 @@ describe("loadTeam", () => {
       "settings.json": '{ "permissions": { "allow": ["Bash(pnpm test)"] } }',
       "team.json": '{ "review": false, "meetingSize": "large" }',
     });
-    const { team, settings, meetingSize } = await loadTeam(top);
+    const { team, settings, meetingSize } = await loadTeam([
+      path.join(top, "user"),
+      teamFolder(top),
+    ]);
     expect([team.review, settings, meetingSize]).toEqual([
       false,
       { permissions: { allow: ["Bash(pnpm test)"] } },
@@ -80,22 +86,69 @@ describe("loadTeam", () => {
     ]);
   });
 
+  it("takes yours under the repository's, which wins on a name both have", async () => {
+    const user = path.join(top, "user");
+    for (const [name, text] of Object.entries({
+      "roles/ui-designer.md": UI,
+      "roles/programmer.md": "---\ntitle: Programmer\n---\nWrite the code.",
+      "members/glm.md": "---\nrole: ui-designer\nmodel: glm-5\n---\n",
+      "members/sonnet.md": "---\nrole: programmer\n---\n",
+      "settings.json": JSON.stringify({
+        permissions: { allow: ["Read"], deny: ["Bash(rm:*)"] },
+        model: "x",
+      }),
+      "team.json": '{ "review": false, "meetingSize": "large" }',
+    })) {
+      await mkdir(path.dirname(path.join(user, name)), { recursive: true });
+      await writeFile(path.join(user, name), text);
+    }
+    await write({
+      "roles/programmer.md": "---\ntitle: Game programmer\n---\nWrite the game.",
+      "members/glm.md": "---\nrole: programmer\n---\n",
+      "members/ann.md": "---\nrole: ui-designer\n---\n",
+      "settings.json": JSON.stringify({ permissions: { allow: ["Read", "Bash(pnpm test)"] } }),
+      "team.json": '{ "meetingSize": "small" }',
+    });
+    const { team, settings, meetingSize } = await loadTeam([user, teamFolder(top)]);
+    expect(team.members.map((m) => [m.name, m.role.title, m.model])).toEqual([
+      ["ann", "UI designer", undefined],
+      ["glm", "Game programmer", undefined],
+      ["sonnet", "Game programmer", undefined],
+    ]);
+    expect([team.review, meetingSize, settings]).toEqual([
+      false,
+      "small",
+      {
+        permissions: { allow: ["Read", "Bash(pnpm test)"], deny: ["Bash(rm:*)"] },
+        model: "x",
+      },
+    ]);
+  });
+
   it("says which file is wrong, and how", async () => {
-    await expect(loadTeam(top)).rejects.toThrow("The team has no members");
+    await expect(loadTeam([path.join(top, "user"), teamFolder(top)])).rejects.toThrow(
+      "The team has no members",
+    );
     await write({ "members/glm.md": "---\nrole: ui-designer\n---\n" });
-    await expect(loadTeam(top)).rejects.toThrow(/glm\.md: there is no role "ui-designer"/);
+    await expect(loadTeam([path.join(top, "user"), teamFolder(top)])).rejects.toThrow(
+      /glm\.md: there is no role "ui-designer"/,
+    );
     await write({
       "roles/ui-designer.md": UI,
       "members/glm.md": "---\nrole: ui-designer\neffort: huge\n---\n",
     });
-    await expect(loadTeam(top)).rejects.toThrow(/glm\.md:\n.*effort/s);
+    await expect(loadTeam([path.join(top, "user"), teamFolder(top)])).rejects.toThrow(
+      /glm\.md:\n.*effort/s,
+    );
     await write({ "members/glm.md": "---\nrole: [ui-designer\n---\n" });
-    await expect(loadTeam(top)).rejects.toThrow(/glm\.md: /);
+    await expect(loadTeam([path.join(top, "user"), teamFolder(top)])).rejects.toThrow(/glm\.md: /);
     await write({
       "members/glm.md": "---\nrole: ui-designer\n---\n",
       "team.json": "{ review: false }",
     });
-    await expect(loadTeam(top)).rejects.toThrow(/team\.json: /);
+    await expect(loadTeam([path.join(top, "user"), teamFolder(top)])).rejects.toThrow(
+      /team\.json: /,
+    );
   });
 });
 

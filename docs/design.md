@@ -84,12 +84,12 @@ The repository's `plugin/` folder is the plugin, listed by the marketplace at th
 
 ### 3.4 Where things live
 
-| What                                        | Where                                                                        | In git          |
-| ------------------------------------------- | ---------------------------------------------------------------------------- | --------------- |
-| Team: roles, members, settings              | `.claude/openplan/` in the repository                                        | Yours to commit |
-| State, meeting records, plans, logs, events | `${CLAUDE_PLUGIN_DATA}/repos/<repo-id>/`                                     | No              |
-| Worktrees                                   | `${CLAUDE_PLUGIN_DATA}/repos/<repo-id>/goals/<goal>/` and `desks/<subtask>/` | Branches only   |
-| The MCP server's npm dependencies           | `${CLAUDE_PLUGIN_DATA}/deps/<version-hash>/`                                 | No              |
+| What                                        | Where                                                                        | In git                            |
+| ------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------- |
+| Team: roles, members, settings              | `~/.claude/openplan/`, and `.claude/openplan/` in the repository             | The repository's, yours to commit |
+| State, meeting records, plans, logs, events | `${CLAUDE_PLUGIN_DATA}/repos/<repo-id>/`                                     | No                                |
+| Worktrees                                   | `${CLAUDE_PLUGIN_DATA}/repos/<repo-id>/goals/<goal>/` and `desks/<subtask>/` | Branches only                     |
+| The MCP server's npm dependencies           | `${CLAUDE_PLUGIN_DATA}/deps/<version-hash>/`                                 | No                                |
 
 `${CLAUDE_PLUGIN_DATA}` is the data folder Claude Code gives each plugin (`~/.claude/plugins/data/<plugin-id>/`). It is passed to the MCP server and the hooks. It survives plugin updates and is removed on uninstall, worktrees included; their branches stay in your repository, and git prunes the stale worktree entries on its own. `claude plugin uninstall --keep-data` keeps it.
 
@@ -180,7 +180,8 @@ Kinds: a teammate's question (answered by that teammate in a read-only session),
 ## 6. Team configuration
 
 ```
-.claude/openplan/
+~/.claude/openplan/          yours, for every repository
+.claude/openplan/            the repository's
   roles/gameplay-programmer.md
   members/sonnet.md
   members/glm.md
@@ -188,7 +189,7 @@ Kinds: a teammate's question (answered by that teammate in a read-only session),
   team.json
 ```
 
-The team sits beside the rest of the repository's Claude Code setup, and you write its files yourself. It is not in `.claude/agents/`: Claude Code would load members there as its own subagents, on its own provider.
+The team has the two scopes Claude Code's own setup has, and you write its files yourself. Yours sits beside Claude Code's user settings (in `CLAUDE_CONFIG_DIR` when that is set); the repository's beside the rest of its Claude Code setup. The two are read together: a role or member the repository has by the same name replaces yours, its `team.json` fields replace yours, and the two `settings.json` merge as Claude Code merges its scopes, arrays joined. Most people keep their members in theirs, written once, and give a repository only what is its own. The team is not in `agents/`: Claude Code would load members there as its own subagents, on its own provider.
 
 A role file is its duties in Markdown with a `title` in front matter. A member file names its role, model and effort, and the environment its Claude Code runs with:
 
@@ -207,7 +208,7 @@ The member's name is the file name. `env` is written as in `.mcp.json`: `${VAR}`
 
 `settings.json` is a Claude Code settings file applied to every member: the permission rules they work under, the sandbox, anything else Claude Code settings hold. `team.json` holds openplan's own: acceptance review on or off (on by default) and the default meeting size.
 
-A member session loads your user and project settings like any session of yours. On top, as flag settings, which outrank both: the team's `settings.json`, the member's `env`, and the guards of §8. Your own settings' `env` would otherwise override the member's. The engine writes these to a file only you can read in the data folder as the team opens, and again as you allow a rule always, and passes its path, since settings given inline end up on a command line where other processes can read them.
+A member session loads your user and project settings like any session of yours. On top, as flag settings, which outrank both: the team's `settings.json`, the member's `env`, and the guards of §8. Your own settings' `env` would otherwise override the member's. The engine writes these to a file only you can read in the data folder as the team opens, and again as you allow a rule always (the rule goes in the repository's `settings.json`), and passes its path, since settings given inline end up on a command line where other processes can read them.
 
 ## 7. Interaction
 

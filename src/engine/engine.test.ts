@@ -52,6 +52,7 @@ beforeEach(async () => {
     claude: "claude",
     session: 41,
     plugin: "openplan@inline",
+    userTeam: path.join(dir, "user-team"),
     env: { GLM_KEY: "key-1" },
     failed: vi.fn(),
   };

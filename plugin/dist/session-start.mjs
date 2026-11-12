@@ -7519,6 +7519,7 @@ var serial = serialBy();
 // src/engine/team.ts
 var import_yaml = __toESM(require_dist(), 1);
 import { readdir as readdir2, readFile as readFile3 } from "node:fs/promises";
+import { homedir } from "node:os";
 import path3 from "node:path";
 
 // node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/external.js
@@ -11083,7 +11084,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     }
     return propValues;
   });
-  const isObject2 = isObject;
+  const isObject3 = isObject;
   const catchall = def.catchall;
   let value;
   const memo2 = globalConfig.memoizer;
@@ -11091,7 +11092,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
   inst._zod.parse = (payload, ctx) => {
     value ?? (value = _normalized.value);
     const input3 = payload.value;
-    if (!isObject2(input3)) {
+    if (!isObject3(input3)) {
       payload.issues.push({
         expected: "object",
         code: "invalid_type",
@@ -11227,7 +11228,7 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
     return doc.compile();
   };
   let fastpass;
-  const isObject2 = isObject;
+  const isObject3 = isObject;
   const jit = !globalConfig.jitless;
   const allowsEval2 = allowsEval;
   const fastEnabled = jit && allowsEval2.value;
@@ -11236,7 +11237,7 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
   inst._zod.parse = (payload, ctx) => {
     value ?? (value = _normalized.value);
     const input3 = payload.value;
-    if (!isObject2(input3)) {
+    if (!isObject3(input3)) {
       payload.issues.push({
         expected: "object",
         code: "invalid_type",
@@ -27246,6 +27247,7 @@ var GOAL_ACTIONS = ["pause", "resume", "archive", "delete"];
 
 // src/engine/team.ts
 var teamFolder = (top) => path3.join(top, ".claude", "openplan");
+var userTeamFolder = (env) => path3.join(env.CLAUDE_CONFIG_DIR ?? path3.join(homedir(), ".claude"), "openplan");
 var EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 var roleSchema = external_exports.object({ title: external_exports.string().trim().min(1) });
 var memberSchema = external_exports.object({
@@ -27256,8 +27258,8 @@ var memberSchema = external_exports.object({
   env: external_exports.record(external_exports.string(), external_exports.union([external_exports.string(), external_exports.number(), external_exports.boolean()]).transform(String)).default({})
 });
 var teamSchema = external_exports.object({
-  review: external_exports.boolean().default(true),
-  meetingSize: external_exports.enum(MEETING_SIZES).default("discussion")
+  review: external_exports.boolean().optional(),
+  meetingSize: external_exports.enum(MEETING_SIZES).optional()
 });
 var settingsSchema = external_exports.record(external_exports.string(), external_exports.unknown());
 function parsed(schema, data, file2) {
@@ -27309,36 +27311,59 @@ async function markdownFiles(folder2) {
     })
   );
 }
-async function loadTeam(top) {
-  const folder2 = teamFolder(top);
-  const roles = new Map(
-    (await markdownFiles(path3.join(folder2, "roles"))).map(({ name, file: file2, data, body }) => [
+function mergeSettings(under, over) {
+  const merged = { ...under };
+  for (const [key, value] of Object.entries(over)) {
+    const was = merged[key];
+    merged[key] = Array.isArray(was) && Array.isArray(value) ? [.../* @__PURE__ */ new Set([...was, ...value])] : isObject2(was) && isObject2(value) ? mergeSettings(was, value) : value;
+  }
+  return merged;
+}
+var isObject2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+async function loadTeam(folders) {
+  const roles = /* @__PURE__ */ new Map();
+  const written = /* @__PURE__ */ new Map();
+  let own2 = {};
+  let settings = {};
+  for (const folder2 of folders) {
+    for (const { name, file: file2, data, body } of await markdownFiles(path3.join(folder2, "roles")))
+      roles.set(name, {
+        id: name,
+        title: parsed(roleSchema, data, file2).title,
+        duties: body.trim()
+      });
+    for (const { name, file: file2, data } of await markdownFiles(path3.join(folder2, "members")))
+      written.set(name, { file: file2, data });
+    const teamFile = path3.join(folder2, "team.json");
+    own2 = { ...own2, ...parsed(teamSchema, await jsonFile(teamFile) ?? {}, teamFile) };
+    const settingsFile = path3.join(folder2, "settings.json");
+    settings = mergeSettings(
+      settings,
+      parsed(settingsSchema, await jsonFile(settingsFile) ?? {}, settingsFile)
+    );
+  }
+  const byName = [...written].sort(([a], [b]) => a < b ? -1 : 1);
+  const members2 = byName.map(([name, { file: file2, data }]) => {
+    const { role, model, effort, env } = parsed(memberSchema, data, file2);
+    const found = roles.get(role);
+    if (!found) throw new Error(`${file2}: there is no role "${role}" in the team's roles/`);
+    return {
       name,
-      { id: name, title: parsed(roleSchema, data, file2).title, duties: body.trim() }
-    ])
-  );
-  const members2 = (await markdownFiles(path3.join(folder2, "members"))).map(
-    ({ name, file: file2, data }) => {
-      const { role, model, effort, env } = parsed(memberSchema, data, file2);
-      const found = roles.get(role);
-      if (!found)
-        throw new Error(`${file2}: there is no role "${role}" in ${path3.join(folder2, "roles")}`);
-      return {
-        name,
-        role: found,
-        ...model !== void 0 && { model },
-        ...effort !== void 0 && { effort },
-        env
-      };
-    }
-  );
+      role: found,
+      ...model !== void 0 && { model },
+      ...effort !== void 0 && { effort },
+      env
+    };
+  });
   if (!members2.length)
-    throw new Error(`The team has no members: add them in ${path3.join(folder2, "members")}`);
-  const teamFile = path3.join(folder2, "team.json");
-  const { review, meetingSize } = parsed(teamSchema, await jsonFile(teamFile) ?? {}, teamFile);
-  const settingsFile = path3.join(folder2, "settings.json");
-  const settings = parsed(settingsSchema, await jsonFile(settingsFile) ?? {}, settingsFile);
-  return { team: { members: members2, review }, settings, meetingSize };
+    throw new Error(
+      `The team has no members: add them in ${folders.map((f) => path3.join(f, "members")).join(" or ")}`
+    );
+  return {
+    team: { members: members2, review: own2.review ?? true },
+    settings,
+    meetingSize: own2.meetingSize ?? "discussion"
+  };
 }
 var writing = serialBy();
 
@@ -27592,12 +27617,12 @@ function statusText(work) {
 }
 
 // src/plugin/context.ts
-async function sessionContext(cwd, dataFolder2, session) {
+async function sessionContext(cwd, dataFolder2, userTeam, session) {
   let repo;
   let team;
   try {
     repo = await openRepository(cwd);
-    ({ team } = await loadTeam(repo.top));
+    ({ team } = await loadTeam([userTeam, teamFolder(repo.top)]));
   } catch {
     return void 0;
   }
@@ -27625,7 +27650,12 @@ var dataFolder = folder;
 
 // src/plugin/session-start.ts
 var input2 = JSON.parse(await text(process.stdin));
-var context = await sessionContext(input2.cwd, dataFolder, process.ppid);
+var context = await sessionContext(
+  input2.cwd,
+  dataFolder,
+  userTeamFolder(process.env),
+  process.ppid
+);
 if (context)
   process.stdout.write(
     JSON.stringify({

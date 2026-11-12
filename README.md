@@ -36,10 +36,10 @@ In Claude Code:
 
 ## Set up a team
 
-The team lives in `.claude/openplan/` in your repository, in files you write:
+The team is files you write, in `~/.claude/openplan/` for every repository of yours, or in `.claude/openplan/` for one:
 
 ```
-.claude/openplan/
+~/.claude/openplan/
   roles/developer.md
   roles/reviewer.md
   members/sonnet.md
@@ -72,6 +72,8 @@ env:
 ```
 
 `${VAR}` and `${VAR:-default}` are filled in from the environment Claude Code runs in, so keys stay out of the files. A member without `env` runs on your own Claude Code sign-in.
+
+A repository's `.claude/openplan/` adds to yours: a role or member there replaces yours of the same name, and its `settings.json` and `team.json` go on top of yours.
 
 `settings.json` is a Claude Code settings file every member works under: permission rules, the sandbox, anything Claude Code settings hold. `team.json` holds openplan's own:
 

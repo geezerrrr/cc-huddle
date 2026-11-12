@@ -24,7 +24,7 @@ import { systemPrompt } from "./prompts.ts";
 import { Questions, type Answer } from "./questions.ts";
 import { Records } from "./records.ts";
 import { Scheduler } from "./scheduler.ts";
-import { allowInTeam, loadTeam } from "./team.ts";
+import { allowInTeam, loadTeam, teamFolder } from "./team.ts";
 import type { MeetingSize, Question, TeamState } from "./types.ts";
 
 export interface EngineOptions {
@@ -38,6 +38,8 @@ export interface EngineOptions {
   session: number;
   /** openplan's id as `enabledPlugins` names it, turned off in members' sessions. */
   plugin: string;
+  /** Your own team's folder, under the repository's (team.ts userTeamFolder). */
+  userTeam: string;
   /** The environment members' `${VAR}`s are filled in from. */
   env: Record<string, string | undefined>;
   /** Something went wrong that nobody waits on: the state or a record couldn't be written. */
@@ -76,7 +78,10 @@ export class Engine {
     const root = repoFolder(options.dataFolder, repo);
     const files = dataFiles(root);
     // A repository without a team gets no lock or folder of openplan's.
-    const { team, settings, meetingSize } = await loadTeam(repo.top);
+    const { team, settings, meetingSize } = await loadTeam([
+      options.userTeam,
+      teamFolder(repo.top),
+    ]);
     await takeTeam(files.lock, options.session);
     try {
       await recordMembersIn(files.members);
@@ -137,7 +142,10 @@ export class Engine {
    * own. When they can't be read, the team stays as it was.
    */
   async reloadTeam() {
-    const { team, settings, meetingSize } = await loadTeam(this.core.places.repo.top);
+    const { team, settings, meetingSize } = await loadTeam([
+      this.options.userTeam,
+      teamFolder(this.core.places.repo.top),
+    ]);
     await this.writeMemberSettings(team, settings);
     this.core.team = team;
     this.size = meetingSize;

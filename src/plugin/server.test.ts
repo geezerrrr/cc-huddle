@@ -54,6 +54,8 @@ async function connect() {
       PATH: process.env.PATH ?? "",
       CLAUDE_PLUGIN_DATA: path.join(dir, "openplan-inline"),
       CLAUDE_PROJECT_DIR: repo,
+      // Your own team stays out of it.
+      CLAUDE_CONFIG_DIR: path.join(dir, "claude"),
     },
     stderr: "pipe",
   });

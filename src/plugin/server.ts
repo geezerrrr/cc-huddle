@@ -9,6 +9,7 @@ import plugin from "../../plugin/.claude-plugin/plugin.json" with { type: "json"
 import { errorText } from "../engine/core.ts";
 import { Engine } from "../engine/engine.ts";
 import { stopMembers } from "../engine/processes.ts";
+import { userTeamFolder } from "../engine/team.ts";
 import { executableOf } from "./claude.ts";
 import { dataFolder } from "./data-folder.ts";
 import { pluginId } from "./plugin-id.ts";
@@ -33,6 +34,7 @@ const openTeam = async () =>
     claude: await (claude ??= executableOf(process.ppid)),
     session: process.ppid,
     plugin: pluginId(dataFolder),
+    userTeam: userTeamFolder(process.env),
     env: process.env,
     failed(error) {
       say(`the team's state or a record couldn't be written: ${errorText(error)}`);

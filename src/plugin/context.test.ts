@@ -12,11 +12,13 @@ import { sessionContext } from "./context.ts";
 let dir: string;
 let repo: string;
 let data: string;
+let user: string;
 
 beforeEach(async () => {
   dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-context-")));
   repo = path.join(dir, "repo");
   data = path.join(dir, "openplan-inline");
+  user = path.join(dir, "user-team");
   const me = {
     GIT_AUTHOR_NAME: "you",
     GIT_AUTHOR_EMAIL: "y@x",
@@ -72,33 +74,33 @@ async function hold(holder: Holder) {
 
 describe("the session's context", () => {
   it("is where the team stands, once it has a goal", async () => {
-    expect(await sessionContext(repo, data, SESSION)).toBeUndefined();
+    expect(await sessionContext(repo, data, user, SESSION)).toBeUndefined();
     await writeTeamAndGoal();
-    expect(await sessionContext(repo, data, SESSION))
+    expect(await sessionContext(repo, data, user, SESSION))
       .toBe(`openplan's team on this repository, as it stands:
 
 Team: glm
 
 Goal "Dice" [g1]: paused, on branch openplan/dice/main`);
-    expect(await sessionContext(dir, data, SESSION)).toBeUndefined();
+    expect(await sessionContext(dir, data, user, SESSION)).toBeUndefined();
   });
 
   it("says what a session that ended without closing the team left going is paused as it opens", async () => {
     await writeTeamAndGoal("active");
     const left = "The session before ended without closing the team.";
-    expect(await sessionContext(repo, data, SESSION)).toContain(left);
+    expect(await sessionContext(repo, data, user, SESSION)).toContain(left);
     // This session's server has the team, but hasn't opened it yet.
     await hold({ pid: process.pid, session: SESSION, open: false });
-    expect(await sessionContext(repo, data, SESSION)).toContain(left);
+    expect(await sessionContext(repo, data, user, SESSION)).toContain(left);
     // It has: the goal is active in this session (the context after /clear).
     await hold({ pid: process.pid, session: SESSION, open: true });
-    expect(await sessionContext(repo, data, SESSION)).not.toContain(left);
+    expect(await sessionContext(repo, data, user, SESSION)).not.toContain(left);
   });
 
   it("says when another session runs the team", async () => {
     await writeTeamAndGoal("active");
     await hold({ pid: process.pid, session: 42, open: true });
-    expect(await sessionContext(repo, data, SESSION)).toMatch(
+    expect(await sessionContext(repo, data, user, SESSION)).toMatch(
       /^openplan's team on this repository runs in another Claude Code session \(pid 42\)/,
     );
   });
@@ -112,7 +114,7 @@ Goal "Dice" [g1]: paused, on branch openplan/dice/main`);
         "--no-warnings",
         fileURLToPath(new URL("session-start.ts", import.meta.url)),
       ],
-      { env: { PATH: process.env.PATH, CLAUDE_PLUGIN_DATA: data } },
+      { env: { PATH: process.env.PATH, CLAUDE_PLUGIN_DATA: data, CLAUDE_CONFIG_DIR: dir } },
     );
     hook.stdin?.end(JSON.stringify({ hook_event_name: "SessionStart", cwd: repo }));
     let stdout = "";
