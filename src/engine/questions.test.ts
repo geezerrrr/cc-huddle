@@ -273,6 +273,33 @@ describe("calling off", () => {
     expect(box.state.questions).toEqual([]);
   });
 
+  it("after a restart, what members asked, your decisions standing", () => {
+    const { box, questions } = inbox();
+    box.state.questions.push(
+      {
+        id: "q1",
+        from: "glm",
+        to: "you",
+        text: "Allow?",
+        options: [],
+        status: "open",
+        createdAt: 0,
+      },
+      {
+        id: "q2",
+        from: "glm",
+        to: "sonnet",
+        text: "Font?",
+        options: [],
+        status: "open",
+        createdAt: 0,
+      },
+    );
+    questions.openDecision(subtask("s1"), { kind: "merge", options: ["retry"] }, "git failed");
+    questions.recover();
+    expect(box.state.questions.map((q) => q.decision?.kind)).toEqual(["merge"]);
+  });
+
   it("a task's delivery leaves its other decisions", () => {
     const { box, questions } = inbox();
     box.state.subtasks.push(subtask("s1"), subtask("x", { taskId: "t2" }));

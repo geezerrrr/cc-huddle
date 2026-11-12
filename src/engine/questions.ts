@@ -156,6 +156,11 @@ export class Questions {
     this.cancelAll((q) => q.subtaskId === subtaskId && (decisions || !q.decision));
   }
 
+  /** After a restart no turn waits on anything: what members asked is called off; your decisions stand. */
+  recover() {
+    this.cancelAll((q) => !q.decision);
+  }
+
   /** Calls off a task's delivery waiting on you: work in it is being done again. */
   cancelDelivery(taskId: string) {
     const inTask = new Set(
