@@ -91,7 +91,7 @@ export function statusText(work: Work): string {
       (m) => m.goalId === goal.id && m.status !== "approved",
     ))
       lines.push(
-        `  Meeting [${meeting.id}] on "${meeting.agenda}", hosted by ${meeting.host}: ${MEETING_STATUS[meeting.status]}${meeting.error ? ` (${meeting.error})` : ""}${derived.resumable.includes(meeting.id) ? "; it can go on" : ""}`,
+        `  Meeting [${meeting.id}], hosted by ${meeting.host}: ${MEETING_STATUS[meeting.status]}${meeting.error ? ` (${meeting.error})` : ""}${derived.resumable.includes(meeting.id) ? "; it can go on" : ""}`,
       );
     for (const task of work.tasks.filter((t) => t.goalId === goal.id)) {
       lines.push(`  Task "${task.title}" [${task.id}]`);

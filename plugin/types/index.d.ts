@@ -18,6 +18,9 @@ export type OpenplanTeam = {
 
 export type OpenplanMeeting = {
   id: string;
+  /** What it is about, in a line: its goal's name. */
+  about: string;
+  /** The brief it was given. */
   agenda: string;
   /** Its state in words: who speaks, the host writing the plan, the plan out for review. */
   status: string;

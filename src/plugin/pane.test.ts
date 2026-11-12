@@ -28,7 +28,7 @@ const subtask = (id: string, fields: Partial<Subtask>): Subtask => ({
 const meeting: Meeting = {
   id: "m1",
   goalId: "g1",
-  agenda: "Dice",
+  agenda: "Plan a dice game for two, as the user put it",
   size: "small",
   participants: ["sonnet", "glm"],
   host: "sonnet",
@@ -111,7 +111,8 @@ describe("paneTeam", () => {
     expect(team.band).toBe("1 working · 3 need you");
     expect(team.meeting).toEqual({
       id: "m1",
-      agenda: "Dice",
+      about: "Dice",
+      agenda: "Plan a dice game for two, as the user put it",
       status: "plan approved",
       participants: ["sonnet", "glm"],
       turns: [{ speaker: "sonnet", text: "Two dice." }],
@@ -192,7 +193,7 @@ Tell the user what was done, and ask whether to accept it or send it back with w
       'at the meeting on "Dice"',
       'at the meeting on "Dice"',
     ]);
-    expect(paneTeam({ ...now, goals: [] }, members).band).toBeUndefined();
+    expect(paneTeam({ ...now, goals: [], meetings: [] }, members).band).toBeUndefined();
     now.meetings = [{ ...meeting, status: "review" }];
     const review = paneTeam(now, members);
     expect(review.band).toBe("plan to review");

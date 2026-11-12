@@ -21,6 +21,16 @@ import {
 } from "../engine/types.ts";
 import { stepText, waitText } from "./status.ts";
 
+/**
+ * What a meeting is about, in a line: its goal's name. Its agenda is the
+ * brief your session wrote for it, too long for a line.
+ */
+function aboutOf(work: Work, meeting: Meeting): string {
+  const goal = work.goals.find((g) => g.id === meeting.goalId);
+  if (!goal) throw new Error(`The goal of the meeting [${meeting.id}] is gone`);
+  return goal.name;
+}
+
 const plural = (n: number, one: string, many: string) => `${String(n)} ${n === 1 ? one : many}`;
 
 /** The meeting the pane shows: one under way, else one whose plan waits on you, else the latest. */
@@ -51,8 +61,9 @@ function meetingStatus(meeting: Meeting): string {
   }
 }
 
-const meetingOf = (meeting: Meeting): OpenplanMeeting => ({
+const meetingOf = (meeting: Meeting, work: Work): OpenplanMeeting => ({
   id: meeting.id,
+  about: aboutOf(work, meeting),
   agenda: meeting.agenda,
   status: meetingStatus(meeting),
   participants: meeting.participants,
@@ -84,7 +95,7 @@ function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>
   if (running) {
     const step = stepText(running.progress);
     doing = `works on "${running.title}"${step ? `, ${step}` : ""}`;
-  } else if (meeting) doing = `at the meeting on "${meeting.agenda}"`;
+  } else if (meeting) doing = `at the meeting on "${aboutOf(work, meeting)}"`;
   else if (reviewing) doing = `reviews "${reviewing.title}" by ${reviewing.assignee}`;
   else if (at("reviewing")) doing = `"${at("reviewing")?.title ?? ""}" is in review`;
   else if (at("merging")) doing = `"${at("merging")?.title ?? ""}" is being merged`;
@@ -166,7 +177,7 @@ function milestones(work: Work): OpenplanTeam["milestones"] {
   const said: OpenplanTeam["milestones"] = [];
   for (const meeting of work.meetings)
     if (meeting.status === "approved")
-      said.push({ key: `plan:${meeting.id}`, text: `Plan approved: "${meeting.agenda}"` });
+      said.push({ key: `plan:${meeting.id}`, text: `Plan approved: "${aboutOf(work, meeting)}"` });
   for (const s of work.subtasks) {
     if (s.review?.rounds)
       said.push({
@@ -194,7 +205,7 @@ function prompts(work: Work): OpenplanTeam["prompts"] {
     if (meeting.status === "review" && meeting.plan)
       asked.push({
         key: `review:${meeting.id}`,
-        text: `The meeting [${meeting.id}] on "${meeting.agenda}" has a plan: ${meeting.plan.summary}. Show it to the user with show_plan, and ask whether to approve it, change it, or cancel it.`,
+        text: `The meeting [${meeting.id}] on "${aboutOf(work, meeting)}" has a plan: ${meeting.plan.summary}. Show it to the user with show_plan, and ask whether to approve it, change it, or cancel it.`,
       });
   for (const question of work.questions) {
     if (question.kind !== "decision" || question.decision.kind !== "delivery") continue;
@@ -241,7 +252,7 @@ export function paneTeam(work: Work, members: readonly Member[]): OpenplanTeam {
   const band = bandText(work, needs.length);
   return {
     ...(band && { band }),
-    ...(meeting && { meeting: meetingOf(meeting) }),
+    ...(meeting && { meeting: meetingOf(meeting, work) }),
     members: members.map((m) => memberOf(m, work, derived)),
     needs,
     milestones: milestones(work),

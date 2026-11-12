@@ -261,11 +261,12 @@ async function meetingTab($: $, ui: Ui, meeting: OpenplanMeeting | undefined) {
     <Box flexDirection="column" gap={1}>
       <Box flexDirection="column">
         <Text bold>
-          {meeting.agenda} · {meeting.status}
+          {meeting.about} · {meeting.status}
         </Text>
         <Text dimColor>
           {meeting.participants.join(", ")}, hosted by {meeting.participants[0]}
         </Text>
+        <Markdown key="agenda" text={meeting.agenda} dimColor />
       </Box>
       {meeting.turns.map((turn, i) => (
         <Box key={`turn-${i}`} flexDirection="column">

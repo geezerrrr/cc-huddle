@@ -10669,7 +10669,7 @@ function statusText(work) {
       (m) => m.goalId === goal2.id && m.status !== "approved"
     ))
       lines.push(
-        `  Meeting [${meeting2.id}] on "${meeting2.agenda}", hosted by ${meeting2.host}: ${MEETING_STATUS[meeting2.status]}${meeting2.error ? ` (${meeting2.error})` : ""}${derived.resumable.includes(meeting2.id) ? "; it can go on" : ""}`
+        `  Meeting [${meeting2.id}], hosted by ${meeting2.host}: ${MEETING_STATUS[meeting2.status]}${meeting2.error ? ` (${meeting2.error})` : ""}${derived.resumable.includes(meeting2.id) ? "; it can go on" : ""}`
       );
     for (const task of work.tasks.filter((t) => t.goalId === goal2.id)) {
       lines.push(`  Task "${task.title}" [${task.id}]`);
@@ -10683,6 +10683,11 @@ function statusText(work) {
 }
 
 // src/plugin/pane.ts
+function aboutOf(work, meeting2) {
+  const goal2 = work.goals.find((g) => g.id === meeting2.goalId);
+  if (!goal2) throw new Error(`The goal of the meeting [${meeting2.id}] is gone`);
+  return goal2.name;
+}
 var plural = (n, one, many) => `${String(n)} ${n === 1 ? one : many}`;
 function shownMeeting(work) {
   const latest = (status) => work.meetings.filter((m) => !status || m.status === status).at(-1);
@@ -10702,8 +10707,9 @@ function meetingStatus(meeting2) {
       return `failed${meeting2.error ? `: ${meeting2.error}` : ""}`;
   }
 }
-var meetingOf = (meeting2) => ({
+var meetingOf = (meeting2, work) => ({
   id: meeting2.id,
+  about: aboutOf(work, meeting2),
   agenda: meeting2.agenda,
   status: meetingStatus(meeting2),
   participants: meeting2.participants,
@@ -10730,7 +10736,7 @@ function memberOf(member, work, derived) {
   if (running3) {
     const step2 = stepText(running3.progress);
     doing = `works on "${running3.title}"${step2 ? `, ${step2}` : ""}`;
-  } else if (meeting2) doing = `at the meeting on "${meeting2.agenda}"`;
+  } else if (meeting2) doing = `at the meeting on "${aboutOf(work, meeting2)}"`;
   else if (reviewing) doing = `reviews "${reviewing.title}" by ${reviewing.assignee}`;
   else if (at("reviewing")) doing = `"${at("reviewing")?.title ?? ""}" is in review`;
   else if (at("merging")) doing = `"${at("merging")?.title ?? ""}" is being merged`;
@@ -10799,7 +10805,7 @@ function milestones(work) {
   const said = [];
   for (const meeting2 of work.meetings)
     if (meeting2.status === "approved")
-      said.push({ key: `plan:${meeting2.id}`, text: `Plan approved: "${meeting2.agenda}"` });
+      said.push({ key: `plan:${meeting2.id}`, text: `Plan approved: "${aboutOf(work, meeting2)}"` });
   for (const s of work.subtasks) {
     if (s.review?.rounds)
       said.push({
@@ -10822,7 +10828,7 @@ function prompts(work) {
     if (meeting2.status === "review" && meeting2.plan)
       asked.push({
         key: `review:${meeting2.id}`,
-        text: `The meeting [${meeting2.id}] on "${meeting2.agenda}" has a plan: ${meeting2.plan.summary}. Show it to the user with show_plan, and ask whether to approve it, change it, or cancel it.`
+        text: `The meeting [${meeting2.id}] on "${aboutOf(work, meeting2)}" has a plan: ${meeting2.plan.summary}. Show it to the user with show_plan, and ask whether to approve it, change it, or cancel it.`
       });
   for (const question of work.questions) {
     if (question.kind !== "decision" || question.decision.kind !== "delivery") continue;
@@ -10860,7 +10866,7 @@ function paneTeam(work, members) {
   const band = bandText(work, needs.length);
   return {
     ...band && { band },
-    ...meeting2 && { meeting: meetingOf(meeting2) },
+    ...meeting2 && { meeting: meetingOf(meeting2, work) },
     members: members.map((m) => memberOf(m, work, derived)),
     needs,
     milestones: milestones(work),

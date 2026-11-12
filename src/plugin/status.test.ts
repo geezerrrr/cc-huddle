@@ -76,7 +76,7 @@ describe("statusText", () => {
     expect(text).toBe(`Team: glm (busy), sonnet
 
 Goal "Dice" [g1]: active, on branch openplan/dice/main
-  Meeting [m1] on "Scoring", hosted by sonnet: its plan waits for you: approve it, change it, or cancel it
+  Meeting [m1], hosted by sonnet: its plan waits for you: approve it, change it, or cancel it
   Task "Game" [t1]
     - Rules [Rules], glm: running, step 2 of 3: Write the rolls, waits on your answer
     - Board [Board], sonnet: pending, waits on "Rules" by glm
