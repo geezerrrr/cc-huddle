@@ -5,10 +5,15 @@
  * - `server.mjs`: the MCP server. Our code, with the dependencies the Agent
  *   SDK shares left out: the SDK isn't ours to ship, so these are installed
  *   from npm on first start (src/plugin/bootstrap.ts), as `package.json`
- *   here names them, at the versions this repository locks.
+ *   here names them, at the versions this repository locks, and as
+ *   `package-lock.json` locks theirs. The lock is kept while the versions
+ *   stay; npm writes a new one when they change.
  * - `session-start.mjs`: the SessionStart hook, whole.
  */
+import { execFile } from "node:child_process";
 import { readFile, rm, writeFile } from "node:fs/promises";
+import process from "node:process";
+import { isDeepStrictEqual, promisify } from "node:util";
 import { build } from "esbuild";
 
 /** Installed on first start; everything else is in the bundle. */
@@ -27,6 +32,9 @@ const common = {
   },
   logLevel: "warning",
 };
+
+const LOCK = "plugin/dist/package-lock.json";
+const lock = await readFile(LOCK, "utf8").catch(() => undefined);
 
 await rm("plugin/dist", { recursive: true, force: true });
 await build({
@@ -47,3 +55,11 @@ await writeFile(
   "plugin/dist/package.json",
   `${JSON.stringify({ private: true, type: "module", dependencies }, null, 2)}\n`,
 );
+if (lock && isDeepStrictEqual(JSON.parse(lock).packages[""].dependencies, dependencies))
+  await writeFile(LOCK, lock);
+else
+  await promisify(execFile)(
+    "npm",
+    ["install", "--package-lock-only", "--ignore-scripts", "--no-audit", "--no-fund"],
+    { cwd: "plugin/dist", shell: process.platform === "win32" },
+  );

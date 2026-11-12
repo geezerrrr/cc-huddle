@@ -80,7 +80,7 @@ One session runs a repository's team at a time, held by a lock in the repository
 - **Skill**: tells your session what it is for: relay and act, never do the work itself.
 - **SessionStart hook**: tells your session what stopped or waits on you, as context. The mod shows you the same in the band.
 
-The repository's `plugin/` folder is the plugin, listed by the marketplace at the repository's top, so it installs with `/plugin install`. The MCP server and the hook are bundled into `plugin/dist/`, committed so an install needs no build. The Agent SDK isn't openplan's to ship: the server's npm dependencies are installed into the data folder the first time a version starts (`dist/package.json` names them, with exact versions), without their optional platform binaries, since members run your session's Claude Code.
+The repository's `plugin/` folder is the plugin, listed by the marketplace at the repository's top, so it installs with `/plugin install`. The MCP server and the hook are bundled into `plugin/dist/`, committed so an install needs no build. The Agent SDK isn't openplan's to ship: the server's npm dependencies are installed into the data folder the first time a version starts, with `npm ci` from `dist/package.json` and the `dist/package-lock.json` beside it, so every install gets the same tree, without the optional platform binaries, since members run your session's Claude Code.
 
 ### 3.4 Where things live
 

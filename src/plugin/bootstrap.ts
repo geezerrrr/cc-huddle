@@ -1,9 +1,9 @@
 /**
  * How the installed plugin starts its MCP server. The Agent SDK isn't ours to
  * ship, so the server's dependencies are installed from npm into the data
- * folder (`dist/package.json` names them) the first time a version runs, and
- * the server's imports are resolved from there. Not the SDK's own Claude
- * Code: members run your session's (claude.ts).
+ * folder the first time a version runs, exactly as `dist/package-lock.json`
+ * locks them, and the server's imports are resolved from there. Not the SDK's
+ * own Claude Code: members run your session's (claude.ts).
  */
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -18,11 +18,25 @@ const dataFolder = process.env.CLAUDE_PLUGIN_DATA;
 if (!dataFolder)
   throw new Error("openplan's MCP server runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA");
 
+/** How long the first start may take to install the dependencies. */
+const INSTALL_TIMEOUT_MS = 5 * 60_000;
+
 const here = path.dirname(fileURLToPath(import.meta.url));
-const manifest = await readFile(path.join(here, "package.json"), "utf8");
+/** What names the dependencies, and what locks them: each file and its text. */
+const manifests = await Promise.all(
+  ["package.json", "package-lock.json"].map(
+    async (file) => [file, await readFile(path.join(here, file), "utf8")] as const,
+  ),
+);
 const deps = path.join(dataFolder, "deps");
-/** The dependencies of this version, by what it names. */
-const home = path.join(deps, createHash("sha256").update(manifest).digest("hex").slice(0, 12));
+/** The dependencies of this version, by what it locks. */
+const home = path.join(
+  deps,
+  manifests
+    .reduce((hash, [, text]) => hash.update(text), createHash("sha256"))
+    .digest("hex")
+    .slice(0, 12),
+);
 
 const exists = (file: string) =>
   stat(file).then(
@@ -30,28 +44,27 @@ const exists = (file: string) =>
     () => false,
   );
 
-if (!(await exists(path.join(home, "node_modules")))) {
+const installed = () => exists(path.join(home, "node_modules"));
+
+if (!(await installed())) {
   // Installed beside, then moved in whole: two sessions starting at once don't share a half install.
   const draft = `${home}.${String(process.pid)}`;
   await mkdir(draft, { recursive: true });
-  await writeFile(path.join(draft, "package.json"), manifest);
+  for (const [file, text] of manifests) await writeFile(path.join(draft, file), text);
   try {
     await promisify(execFile)(
       process.platform === "win32" ? "npm.cmd" : "npm",
-      ["install", "--omit=optional", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund"],
-      { cwd: draft, shell: process.platform === "win32" },
+      ["ci", "--omit=optional", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund"],
+      { cwd: draft, shell: process.platform === "win32", timeout: INSTALL_TIMEOUT_MS },
     );
+    await rename(draft, home);
   } catch (error) {
     await rm(draft, { recursive: true, force: true });
-    throw new Error(`openplan couldn't install its dependencies with npm in ${draft}`, {
-      cause: error,
-    });
-  }
-  try {
-    await rename(draft, home);
-  } catch {
     // Another session's install got there first.
-    await rm(draft, { recursive: true, force: true });
+    if (!(await installed()))
+      throw new Error(`openplan couldn't install its dependencies with npm in ${draft}`, {
+        cause: error,
+      });
   }
   // What earlier versions installed goes, and installs left half done by a process that ended.
   for (const name of await readdir(deps)) {

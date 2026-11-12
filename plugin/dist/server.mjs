@@ -14,34 +14,40 @@ import { promisify } from "node:util";
 var dataFolder = process.env.CLAUDE_PLUGIN_DATA;
 if (!dataFolder)
   throw new Error("openplan's MCP server runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA");
+var INSTALL_TIMEOUT_MS = 5 * 6e4;
 var here = path.dirname(fileURLToPath(import.meta.url));
-var manifest = await readFile(path.join(here, "package.json"), "utf8");
+var manifests = await Promise.all(
+  ["package.json", "package-lock.json"].map(
+    async (file) => [file, await readFile(path.join(here, file), "utf8")]
+  )
+);
 var deps = path.join(dataFolder, "deps");
-var home = path.join(deps, createHash("sha256").update(manifest).digest("hex").slice(0, 12));
+var home = path.join(
+  deps,
+  manifests.reduce((hash, [, text]) => hash.update(text), createHash("sha256")).digest("hex").slice(0, 12)
+);
 var exists = (file) => stat(file).then(
   () => true,
   () => false
 );
-if (!await exists(path.join(home, "node_modules"))) {
+var installed = () => exists(path.join(home, "node_modules"));
+if (!await installed()) {
   const draft = `${home}.${String(process.pid)}`;
   await mkdir(draft, { recursive: true });
-  await writeFile(path.join(draft, "package.json"), manifest);
+  for (const [file, text] of manifests) await writeFile(path.join(draft, file), text);
   try {
     await promisify(execFile)(
       process.platform === "win32" ? "npm.cmd" : "npm",
-      ["install", "--omit=optional", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund"],
-      { cwd: draft, shell: process.platform === "win32" }
+      ["ci", "--omit=optional", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund"],
+      { cwd: draft, shell: process.platform === "win32", timeout: INSTALL_TIMEOUT_MS }
     );
+    await rename(draft, home);
   } catch (error) {
     await rm(draft, { recursive: true, force: true });
-    throw new Error(`openplan couldn't install its dependencies with npm in ${draft}`, {
-      cause: error
-    });
-  }
-  try {
-    await rename(draft, home);
-  } catch {
-    await rm(draft, { recursive: true, force: true });
+    if (!await installed())
+      throw new Error(`openplan couldn't install its dependencies with npm in ${draft}`, {
+        cause: error
+      });
   }
   for (const name of await readdir(deps)) {
     const [, pid] = name.split(".");
