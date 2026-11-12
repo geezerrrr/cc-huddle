@@ -6,6 +6,7 @@
 import { createHash } from "node:crypto";
 import { link, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { readFileSync, unlinkSync } from "node:fs";
+import { setTimeout as delay } from "node:timers/promises";
 import path from "node:path";
 import { errorText } from "./core.ts";
 import { writeWhole } from "./files.ts";
@@ -110,10 +111,20 @@ export interface Holder {
   open: boolean;
 }
 
+/** A lock file's text; undefined when there is none. */
+function lockText(file: string): string | undefined {
+  try {
+    return readFileSync(file, "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
 /** The holder a lock file names; undefined when there is none or it can't be read. */
 function readHolder(file: string): Holder | undefined {
+  const text = lockText(file);
   try {
-    return JSON.parse(readFileSync(file, "utf8")) as Holder;
+    return text === undefined ? undefined : (JSON.parse(text) as Holder);
   } catch {
     return undefined;
   }
@@ -141,11 +152,16 @@ async function holding(lock: string, session: number, open: boolean): Promise<st
 
 const code = (error: unknown) => (error as NodeJS.ErrnoException).code;
 
+/** How long a taker waits for another that is replacing an ended holder's lock. */
+const REPLACING_WAIT_MS = 10;
+
 /**
  * Takes a repository's team for this process and `session` (its pid), or
- * throws which session holds it. The lock is made whole or not at
- * all, so two sessions starting at once can't both take it; one whose holder
- * has ended is moved aside first, by one taker only.
+ * throws which session holds it. A lock is put in place whole or not at all,
+ * so of several sessions starting at once one takes it. A lock whose holder
+ * has ended is replaced by one taker only: the one that claims that ending,
+ * which replaces the lock only if it is still the ended holder's, so a lock
+ * taken meanwhile is never replaced.
  */
 export async function takeTeam(lock: string, session: number): Promise<void> {
   const mine = await holding(lock, session, false);
@@ -157,30 +173,39 @@ export async function takeTeam(lock: string, session: number): Promise<void> {
       } catch (error) {
         if (code(error) !== "EEXIST") throw error;
       }
+      const ended = lockText(lock);
+      // Let go of meanwhile: try again.
+      if (ended === undefined) continue;
       const holder = readHolder(lock);
       if (holder && running(holder.pid)) {
         if (holder.pid !== process.pid) throw busy(lock, holder);
         await rename(mine, lock);
         return;
       }
-      const aside = `${lock}.${String(process.pid)}.ended`;
+      const claim = `${lock}.ended-${String(holder?.pid ?? "unread")}`;
       try {
-        await rename(lock, aside);
+        await link(mine, claim);
       } catch (error) {
-        // Another taker moved it first: try again.
-        if (code(error) === "ENOENT") continue;
-        throw error;
+        if (code(error) !== "EEXIST") throw error;
+        // Done with meanwhile: try again. Still there, its taker either replaces the lock or ended partway.
+        if (lockText(claim) === undefined) continue;
+        const replacing = readHolder(claim);
+        if (!replacing || !running(replacing.pid))
+          throw new Error(
+            `A session taking this repository's team ended partway: delete ${lock} and ${claim}`,
+            { cause: error },
+          );
+        await delay(REPLACING_WAIT_MS);
+        continue;
       }
-      const moved = readHolder(aside);
-      if (moved && running(moved.pid)) {
-        // It was taken between the look and the move: it goes back.
-        await link(aside, lock).catch((error: unknown) => {
-          if (code(error) !== "EEXIST") throw error;
-        });
-        await rm(aside, { force: true });
-        throw busy(lock, moved);
+      try {
+        if (lockText(lock) === ended) {
+          await rename(mine, lock);
+          return;
+        }
+      } finally {
+        await rm(claim, { force: true });
       }
-      await rm(aside, { force: true });
     }
   } finally {
     await rm(mine, { force: true });

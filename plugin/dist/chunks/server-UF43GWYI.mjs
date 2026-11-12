@@ -7366,6 +7366,7 @@ var errorText = (error) => error instanceof Error ? error.message : String(error
 import { createHash } from "node:crypto";
 import { link, mkdir as mkdir2, readFile, rename as rename2, rm, writeFile as writeFile2 } from "node:fs/promises";
 import { readFileSync, unlinkSync } from "node:fs";
+import { setTimeout as delay } from "node:timers/promises";
 import path2 from "node:path";
 
 // src/engine/files.ts
@@ -7438,9 +7439,17 @@ function stateWriter(file, state, failed) {
     }
   };
 }
-function readHolder(file) {
+function lockText(file) {
   try {
-    return JSON.parse(readFileSync(file, "utf8"));
+    return readFileSync(file, "utf8");
+  } catch {
+    return void 0;
+  }
+}
+function readHolder(file) {
+  const text2 = lockText(file);
+  try {
+    return text2 === void 0 ? void 0 : JSON.parse(text2);
   } catch {
     return void 0;
   }
@@ -7460,6 +7469,7 @@ async function holding(lock, session, open2) {
   return file;
 }
 var code = (error) => error.code;
+var REPLACING_WAIT_MS = 10;
 async function takeTeam(lock, session) {
   const mine = await holding(lock, session, false);
   try {
@@ -7470,28 +7480,37 @@ async function takeTeam(lock, session) {
       } catch (error) {
         if (code(error) !== "EEXIST") throw error;
       }
+      const ended = lockText(lock);
+      if (ended === void 0) continue;
       const holder = readHolder(lock);
       if (holder && running(holder.pid)) {
         if (holder.pid !== process.pid) throw busy(lock, holder);
         await rename2(mine, lock);
         return;
       }
-      const aside = `${lock}.${String(process.pid)}.ended`;
+      const claim = `${lock}.ended-${String(holder?.pid ?? "unread")}`;
       try {
-        await rename2(lock, aside);
+        await link(mine, claim);
       } catch (error) {
-        if (code(error) === "ENOENT") continue;
-        throw error;
+        if (code(error) !== "EEXIST") throw error;
+        if (lockText(claim) === void 0) continue;
+        const replacing = readHolder(claim);
+        if (!replacing || !running(replacing.pid))
+          throw new Error(
+            `A session taking this repository's team ended partway: delete ${lock} and ${claim}`,
+            { cause: error }
+          );
+        await delay(REPLACING_WAIT_MS);
+        continue;
       }
-      const moved = readHolder(aside);
-      if (moved && running(moved.pid)) {
-        await link(aside, lock).catch((error) => {
-          if (code(error) !== "EEXIST") throw error;
-        });
-        await rm(aside, { force: true });
-        throw busy(lock, moved);
+      try {
+        if (lockText(lock) === ended) {
+          await rename2(mine, lock);
+          return;
+        }
+      } finally {
+        await rm(claim, { force: true });
       }
-      await rm(aside, { force: true });
     }
   } finally {
     await rm(mine, { force: true });

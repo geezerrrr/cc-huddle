@@ -71,7 +71,7 @@ Closing the session pauses every active goal, as if you had paused each one (§4
 
 `/clear` only clears the conversation: the team keeps working, and the new conversation learns where it stands from the SessionStart hook and the tools.
 
-One session runs a repository's team at a time, held by a lock in the repository's data folder with the pids of the MCP server and its session, and whether the server has opened the team yet. Another session in the same repository sees the team and what stopped, and can take it over once the holder has ended.
+One session runs a repository's team at a time, held by a lock in the repository's data folder with the pids of the MCP server and its session, and whether the server has opened the team yet. Another session in the same repository sees the team and what stopped, and can take it over once the holder has ended. The lock is put in place whole, so of sessions starting at once one takes it. A lock whose holder has ended is replaced by the one taker that claims that ending (a file named for the ended pid), and only while it is still that holder's, so a lock taken meanwhile is never replaced.
 
 ### 3.3 Plugin
 

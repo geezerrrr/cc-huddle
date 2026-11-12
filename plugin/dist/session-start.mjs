@@ -7425,9 +7425,17 @@ async function readState(file2) {
     throw new Error(`${file2} was written by a newer openplan: update openplan to go on`);
   return saved.state;
 }
-function readHolder(file2) {
+function lockText(file2) {
   try {
-    return JSON.parse(readFileSync(file2, "utf8"));
+    return readFileSync(file2, "utf8");
+  } catch {
+    return void 0;
+  }
+}
+function readHolder(file2) {
+  const text2 = lockText(file2);
+  try {
+    return text2 === void 0 ? void 0 : JSON.parse(text2);
   } catch {
     return void 0;
   }
