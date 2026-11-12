@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { goOnMessage, systemPrompt, taskBrief, teammateQuestion } from "./prompts.ts";
-import type { Member, Subtask } from "./types.ts";
+import {
+  goOnMessage,
+  meetingAnswer,
+  meetingClosing,
+  meetingHand,
+  meetingOpening,
+  meetingSteer,
+  systemPrompt,
+  taskBrief,
+  teammateQuestion,
+  type MeetingBrief,
+} from "./prompts.ts";
+import type { Meeting, MeetingTurn, Member, Subtask } from "./types.ts";
 
 const member = (name: string, title: string): Member => ({
   name,
@@ -111,5 +122,75 @@ describe("teammateQuestion", () => {
     });
     expect(prompt).toContain('glm (UI designer) asks you this while working on "Scoreboard"');
     expect(prompt).toContain("- Rules (done): Rules in rules.ts");
+  });
+});
+
+describe("meeting prompts", () => {
+  const meeting = (fields: Partial<Meeting> = {}): Meeting => ({
+    id: "m1",
+    goalId: "g1",
+    agenda: "A two-player dice game",
+    size: "small",
+    participants: ["sonnet", "glm"],
+    host: "sonnet",
+    status: "running",
+    turns: [],
+    tokens: 0,
+    createdAt: 0,
+    ...fields,
+  });
+  const brief = (fields: Partial<Meeting> = {}): MeetingBrief => ({
+    meeting: meeting(fields),
+    goal: { id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 },
+    attendees: [sonnet, glm],
+    cwd: "/goals/dice",
+  });
+  const turn = (speaker: string, text: string, phase: MeetingTurn["phase"]): MeetingTurn => ({
+    speaker,
+    text,
+    at: 0,
+    phase,
+    tokens: 0,
+  });
+
+  it("brief an attendee the first time only", () => {
+    const opening = meetingOpening(brief());
+    expect(opening).toMatch(/^You're hosting a planning meeting\.\nGoal: Dice\nTo plan: A two/);
+    expect(opening).toContain("Attending: sonnet (Programmer) and glm (UI designer)");
+    const seated = brief({ seats: { glm: { session: "s", heard: 1 } } });
+    expect(meetingHand(seated, glm)).toMatch(/^Said since you last took it in:/);
+  });
+
+  it("tell each what was said since they last took the meeting in, not their own words", () => {
+    const ctx = brief({
+      turns: [
+        turn("sonnet", "What engine?", "opening"),
+        turn("glm", "Canvas.", "round"),
+        turn("sonnet", "Agreed.", "steer"),
+      ],
+      seats: { glm: { session: "s", heard: 1 } },
+    });
+    expect(meetingAnswer(ctx, glm, "Colors")).toContain(
+      "Said since you last took it in:\n[sonnet] Agreed.\n\nYou have the floor, for what you raised your hand about: Colors.",
+    );
+  });
+
+  it("give the host the hands up, the floor each has had and what is left", () => {
+    const ctx = brief({
+      turns: [
+        turn("sonnet", "?", "opening"),
+        turn("glm", "x", "round"),
+        turn("glm", "y", "answer"),
+      ],
+      hands: [{ member: "glm", point: "Use canvas", to: "sonnet" }],
+    });
+    const steer = meetingSteer(ctx, 1);
+    expect(steer).toContain("Hands up:\n- glm (to sonnet): Use canvas");
+    expect(steer).toContain("Times each has had the floor in the discussion: glm 1.");
+    expect(steer).toContain("You can give the floor 1 more time at most.");
+  });
+
+  it("have the host write the plan for the attendees", () => {
+    expect(meetingClosing(brief())).toContain('whose name goes in assignee: "sonnet" and "glm"');
   });
 });
