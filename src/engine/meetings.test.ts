@@ -129,14 +129,16 @@ function scripted(script: Partial<Record<"hand" | "steer", (ask: Ask) => Promise
   });
 }
 
-/** A meeting starts with real git, setting up its goal's worktree: slow while other test files run. */
+/**
+ * Waits for `check` to pass: a meeting starts with real git, setting up its
+ * goal's worktree, slow while the other test files run alongside.
+ */
+const eventually = (check: () => unknown) => vi.waitFor(check, { timeout: 10_000 });
+
 const ended = (meeting: Meeting) =>
-  vi.waitFor(
-    () => {
-      expect(meeting.status).not.toBe("running");
-    },
-    { timeout: 10_000 },
-  );
+  eventually(() => {
+    expect(meeting.status).not.toBe("running");
+  });
 const phases = (meeting: Meeting) =>
   meeting.turns.map((t: MeetingTurn) => `${t.phase}:${t.speaker}`);
 
@@ -263,7 +265,7 @@ describe("Meetings", () => {
         }),
     );
     const meeting = meetings.start({ goalId: "g1", agenda: "x", size: "small", attendees: [] });
-    await vi.waitFor(() => {
+    await eventually(() => {
       expect(askOnce).toHaveBeenCalled();
     });
     await meetings.cancel(meeting.id);

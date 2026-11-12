@@ -107,14 +107,13 @@ const working = (run: Run) =>
     else run.signal.addEventListener("abort", stopped);
   });
 
-/** Real git merges: slow while the other test files run alongside. */
+/** Waits for `check` to pass: real git is slow while the other test files run alongside. */
+const eventually = (check: () => unknown) => vi.waitFor(check, { timeout: 10_000 });
+
 const settled = (s: Subtask, status: Subtask["status"]) =>
-  vi.waitFor(
-    () => {
-      expect(s.status).toBe(status);
-    },
-    { timeout: 10_000 },
-  );
+  eventually(() => {
+    expect(s.status).toBe(status);
+  });
 
 const onGoal = (file: string) => readFile(path.join(goalFolder(core.places, "dice"), file), "utf8");
 
@@ -263,7 +262,7 @@ describe("Scheduler", () => {
       });
     s2.session = "sonnet-1";
     scheduler.pump();
-    await vi.waitFor(() => {
+    await eventually(() => {
       expect(second).toBeDefined();
     });
     expect(second?.resume).toBe("sonnet-1");
@@ -335,7 +334,7 @@ describe("Scheduler", () => {
         tokens: 0,
       });
       scheduler.pump();
-      await vi.waitFor(() => {
+      await eventually(() => {
         expect(core.state.questions).toHaveLength(1);
       });
       const runs = vi.mocked(runSubtask).mock.calls.map(([run]) => run);
@@ -355,7 +354,7 @@ describe("Scheduler", () => {
       vi.mocked(runSubtask).mockImplementation(delivering({ "score.txt": "0:0\n" }));
       vi.mocked(askOnce).mockRejectedValue(new Error("API Error: 529"));
       scheduler.pump();
-      await vi.waitFor(() => {
+      await eventually(() => {
         expect(core.state.questions).toMatchObject([
           { text: "API Error: 529", decision: { kind: "review" } },
         ]);
@@ -373,7 +372,7 @@ describe("Scheduler", () => {
         .mockImplementationOnce(working)
         .mockImplementationOnce(delivering({ "score.txt": "1\n" }));
       scheduler.pump();
-      await vi.waitFor(() => {
+      await eventually(() => {
         expect(runs()).toHaveLength(1);
       });
       await scheduler.stop("s1");
@@ -429,7 +428,7 @@ describe("Scheduler", () => {
           tokens: 0,
         });
       scheduler.pump();
-      await vi.waitFor(() => {
+      await eventually(() => {
         expect(askOnce).toHaveBeenCalledTimes(1);
       });
       await scheduler.stop("s1");
@@ -447,7 +446,7 @@ describe("Scheduler", () => {
       vi.mocked(runSubtask).mockImplementation(delivering({ "score.txt": "1\n" }));
       vi.mocked(askOnce).mockRejectedValue(new Error("API Error: 529"));
       scheduler.pump();
-      await vi.waitFor(() => {
+      await eventually(() => {
         expect(core.state.questions).toHaveLength(1);
       });
       const [stuck] = core.state.questions;
@@ -461,13 +460,13 @@ describe("Scheduler", () => {
       core.state.subtasks.push(s1);
       vi.mocked(runSubtask).mockImplementation(delivering({ "score.txt": "1\n" }));
       scheduler.pump();
-      await vi.waitFor(() => {
+      await eventually(() => {
         expect(core.state.questions).toHaveLength(1);
       });
       const answer = { decision: "revise" as const, note: "Bigger numbers" };
       const question = questions.answer(core.state.questions[0]?.id ?? "", answer);
       await scheduler.decide(question, answer);
-      await vi.waitFor(() => {
+      await eventually(() => {
         expect(runs()).toHaveLength(2);
       });
       expect(runs()[1]).toMatchObject({
@@ -489,7 +488,7 @@ describe("Scheduler", () => {
           return delivering({ "logo.bin": "sonnet\0\n" })(run);
         });
       scheduler.pump();
-      await vi.waitFor(() => {
+      await eventually(() => {
         expect(core.state.questions.map((q) => q.decision?.kind)).toContain("merge");
       });
       const conflict = core.state.questions.find((q) => q.decision?.kind === "merge");
@@ -528,7 +527,7 @@ describe("Scheduler", () => {
   describe("work on hold", () => {
     const runs = () => vi.mocked(runSubtask).mock.calls.map(([run]) => run);
     const started = (n: number) =>
-      vi.waitFor(() => {
+      eventually(() => {
         expect(runs()).toHaveLength(n);
       });
 
