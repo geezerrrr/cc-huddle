@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  # The Claude Code that validates and tests the mod: the version openplan is checked on.
+  CLAUDE_CODE_VERSION: 2.1.322
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Node and pnpm at the versions in mise.toml.
+      - uses: jdx/mise-action@v5
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm test
+      - name: plugin/dist is built from the source
+        run: |
+          pnpm build
+          if [ -n "$(git status --porcelain plugin/dist)" ]; then
+            git status --short plugin/dist
+            echo "::error::plugin/dist is out of date: run pnpm build and commit it"
+            exit 1
+          fi
+      - run: npm install --global @anthropic-ai/claude-code@$CLAUDE_CODE_VERSION
+      - run: pnpm check:mod
