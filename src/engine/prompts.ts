@@ -97,7 +97,7 @@ export function goOnMessage(reasons: readonly GoOn[], subtask: Subtask): string 
       case "continued":
         return "The user asks you to go on from where you stopped.";
       case "rejected":
-        return `The review sent your delivery back. Fix what it says, then deliver again:\n${subtask.review?.notes ?? ""}`;
+        return `The review sent your delivery back. Fix what it says, then deliver again:\n${note}`;
       case "conflict":
         return `Merging your delivery into the goal's branch left conflicts in ${subtask.conflict?.files.join(", ") ?? ""}. The merge is under way in your worktree, the conflict markers in those files. Resolve them, keeping what both sides meant, then deliver again.`;
       case "redo":

@@ -8381,7 +8381,7 @@ ${note}`;
         return "The user asks you to go on from where you stopped.";
       case "rejected":
         return `The review sent your delivery back. Fix what it says, then deliver again:
-${subtask2.review?.notes ?? ""}`;
+${note}`;
       case "conflict":
         return `Merging your delivery into the goal's branch left conflicts in ${subtask2.conflict?.files.join(", ") ?? ""}. The merge is under way in your worktree, the conflict markers in those files. Resolve them, keeping what both sides meant, then deliver again.`;
       case "redo":
@@ -9841,7 +9841,10 @@ var Scheduler = class {
       if (pick === "skip") this.move(subtask2, "merge");
       else if (pick === "sendBack") {
         this.move(subtask2, "reject");
-        if (subtask2.session) goOnWith(subtask2, { why: "rejected" });
+        if (subtask2.session) {
+          goOnWith(subtask2, { why: "rejected", note: subtask2.review.notes ?? "" });
+          if (note) goOnWith(subtask2, { why: "carried", note });
+        }
       }
     } else if (subtask2.status === "merging") {
       const { slug } = this.goalOf(subtask2);
@@ -10163,7 +10166,7 @@ ${outcome.handover.summary}`
         );
       else {
         this.move(subtask2, "reject");
-        if (subtask2.session) goOnWith(subtask2, { why: "rejected" });
+        if (subtask2.session) goOnWith(subtask2, { why: "rejected", note: verdict.notes });
       }
     } catch (error) {
       if (abort.signal.aborted || subtask2.status !== "reviewing") return;

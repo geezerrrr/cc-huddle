@@ -330,7 +330,7 @@ describe("Scheduler", () => {
       expect(s1).toMatchObject({ tokens: 10, review: { rounds: 0, notes: "Fine." } });
     });
 
-    it("sends it back with the notes twice, then puts it to you", async () => {
+    it("sends it back with the notes twice, then puts it to you, to send back with your words", async () => {
       const s1 = subtask("s1", { session: "glm-1" });
       core.state.subtasks.push(s1);
       vi.mocked(runSubtask).mockImplementation(delivering({ "score.txt": "0:0\n" }));
@@ -353,6 +353,16 @@ describe("Scheduler", () => {
         text: "Scores overlap",
         decision: { kind: "review", options: ["rereview", "skip", "sendBack"] },
       });
+      await decide(core.state.questions[0]?.id ?? "", {
+        decision: "sendBack",
+        note: "Keep the board",
+      });
+      await eventually(() => {
+        expect(vi.mocked(runSubtask).mock.calls.length).toBeGreaterThan(3);
+      });
+      expect(vi.mocked(runSubtask).mock.calls[3]?.[0].opening).toBe(
+        "The review sent your delivery back. Fix what it says, then deliver again:\nScores overlap\n\nThe user adds to your subtask:\nKeep the board",
+      );
     });
 
     it("puts a review that fails to you", async () => {

@@ -329,7 +329,10 @@ export class Scheduler {
       if (pick === "skip") this.move(subtask, "merge");
       else if (pick === "sendBack") {
         this.move(subtask, "reject");
-        if (subtask.session) goOnWith(subtask, { why: "rejected" });
+        if (subtask.session) {
+          goOnWith(subtask, { why: "rejected", note: subtask.review.notes ?? "" });
+          if (note) goOnWith(subtask, { why: "carried", note });
+        }
       }
     } else if (subtask.status === "merging") {
       const { slug } = this.goalOf(subtask);
@@ -689,7 +692,7 @@ export class Scheduler {
         );
       else {
         this.move(subtask, "reject");
-        if (subtask.session) goOnWith(subtask, { why: "rejected" });
+        if (subtask.session) goOnWith(subtask, { why: "rejected", note: verdict.notes });
       }
     } catch (error) {
       if (abort.signal.aborted || subtask.status !== "reviewing") return;

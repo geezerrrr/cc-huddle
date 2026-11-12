@@ -108,8 +108,13 @@ Use blue`);
 describe("goOnMessage", () => {
   it("says each thing that came up once, in the order it came", () => {
     const message = goOnMessage(
-      [{ why: "held" }, { why: "rejected" }, { why: "held" }, { why: "carried", note: "Use blue" }],
-      subtask("s1", { review: { rounds: 1, notes: "Scores overlap" } }),
+      [
+        { why: "held" },
+        { why: "rejected", note: "Scores overlap" },
+        { why: "held" },
+        { why: "carried", note: "Use blue" },
+      ],
+      subtask("s1"),
     );
     expect(message.split("\n\n")).toEqual([
       "Your work was paused and now goes on. Pick up where you left off.",
