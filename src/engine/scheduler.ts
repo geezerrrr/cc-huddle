@@ -2,12 +2,13 @@
  * The scheduler (docs/design.md §4.3, §5): the only module that moves a
  * subtask (SUBTASK_MACHINE). It starts every subtask that can start (its
  * upstream merged, its member free, its goal active) in its own worktree,
- * and merges what is delivered into the goal's branch, one merge at a time
- * per goal.
+ * has what is delivered reviewed when review is on, and merges it into the
+ * goal's branch, one merge at a time per goal.
  */
 import { stat } from "node:fs/promises";
 import path from "node:path";
-import { busyMembers, waitsIn } from "./derive.ts";
+import { z } from "zod";
+import { busyMembers, reviewerOf, waitsIn } from "./derive.ts";
 import { errorText, workOf, type Core } from "./core.ts";
 import {
   commitDesk,
@@ -19,13 +20,27 @@ import {
   unresolved,
 } from "./git.ts";
 import { step, SUBTASK_MACHINE } from "./machines.ts";
-import { goOnMessage, taskBrief, teammateQuestion, type Upstream } from "./prompts.ts";
+import {
+  goOnMessage,
+  reviewPrompt,
+  taskBrief,
+  teammateQuestion,
+  type Upstream,
+} from "./prompts.ts";
 import type { Questions } from "./questions.ts";
 import { runSubtask, type RunOutcome } from "./run.ts";
 import { askOnce, type Step } from "./turns.ts";
 import type { DecisionOption, Goal, GoOn, Member, Progress, Subtask, Task } from "./types.ts";
 
-/** Your calls on a merge with files that can't be merged line by line, and on a task done. */
+/** A reviewer's verdict on a delivery. */
+const verdictSchema = z.object({ pass: z.boolean(), notes: z.string().trim() });
+const VERDICT = z.toJSONSchema(verdictSchema);
+
+/** Sent back this many times, a delivery is yours to decide on. */
+const REVIEW_ROUNDS = 3;
+
+/** Your calls on a stuck review, a merge with files that can't be merged line by line, and a task done. */
+const REVIEW_CALLS: DecisionOption[] = ["rereview", "skip", "sendBack"];
 const SIDE_CALLS: DecisionOption[] = ["ours", "theirs", "retry"];
 const DELIVERY_CALLS: DecisionOption[] = ["accept", "revise"];
 
@@ -44,13 +59,13 @@ const progressOf = (steps: Step[]): Progress => {
   };
 };
 
-/** When a subtask being merged was delivered; the rest keep their order. */
+/** When a subtask in review or being merged was delivered; the rest keep their order. */
 const handedAt = (subtask: Subtask) =>
-  subtask.status === "merging" ? (subtask.delivery?.at ?? 0) : 0;
+  subtask.status === "reviewing" || subtask.status === "merging" ? (subtask.delivery?.at ?? 0) : 0;
 
 /** A subtask's stage under way: how to stop it, and when it has ended. */
 interface Live {
-  kind: "run" | "merge";
+  kind: "run" | "review" | "merge";
   abort: AbortController;
   ended: Promise<void>;
 }
@@ -75,15 +90,23 @@ export class Scheduler {
 
   /**
    * Takes up whatever can go on: what goes on in its session first, then new
-   * work, and delivered work merged in the order it was delivered. A pending
-   * subtask starts when nothing holds it up (waitsIn); one being merged is
-   * merged unless you are deciding about it, one at a time per goal.
+   * work, and delivered work reviewed and merged in the order it was
+   * delivered. A pending subtask starts, and one in review is reviewed, when
+   * nothing holds it up (waitsIn: its goal active, you not deciding about it,
+   * its member or reviewer free); one being merged is merged unless you are
+   * deciding about it, one at a time per goal.
    */
   pump() {
     if (this.closed) return;
     const { state } = this.core;
     const work = workOf(this.core);
     const busy = busyMembers(work);
+    // One review each: those under way and those this pump starts.
+    const reviews = new Set(
+      state.subtasks
+        .filter((s) => this.live.get(s.id)?.kind === "review")
+        .map((s) => reviewerOf(work, s)),
+    );
     const merging = new Set(
       state.subtasks.filter((s) => this.live.get(s.id)?.kind === "merge").map((s) => s.goalId),
     );
@@ -96,6 +119,11 @@ export class Scheduler {
         if (waitsIn(work, subtask, busy).length) continue;
         busy.add(subtask.assignee);
         void this.startRun(subtask);
+      } else if (subtask.status === "reviewing") {
+        const reviewer = reviewerOf(work, subtask);
+        if (reviews.has(reviewer) || waitsIn(work, subtask, busy).length) continue;
+        reviews.add(reviewer);
+        void this.startReview(subtask);
       } else if (subtask.status === "merging") {
         if (waitsIn(work, subtask, busy).length || merging.has(subtask.goalId)) continue;
         merging.add(subtask.goalId);
@@ -104,11 +132,12 @@ export class Scheduler {
     }
   }
 
-  /** Moves a subtask by its machine. Leaving a merge calls off your decision on it. */
+  /** Moves a subtask by its machine. Leaving review or a merge calls off your decision on it. */
   private move(subtask: Subtask, event: keyof typeof SUBTASK_MACHINE) {
     const from = subtask.status;
     subtask.status = step(SUBTASK_MACHINE, from, event);
-    if (from === "merging" && subtask.status !== from) this.questions.cancelFor(subtask.id, true);
+    if ((from === "reviewing" || from === "merging") && subtask.status !== from)
+      this.questions.cancelFor(subtask.id, true);
   }
 
   private goalOf(subtask: Subtask): Goal {
@@ -123,10 +152,10 @@ export class Scheduler {
     return task;
   }
 
-  /** The member a subtask is assigned to: one taken off the team since can't run it. */
-  private memberOf(subtask: Subtask): Member {
-    const member = this.core.team.members.find((m) => m.name === subtask.assignee);
-    if (!member) throw new Error(`${subtask.assignee} is no longer on the team`);
+  /** A member by name: one taken off the team since can't work or review. */
+  private memberOf(name: string): Member {
+    const member = this.core.team.members.find((m) => m.name === name);
+    if (!member) throw new Error(`${name} is no longer on the team`);
     return member;
   }
 
@@ -188,7 +217,7 @@ export class Scheduler {
 
     let outcome: RunOutcome;
     try {
-      const member = this.memberOf(subtask);
+      const member = this.memberOf(subtask.assignee);
       const goal = this.goalOf(subtask);
       const desk = await openDesk(core.places, goal.slug, subtask.id);
       const recorder = core.recorder(subtask);
@@ -253,7 +282,7 @@ export class Scheduler {
     if (outcome.status === "delivered") {
       subtask.delivery = { ...outcome.handover, at: Date.now() };
       subtask.conflict = undefined;
-      this.move(subtask, "merge");
+      this.move(subtask, core.team.review ? "review" : "merge");
     } else {
       this.move(subtask, outcome.status === "failed" ? "fail" : "stop");
       if (outcome.status === "failed") subtask.error = outcome.error;
@@ -343,6 +372,63 @@ export class Scheduler {
         refused: `Not delivered: conflict markers are still in ${left.join(", ")}. Resolve them first, keeping what both sides meant, then deliver.`,
       };
     return { files: [...new Set(kept)] };
+  }
+
+  /**
+   * Reviews a delivery: a read-only session of the reviewer's in the
+   * subtask's worktree passes it on to be merged, or sends it back with
+   * notes; the third time back, or when the review fails, you decide. Stopped
+   * meanwhile, it leaves the subtask as it is.
+   */
+  private async startReview(subtask: Subtask) {
+    const { core } = this;
+    const { abort, end } = this.begin(subtask, "review");
+    try {
+      const reviewer = this.memberOf(reviewerOf(workOf(core), subtask));
+      const { delivery } = subtask;
+      if (!delivery) throw new Error(`"${subtask.title}" has no delivery to review`);
+      const desk = await openDesk(core.places, this.goalOf(subtask).slug, subtask.id);
+      const reply = await askOnce({
+        prompt: reviewPrompt({
+          task: this.taskOf(subtask),
+          subtask,
+          delivery,
+          cwd: desk,
+        }),
+        options: await core.options(reviewer, "review", desk),
+        schema: VERDICT,
+        signal: abort.signal,
+      });
+      subtask.tokens += reply.tokens;
+      if (subtask.status !== "reviewing") return;
+      const verdict = verdictSchema.parse(reply.structured);
+      const rounds = (subtask.review?.rounds ?? 0) + (verdict.pass ? 0 : 1);
+      subtask.review = { rounds, notes: verdict.notes };
+      if (verdict.pass) this.move(subtask, "merge");
+      else if (rounds >= REVIEW_ROUNDS)
+        this.questions.openDecision(
+          subtask,
+          { kind: "review", options: REVIEW_CALLS },
+          verdict.notes,
+        );
+      else {
+        this.move(subtask, "reject");
+        if (subtask.session) goOnWith(subtask, { why: "rejected" });
+      }
+    } catch (error) {
+      if (abort.signal.aborted || subtask.status !== "reviewing") return;
+      this.questions.openDecision(
+        subtask,
+        { kind: "review", options: REVIEW_CALLS },
+        errorText(error),
+      );
+    } finally {
+      end();
+      if (!this.closed) {
+        core.changed();
+        this.pump();
+      }
+    }
   }
 
   /**

@@ -75,6 +75,7 @@ beforeEach(async () => {
   questions = new Questions(core);
   scheduler = new Scheduler(core, questions);
   vi.mocked(runSubtask).mockReset();
+  vi.mocked(askOnce).mockReset();
 });
 
 afterEach(async () => {
@@ -217,5 +218,71 @@ describe("Scheduler", () => {
       model: "answer",
     });
     expect(s1.tokens).toBe(5);
+  });
+
+  describe("with review on", () => {
+    beforeEach(() => {
+      core.team = { ...core.team, review: true };
+    });
+
+    it("has another member review the delivery in its worktree before it is merged", async () => {
+      const s1 = subtask("s1", { acceptance: "Shows both scores" });
+      core.state.subtasks.push(s1);
+      vi.mocked(runSubtask).mockImplementation(delivering({ "score.txt": "0:0\n" }));
+      vi.mocked(askOnce).mockResolvedValue({
+        text: "",
+        structured: { pass: true, notes: "Fine." },
+        session: "r",
+        tokens: 7,
+      });
+      scheduler.pump();
+      await settled(s1, "done");
+      const review = vi.mocked(askOnce).mock.lastCall?.[0];
+      expect(review?.options).toEqual({
+        cwd: path.join(core.places.root, "desks", "s1"),
+        model: "review",
+      });
+      expect(review?.prompt).toContain("Acceptance criteria: Shows both scores");
+      expect(review?.schema).toMatchObject({ type: "object", required: ["pass", "notes"] });
+      expect(s1).toMatchObject({ tokens: 10, review: { rounds: 0, notes: "Fine." } });
+    });
+
+    it("sends it back with the notes twice, then puts it to you", async () => {
+      const s1 = subtask("s1", { session: "glm-1" });
+      core.state.subtasks.push(s1);
+      vi.mocked(runSubtask).mockImplementation(delivering({ "score.txt": "0:0\n" }));
+      vi.mocked(askOnce).mockResolvedValue({
+        text: "",
+        structured: { pass: false, notes: "Scores overlap" },
+        session: "r",
+        tokens: 0,
+      });
+      scheduler.pump();
+      await vi.waitFor(() => {
+        expect(core.state.questions).toHaveLength(1);
+      });
+      const runs = vi.mocked(runSubtask).mock.calls.map(([run]) => run);
+      expect(runs).toHaveLength(3);
+      expect(runs[1]?.opening).toContain("The review sent your delivery back");
+      expect(runs[1]?.opening).toContain("Scores overlap");
+      expect(s1).toMatchObject({ status: "reviewing", review: { rounds: 3 } });
+      expect(core.state.questions[0]).toMatchObject({
+        text: "Scores overlap",
+        decision: { kind: "review", options: ["rereview", "skip", "sendBack"] },
+      });
+    });
+
+    it("puts a review that fails to you", async () => {
+      const s1 = subtask("s1");
+      core.state.subtasks.push(s1);
+      vi.mocked(runSubtask).mockImplementation(delivering({ "score.txt": "0:0\n" }));
+      vi.mocked(askOnce).mockRejectedValue(new Error("API Error: 529"));
+      scheduler.pump();
+      await vi.waitFor(() => {
+        expect(core.state.questions).toMatchObject([
+          { text: "API Error: 529", decision: { kind: "review" } },
+        ]);
+      });
+    });
   });
 });
