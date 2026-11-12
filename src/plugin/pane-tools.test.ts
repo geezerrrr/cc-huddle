@@ -1,4 +1,6 @@
+import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { request } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -10,11 +12,13 @@ import { git } from "../engine/git.ts";
 import { teamFolder } from "../engine/team.ts";
 import type { Question } from "../engine/types.ts";
 import type { OpenplanView } from "../../plugin/types/index.d.ts";
+import { servePane, type PaneServer } from "./pane-server.ts";
 import { addPaneTools } from "./pane-tools.ts";
 
 let dir: string;
 let engine: Engine;
 let client: Client;
+let pane: PaneServer;
 
 beforeEach(async () => {
   dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-pane-")));
@@ -49,7 +53,8 @@ beforeEach(async () => {
     failed: vi.fn(),
   });
   const server = new McpServer({ name: "openplan", version: "0.0.0" });
-  addPaneTools(server, () => Promise.resolve(engine));
+  pane = await servePane(() => Promise.resolve(engine));
+  addPaneTools(server, () => Promise.resolve(engine), pane);
   const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
   await server.connect(serverSide);
   client = new Client({ name: "test", version: "0.0.0" });
@@ -58,6 +63,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await client.close();
+  pane.close();
   await engine.close();
   await rm(dir, { recursive: true, force: true });
 });
@@ -68,10 +74,33 @@ async function call(name: string, args: Record<string, unknown> = {}) {
   return { text: first?.text ?? "", error: result.isError === true };
 }
 
-const view = async (args: Record<string, unknown> = {}) =>
-  JSON.parse((await call("view", args)).text) as OpenplanView;
+/** Asks the pane's socket, at the address the `pane` tool gives: its status and body. */
+async function ask(path_: string, body: string) {
+  const socketPath = (await call("pane")).text;
+  return new Promise<{ status: number; text: string }>((resolve, reject) => {
+    const sent = request({ socketPath, path: path_, method: "POST" }, (response) => {
+      let text = "";
+      response.setEncoding("utf8").on("data", (chunk: string) => (text += chunk));
+      response.on("end", () => {
+        resolve({ status: response.statusCode ?? 0, text });
+      });
+    });
+    sent.once("error", reject).end(body);
+  });
+}
 
-describe("the pane's tools", () => {
+const view = async (args: Record<string, unknown> = {}) =>
+  JSON.parse((await ask("/view", JSON.stringify(args))).text) as OpenplanView;
+
+describe("the pane's socket and tools", () => {
+  it("serve only the view, and say why an ask doesn't fit", async () => {
+    expect((await ask("/answer", "{}")).status).toBe(404);
+    expect(await ask("/view", '{ "revision": "one" }')).toMatchObject({ status: 409 });
+    const { address } = pane;
+    pane.close();
+    expect(existsSync(address)).toBe(false);
+  });
+
   it("give the team only when it changed since the pane's revision", async () => {
     const first = await view();
     expect(first.team).toEqual({
@@ -123,7 +152,8 @@ describe("the pane's tools", () => {
       text: "That answer doesn't fit the question.",
       error: true,
     });
-    expect(await call("answer", { question: "q1", picks: ["Grid"] })).toMatchObject({
+    expect(await call("answer", { question: "q1", picks: ["Grid"] })).toEqual({
+      text: "Answered q1.",
       error: false,
     });
     expect(question.status).toBe("answered");

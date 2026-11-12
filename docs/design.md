@@ -38,7 +38,7 @@ Two layers. The engine knows nothing of the plugin.
 ```
 ┌─────────────────── Claude Code (your session) ───────────────────┐
 │  mod: pane, band, toasts, /openplan          skill               │
-│        │ $.mcp.call: view, answer                                 │
+│        │ socket: view    $.mcp.call: pane, answer                 │
 │  MCP server `openplan`: tools ── engine: state machines ·         │
 │                                  scheduler · meetings · questions │
 │                                  · worktrees and merges           │
@@ -75,7 +75,7 @@ One session runs a repository's team at a time, held by a lock in the repository
 
 ### 3.3 Plugin
 
-- **MCP server `openplan`**: the engine and the tools your session uses (§7.3). Two more tools serve the mod, which calls them with `$.mcp.call`: `view` (the team as the pane draws it, a member's record from where it left off) and `answer`. The mod keeps both from your session's model, so an answer comes only from you.
+- **MCP server `openplan`**: the engine and the tools your session uses (§7.3). The pane reads the team twice a second from the server's own socket: `POST /view` gives the team as the pane draws it and a member's record from where it left off. It doesn't go through `$.mcp.call`, which Claude Code runs as a tool call, with your PreToolUse and PostToolUse hooks around it each time. The socket is one per session, in a folder only you can read (a named pipe on Windows), and only reads. Two more tools serve the mod: `pane` names the socket, once, and `answer` carries what you pressed. The mod keeps both from your session's model, so an answer comes only from you.
 - **Mod**: the pane, the band, toasts, transcript rows and the `/openplan` command (§7.2), and the prompts that wake your session (§7.3). `/openplan <task>` hands your session the task for the team; the pane and `status` run without a model turn.
 - **Skill**: tells your session what it is for: relay and act, never do the work itself.
 - **SessionStart hook**: tells your session what stopped or waits on you, as context. The mod shows you the same in the band.
@@ -238,7 +238,7 @@ Your session talks; the pane shows and answers. The tools your session has: see 
 
 A tool that names a member (a meeting's attendees, an assignee, a plan's owners) takes only the team's members, each listed with their role in its schema, so your session matches what you said against the team as it would against any tool's options. When the team is read again, the server tells Claude Code its tools changed (`notifications/tools/list_changed`).
 
-Your session is woken only for what needs a conversation: a plan to review and a task to accept. The `view` tool lists each, and the mod submits each new one to your session with `$.prompt.submit`, Claude Code's call for a plugin's prompt: an idle session starts a turn with it, read as a message from the openplan plugin. What waits already when the team opens is the SessionStart hook's to tell.
+Your session is woken only for what needs a conversation: a plan to review and a task to accept. The pane's view lists each, and the mod submits each new one to your session with `$.prompt.submit`, Claude Code's call for a plugin's prompt: an idle session starts a turn with it, read as a message from the openplan plugin. What waits already when the team opens is the SessionStart hook's to tell.
 
 ## 8. Permissions
 
@@ -274,7 +274,8 @@ Checked on Claude Code 2.1.322 and Agent SDK 0.3.322, with a probe plugin and a 
 - An MCP server is not given `CLAUDE_PID` (hooks are); its parent process is the session. A command-form hook is the session's child too.
 - A plugin's skill takes the plugin's name as its short command: a skill named `openplan` in the plugin `openplan` keeps the mod from registering `/openplan`, `user-invocable: false` or not.
 - A plugin's `$.prompt.submit` from a `command.run` hook is refused, as it would wait on the command's own run; from a timer after it, it starts the turn. `/openplan <task>` so reaches the session, with the roster of a team kept only in `CLAUDE_CONFIG_DIR/openplan/`.
+- `$.mcp.call` runs as a tool call: a PreToolUse and a PostToolUse hook in your settings run around each one (79 of each in 40 s of the pane's old 500 ms poll). `$.http.fetch` over a Unix socket runs none; the pane's poll there takes 1 to 4 ms.
 - Claude Code refreshes a server's tools on `notifications/tools/list_changed`, so the member names in the tools follow the team as it is read.
 - Loaded with `--plugin-dir` against the mock: the first start installs the dependencies and connects in about 5 s, later ones at once; the band, `/openplan`, `/openplan status`, the pane and the SessionStart context all show the team as its state file has it.
 
-Left: whether the pane redraws smoothly, polling the MCP server every 500 ms with `$.mcp.call`, while a meeting streams.
+Left: whether the pane redraws smoothly, polling its socket every 500 ms, while a meeting streams.

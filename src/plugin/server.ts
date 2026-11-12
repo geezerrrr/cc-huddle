@@ -1,7 +1,8 @@
 /**
  * openplan's MCP server (docs/design.md §3.2, §3.3). Claude Code starts it
  * with your session and ends it with the session; it runs the team of the
- * repository the session is in, and gives your session its tools.
+ * repository the session is in, and gives your session its tools and the
+ * pane its socket.
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -13,6 +14,7 @@ import { userTeamFolder } from "../engine/team.ts";
 import { executableOf } from "./claude.ts";
 import { dataFolder } from "./data-folder.ts";
 import { pluginId } from "./plugin-id.ts";
+import { servePane } from "./pane-server.ts";
 import { addPaneTools } from "./pane-tools.ts";
 import { addTools } from "./tools.ts";
 
@@ -78,9 +80,14 @@ process.on("uncaughtException", (error) => {
 });
 process.once("exit", stopMembers);
 
+const pane = await servePane(team);
+process.once("exit", () => {
+  pane.close();
+});
+
 const server = new McpServer({ name: "openplan", version: plugin.version });
 const listMembers = addTools(server, team);
-addPaneTools(server, team);
+addPaneTools(server, team, pane);
 await server.connect(new StdioServerTransport());
 // Opened now, so the session finds its team as it stands; a tool says why, if it can't be.
 team().catch((error: unknown) => {

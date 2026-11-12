@@ -59,15 +59,29 @@ const TEAM: OpenplanTeam = {
   prompts: [],
 };
 
-/** The server as the mod reaches it: `view` answers with `views` in turn, the rest is kept, with each pane opened. */
+const SOCKET = "/tmp/openplan-test/pane.sock";
+
+/** An answer on the pane's socket. */
+const served = (status: number, text: string) => ({
+  value: { status, ok: status < 300, headers: {}, text },
+});
+
+/**
+ * The server as the mod reaches it: its socket's view answers with `views` in
+ * turn; each call is kept, the view's as `view`, with each pane opened.
+ */
 function serve(on: On, views: OpenplanView[]) {
   const calls: { tool: string; args: Record<string, unknown> }[] = [];
   on("mcp.connect", () => ({ value: { isConnected: true, server: SERVER } }));
   on("mcp.call", (_, e) => {
     calls.push({ tool: e.tool, args: e.args });
-    const text =
-      e.tool === "view" ? JSON.stringify(views.length > 1 ? views.shift() : views[0]) : "Team: glm";
+    const text = e.tool === "pane" ? SOCKET : "Team: glm";
     return { value: { content: [{ type: "text", text }], isError: false } };
+  });
+  on("http.fetch", (_, e) => {
+    expect([e.url, e.init?.socketPath]).toEqual(["http://openplan/view", SOCKET]);
+    calls.push({ tool: "view", args: JSON.parse(e.init?.body ?? "{}") as Record<string, unknown> });
+    return served(200, JSON.stringify(views.length > 1 ? views.shift() : views[0]));
   });
   on("command.register", (_, e) => ({ value: { command: e.name } }));
   on("ui.open", (_, e) => {
@@ -221,10 +235,10 @@ test("the pane stops asking a team that can't be opened, until you or your sessi
   const clock = mock.clock(on);
   let views = 0;
   on("mcp.connect", () => ({ value: { isConnected: true, server: SERVER } }));
-  on("mcp.call", (_, e) => {
-    if (e.tool === "view") views++;
-    const text = e.tool === "view" ? "The team has no members" : "Started.";
-    return { value: { content: [{ type: "text", text }], isError: e.tool === "view" } };
+  on("mcp.call", () => ({ value: { content: [{ type: "text", text: SOCKET }], isError: false } }));
+  on("http.fetch", () => {
+    views++;
+    return served(409, "The team has no members");
   });
   on("command.register", (_, e) => ({ value: { command: e.name } }));
   on("ui.open", () => ({ value: { isPlaced: true } }));

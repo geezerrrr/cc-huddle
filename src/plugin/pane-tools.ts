@@ -1,58 +1,29 @@
 /**
- * The tools openplan's pane draws from and answers with (docs/design.md
- * §7.2). They are the pane's, not your session's: the mod keeps the model
- * from calling them, so a permission is granted only by you, pressing its
- * button.
+ * The tools of openplan's pane (docs/design.md §7.2): where it reads the team
+ * (`pane`, its socket), and how it answers what waits on you (`answer`).
+ * They are the pane's, not your session's: the mod keeps the model from
+ * calling them, so a permission is granted only by you, pressing its button.
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { OpenplanView } from "../../plugin/types/index.d.ts";
-import { workOf } from "../engine/core.ts";
 import type { Engine } from "../engine/engine.ts";
 import type { Answer } from "../engine/questions.ts";
 import { DECISION_OPTIONS, PERMISSION_OPTIONS } from "../engine/types.ts";
-import { paneTeam, shownMeeting } from "./pane.ts";
+import { toolText } from "../engine/turns.ts";
+import type { PaneServer } from "./pane-server.ts";
 import { decisionOf } from "./tools.ts";
-
-const json = (value: unknown) => ({
-  content: [{ type: "text" as const, text: JSON.stringify(value) }],
-});
 
 const PANE_ONLY = "For openplan's pane only: your session never calls it.";
 
-/** Adds the pane's tools to `server`; each opens the team first, if it isn't open (`team`). */
-export function addPaneTools(server: McpServer, team: () => Promise<Engine>) {
+/** Adds the pane's tools to `server`; `answer` opens the team first, if it isn't open (`team`). */
+export function addPaneTools(server: McpServer, team: () => Promise<Engine>, pane: PaneServer) {
   server.registerTool(
-    "view",
+    "pane",
     {
-      description: `${PANE_ONLY} The team as the pane draws it.`,
-      inputSchema: {
-        revision: z.number().int().optional().describe("The revision the pane has"),
-        record: z
-          .object({ subtask: z.string(), from: z.number().int().min(0) })
-          .optional()
-          .describe("The subtask whose record the pane follows, and the byte it read up to"),
-      },
+      description: `${PANE_ONLY} The socket the pane reads the team from.`,
       annotations: { readOnlyHint: true },
     },
-    async ({ revision, record }) => {
-      const engine = await team();
-      const work = workOf(engine);
-      const meeting = shownMeeting(work);
-      const spoken = meeting && engine.records.speaking(meeting);
-      const view: OpenplanView = {
-        revision: engine.revision,
-        ...(revision !== engine.revision && { team: paneTeam(work, engine.team.members) }),
-        ...(spoken && { speaking: { speaker: spoken.speaker, text: spoken.text } }),
-        ...(record && {
-          record: {
-            subtask: record.subtask,
-            ...(await engine.records.read(record.subtask, record.from)),
-          },
-        }),
-      };
-      return json(view);
-    },
+    () => toolText(pane.address),
   );
 
   server.registerTool(
@@ -75,7 +46,7 @@ export function addPaneTools(server: McpServer, team: () => Promise<Engine>) {
           ? decisionOf(decision, note, sent_back)
           : { picks: picks ?? [] };
       await (await team()).answer(question, answer);
-      return json({ answered: question });
+      return toolText(`Answered ${question}.`);
     },
   );
 }

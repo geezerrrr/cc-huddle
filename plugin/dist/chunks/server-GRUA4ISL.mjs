@@ -84,17 +84,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path9) {
-      const ctrl = callVisitor(key, node, visitor, path9);
+    function visit_(key, node, visitor, path10) {
+      const ctrl = callVisitor(key, node, visitor, path10);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path9, ctrl);
-        return visit_(key, ctrl, visitor, path9);
+        replaceNode(key, path10, ctrl);
+        return visit_(key, ctrl, visitor, path10);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path9 = Object.freeze(path9.concat(node));
+          path10 = Object.freeze(path10.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path9);
+            const ci = visit_(i, node.items[i], visitor, path10);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -105,13 +105,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path9 = Object.freeze(path9.concat(node));
-          const ck = visit_("key", node.key, visitor, path9);
+          path10 = Object.freeze(path10.concat(node));
+          const ck = visit_("key", node.key, visitor, path10);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path9);
+          const cv = visit_("value", node.value, visitor, path10);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -132,17 +132,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path9) {
-      const ctrl = await callVisitor(key, node, visitor, path9);
+    async function visitAsync_(key, node, visitor, path10) {
+      const ctrl = await callVisitor(key, node, visitor, path10);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path9, ctrl);
-        return visitAsync_(key, ctrl, visitor, path9);
+        replaceNode(key, path10, ctrl);
+        return visitAsync_(key, ctrl, visitor, path10);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path9 = Object.freeze(path9.concat(node));
+          path10 = Object.freeze(path10.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path9);
+            const ci = await visitAsync_(i, node.items[i], visitor, path10);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -153,13 +153,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path9 = Object.freeze(path9.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path9);
+          path10 = Object.freeze(path10.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path10);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path9);
+          const cv = await visitAsync_("value", node.value, visitor, path10);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -186,23 +186,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path9) {
+    function callVisitor(key, node, visitor, path10) {
       if (typeof visitor === "function")
-        return visitor(key, node, path9);
+        return visitor(key, node, path10);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path9);
+        return visitor.Map?.(key, node, path10);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path9);
+        return visitor.Seq?.(key, node, path10);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path9);
+        return visitor.Pair?.(key, node, path10);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path9);
+        return visitor.Scalar?.(key, node, path10);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path9);
+        return visitor.Alias?.(key, node, path10);
       return void 0;
     }
-    function replaceNode(key, path9, node) {
-      const parent = path9[path9.length - 1];
+    function replaceNode(key, path10, node) {
+      const parent = path10[path10.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -814,10 +814,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path9, value) {
+    function collectionFromPath(schema, path10, value) {
       let v = value;
-      for (let i = path9.length - 1; i >= 0; --i) {
-        const k = path9[i];
+      for (let i = path10.length - 1; i >= 0; --i) {
+        const k = path10[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -836,7 +836,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path9) => path9 == null || typeof path9 === "object" && !!path9[Symbol.iterator]().next().done;
+    var isEmptyPath = (path10) => path10 == null || typeof path10 === "object" && !!path10[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -866,11 +866,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path9, value) {
-        if (isEmptyPath(path9))
+      addIn(path10, value) {
+        if (isEmptyPath(path10))
           this.add(value);
         else {
-          const [key, ...rest] = path9;
+          const [key, ...rest] = path10;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -884,8 +884,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path9) {
-        const [key, ...rest] = path9;
+      deleteIn(path10) {
+        const [key, ...rest] = path10;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -899,8 +899,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path9, keepScalar) {
-        const [key, ...rest] = path9;
+      getIn(path10, keepScalar) {
+        const [key, ...rest] = path10;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -918,8 +918,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path9) {
-        const [key, ...rest] = path9;
+      hasIn(path10) {
+        const [key, ...rest] = path10;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -929,8 +929,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path9, value) {
-        const [key, ...rest] = path9;
+      setIn(path10, value) {
+        const [key, ...rest] = path10;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -974,14 +974,14 @@ var require_foldFlowLines = __commonJS({
     var FOLD_FLOW = "flow";
     var FOLD_BLOCK = "block";
     var FOLD_QUOTED = "quoted";
-    function foldFlowLines(text, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
+    function foldFlowLines(text2, indent, mode = "flow", { indentAtStart, lineWidth = 80, minContentWidth = 20, onFold, onOverflow } = {}) {
       if (!lineWidth || lineWidth < 0)
-        return text;
+        return text2;
       if (lineWidth < minContentWidth)
         minContentWidth = 0;
       const endStep = Math.max(1 + minContentWidth, 1 + lineWidth - indent.length);
-      if (text.length <= endStep)
-        return text;
+      if (text2.length <= endStep)
+        return text2;
       const folds = [];
       const escapedFolds = {};
       let end2 = lineWidth - indent.length;
@@ -998,14 +998,14 @@ var require_foldFlowLines = __commonJS({
       let escStart = -1;
       let escEnd = -1;
       if (mode === FOLD_BLOCK) {
-        i = consumeMoreIndentedLines(text, i, indent.length);
+        i = consumeMoreIndentedLines(text2, i, indent.length);
         if (i !== -1)
           end2 = i + endStep;
       }
-      for (let ch; ch = text[i += 1]; ) {
+      for (let ch; ch = text2[i += 1]; ) {
         if (mode === FOLD_QUOTED && ch === "\\") {
           escStart = i;
-          switch (text[i + 1]) {
+          switch (text2[i + 1]) {
             case "x":
               i += 3;
               break;
@@ -1022,12 +1022,12 @@ var require_foldFlowLines = __commonJS({
         }
         if (ch === "\n") {
           if (mode === FOLD_BLOCK)
-            i = consumeMoreIndentedLines(text, i, indent.length);
+            i = consumeMoreIndentedLines(text2, i, indent.length);
           end2 = i + indent.length + endStep;
           split = void 0;
         } else {
           if (ch === " " && prev && prev !== " " && prev !== "\n" && prev !== "	") {
-            const next = text[i + 1];
+            const next = text2[i + 1];
             if (next && next !== " " && next !== "\n" && next !== "	")
               split = i;
           }
@@ -1039,12 +1039,12 @@ var require_foldFlowLines = __commonJS({
             } else if (mode === FOLD_QUOTED) {
               while (prev === " " || prev === "	") {
                 prev = ch;
-                ch = text[i += 1];
+                ch = text2[i += 1];
                 overflow = true;
               }
               const j = i > escEnd + 1 ? i - 2 : escStart - 1;
               if (escapedFolds[j])
-                return text;
+                return text2;
               folds.push(j);
               escapedFolds[j] = true;
               end2 = j + endStep;
@@ -1059,39 +1059,39 @@ var require_foldFlowLines = __commonJS({
       if (overflow && onOverflow)
         onOverflow();
       if (folds.length === 0)
-        return text;
+        return text2;
       if (onFold)
         onFold();
-      let res = text.slice(0, folds[0]);
+      let res = text2.slice(0, folds[0]);
       for (let i2 = 0; i2 < folds.length; ++i2) {
         const fold = folds[i2];
-        const end3 = folds[i2 + 1] || text.length;
+        const end3 = folds[i2 + 1] || text2.length;
         if (fold === 0)
           res = `
-${indent}${text.slice(0, end3)}`;
+${indent}${text2.slice(0, end3)}`;
         else {
           if (mode === FOLD_QUOTED && escapedFolds[fold])
-            res += `${text[fold]}\\`;
+            res += `${text2[fold]}\\`;
           res += `
-${indent}${text.slice(fold + 1, end3)}`;
+${indent}${text2.slice(fold + 1, end3)}`;
         }
       }
       return res;
     }
-    function consumeMoreIndentedLines(text, i, indent) {
+    function consumeMoreIndentedLines(text2, i, indent) {
       let end2 = i;
       let start = i + 1;
-      let ch = text[start];
+      let ch = text2[start];
       while (ch === " " || ch === "	") {
         if (i < start + indent) {
-          ch = text[++i];
+          ch = text2[++i];
         } else {
           do {
-            ch = text[++i];
+            ch = text2[++i];
           } while (ch && ch !== "\n");
           end2 = i;
           start = i + 1;
-          ch = text[start];
+          ch = text2[start];
         }
       }
       return end2;
@@ -1134,27 +1134,27 @@ var require_stringifyString = __commonJS({
       return true;
     }
     function doubleQuotedString(value, ctx) {
-      const json2 = JSON.stringify(value);
+      const json = JSON.stringify(value);
       if (ctx.options.doubleQuotedAsJSON)
-        return json2;
+        return json;
       const { implicitKey } = ctx;
       const minMultiLineLength = ctx.options.doubleQuotedMinMultiLineLength;
       const indent = ctx.indent || (containsDocumentMarker(value) ? "  " : "");
       let str = "";
       let start = 0;
-      for (let i = 0, ch = json2[i]; ch; ch = json2[++i]) {
-        if (ch === " " && json2[i + 1] === "\\" && json2[i + 2] === "n") {
-          str += json2.slice(start, i) + "\\ ";
+      for (let i = 0, ch = json[i]; ch; ch = json[++i]) {
+        if (ch === " " && json[i + 1] === "\\" && json[i + 2] === "n") {
+          str += json.slice(start, i) + "\\ ";
           i += 1;
           start = i;
           ch = "\\";
         }
         if (ch === "\\")
-          switch (json2[i + 1]) {
+          switch (json[i + 1]) {
             case "u":
               {
-                str += json2.slice(start, i);
-                const code2 = json2.substr(i + 2, 4);
+                str += json.slice(start, i);
+                const code2 = json.substr(i + 2, 4);
                 switch (code2) {
                   case "0000":
                     str += "\\0";
@@ -1184,23 +1184,23 @@ var require_stringifyString = __commonJS({
                     if (code2.substr(0, 2) === "00")
                       str += "\\x" + code2.substr(2);
                     else
-                      str += json2.substr(i, 6);
+                      str += json.substr(i, 6);
                 }
                 i += 5;
                 start = i + 1;
               }
               break;
             case "n":
-              if (implicitKey || json2[i + 2] === '"' || json2.length < minMultiLineLength) {
+              if (implicitKey || json[i + 2] === '"' || json.length < minMultiLineLength) {
                 i += 1;
               } else {
-                str += json2.slice(start, i) + "\n\n";
-                while (json2[i + 2] === "\\" && json2[i + 3] === "n" && json2[i + 4] !== '"') {
+                str += json.slice(start, i) + "\n\n";
+                while (json[i + 2] === "\\" && json[i + 3] === "n" && json[i + 4] !== '"') {
                   str += "\n";
                   i += 2;
                 }
                 str += indent;
-                if (json2[i + 2] === " ")
+                if (json[i + 2] === " ")
                   str += "\\";
                 i += 1;
                 start = i + 1;
@@ -1210,7 +1210,7 @@ var require_stringifyString = __commonJS({
               i += 1;
           }
       }
-      str = start ? str + json2.slice(start) : json2;
+      str = start ? str + json.slice(start) : json;
       return implicitKey ? str : foldFlowLines.foldFlowLines(str, indent, foldFlowLines.FOLD_QUOTED, getFoldOptions(ctx, false));
     }
     function singleQuotedString(value, ctx) {
@@ -3445,9 +3445,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path9, value) {
+      addIn(path10, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path9, value);
+          this.contents.addIn(path10, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3522,14 +3522,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path9) {
-        if (Collection.isEmptyPath(path9)) {
+      deleteIn(path10) {
+        if (Collection.isEmptyPath(path10)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path9) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path10) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3544,10 +3544,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path9, keepScalar) {
-        if (Collection.isEmptyPath(path9))
+      getIn(path10, keepScalar) {
+        if (Collection.isEmptyPath(path10))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path9, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path10, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3558,10 +3558,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path9) {
-        if (Collection.isEmptyPath(path9))
+      hasIn(path10) {
+        if (Collection.isEmptyPath(path10))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path9) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path10) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3578,13 +3578,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path9, value) {
-        if (Collection.isEmptyPath(path9)) {
+      setIn(path10, value) {
+        if (Collection.isEmptyPath(path10)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path9), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path10), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path9, value);
+          this.contents.setIn(path10, value);
         }
       }
       /**
@@ -3632,11 +3632,11 @@ var require_Document = __commonJS({
           throw new Error(`With a null YAML version, the { schema: Schema } option is required`);
       }
       // json & jsonArg are only used from toJSON()
-      toJS({ json: json2, jsonArg, mapAsMap, maxAliasCount, onAnchor, reviver } = {}) {
+      toJS({ json, jsonArg, mapAsMap, maxAliasCount, onAnchor, reviver } = {}) {
         const ctx = {
           anchors: /* @__PURE__ */ new Map(),
           doc: this,
-          keep: !json2,
+          keep: !json,
           mapAsMap: mapAsMap === true,
           mapKeyWarned: false,
           maxAliasCount: typeof maxAliasCount === "number" ? maxAliasCount : 100
@@ -5545,9 +5545,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path9) => {
+    visit.itemAtPath = (cst, path10) => {
       let item = cst;
-      for (const [field, index] of path9) {
+      for (const [field, index] of path10) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5556,23 +5556,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path9) => {
-      const parent = visit.itemAtPath(cst, path9.slice(0, -1));
-      const field = path9[path9.length - 1][0];
+    visit.parentCollection = (cst, path10) => {
+      const parent = visit.itemAtPath(cst, path10.slice(0, -1));
+      const field = path10[path10.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path9, item, visitor) {
-      let ctrl = visitor(item, path9);
+    function _visit(path10, item, visitor) {
+      let ctrl = visitor(item, path10);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path9.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path10.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -5583,10 +5583,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path9);
+            ctrl = ctrl(item, path10);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path9) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path10) : ctrl;
     }
     exports.visit = visit;
   }
@@ -7373,13 +7373,13 @@ import { renameSync, writeFileSync } from "node:fs";
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 var fresh = (file) => `${file}.${String(process.pid)}.new`;
-async function writeWhole(file, text, mode) {
+async function writeWhole(file, text2, mode) {
   await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(fresh(file), text, { mode });
+  await writeFile(fresh(file), text2, { mode });
   await rename(fresh(file), file);
 }
-function writeWholeSync(file, text) {
-  writeFileSync(fresh(file), text);
+function writeWholeSync(file, text2) {
+  writeFileSync(fresh(file), text2);
   renameSync(fresh(file), file);
 }
 
@@ -7399,16 +7399,16 @@ var dataFiles = (folder) => ({
 var STATE_VERSION = 1;
 var SAVE_DELAY_MS = 200;
 async function readState(file) {
-  let text;
+  let text2;
   try {
-    text = await readFile(file, "utf8");
+    text2 = await readFile(file, "utf8");
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
     return { goals: [], tasks: [], subtasks: [], meetings: [], questions: [] };
   }
   let saved;
   try {
-    saved = JSON.parse(text);
+    saved = JSON.parse(text2);
   } catch (error) {
     throw new Error(`${file} can't be read (${errorText(error)}): move it away to start over`, {
       cause: error
@@ -7687,7 +7687,7 @@ async function unresolved(places, subtaskId, files) {
   const marked = await Promise.all(
     files.map(
       (file) => readFile2(path3.join(desk, file), "utf8").then(
-        (text) => MARKERS.test(text),
+        (text2) => MARKERS.test(text2),
         () => false
       )
     )
@@ -7698,8 +7698,8 @@ async function conflicts(places, subtaskId, at) {
   const list = await git(at, ["diff", "--name-only", "-z", "--diff-filter=U"]);
   const files = list.stdout.split("\0").filter(Boolean);
   if (!files.length) return void 0;
-  const text = await unresolved(places, subtaskId, files);
-  return { kind: "conflict", text, other: files.filter((file) => !text.includes(file)) };
+  const text2 = await unresolved(places, subtaskId, files);
+  return { kind: "conflict", text: text2, other: files.filter((file) => !text2.includes(file)) };
 }
 async function removeDesk(places, slug, subtaskId) {
   const desk = deskFolder(places, subtaskId);
@@ -8604,7 +8604,7 @@ async function recordMembersIn(file) {
 // src/engine/turns.ts
 var TURN_SERVER = "openplan";
 var turnToolName = (name) => `mcp__${TURN_SERVER}__${name}`;
-var toolText = (text) => ({ content: [{ type: "text", text }] });
+var toolText = (text2) => ({ content: [{ type: "text", text: text2 }] });
 var tokensOf = (usage) => usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens + usage.output_tokens;
 function resultOutcome(message, subagentTokens = 0) {
   const tokens = tokensOf(message.usage) + subagentTokens;
@@ -9109,10 +9109,10 @@ var Meetings = class {
       core.changed();
       return ask(member, prompt, { ...turn, listener: core.speech(meeting2, member.name) });
     };
-    const said = (speaker, { text, tokens }, phase, calls) => {
+    const said = (speaker, { text: text2, tokens }, phase, calls) => {
       meeting2.turns.push({
         speaker: speaker.name,
-        text,
+        text: text2,
         at: Date.now(),
         phase,
         tokens,
@@ -9169,8 +9169,8 @@ var Meetings = class {
           tool: floorTool(others, (given) => floor = given)
         });
         const called2 = floor?.member ?? meeting2.hands?.[0]?.member;
-        const text = steer.text.trim();
-        if (text && !floor?.quiet) said(host, { text, tokens: steer.tokens }, "steer", called2);
+        const text2 = steer.text.trim();
+        if (text2 && !floor?.quiet) said(host, { text: text2, tokens: steer.tokens }, "steer", called2);
         else if (called2) await answer(called2);
         else return false;
         return true;
@@ -9335,8 +9335,8 @@ var Questions = class {
    * and leaves the state when it settles. Its subtask's run stopping calls it
    * off (cancelFor) and should stop `answering` too.
    */
-  async toTeammate(asker, to, text, answering) {
-    const question = this.open(asker, { text, kind: "teammate", to });
+  async toTeammate(asker, to, text2, answering) {
+    const question = this.open(asker, { text: text2, kind: "teammate", to });
     try {
       return await answering();
     } finally {
@@ -9347,10 +9347,10 @@ var Questions = class {
    * A stuck review, a merge that needs you, or a task done (with why, or
    * what, in `text`): it waits for your answer, no turn behind it.
    */
-  openDecision(subtask2, decision, text) {
+  openDecision(subtask2, decision, text2) {
     this.open(
       { from: subtask2.assignee, subtaskId: subtask2.id },
-      { text, kind: "decision", decision }
+      { text: text2, kind: "decision", decision }
     );
   }
   /**
@@ -10269,15 +10269,15 @@ ${z5.prettifyError(result.error)}`);
 }
 var missing = (error) => error.code === "ENOENT";
 async function jsonFile(file) {
-  let text;
+  let text2;
   try {
-    text = await readFile4(file, "utf8");
+    text2 = await readFile4(file, "utf8");
   } catch (error) {
     if (missing(error)) return void 0;
     throw error;
   }
   try {
-    return JSON.parse(text);
+    return JSON.parse(text2);
   } catch (error) {
     throw new Error(`${file}: ${errorText(error)}`, { cause: error });
   }
@@ -10293,8 +10293,8 @@ async function markdownFiles(folder) {
   return Promise.all(
     names.map(async (name) => {
       const file = path7.join(folder, name);
-      const text = await readFile4(file, "utf8");
-      const front = /^---\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(text);
+      const text2 = await readFile4(file, "utf8");
+      const front = /^---\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(text2);
       let data;
       try {
         data = (0, import_yaml.parse)(front?.[1] ?? "") ?? {};
@@ -10305,7 +10305,7 @@ async function markdownFiles(folder) {
         name: name.slice(0, -".md".length),
         file,
         data,
-        body: text.slice(front?.[0].length ?? 0)
+        body: text2.slice(front?.[0].length ?? 0)
       };
     })
   );
@@ -10586,8 +10586,14 @@ function pluginId(dataFolder2) {
   return `${PLUGIN}@${path8.basename(dataFolder2).slice(PLUGIN.length + 1)}`;
 }
 
-// src/plugin/pane-tools.ts
-import { z as z7 } from "zod";
+// src/plugin/pane-server.ts
+import { randomBytes } from "node:crypto";
+import { mkdtempSync, rmSync } from "node:fs";
+import { createServer } from "node:http";
+import { tmpdir } from "node:os";
+import path9 from "node:path";
+import { text } from "node:stream/consumers";
+import { z as z6 } from "zod";
 
 // src/plugin/status.ts
 var MEETING_STATUS = {
@@ -10857,8 +10863,72 @@ function paneTeam(work, members) {
   };
 }
 
+// src/plugin/pane-server.ts
+var viewSchema = z6.object({
+  /** The revision the pane has. */
+  revision: z6.number().int().optional(),
+  /** The subtask whose record the pane follows, and the byte it read up to. */
+  record: z6.object({ subtask: z6.string(), from: z6.number().int().min(0) }).optional()
+});
+async function paneView(engine2, { revision, record: record2 }) {
+  const work = workOf(engine2);
+  const meeting2 = shownMeeting(work);
+  const spoken = meeting2 && engine2.records.speaking(meeting2);
+  return {
+    revision: engine2.revision,
+    ...revision !== engine2.revision && { team: paneTeam(work, engine2.team.members) },
+    ...spoken && { speaking: { speaker: spoken.speaker, text: spoken.text } },
+    ...record2 && {
+      record: {
+        subtask: record2.subtask,
+        ...await engine2.records.read(record2.subtask, record2.from)
+      }
+    }
+  };
+}
+function socketAddress() {
+  if (process.platform === "win32")
+    return { address: `\\\\.\\pipe\\openplan-${randomBytes(12).toString("hex")}` };
+  const folder = mkdtempSync(path9.join(tmpdir(), "openplan-"));
+  return { address: path9.join(folder, "pane.sock"), folder };
+}
+async function viewOf(team2, request) {
+  const asked = viewSchema.parse(JSON.parse(await text(request) || "{}"));
+  return paneView(await team2(), asked);
+}
+async function servePane(team2) {
+  const { address, folder } = socketAddress();
+  const server2 = createServer((request, response) => {
+    if (request.method !== "POST" || request.url !== "/view") {
+      response.writeHead(404).end();
+      return;
+    }
+    viewOf(team2, request).then(
+      (view) => {
+        response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(view));
+      },
+      (error) => {
+        response.writeHead(409, { "content-type": "text/plain" }).end(errorText(error));
+      }
+    );
+  });
+  await new Promise((resolve, reject) => {
+    server2.once("error", reject).listen(address, resolve);
+  });
+  return {
+    address,
+    close() {
+      server2.close();
+      if (folder) rmSync(folder, { recursive: true, force: true });
+    }
+  };
+}
+
+// src/plugin/pane-tools.ts
+import { z as z8 } from "zod";
+
 // src/plugin/tools.ts
-import { z as z6 } from "zod";
+import { z as z7 } from "zod";
 var decisionOf = (decision, note, sentBack) => ({
   decision,
   ...note && { note },
@@ -10886,28 +10956,28 @@ var writtenPlan = (plan) => ({
     }))
   }))
 });
-var goal = z6.string().describe("The goal's id, or its name");
-var meeting = z6.string().describe("The meeting's id");
-var subtask = z6.string().describe("The subtask's id");
+var goal = z7.string().describe("The goal's id, or its name");
+var meeting = z7.string().describe("The meeting's id");
+var subtask = z7.string().describe("The subtask's id");
 function memberName(members) {
-  if (!members) return z6.string().describe("A member's name");
+  if (!members) return z7.string().describe("A member's name");
   const names = members.map((m) => m.name);
   const roster = members.map((m) => `${m.name} (${m.role.title})`).join(", ");
-  return z6.enum(names).describe(`One of the team: ${roster}`);
+  return z7.enum(names).describe(`One of the team: ${roster}`);
 }
 var meetingInput = (member) => ({
   goal,
-  agenda: z6.string().trim().min(1).describe("What to plan, with everything the user said about it"),
-  size: z6.enum(MEETING_SIZES).optional().describe("How long the discussion runs; the team's default when left out"),
-  attendees: z6.array(member).default([]).describe("The host first; everyone when empty")
+  agenda: z7.string().trim().min(1).describe("What to plan, with everything the user said about it"),
+  size: z7.enum(MEETING_SIZES).optional().describe("How long the discussion runs; the team's default when left out"),
+  attendees: z7.array(member).default([]).describe("The host first; everyone when empty")
 });
 var changePlanInput = (member) => ({ meeting, plan: planSchema(member) });
 var assignInput = (member) => ({
   goal,
   assignee: member,
-  title: z6.string().trim().min(1),
-  description: z6.string().trim().describe("Everything the user said about it"),
-  acceptance: z6.string().trim().default("").describe("When it counts as done")
+  title: z7.string().trim().min(1),
+  description: z7.string().trim().describe("Everything the user said about it"),
+  acceptance: z7.string().trim().default("").describe("When it counts as done")
 });
 function addTools(server2, team2) {
   server2.registerTool(
@@ -10925,7 +10995,7 @@ function addTools(server2, team2) {
     "start_goal",
     {
       description: "Start a goal: something the user wants done. It gets its own branch, cut from the repository's HEAD. Then hold a meeting to plan it, or assign work directly.",
-      inputSchema: { name: z6.string().trim().min(1).describe("A few words for what is wanted") }
+      inputSchema: { name: z7.string().trim().min(1).describe("A few words for what is wanted") }
     },
     async ({ name }) => {
       const started = await (await team2()).goals.start(name);
@@ -11028,7 +11098,7 @@ function addTools(server2, team2) {
     "goal_action",
     {
       description: "Pause a goal (its runs stop, to go on later in their sessions), resume it, archive it, or delete an archived one: its worktrees and subtask branches go, its own branch stays. Delete only when the user has confirmed it.",
-      inputSchema: { goal, action: z6.enum(GOAL_ACTIONS) },
+      inputSchema: { goal, action: z7.enum(GOAL_ACTIONS) },
       annotations: { destructiveHint: true }
     },
     async ({ goal: ref, action }) => {
@@ -11042,7 +11112,7 @@ function addTools(server2, team2) {
     "subtask_action",
     {
       description: "Stop a subtask; continue a stopped or failed one in its session and worktree; retry one from the start; or redo a done one whose upstream was redone.",
-      inputSchema: { subtask, action: z6.enum(SUBTASK_ACTIONS) }
+      inputSchema: { subtask, action: z7.enum(SUBTASK_ACTIONS) }
     },
     async ({ subtask: id, action }) => {
       const engine2 = await team2();
@@ -11058,10 +11128,10 @@ function addTools(server2, team2) {
     "message",
     {
       description: "Pass the user's words to the member working on a subtask: a running one takes them at once, in its session; one not started reads them first.",
-      inputSchema: { subtask, text: z6.string().trim().min(1) }
+      inputSchema: { subtask, text: z7.string().trim().min(1) }
     },
-    async ({ subtask: id, text }) => {
-      const went = (await team2()).scheduler.carry(id, text);
+    async ({ subtask: id, text: text2 }) => {
+      const went = (await team2()).scheduler.carry(id, text2);
       return toolText(
         went === "goes" ? "Passed on." : went === "handedOver" ? "Not passed on: it is delivered and in review or being merged. Send its task back once it is done." : "Not passed on: its goal is paused or archived."
       );
@@ -11072,10 +11142,10 @@ function addTools(server2, team2) {
     {
       description: "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask), a stuck review (rereview, skip, sendBack), or a merge (ours, theirs, retry).",
       inputSchema: {
-        question: z6.string().describe("The id of what waits on the user"),
-        decision: z6.enum(DECISION_OPTIONS),
-        note: z6.string().trim().optional().describe("What to change, in the user's words"),
-        sent_back: z6.string().optional().describe("The subtask a revised task goes back to")
+        question: z7.string().describe("The id of what waits on the user"),
+        decision: z7.enum(DECISION_OPTIONS),
+        note: z7.string().trim().optional().describe("What to change, in the user's words"),
+        sent_back: z7.string().optional().describe("The subtask a revised task goes back to")
       }
     },
     async ({ question, decision, note, sent_back }) => {
@@ -11092,64 +11162,40 @@ function addTools(server2, team2) {
 }
 
 // src/plugin/pane-tools.ts
-var json = (value) => ({
-  content: [{ type: "text", text: JSON.stringify(value) }]
-});
 var PANE_ONLY = "For openplan's pane only: your session never calls it.";
-function addPaneTools(server2, team2) {
+function addPaneTools(server2, team2, pane2) {
   server2.registerTool(
-    "view",
+    "pane",
     {
-      description: `${PANE_ONLY} The team as the pane draws it.`,
-      inputSchema: {
-        revision: z7.number().int().optional().describe("The revision the pane has"),
-        record: z7.object({ subtask: z7.string(), from: z7.number().int().min(0) }).optional().describe("The subtask whose record the pane follows, and the byte it read up to")
-      },
+      description: `${PANE_ONLY} The socket the pane reads the team from.`,
       annotations: { readOnlyHint: true }
     },
-    async ({ revision, record: record2 }) => {
-      const engine2 = await team2();
-      const work = workOf(engine2);
-      const meeting2 = shownMeeting(work);
-      const spoken = meeting2 && engine2.records.speaking(meeting2);
-      const view = {
-        revision: engine2.revision,
-        ...revision !== engine2.revision && { team: paneTeam(work, engine2.team.members) },
-        ...spoken && { speaking: { speaker: spoken.speaker, text: spoken.text } },
-        ...record2 && {
-          record: {
-            subtask: record2.subtask,
-            ...await engine2.records.read(record2.subtask, record2.from)
-          }
-        }
-      };
-      return json(view);
-    }
+    () => toolText(pane2.address)
   );
   server2.registerTool(
     "answer",
     {
       description: `${PANE_ONLY} Answers what waits on the user, as they pressed it.`,
       inputSchema: {
-        question: z7.string(),
-        option: z7.enum(PERMISSION_OPTIONS).optional().describe("A permission's answer"),
-        picks: z7.array(z7.string()).optional().describe("One pick per question with choices"),
-        decision: z7.enum(DECISION_OPTIONS).optional(),
-        note: z7.string().trim().optional().describe("Why it is denied, or what to change"),
-        sent_back: z7.string().optional().describe("The subtask a revised task goes back to")
+        question: z8.string(),
+        option: z8.enum(PERMISSION_OPTIONS).optional().describe("A permission's answer"),
+        picks: z8.array(z8.string()).optional().describe("One pick per question with choices"),
+        decision: z8.enum(DECISION_OPTIONS).optional(),
+        note: z8.string().trim().optional().describe("Why it is denied, or what to change"),
+        sent_back: z8.string().optional().describe("The subtask a revised task goes back to")
       }
     },
     async ({ question, option, picks, decision, note, sent_back }) => {
       const answer = option ? { option, ...note && { note } } : decision ? decisionOf(decision, note, sent_back) : { picks: picks ?? [] };
       await (await team2()).answer(question, answer);
-      return json({ answered: question });
+      return toolText(`Answered ${question}.`);
     }
   );
 }
 
 // src/plugin/server.ts
-var say = (text) => {
-  console.error(`openplan: ${text}`);
+var say = (text2) => {
+  console.error(`openplan: ${text2}`);
 };
 var engine;
 var opening;
@@ -11197,9 +11243,13 @@ process.on("uncaughtException", (error) => {
   process.exit(1);
 });
 process.once("exit", stopMembers);
+var pane = await servePane(team);
+process.once("exit", () => {
+  pane.close();
+});
 var server = new McpServer({ name: "openplan", version: plugin_default.version });
 var listMembers = addTools(server, team);
-addPaneTools(server, team);
+addPaneTools(server, team, pane);
 await server.connect(new StdioServerTransport());
 team().catch((error) => {
   say(errorText(error));

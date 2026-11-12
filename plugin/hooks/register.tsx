@@ -2,9 +2,9 @@
  * openplan's mod (docs/design.md §7.2): the pane, the band above the prompt,
  * toasts for what needs you, transcript rows for milestones, prompts to your
  * session for what needs a conversation, and the `/openplan` command, which
- * hands the team a task. It draws what the MCP server's `view` tool gives and
- * answers through its `answer` tool, with no model in between; the model is
- * kept from both.
+ * hands the team a task. It draws what the MCP server serves on the pane's
+ * socket, which the `pane` tool names, and answers through the `answer`
+ * tool, with no model in between; the model is kept from both tools.
  */
 import { atom, read, update } from "claude-code";
 import type { Elements, EngineInterface, Register, Timer } from "claude-code";
@@ -26,7 +26,7 @@ const PANE = "openplan";
 /** The server's tools, as the model names them. */
 const TOOLS = /^mcp__plugin_openplan_openplan__/;
 /** The tools only the pane calls, as the model would name them. */
-const PANE_ONLY = /^mcp__plugin_openplan_openplan__(view|answer)$/;
+const PANE_ONLY = /^mcp__plugin_openplan_openplan__(pane|answer)$/;
 const PANE_ONLY_REASON = "This tool is openplan's pane's: the user answers there, in /openplan.";
 /** How often the pane asks the team how it stands. */
 const POLL_MS = 500;
@@ -62,6 +62,8 @@ const PERMISSIONS = { once: "Allow once", always: "Always allow", deny: "Deny" }
 
 /** The name `$.mcp.call` takes for openplan's server, once connected. */
 let server: string | undefined;
+/** The socket the server serves the pane's view on, once the `pane` tool named it. */
+let socket: string | undefined;
 /** The revision of the team the pane has. */
 let revision: number | undefined;
 /** Needs, milestones and prompts told already; those there at the first look are not news. */
@@ -130,6 +132,29 @@ function handOff(task: string, now: OpenplanTeam | null): string {
     "",
     "Propose who takes it, keeping to anyone the user named: a meeting when it needs planning among several members (who attends, the host first, and what each brings to it), or one member when it doesn't (what they will do). Ask the user with AskUserQuestion to start with that or say what to change, and propose again until they start. Then start a goal (start_goal) and hold the meeting (hold_meeting) or assign the work (assign).",
   ].join("\n");
+}
+
+/**
+ * The team as the server has it, through the pane's socket: not a tool call,
+ * so your tool hooks don't run twice a second. A server started again has a
+ * new socket, asked for after the old one fails.
+ */
+async function view($: $, args: Record<string, unknown>): Promise<OpenplanView> {
+  socket ??= await call($, "pane");
+  let response;
+  try {
+    response = await $.http.fetch("http://openplan/view", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(args),
+      socketPath: socket,
+    });
+  } catch (error) {
+    socket = undefined;
+    throw error;
+  }
+  if (!response.ok) throw new Refused(response.text);
+  return JSON.parse(response.text) as OpenplanView;
 }
 
 /** Polls the team, unless it does already. */
@@ -201,21 +226,19 @@ async function poll($: $) {
   polling = true;
   try {
     const following = await read($, record);
-    const view = JSON.parse(
-      await call($, "view", {
-        ...(revision !== undefined && { revision }),
-        ...(following && { record: { subtask: following.subtask, from: following.next } }),
-      }),
-    ) as OpenplanView;
-    revision = view.revision;
+    const now = await view($, {
+      ...(revision !== undefined && { revision }),
+      ...(following && { record: { subtask: following.subtask, from: following.next } }),
+    });
+    revision = now.revision;
     await update($, problem, () => null);
-    if (view.team) {
-      tell($, view.team);
-      await update($, team, () => view.team ?? null);
+    if (now.team) {
+      tell($, now.team);
+      await update($, team, () => now.team ?? null);
     }
-    const said = view.speaking ?? null;
+    const said = now.speaking ?? null;
     await update($, speaking, (was) => (JSON.stringify(was) === JSON.stringify(said) ? was : said));
-    await update($, record, (was) => followed(was, view));
+    await update($, record, (was) => followed(was, now));
   } catch (error) {
     // A server still starting is asked again; a team it can't open waits for you.
     if (error instanceof Refused) {
