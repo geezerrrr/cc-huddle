@@ -10,13 +10,10 @@ import { errorText } from "../engine/core.ts";
 import { Engine } from "../engine/engine.ts";
 import { stopMembers } from "../engine/processes.ts";
 import { executableOf } from "./claude.ts";
+import { dataFolder } from "./data-folder.ts";
 import { pluginId } from "./plugin-id.ts";
 import { addPaneTools } from "./pane-tools.ts";
 import { addTools } from "./tools.ts";
-
-const dataFolder = process.env.CLAUDE_PLUGIN_DATA;
-if (!dataFolder)
-  throw new Error("openplan's MCP server runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA");
 
 const say = (text: string) => {
   console.error(`openplan: ${text}`);

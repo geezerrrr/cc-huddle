@@ -3,8 +3,9 @@ import {
   __commonJS,
   __require,
   __toESM,
+  dataFolder,
   running
-} from "./chunk-57CQPYHZ.mjs";
+} from "./chunk-P5QDYH7F.mjs";
 
 // node_modules/.pnpm/yaml@2.9.1/node_modules/yaml/dist/nodes/identity.js
 var require_identity = __commonJS({
@@ -8925,14 +8926,14 @@ var Meetings = class {
     const { core } = this;
     const named = [...new Set(call.attendees.map((name) => name.trim()))];
     const attendees = named.length ? named : core.team.members.map((m) => m.name).sort((a, b) => a.localeCompare(b));
-    this.admit(call.goalId, attendees);
+    const host = this.admit(call.goalId, attendees);
     const meeting2 = {
       id: randomUUID2(),
       goalId: call.goalId,
       agenda: call.agenda,
       size: call.size,
       participants: attendees,
-      host: attendees[0] ?? "",
+      host,
       status: "running",
       turns: [],
       tokens: 0,
@@ -9019,20 +9020,23 @@ var Meetings = class {
   }
   /**
    * Whether these members can sit down together now for this goal: the goal
-   * is active, each is on the team and free. Throws why not. Nothing is
+   * is active, each is on the team and free. Throws why not; gives the first,
+   * who hosts. Nothing is
    * awaited here or before the meeting is under way, so two meetings can't
    * both take the same member.
    */
   admit(goalId, attendees) {
     const { core } = this;
     this.activeGoal(goalId);
-    if (!attendees.length) throw new Error("The team has no members");
+    const [host] = attendees;
+    if (host === void 0) throw new Error("The team has no members");
     const names = new Set(core.team.members.map((m) => m.name));
     const stranger = attendees.find((name) => !names.has(name));
     if (stranger) throw new Error(`There is no member called "${stranger}"`);
     const busy2 = busyMembers(workOf(core));
     const taken = attendees.find((name) => busy2.has(name));
     if (taken) throw new Error(`${taken} is busy: working, reviewing, or at another meeting`);
+    return host;
   }
   /** A goal that is active, or throws why it isn't. */
   activeGoal(goalId) {
@@ -9077,7 +9081,7 @@ var Meetings = class {
           ...seat && { resume: seat.session },
           ...turn.tool && {
             mcpServers: { ...options.mcpServers, [TURN_SERVER]: turn.tool.server },
-            allowedTools: [...options.allowedTools ?? [], turn.tool.name]
+            allowedTools: [turn.tool.name]
           }
         },
         ...turn.schema && { schema: turn.schema },
@@ -11089,9 +11093,6 @@ function addPaneTools(server2, team2) {
 }
 
 // src/plugin/server.ts
-var dataFolder = process.env.CLAUDE_PLUGIN_DATA;
-if (!dataFolder)
-  throw new Error("openplan's MCP server runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA");
 var say = (text) => {
   console.error(`openplan: ${text}`);
 };

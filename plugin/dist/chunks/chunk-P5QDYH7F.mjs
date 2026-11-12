@@ -45,9 +45,15 @@ function running(pid) {
   }
 }
 
+// src/plugin/data-folder.ts
+var folder = process.env.CLAUDE_PLUGIN_DATA;
+if (!folder) throw new Error("openplan runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA");
+var dataFolder = folder;
+
 export {
   __require,
   __commonJS,
   __toESM,
-  running
+  running,
+  dataFolder
 };

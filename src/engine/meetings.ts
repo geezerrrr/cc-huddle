@@ -174,14 +174,14 @@ export class Meetings {
     const attendees = named.length
       ? named
       : core.team.members.map((m) => m.name).sort((a, b) => a.localeCompare(b));
-    this.admit(call.goalId, attendees);
+    const host = this.admit(call.goalId, attendees);
     const meeting: Meeting = {
       id: randomUUID(),
       goalId: call.goalId,
       agenda: call.agenda,
       size: call.size,
       participants: attendees,
-      host: attendees[0] ?? "",
+      host,
       status: "running",
       turns: [],
       tokens: 0,
@@ -278,20 +278,23 @@ export class Meetings {
 
   /**
    * Whether these members can sit down together now for this goal: the goal
-   * is active, each is on the team and free. Throws why not. Nothing is
+   * is active, each is on the team and free. Throws why not; gives the first,
+   * who hosts. Nothing is
    * awaited here or before the meeting is under way, so two meetings can't
    * both take the same member.
    */
-  private admit(goalId: string, attendees: readonly string[]) {
+  private admit(goalId: string, attendees: readonly string[]): string {
     const { core } = this;
     this.activeGoal(goalId);
-    if (!attendees.length) throw new Error("The team has no members");
+    const [host] = attendees;
+    if (host === undefined) throw new Error("The team has no members");
     const names = new Set(core.team.members.map((m) => m.name));
     const stranger = attendees.find((name) => !names.has(name));
     if (stranger) throw new Error(`There is no member called "${stranger}"`);
     const busy = busyMembers(workOf(core));
     const taken = attendees.find((name) => busy.has(name));
     if (taken) throw new Error(`${taken} is busy: working, reviewing, or at another meeting`);
+    return host;
   }
 
   /** A goal that is active, or throws why it isn't. */
@@ -357,7 +360,7 @@ export class Meetings {
           ...(seat && { resume: seat.session }),
           ...(turn.tool && {
             mcpServers: { ...options.mcpServers, [TURN_SERVER]: turn.tool.server },
-            allowedTools: [...(options.allowedTools ?? []), turn.tool.name],
+            allowedTools: [turn.tool.name],
           }),
         },
         ...(turn.schema && { schema: turn.schema }),

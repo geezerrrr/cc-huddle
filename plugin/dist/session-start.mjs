@@ -7397,12 +7397,12 @@ function repoFolder(dataFolder2, repo) {
   const hash2 = createHash("sha256").update(repo.common).digest("hex").slice(0, 12);
   return path.join(dataFolder2, "repos", `${name}-${hash2}`);
 }
-var dataFiles = (folder) => ({
-  state: path.join(folder, "state.json"),
-  lock: path.join(folder, "lock"),
-  members: path.join(folder, "members.json"),
+var dataFiles = (folder2) => ({
+  state: path.join(folder2, "state.json"),
+  lock: path.join(folder2, "lock"),
+  members: path.join(folder2, "members.json"),
   /** A member's settings file (policy.ts writeSettings). */
-  settings: (member) => path.join(folder, "settings", `${member}.json`)
+  settings: (member) => path.join(folder2, "settings", `${member}.json`)
 });
 var STATE_VERSION = 1;
 async function readState(file2) {
@@ -7500,18 +7500,18 @@ function git(at, args, options = {}) {
     child.stdin.end(options.input);
   });
 }
-async function openRepository(folder) {
-  const at = { cwd: folder };
+async function openRepository(folder2) {
+  const at = { cwd: folder2 };
   const found = await git(at, ["rev-parse", "--show-toplevel", "--git-common-dir"], {
     allow: [128]
   });
   const [top, common] = found.stdout.split("\n");
   if (found.code !== 0 || !top || !common)
-    throw new GitError(["rev-parse"], found.code, `${folder} is not in a git repository`);
+    throw new GitError(["rev-parse"], found.code, `${folder2} is not in a git repository`);
   const head = await git(at, ["rev-parse", "--verify", "-q", "HEAD"], { allow: [1] });
   if (head.code !== 0)
     throw new GitError(["rev-parse"], head.code, `${top} has no commit to start from yet`);
-  return { top: await realpath(top), common: await realpath(path2.resolve(folder, common)) };
+  return { top: await realpath(top), common: await realpath(path2.resolve(folder2, common)) };
 }
 var goalBranch = (slug) => `openplan/${slug}/main`;
 var serial = serialBy();
@@ -27281,17 +27281,17 @@ async function jsonFile(file2) {
     throw new Error(`${file2}: ${errorText(error62)}`, { cause: error62 });
   }
 }
-async function markdownFiles(folder) {
+async function markdownFiles(folder2) {
   let names;
   try {
-    names = (await readdir2(folder)).filter((name) => name.endsWith(".md")).sort();
+    names = (await readdir2(folder2)).filter((name) => name.endsWith(".md")).sort();
   } catch (error62) {
     if (missing(error62)) return [];
     throw error62;
   }
   return Promise.all(
     names.map(async (name) => {
-      const file2 = path3.join(folder, name);
+      const file2 = path3.join(folder2, name);
       const text2 = await readFile3(file2, "utf8");
       const front = /^---\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(text2);
       let data;
@@ -27310,19 +27310,19 @@ async function markdownFiles(folder) {
   );
 }
 async function loadTeam(top) {
-  const folder = teamFolder(top);
+  const folder2 = teamFolder(top);
   const roles = new Map(
-    (await markdownFiles(path3.join(folder, "roles"))).map(({ name, file: file2, data, body }) => [
+    (await markdownFiles(path3.join(folder2, "roles"))).map(({ name, file: file2, data, body }) => [
       name,
       { id: name, title: parsed(roleSchema, data, file2).title, duties: body.trim() }
     ])
   );
-  const members2 = (await markdownFiles(path3.join(folder, "members"))).map(
+  const members2 = (await markdownFiles(path3.join(folder2, "members"))).map(
     ({ name, file: file2, data }) => {
       const { role, model, effort, env } = parsed(memberSchema, data, file2);
       const found = roles.get(role);
       if (!found)
-        throw new Error(`${file2}: there is no role "${role}" in ${path3.join(folder, "roles")}`);
+        throw new Error(`${file2}: there is no role "${role}" in ${path3.join(folder2, "roles")}`);
       return {
         name,
         role: found,
@@ -27333,10 +27333,10 @@ async function loadTeam(top) {
     }
   );
   if (!members2.length)
-    throw new Error(`The team has no members: add them in ${path3.join(folder, "members")}`);
-  const teamFile = path3.join(folder, "team.json");
+    throw new Error(`The team has no members: add them in ${path3.join(folder2, "members")}`);
+  const teamFile = path3.join(folder2, "team.json");
   const { review, meetingSize } = parsed(teamSchema, await jsonFile(teamFile) ?? {}, teamFile);
-  const settingsFile = path3.join(folder, "settings.json");
+  const settingsFile = path3.join(folder2, "settings.json");
   const settings = parsed(settingsSchema, await jsonFile(settingsFile) ?? {}, settingsFile);
   return { team: { members: members2, review }, settings, meetingSize };
 }
@@ -27618,10 +27618,14 @@ ${status}`;
 The session before ended without closing the team. This session pauses what it left going as it opens the team; nothing goes on until a goal is resumed.` : context2;
 }
 
+// src/plugin/data-folder.ts
+var folder = process.env.CLAUDE_PLUGIN_DATA;
+if (!folder) throw new Error("openplan runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA");
+var dataFolder = folder;
+
 // src/plugin/session-start.ts
 var input2 = JSON.parse(await text(process.stdin));
-var dataFolder = process.env.CLAUDE_PLUGIN_DATA;
-var context = dataFolder && await sessionContext(input2.cwd, dataFolder, process.ppid);
+var context = await sessionContext(input2.cwd, dataFolder, process.ppid);
 if (context)
   process.stdout.write(
     JSON.stringify({

@@ -13,10 +13,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import { running } from "../engine/running.ts";
-
-const dataFolder = process.env.CLAUDE_PLUGIN_DATA;
-if (!dataFolder)
-  throw new Error("openplan's MCP server runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA");
+import { dataFolder } from "./data-folder.ts";
 
 /** How long the first start may take to install the dependencies. */
 const INSTALL_TIMEOUT_MS = 5 * 60_000;

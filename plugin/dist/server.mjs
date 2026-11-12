@@ -1,7 +1,8 @@
 import { createRequire } from "node:module"; const require = createRequire(import.meta.url);
 import {
+  dataFolder,
   running
-} from "./chunks/chunk-57CQPYHZ.mjs";
+} from "./chunks/chunk-P5QDYH7F.mjs";
 
 // src/plugin/bootstrap.ts
 import { execFile } from "node:child_process";
@@ -11,9 +12,6 @@ import { registerHooks } from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
-var dataFolder = process.env.CLAUDE_PLUGIN_DATA;
-if (!dataFolder)
-  throw new Error("openplan's MCP server runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA");
 var INSTALL_TIMEOUT_MS = 5 * 6e4;
 var here = path.dirname(fileURLToPath(import.meta.url));
 var manifests = await Promise.all(
@@ -63,4 +61,4 @@ registerHooks({
     return bare && context.parentURL?.startsWith(ours) ? next(specifier, { ...context, parentURL: from }) : next(specifier, context);
   }
 });
-await import("./chunks/server-52Q7F5MX.mjs");
+await import("./chunks/server-MJFSNJ3A.mjs");

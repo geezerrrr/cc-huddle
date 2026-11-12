@@ -4,11 +4,11 @@
  */
 import { text } from "node:stream/consumers";
 import { sessionContext } from "./context.ts";
+import { dataFolder } from "./data-folder.ts";
 
 const input = JSON.parse(await text(process.stdin)) as { cwd: string };
-const dataFolder = process.env.CLAUDE_PLUGIN_DATA;
 // Claude Code starts the hook itself.
-const context = dataFolder && (await sessionContext(input.cwd, dataFolder, process.ppid));
+const context = await sessionContext(input.cwd, dataFolder, process.ppid);
 if (context)
   process.stdout.write(
     JSON.stringify({
