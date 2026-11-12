@@ -99,6 +99,13 @@ The team runs while your session does. Closing the session pauses its goals; res
 
 openplan works only on `openplan/*` branches: each goal has `openplan/<goal>/main`, yours to review and merge. It never pushes and never checks anything out in your working tree. Its state, records and worktrees are in the plugin's data folder, outside the repository.
 
+## What runs, and what it may do
+
+- **Processes and tokens.** Each member's turn is a Claude Code process of its own, started by the plugin's MCP server: one per running subtask, review and meeting turn, several at once. Each uses tokens on its member's provider; the pane shows how many each member has used.
+- **Settings.** A member loads your user and project Claude Code settings, as any session of yours does, with the team's `settings.json` and its own `env` on top. Unless `settings.json` says otherwise, it edits freely in its worktree (`acceptEdits`) and runs commands in Claude Code's sandbox. A call its rules don't allow waits for you in the pane, and so does any git command that writes: members leave committing to delivery.
+- **Who answers.** Permissions and members' questions are answered in the pane, by you: the plugin keeps your session's model from the pane's tools. That guard is one of the plugin's hooks, so where `allowManagedHooksOnly` keeps a user's plugins from loading hooks, install openplan as a managed plugin. `claude -p` draws no pane: what needs you waits for an interactive session.
+- **Uninstalling** removes the plugin's data folder, worktrees included, and with them any work a member hasn't delivered. Delivered work stays on the `openplan/*` branches. `claude plugin uninstall openplan --keep-data` keeps the folder.
+
 ## Development
 
 ```sh

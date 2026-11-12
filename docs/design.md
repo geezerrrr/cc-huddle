@@ -216,7 +216,7 @@ A member session loads your user and project settings like any session of yours.
 1. You say what you want: "hold a meeting and build a two-player dice game", or "have GLM do the scoreboard". Your session calls a tool and returns at once.
 2. The meeting runs in the background. You watch it live in the pane.
 3. The plan is ready: your session wakes, shows the plan's summary and asks with `AskUserQuestion`: approve, change it, or drop it. Changes are said in words, and your session rewrites the plan with them; any member can be given work, not only those who attended.
-4. Members work. Everything that needs you lands in the pane's "Needs you" tab with a toast; you answer there with its own options.
+4. Members work. Everything that needs you lands in the pane's "Needs you" tab with a toast, and the pane opens where it docks beside the transcript; you answer there with its own options.
 5. A task is done: its delivery waits for your acceptance. Accepting it unblocks work that depends on it.
 
 ### 7.2 What you see
