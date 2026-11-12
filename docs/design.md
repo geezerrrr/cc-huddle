@@ -1,0 +1,254 @@
+# openplan design
+
+This document is the source of truth for how openplan behaves. Change it first, then the code; code that disagrees with it is a bug.
+
+## 1. What it is
+
+openplan is a Claude Code plugin that runs a team of Claude Code sessions on your repository. Each member has a role and its own model, which can come from any provider with an Anthropic-compatible API. A goal starts with a meeting where the members compare approaches and the host writes a plan of tasks with owners, dependencies and acceptance criteria. You approve the plan, and the members work in parallel, each subtask in its own git worktree. Their deliveries are reviewed, sent back when they fail, and merged into the goal's branch. You are asked only when something needs you.
+
+What makes it different is where the rules live. Agent Teams and prompt-driven orchestrators ask a lead model to follow a process. openplan keeps the process in state machines in code: the models decide what to write, never which step comes next. Workers are driven through the Agent SDK, so the engine sees every tool call, permission request, question and result as a structured event and never guesses a terminal's state.
+
+openplan comes out of [Crewloft](https://playcrewloft.com), a game in which the same engine runs a studio of AI staff.
+
+### Not in scope
+
+- A user interface of its own. Everything you see is drawn inside Claude Code (§7).
+- Single focused jobs. A subagent is cheaper and quicker for one search, one review or one module; openplan is for work with several people, steps and dependencies.
+- Pushing, opening pull requests, or touching your checkout. The team works on its own branches; merging them is yours.
+
+## 2. Concepts
+
+| Concept       | What it is                                                                                                                                                 |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Role          | A job and its duties, e.g. `gameplay-programmer`. A file in the team folder.                                                                               |
+| Member        | Someone on the team: a name, a role, a provider, a model and an effort. A file in the team folder.                                                         |
+| Goal          | What you want done, with its own branch `openplan/<goal>` cut from your `HEAD` when it starts.                                                             |
+| Meeting       | A read-only discussion among chosen members that ends in a plan for a goal.                                                                                |
+| Plan          | The host's document plus a tree: tasks, their subtasks, an owner, dependencies and acceptance criteria for each.                                           |
+| Task, subtask | A task groups subtasks; a subtask is one member's piece of work, done in one worktree.                                                                     |
+| Question      | Anything that waits on someone: a member asking a teammate or you, a permission request, a decision on a stuck review or merge, a finished task to accept. |
+| Your session  | The Claude Code session you talk in. It relays what you want and acts on it through tools. It never does the team's work.                                  |
+
+A member is busy while a subtask of theirs runs, while they review a delivery, or while they sit in a meeting. A busy member starts nothing new. Everyone does one thing at a time.
+
+## 3. Architecture
+
+Two layers. The engine knows nothing of the plugin.
+
+```
+┌─────────────────── Claude Code (your session) ───────────────────┐
+│  mod: pane, band, toasts, /openplan          skill               │
+│        │ loopback HTTP                                            │
+│  MCP server `openplan`: tools ── engine: state machines ·         │
+│                                  scheduler · meetings · questions │
+│                                  · worktrees and merges           │
+└────────────────────────────────┬──────────────────────────────────┘
+                                 │ one Claude Code process per running turn
+                 member sessions (Agent SDK), each in its worktree
+```
+
+### 3.1 Engine
+
+A library with no knowledge of Claude Code's interface. It holds:
+
+- **State machines** (§4): the only place a status changes.
+- **Derivations**: what each subtask waits on, who is busy, who reviews, what you can do to each thing. Worked out from state every time, never stored.
+- **Scheduler**: starts every pending subtask whose upstream is merged and whose owner is free.
+- **Meetings**: turns, raised hands, the floor, the host's plan.
+- **Questions**: one inbox for everything that waits on a person.
+- **Git**: worktrees, delivery commits, serialized merges, conflict handling (§5).
+- **Turns**: one Agent SDK query per turn, one decoder for its message stream, one place that judges success.
+- **Policy**: the options of every session: tools, permission rules, sandbox, environment.
+- **Prompts**: every prompt the engine sends, in one module.
+
+It is ported from Crewloft's engine without the game: no economy, life, seats, account or layout.
+
+### 3.2 Lifetime
+
+The team belongs to the session it runs in, like everything else that session starts. The engine runs inside the session's MCP server, which Claude Code starts with the session and ends with it, and the member processes are its children. There is no process of openplan's own outside a session.
+
+Closing the session pauses every active goal, as if you had paused each one (§4.1): running subtasks are held in their sessions (a merge under way finishes first), a running meeting is cancelled, open questions stay open, sessions and worktrees are kept. Resuming the session brings back its context and shows the paused goals; nothing starts again until you resume one. To keep the team working while you are away, keep the session running, in the background if you like, the way Claude Code already offers.
+
+`/clear` only clears the conversation: the team keeps working, and the new conversation learns where it stands from the SessionStart hook and the tools.
+
+One session runs a repository's team at a time, held by a lock in the repository's data folder with the session's pid. Another session in the same repository sees the team and what stopped, and can take it over once the holder has ended.
+
+### 3.3 Plugin
+
+- **MCP server `openplan`**: the engine and the tools your session uses (§7.3). It serves the mod over loopback HTTP, with a token in the data folder: a mod has no network or file access of its own beyond `$.http.fetch` and `$.fs.read`.
+- **Mod**: the pane, the band, toasts, transcript rows and the `/openplan` commands (§7.2). Commands run without a model turn.
+- **Skill**: tells your session what it is for: relay and act, never do the work itself.
+- **SessionStart hook**: tells your session what stopped or waits on you, as context. The mod shows you the same in the band.
+
+### 3.4 Where things live
+
+| What                                        | Where                                                    | In git          |
+| ------------------------------------------- | -------------------------------------------------------- | --------------- |
+| Team: roles, members, settings              | `.claude/openplan/` in the repository                    | Yours to commit |
+| State, meeting records, plans, logs, events | `${CLAUDE_PLUGIN_DATA}/repos/<repo-id>/`                 | No              |
+| Worktrees                                   | `${CLAUDE_PLUGIN_DATA}/repos/<repo-id>/desks/<subtask>/` | Branches only   |
+
+`${CLAUDE_PLUGIN_DATA}` is the data folder Claude Code gives each plugin (`~/.claude/plugins/data/<plugin-id>/`). It is passed to the MCP server and the hooks. It survives plugin updates and is removed on uninstall, worktrees included; their branches stay in your repository, and git prunes the stale worktree entries on its own. `claude plugin uninstall --keep-data` keeps it.
+
+Worktrees sit outside the repository on purpose: inside it, every member session would also load the main checkout's `CLAUDE.md` files as parent folders. Keys never go in any of these (§6).
+
+## 4. State machines
+
+Each machine is one table in code (`src/engine/machines.ts`), moved only by its owner module through `step`. A move the table lacks is refused. Waiting is never a status: why something waits is derived (§4.5).
+
+### 4.1 Goal
+
+| From             | Event              | To       |
+| ---------------- | ------------------ | -------- |
+| —                | start              | active   |
+| active           | pause              | paused   |
+| active, paused   | archive            | archived |
+| paused, archived | resume             | active   |
+| archived         | delete (confirmed) | removed  |
+
+Pausing holds its running subtasks in their sessions and cancels its running meeting. Deleting removes its worktrees and subtask branches; its branch `openplan/<goal>` stays.
+
+### 4.2 Meeting
+
+| From              | Event                                      | To                             |
+| ----------------- | ------------------------------------------ | ------------------------------ |
+| —                 | start: goal active, every participant free | running                        |
+| running           | the host's plan parses                     | review                         |
+| running           | error                                      | failed                         |
+| running           | you cancel, goal paused or archived        | cancelled                      |
+| review            | you approve                                | approved                       |
+| review            | you cancel, goal archived                  | cancelled                      |
+| failed, cancelled | you go on (no plan yet)                    | running, from where it stopped |
+
+The flow is Crewloft's (its `team.md` §4): the host opens with the questions to settle; everyone else answers independently; members raise a hand to speak; the host gives the floor, closes when every question is settled or the size's turn budget is spent, and writes the plan. Sizes (`small`, `discussion`, `large`) set only how many turns each member gets. Meeting sessions are read-only.
+
+### 4.3 Subtask
+
+| From                                                  | Event                                                           | To                                                      |
+| ----------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------- |
+| —                                                     | plan approved, or assigned directly                             | pending                                                 |
+| pending                                               | upstream merged, owner free, goal active                        | running                                                 |
+| pending, running, reviewing, merging (waiting on you) | you stop it                                                     | stopped                                                 |
+| running                                               | delivered, review on                                            | reviewing                                               |
+| running                                               | delivered, review off                                           | merging                                                 |
+| running                                               | error, or no delivery after one reminder                        | failed                                                  |
+| running                                               | goal paused, you add to it                                      | pending, same session                                   |
+| reviewing                                             | passed, or you skip the review                                  | merging                                                 |
+| reviewing                                             | sent back (first two times)                                     | pending, same session, with the notes                   |
+| merging                                               | merged                                                          | done                                                    |
+| merging                                               | text conflicts                                                  | pending, same session, to resolve them                  |
+| failed, stopped                                       | retry                                                           | pending, fresh session and worktree                     |
+| failed, stopped                                       | go on                                                           | pending, same session and worktree                      |
+| stopped (after delivery)                              | go on                                                           | reviewing or merging, where it stopped                  |
+| done                                                  | redo: upstream redone, you add to it, or you send its task back | pending, same session, worktree rebuilt from the branch |
+
+A third failed review, a review that errors, a binary conflict and a git error each become a decision for you (§4.4) rather than a move.
+
+### 4.4 Question
+
+| From | Event                   | To        |
+| ---- | ----------------------- | --------- |
+| —    | asked                   | open      |
+| open | answered                | answered  |
+| open | the asker stops waiting | cancelled |
+
+Kinds: a teammate's question (answered by that teammate in a read-only session), a question to you (Claude Code's own `AskUserQuestion`, intercepted), a permission request, a decision (stuck review, binary conflict, git error), and a finished task to accept. Answered and cancelled questions leave the state.
+
+### 4.5 Derived, never stored
+
+- What a subtask waits on: an upstream subtask, another task's acceptance, a busy owner or reviewer, a paused goal, a teammate's or your answer.
+- Who is busy, who reviews a delivery (the meeting's host, else another member), whose upstream was redone after it started.
+- What you can do to each subtask, meeting and goal: asked of the same tables with `can`.
+
+## 5. Git
+
+- A goal's branch `openplan/<goal>` is cut from your `HEAD` when it starts. If the name is taken (a deleted goal's branch, another clone's), the goal takes `<goal>-2` and so on.
+- Each subtask works in its own worktree on branch `openplan/<goal>/<subtask>`, cut from the goal branch when it first starts, kept through send-backs, conflicts and pauses, removed when merged.
+- Delivering commits what is uncommitted in the worktree as the member (`<name> <member-id>@openplan.local`). Members may also commit themselves.
+- Merges run one at a time per goal, in delivery order: the goal branch is merged into the worktree, then the goal branch fast-forwards to it. Text conflicts go back to the member who delivered last, in their session. Binary and delete/modify conflicts and git errors become your decision.
+- Git runs with hooks, fsmonitor and signing off for the engine's own commands. It is the `git` on your `PATH`; members use it as they would anywhere.
+- openplan never pushes, never checks out anything in your repository, never runs `worktree prune`, and touches only `openplan/*` branches. When a task is accepted, its goal branch is yours to merge or review.
+
+## 6. Team configuration
+
+```
+.claude/openplan/
+  roles/gameplay-programmer.md
+  members/sonnet.md
+  settings.json
+```
+
+The team sits beside the rest of the repository's Claude Code setup. It is not in `.claude/agents/`: Claude Code would load members there as its own subagents, on its own provider.
+
+A role file is its duties in Markdown with a `title` in front matter. A member file:
+
+```markdown
+---
+role: gameplay-programmer
+provider: anthropic
+model: claude-sonnet-5-5
+effort: high
+---
+```
+
+The member's name is the file name. `provider` names an entry in the provider table: base URL, which environment variable holds the key, how the model is passed. The table has the common providers built in, and a team can add its own with a base URL and a key variable. Keys are read from the environment only. You write these files yourself.
+
+Settings that are the team's, not one member's, live in `settings.json`: acceptance review on or off (on by default), the default meeting size, and the permission rules members work under, written as Claude Code writes them.
+
+## 7. Interaction
+
+### 7.1 A goal, end to end
+
+1. You say what you want: "hold a meeting and build a two-player dice game", or "have GLM do the scoreboard". Your session calls a tool and returns at once.
+2. The meeting runs in the background. You watch it live in the pane.
+3. The plan is ready: your session wakes, shows the plan's summary and asks with `AskUserQuestion`: approve, change it, or drop it. Changes are said in words.
+4. Members work. Everything that needs you lands in the pane's "Needs you" tab with a toast; you answer there with its own options.
+5. A task is done: its delivery waits for your acceptance. Accepting it unblocks work that depends on it.
+
+### 7.2 What you see
+
+- **Pane** (`/openplan`), beside the transcript in a wide fullscreen terminal, above the prompt otherwise. Three tabs:
+  - **Meeting**: the discussion word by word, who speaks, raised hands, whom the host calls.
+  - **Team**: one line per member: what they do, which step, whom they wait on, tokens. Select a member to follow their record live: thinking, tool calls, files changed.
+  - **Needs you**: each open question with its options as buttons. Pressing one answers it. Nothing goes through a model, so a permission is granted only by you.
+- **Band** above the prompt, always: `openplan · meeting · 3 working · 1 needs you`.
+- **Toast** when something new needs you.
+- **Transcript rows**, dim, for milestones (plan approved, subtask merged, sent back), so the conversation keeps a timeline without model turns.
+- **Without drawing** (`claude -p`, a terminal too narrow): `/openplan status` prints the same as text, and every record is a file in the data folder.
+
+### 7.3 Your session
+
+Your session talks; the pane shows and answers. The tools your session has: start a goal, hold a meeting, assign a subtask directly, change a plan under review, approve or cancel it, pause, resume, archive or delete a goal, stop, go on, retry or redo a subtask, and pass a message to a member (`@GLM put the scoreboard top right`), which goes on in that member's session.
+
+The engine wakes your session only for what needs a conversation: a plan to review and a task to accept. It posts a short message to the session's inbox socket (`CLAUDE_CODE_MESSAGING_SOCKET`), and an idle session starts a turn with it.
+
+## 8. Permissions
+
+Members work under Claude Code's own permission modes and rules, set per team. Every member session also gets, as flag settings: openplan disabled (`enabledPlugins`), so a member never starts a team of its own; `crossSessionInbound: refuse` and `SendMessage` and `ListAgents` denied, so members take no messages from your sessions and send none; and `--name openplan-<member>`, so a running member shows under its name in `claude agents`. Bare mode is not used: it would also drop the repository's `CLAUDE.md`. Inside its worktree a member edits freely; commands run in Claude Code's sandbox where the system has one. A call outside the rules becomes a permission request in "Needs you", and the member's turn waits for your answer. Meetings, teammates' answers and reviews run read-only.
+
+## 9. What it fixes
+
+Each row is a scenario the test suite runs end to end against a scripted model.
+
+| Problem elsewhere                                                             | Scenario                                                                                                                     |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| A worker's state is guessed from its terminal; it gets stuck                  | Every status change comes from an SDK event; a run that ends without delivering is reminded once, then fails with the reason |
+| Worker permissions are bypassed                                               | A member's out-of-rule call waits for your answer in "Needs you"                                                             |
+| The process lives in the lead's prompt; the lead stops early or does the work | The scheduler starts and finishes work; your session only relays                                                             |
+| The team's memory is the lead's context, lost on compaction                   | All state is the engine's, in the data folder; compacting your session loses nothing                                         |
+| A failed worker restarts from scratch                                         | An API error mid-subtask: "go on" resumes the same session in the same worktree                                              |
+| Review cannot send work back                                                  | A failed review returns the subtask to its member with the notes                                                             |
+| Teammates overwrite each other's files                                        | Two subtasks edit one file: each in its worktree; the later merge's conflict goes back to its member                         |
+| Closing the terminal loses the team's work                                    | Close Claude Code mid-run: its goals pause; resume the session and a goal, and members go on in their sessions and worktrees |
+
+## 10. Verified, and what is left
+
+Checked on Claude Code 2.1.322 and Agent SDK 0.3.322, with a probe plugin and a mock Messages API:
+
+- The MCP server gets `CLAUDE_CODE_MESSAGING_SOCKET`, `CLAUDE_CODE_MESSAGING_TOKEN` and `CLAUDE_PLUGIN_DATA` in its environment. A `{"type":"user",...}` line it posts to the socket starts a turn in the idle session at once; the session shows it as a message from another session.
+- When Claude Code is killed, the MCP server's stdin ends at once, in time to stop its children.
+- `/clear` keeps the MCP server running: it ends one session id and starts another (SessionEnd `clear`, SessionStart `clear`) in the same process, and posts to the socket still wake the new conversation.
+- In `bypassPermissions` mode the wake-up is delivered too, without approval: the MCP server is verified as the session's own child.
+- A member started with default options loads every enabled plugin, openplan included, and has `SendMessage` and `ListAgents`; the flag settings in §8 remove both. Every member binds an inbox socket and is listed by `claude agents` as an interactive session, under its `--name`.
+
+Left: whether the pane redraws smoothly polling the MCP server over `$.http.fetch` at the rate a streaming meeting needs.
