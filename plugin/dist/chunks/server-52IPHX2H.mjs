@@ -7369,43 +7369,18 @@ var require_dist = __commonJS({
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
-// package.json
-var package_default = {
+// plugin/.claude-plugin/plugin.json
+var plugin_default = {
   name: "openplan",
-  version: "0.0.0",
-  private: true,
+  version: "0.1.0",
   description: "A team of Claude Code sessions on your repository: any model per member, a meeting before the plan, state machines in charge of the process.",
+  author: {
+    name: "geezerrrr"
+  },
+  repository: "https://github.com/geezerrrr/openplan",
   license: "MIT",
-  type: "module",
-  engines: {
-    node: ">=24"
-  },
-  packageManager: "pnpm@10.20.0",
-  scripts: {
-    build: "node scripts/build.js",
-    typecheck: "tsc --noEmit",
-    lint: "eslint .",
-    format: "prettier --write .",
-    "format:check": "prettier --check .",
-    test: "vitest run --dir src",
-    "check:mod": "claude plugin validate plugin && claude plugin test plugin"
-  },
-  devDependencies: {
-    "@eslint/js": "^10.0.0",
-    "@types/node": "^24.0.0",
-    esbuild: "^0.28.2",
-    eslint: "^10.14.0",
-    prettier: "^3.10.0",
-    typescript: "~6.0.3",
-    "typescript-eslint": "^8.72.2",
-    vitest: "^5.1.0"
-  },
-  dependencies: {
-    "@anthropic-ai/claude-agent-sdk": "0.3.322",
-    "@modelcontextprotocol/sdk": "^1.32.2",
-    yaml: "^2.9.1",
-    zod: "^4.6.7"
-  }
+  keywords: ["team", "multi-agent", "planning", "worktrees"],
+  types: "./types/index.d.ts"
 };
 
 // src/engine/core.ts
@@ -11227,7 +11202,7 @@ process.on("uncaughtException", (error) => {
   process.exit(1);
 });
 process.once("exit", stopMembers);
-var server = new McpServer({ name: "openplan", version: package_default.version });
+var server = new McpServer({ name: "openplan", version: plugin_default.version });
 addTools(server, team);
 addPaneTools(server, team);
 await server.connect(new StdioServerTransport());

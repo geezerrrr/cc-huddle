@@ -5,7 +5,7 @@
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import packageJson from "../../package.json" with { type: "json" };
+import plugin from "../../plugin/.claude-plugin/plugin.json" with { type: "json" };
 import { errorText } from "../engine/core.ts";
 import { Engine } from "../engine/engine.ts";
 import { stopMembers } from "../engine/processes.ts";
@@ -88,7 +88,7 @@ process.on("uncaughtException", (error) => {
 });
 process.once("exit", stopMembers);
 
-const server = new McpServer({ name: "openplan", version: packageJson.version });
+const server = new McpServer({ name: "openplan", version: plugin.version });
 addTools(server, team);
 addPaneTools(server, team);
 await server.connect(new StdioServerTransport());
