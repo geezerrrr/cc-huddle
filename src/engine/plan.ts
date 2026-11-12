@@ -5,8 +5,8 @@
 import { z } from "zod";
 import type { Plan, PlanSubtask, PlanTask } from "./types.ts";
 
-/** The host's plan as the model hands it back, each subtask going to an attendee by name. */
-export const hostPlanSchema = (attendees: readonly [string, ...string[]]) =>
+/** A plan in the shape a model writes it, each subtask going to a member by name (`assignee`). */
+export const planSchema = (assignee: z.ZodType<string>) =>
   z.object({
     summary: z.string().trim().describe("The outcome in one sentence"),
     plan_markdown: z.string().trim().describe("The plan document"),
@@ -19,7 +19,7 @@ export const hostPlanSchema = (attendees: readonly [string, ...string[]]) =>
             key: z.string().trim().describe("A short id, unique within this plan, such as api-1"),
             title: z.string().trim(),
             description: z.string().trim(),
-            assignee: z.enum(attendees).describe("The name of the attendee it goes to"),
+            assignee,
             depends_on: z.array(z.string()).describe("The keys of the subtasks it waits for"),
             acceptance: z.string().trim(),
           }),
@@ -27,6 +27,10 @@ export const hostPlanSchema = (attendees: readonly [string, ...string[]]) =>
       }),
     ),
   });
+
+/** The host's plan, each subtask going to an attendee. */
+export const hostPlanSchema = (attendees: readonly [string, ...string[]]) =>
+  planSchema(z.enum(attendees).describe("The name of the attendee it goes to"));
 
 /**
  * The dependencies that close a loop, as [subtask, dependency] pairs. A
