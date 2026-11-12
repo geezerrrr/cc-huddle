@@ -135,11 +135,13 @@ export function waitsIn(state: Work, subtask: Subtask, busy: Set<string>): Wait[
         return [...new Map(upstream.map((w) => [JSON.stringify(w), w])).values()];
       return busy.has(subtask.assignee) ? [{ kind: "busy", by: subtask.assignee }] : [];
     }
-    // Done, the last of its task, it carries the task's acceptance waiting on you.
+    // A done subtask, the last of its task, carries the task's acceptance waiting on you.
     case "running":
-    case "merging":
     case "done":
       return asked();
+    // A merge under way finishes (§3.2); one yet to start waits for its goal.
+    case "merging":
+      return [...held, ...asked()];
     case "reviewing": {
       const reviewer = underReview(state, subtask) ? reviewerAway(state, subtask) : undefined;
       return [...held, ...asked(), ...(reviewer ? [{ kind: "busy" as const, by: reviewer }] : [])];

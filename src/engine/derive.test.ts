@@ -102,11 +102,13 @@ describe("waitsIn", () => {
     ]);
   });
 
-  it("holds everything pending while its goal is paused", () => {
+  it("holds what is pending or yet to merge while its goal is paused", () => {
     const state = work({
       goals: [{ id: "p1", name: "dice", slug: "dice", status: "paused", createdAt: 0 }],
     });
-    expect(waitsIn(state, subtask("s1"), new Set())).toEqual([{ kind: "goal", status: "paused" }]);
+    const held = [{ kind: "goal", status: "paused" }];
+    expect(waitsIn(state, subtask("s1"), new Set())).toEqual(held);
+    expect(waitsIn(state, subtask("s1", { status: "merging" }), new Set())).toEqual(held);
   });
 
   it("waits for a reviewer who is reviewing earlier work", () => {
