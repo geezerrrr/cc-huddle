@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Engine } from "../engine/engine.ts";
@@ -40,6 +41,8 @@ beforeEach(async () => {
     await mkdir(path.dirname(file), { recursive: true });
     await writeFile(file, text);
   }
+  const server = new McpServer({ name: "openplan", version: "0.0.0" });
+  const listMembers = addTools(server, () => Promise.resolve(engine));
   engine = await Engine.open({
     cwd: repo,
     dataFolder: path.join(dir, "openplan-inline"),
@@ -48,6 +51,7 @@ beforeEach(async () => {
     plugin: "openplan@inline",
     userTeam: path.join(dir, "user-team"),
     env: {},
+    teamRead: listMembers,
     failed: vi.fn(),
   });
   // A run goes on until it is stopped.
@@ -61,8 +65,6 @@ beforeEach(async () => {
         else signal.addEventListener("abort", stopped);
       }),
   );
-  const server = new McpServer({ name: "openplan", version: "0.0.0" });
-  addTools(server, () => Promise.resolve(engine));
   const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
   await server.connect(serverSide);
   client = new Client({ name: "test", version: "0.0.0" });
@@ -83,6 +85,34 @@ async function call(name: string, args: Record<string, unknown> = {}) {
 }
 
 describe("tools", () => {
+  it("name members only from the team, each with their role", async () => {
+    const { tools } = await client.listTools();
+    const assign = tools.find((t) => t.name === "assign")?.inputSchema.properties?.assignee;
+    expect(assign).toMatchObject({
+      enum: ["glm", "sonnet"],
+      description: "One of the team: glm (Developer), sonnet (Developer)",
+    });
+    await call("start_goal", { name: "Dice" });
+    expect(
+      await call("assign", { goal: "dice", assignee: "ann", title: "Rules", description: "" }),
+    ).toMatchObject({ error: true, text: expect.stringContaining('"glm"') as string });
+
+    const told = vi.fn();
+    client.setNotificationHandler(ToolListChangedNotificationSchema, told);
+    await writeFile(
+      path.join(teamFolder(path.join(dir, "repo")), "members/ann.md"),
+      "---\nrole: dev\n---\n",
+    );
+    await engine.reloadTeam();
+    await vi.waitFor(() => {
+      expect(told).toHaveBeenCalled();
+    });
+    const { tools: now } = await client.listTools();
+    expect(now.find((t) => t.name === "assign")?.inputSchema.properties?.assignee).toMatchObject({
+      enum: ["ann", "glm", "sonnet"],
+    });
+  });
+
   it("start a goal, assign work, pass a message, stop it, and tell where it stands", async () => {
     expect(await call("start_goal", { name: "Dice" })).toMatchObject({
       text: expect.stringContaining("on branch openplan/dice/main") as string,

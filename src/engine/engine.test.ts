@@ -54,6 +54,7 @@ beforeEach(async () => {
     plugin: "openplan@inline",
     userTeam: path.join(dir, "user-team"),
     env: { GLM_KEY: "key-1" },
+    teamRead: vi.fn(),
     failed: vi.fn(),
   };
   files = dataFiles(repoFolder(dataFolder, await openRepository(repo)));

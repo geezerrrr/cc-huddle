@@ -42,6 +42,8 @@ export interface EngineOptions {
   userTeam: string;
   /** The environment members' `${VAR}`s are filled in from. */
   env: Record<string, string | undefined>;
+  /** The team as it is read: as it opens, and whenever it is read again. */
+  teamRead: (team: Team) => void;
   /** Something went wrong that nobody waits on: the state or a record couldn't be written. */
   failed: (error: unknown) => void;
 }
@@ -105,6 +107,7 @@ export class Engine {
       };
       const engine = new Engine(core, records, files, writer, options, meetingSize);
       await engine.writeMemberSettings(team, settings);
+      options.teamRead(team);
       engine.questions.recover();
       engine.scheduler.recover();
       engine.meetings.recover();
@@ -149,6 +152,7 @@ export class Engine {
     await this.writeMemberSettings(team, settings);
     this.core.team = team;
     this.size = meetingSize;
+    this.options.teamRead(team);
     this.core.changed();
     this.scheduler.pump();
   }

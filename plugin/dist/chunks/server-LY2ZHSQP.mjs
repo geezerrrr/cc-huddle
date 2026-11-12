@@ -10444,6 +10444,7 @@ var Engine = class _Engine {
       };
       const engine2 = new _Engine(core, records, files, writer, options, meetingSize);
       await engine2.writeMemberSettings(team2, settings);
+      options.teamRead(team2);
       engine2.questions.recover();
       engine2.scheduler.recover();
       engine2.meetings.recover();
@@ -10483,6 +10484,7 @@ var Engine = class _Engine {
     await this.writeMemberSettings(team2, settings);
     this.core.team = team2;
     this.size = meetingSize;
+    this.options.teamRead(team2);
     this.core.changed();
     this.scheduler.pump();
   }
@@ -10887,6 +10889,26 @@ var writtenPlan = (plan) => ({
 var goal = z6.string().describe("The goal's id, or its name");
 var meeting = z6.string().describe("The meeting's id");
 var subtask = z6.string().describe("The subtask's id");
+function memberName(members) {
+  if (!members) return z6.string().describe("A member's name");
+  const names = members.map((m) => m.name);
+  const roster = members.map((m) => `${m.name} (${m.role.title})`).join(", ");
+  return z6.enum(names).describe(`One of the team: ${roster}`);
+}
+var meetingInput = (member) => ({
+  goal,
+  agenda: z6.string().trim().min(1).describe("What to plan, with everything the user said about it"),
+  size: z6.enum(MEETING_SIZES).optional().describe("How long the discussion runs; the team's default when left out"),
+  attendees: z6.array(member).default([]).describe("The host first; everyone when empty")
+});
+var changePlanInput = (member) => ({ meeting, plan: planSchema(member) });
+var assignInput = (member) => ({
+  goal,
+  assignee: member,
+  title: z6.string().trim().min(1),
+  description: z6.string().trim().describe("Everything the user said about it"),
+  acceptance: z6.string().trim().default("").describe("When it counts as done")
+});
 function addTools(server2, team2) {
   server2.registerTool(
     "status",
@@ -10912,16 +10934,11 @@ function addTools(server2, team2) {
       );
     }
   );
-  server2.registerTool(
+  const meetingTool = server2.registerTool(
     "hold_meeting",
     {
       description: "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and the session is told when its plan waits for the user.",
-      inputSchema: {
-        goal,
-        agenda: z6.string().trim().min(1).describe("What to plan, with everything the user said about it"),
-        size: z6.enum(MEETING_SIZES).optional().describe("How long the discussion runs; the team's default when left out"),
-        attendees: z6.array(z6.string()).default([]).describe("Member names, the host first; everyone when empty")
-      }
+      inputSchema: meetingInput(memberName())
     },
     async ({ goal: ref, agenda, size, attendees }) => {
       const engine2 = await team2();
@@ -10949,14 +10966,11 @@ function addTools(server2, team2) {
       return toolText(JSON.stringify(writtenPlan(found.plan), null, 2));
     }
   );
-  server2.registerTool(
+  const changePlanTool = server2.registerTool(
     "change_plan",
     {
       description: "Replace a plan under review with the user's changes: the whole plan, as show_plan gives it, changed. Any member can be given work.",
-      inputSchema: {
-        meeting,
-        plan: planSchema(z6.string().describe("The name of the member it goes to"))
-      }
+      inputSchema: changePlanInput(memberName())
     },
     async ({ meeting: id, plan }) => {
       (await team2()).meetings.change(id, plan);
@@ -10998,17 +11012,11 @@ function addTools(server2, team2) {
       return toolText("The meeting goes on.");
     }
   );
-  server2.registerTool(
+  const assignTool = server2.registerTool(
     "assign",
     {
       description: "Give a member one subtask directly, without a meeting. It starts once they are free.",
-      inputSchema: {
-        goal,
-        assignee: z6.string().describe("The member's name"),
-        title: z6.string().trim().min(1),
-        description: z6.string().trim().describe("Everything the user said about it"),
-        acceptance: z6.string().trim().default("").describe("When it counts as done")
-      }
+      inputSchema: assignInput(memberName())
     },
     async ({ goal: ref, ...work }) => {
       const engine2 = await team2();
@@ -11075,6 +11083,12 @@ function addTools(server2, team2) {
       return toolText("Done.");
     }
   );
+  return ({ members }) => {
+    const member = memberName(members);
+    meetingTool.update({ paramsSchema: meetingInput(member) });
+    changePlanTool.update({ paramsSchema: changePlanInput(member) });
+    assignTool.update({ paramsSchema: assignInput(member) });
+  };
 }
 
 // src/plugin/pane-tools.ts
@@ -11148,6 +11162,7 @@ var openTeam = async () => Engine.open({
   plugin: pluginId(dataFolder),
   userTeam: userTeamFolder(process.env),
   env: process.env,
+  teamRead: listMembers,
   failed(error) {
     say(`the team's state or a record couldn't be written: ${errorText(error)}`);
   }
@@ -11183,7 +11198,7 @@ process.on("uncaughtException", (error) => {
 });
 process.once("exit", stopMembers);
 var server = new McpServer({ name: "openplan", version: plugin_default.version });
-addTools(server, team);
+var listMembers = addTools(server, team);
 addPaneTools(server, team);
 await server.connect(new StdioServerTransport());
 team().catch((error) => {

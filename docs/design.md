@@ -235,6 +235,8 @@ A member session loads your user and project settings like any session of yours.
 
 Your session talks; the pane shows and answers. The tools your session has: see where the team stands (`status`); start a goal (`start_goal`); hold a meeting (`hold_meeting`), cancel one (`cancel_meeting`) or resume one that failed or was cancelled (`resume_meeting`); show a plan under review (`show_plan`), change it (`change_plan`) or approve it (`approve_plan`); assign a subtask directly (`assign`); pause, resume, archive or delete a goal (`goal_action`); stop, go on, retry or redo a subtask (`subtask_action`); pass a message to a member (`message`: `@GLM put the scoreboard top right`), which goes on in that member's session; and carry out your decision on a task done, a stuck review or a merge (`decide`).
 
+A tool that names a member (a meeting's attendees, an assignee, a plan's owners) takes only the team's members, each listed with their role in its schema, so your session matches what you said against the team as it would against any tool's options. When the team is read again, the server tells Claude Code its tools changed (`notifications/tools/list_changed`).
+
 Your session is woken only for what needs a conversation: a plan to review and a task to accept. The `view` tool lists each, and the mod submits each new one to your session with `$.prompt.submit`, Claude Code's call for a plugin's prompt: an idle session starts a turn with it, read as a message from the openplan plugin. What waits already when the team opens is the SessionStart hook's to tell.
 
 ## 8. Permissions

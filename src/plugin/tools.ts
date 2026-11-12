@@ -7,7 +7,7 @@
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { workOf } from "../engine/core.ts";
+import { workOf, type Team } from "../engine/core.ts";
 import type { Engine } from "../engine/engine.ts";
 import { goalBranch } from "../engine/git.ts";
 import { planSchema } from "../engine/plan.ts";
@@ -22,6 +22,7 @@ import {
   SUBTASK_ACTIONS,
   type DecisionOption,
   type Goal,
+  type Member,
   type Plan,
 } from "../engine/types.ts";
 import { statusText } from "./status.ts";
@@ -65,7 +66,40 @@ const goal = z.string().describe("The goal's id, or its name");
 const meeting = z.string().describe("The meeting's id");
 const subtask = z.string().describe("The subtask's id");
 
-/** Adds the tools to `server`; each opens the team first, if it isn't open (`team`). */
+/** A member's name: any, until the team is read; then one of its members, each with their role. */
+function memberName(members?: readonly Member[]): z.ZodType<string> {
+  if (!members) return z.string().describe("A member's name");
+  // A team has a member at least (team.ts loadTeam).
+  const names = members.map((m) => m.name) as [string, ...string[]];
+  const roster = members.map((m) => `${m.name} (${m.role.title})`).join(", ");
+  return z.enum(names).describe(`One of the team: ${roster}`);
+}
+
+const meetingInput = (member: z.ZodType<string>) => ({
+  goal,
+  agenda: z.string().trim().min(1).describe("What to plan, with everything the user said about it"),
+  size: z
+    .enum(MEETING_SIZES)
+    .optional()
+    .describe("How long the discussion runs; the team's default when left out"),
+  attendees: z.array(member).default([]).describe("The host first; everyone when empty"),
+});
+
+const changePlanInput = (member: z.ZodType<string>) => ({ meeting, plan: planSchema(member) });
+
+const assignInput = (member: z.ZodType<string>) => ({
+  goal,
+  assignee: member,
+  title: z.string().trim().min(1),
+  description: z.string().trim().describe("Everything the user said about it"),
+  acceptance: z.string().trim().default("").describe("When it counts as done"),
+});
+
+/**
+ * Adds the tools to `server`; each opens the team first, if it isn't open
+ * (`team`). Returns what to call as the team is read, so the tools that name
+ * a member list its members, and your session is told they changed.
+ */
 export function addTools(server: McpServer, team: () => Promise<Engine>) {
   server.registerTool(
     "status",
@@ -95,27 +129,12 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
     },
   );
 
-  server.registerTool(
+  const meetingTool = server.registerTool(
     "hold_meeting",
     {
       description:
         "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and the session is told when its plan waits for the user.",
-      inputSchema: {
-        goal,
-        agenda: z
-          .string()
-          .trim()
-          .min(1)
-          .describe("What to plan, with everything the user said about it"),
-        size: z
-          .enum(MEETING_SIZES)
-          .optional()
-          .describe("How long the discussion runs; the team's default when left out"),
-        attendees: z
-          .array(z.string())
-          .default([])
-          .describe("Member names, the host first; everyone when empty"),
-      },
+      inputSchema: meetingInput(memberName()),
     },
     async ({ goal: ref, agenda, size, attendees }) => {
       const engine = await team();
@@ -146,15 +165,12 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
     },
   );
 
-  server.registerTool(
+  const changePlanTool = server.registerTool(
     "change_plan",
     {
       description:
         "Replace a plan under review with the user's changes: the whole plan, as show_plan gives it, changed. Any member can be given work.",
-      inputSchema: {
-        meeting,
-        plan: planSchema(z.string().describe("The name of the member it goes to")),
-      },
+      inputSchema: changePlanInput(memberName()),
     },
     async ({ meeting: id, plan }) => {
       (await team()).meetings.change(id, plan);
@@ -202,18 +218,12 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
     },
   );
 
-  server.registerTool(
+  const assignTool = server.registerTool(
     "assign",
     {
       description:
         "Give a member one subtask directly, without a meeting. It starts once they are free.",
-      inputSchema: {
-        goal,
-        assignee: z.string().describe("The member's name"),
-        title: z.string().trim().min(1),
-        description: z.string().trim().describe("Everything the user said about it"),
-        acceptance: z.string().trim().default("").describe("When it counts as done"),
-      },
+      inputSchema: assignInput(memberName()),
     },
     async ({ goal: ref, ...work }) => {
       const engine = await team();
@@ -292,4 +302,11 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
       return toolText("Done.");
     },
   );
+
+  return ({ members }: Team) => {
+    const member = memberName(members);
+    meetingTool.update({ paramsSchema: meetingInput(member) });
+    changePlanTool.update({ paramsSchema: changePlanInput(member) });
+    assignTool.update({ paramsSchema: assignInput(member) });
+  };
 }

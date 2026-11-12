@@ -36,6 +36,7 @@ const openTeam = async () =>
     plugin: pluginId(dataFolder),
     userTeam: userTeamFolder(process.env),
     env: process.env,
+    teamRead: listMembers,
     failed(error) {
       say(`the team's state or a record couldn't be written: ${errorText(error)}`);
     },
@@ -78,7 +79,7 @@ process.on("uncaughtException", (error) => {
 process.once("exit", stopMembers);
 
 const server = new McpServer({ name: "openplan", version: plugin.version });
-addTools(server, team);
+const listMembers = addTools(server, team);
 addPaneTools(server, team);
 await server.connect(new StdioServerTransport());
 // Opened now, so the session finds its team as it stands; a tool says why, if it can't be.

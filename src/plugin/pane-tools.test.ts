@@ -45,6 +45,7 @@ beforeEach(async () => {
     plugin: "openplan@inline",
     userTeam: path.join(dir, "user-team"),
     env: {},
+    teamRead: vi.fn(),
     failed: vi.fn(),
   });
   const server = new McpServer({ name: "openplan", version: "0.0.0" });
