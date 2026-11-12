@@ -2,7 +2,7 @@
 
 A team of Claude Code sessions on your repository. Each member has a role and any model with an Anthropic-compatible API. The team meets before it plans, works in parallel in its own worktrees, reviews and merges its own work, and asks you only when something needs you.
 
-> **Status: early.** It runs end to end against a scripted model; expect rough edges with real ones. [docs/design.md](docs/design.md) describes how it works.
+> **Status: early.** The engine is tested against scripted model streams, not yet run at length with real models; expect rough edges. [docs/design.md](docs/design.md) describes how it works.
 
 ## How it differs from Agent Teams
 

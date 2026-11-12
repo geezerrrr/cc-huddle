@@ -242,18 +242,18 @@ Members work under Claude Code's own permission modes and rules, set per team. E
 
 ## 9. What it fixes
 
-Each row is a scenario the test suite runs end to end against a scripted model.
+Each row names the tests that show it, under `src/engine/`. They run the engine against scripted SDK message streams or stubbed runs, with real git; none calls a model.
 
-| Problem elsewhere                                                             | Scenario                                                                                                                     |
-| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| A worker's state is guessed from its terminal; it gets stuck                  | Every status change comes from an SDK event; a run that ends without delivering is reminded once, then fails with the reason |
-| Worker permissions are bypassed                                               | A member's out-of-rule call waits for your answer in "Needs you"                                                             |
-| The process lives in the lead's prompt; the lead stops early or does the work | The scheduler starts and finishes work; your session only relays                                                             |
-| The team's memory is the lead's context, lost on compaction                   | All state is the engine's, in the data folder; compacting your session loses nothing                                         |
-| A failed worker restarts from scratch                                         | An API error mid-subtask: "go on" resumes the same session in the same worktree                                              |
-| Review cannot send work back                                                  | A failed review returns the subtask to its member with the notes                                                             |
-| Teammates overwrite each other's files                                        | Two subtasks edit one file: each in its worktree; the later merge's conflict goes back to its member                         |
-| Closing the terminal loses the team's work                                    | Close Claude Code mid-run: its goals pause; resume the session and a goal, and members go on in their sessions and worktrees |
+| Problem elsewhere                                                             | openplan                                                                                                                     | Shown by                                                                                          |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| A worker's state is guessed from its terminal; it gets stuck                  | Every status change comes from an SDK event; a run that ends without delivering is reminded once, then fails with the reason | `run.test.ts`                                                                                     |
+| Worker permissions are bypassed                                               | A member's out-of-rule call waits for your answer in "Needs you"                                                             | `questions.test.ts`: a call outside the rules                                                     |
+| The process lives in the lead's prompt; the lead stops early or does the work | The scheduler starts and finishes work; your session only relays                                                             | `scheduler.test.ts`: runs a subtask in its worktree                                               |
+| The team's memory is the lead's context, lost on compaction                   | All state is the engine's, in the data folder; your session holds none, so compacting or clearing it loses nothing           | By construction (§3.2); `engine.test.ts`: pauses what a session killed outright left active       |
+| A failed worker restarts from scratch                                         | An API error mid-subtask: "go on" resumes the same session in the same worktree                                              | `scheduler.test.ts`: go on with a failed subtask                                                  |
+| Review cannot send work back                                                  | A failed review returns the subtask to its member with the notes                                                             | `scheduler.test.ts`: sends it back with the notes                                                 |
+| Teammates overwrite each other's files                                        | Two subtasks edit one file: each in its worktree; the later merge's conflict goes back to its member                         | `scheduler.test.ts`: sends a text conflict back                                                   |
+| Closing the terminal loses the team's work                                    | Close Claude Code mid-run: its goals pause; resume the session and a goal, and members go on in their sessions and worktrees | `engine.test.ts`: pauses every active goal as it closes; `scheduler.test.ts`: stops with its goal |
 
 ## 10. Verified, and what is left
 
