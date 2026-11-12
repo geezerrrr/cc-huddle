@@ -120,6 +120,26 @@ export class Questions {
   }
 
   /**
+   * A member asks a teammate: the question is open while `answering` runs
+   * (the teammate's read-only turn), so the asker shows as waiting on them,
+   * and leaves the state when it settles. Its subtask's run stopping calls it
+   * off (cancelFor) and should stop `answering` too.
+   */
+  async toTeammate<T>(
+    asker: Omit<Asker, "signal">,
+    to: string,
+    text: string,
+    answering: () => Promise<T>,
+  ): Promise<T> {
+    const question = this.open(asker, { text, options: [] }, to);
+    try {
+      return await answering();
+    } finally {
+      if (question.status === "open") this.close(question, "answer");
+    }
+  }
+
+  /**
    * A stuck review, a merge that needs you, or a task done (with why, or
    * what, in `text`): it waits for your answer, no turn behind it.
    */
@@ -242,15 +262,17 @@ export class Questions {
     });
   }
 
+  /** Puts a question to `to`: you, unless a teammate is asked. */
   private open(
     asker: Omit<Asker, "signal">,
     ask: Pick<Question, "text" | "options" | "choices" | "permission" | "decision">,
+    to = YOU,
   ): Question {
     const question: Question = {
       id: randomUUID(),
       ...(asker.subtaskId !== undefined && { subtaskId: asker.subtaskId }),
       from: asker.from,
-      to: YOU,
+      to,
       status: "open",
       createdAt: Date.now(),
       ...ask,

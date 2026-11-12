@@ -286,3 +286,32 @@ describe("calling off", () => {
     expect(box.state.questions.map((q) => q.subtaskId)).toEqual(["x"]);
   });
 });
+
+describe("a teammate's question", () => {
+  it("is open while the teammate answers, and leaves once they have", async () => {
+    const { box, questions } = inbox();
+    const { promise, resolve } = Promise.withResolvers<string>();
+    const answered = questions.toTeammate(
+      { from: "glm", subtaskId: "s1" },
+      "sonnet",
+      "Which font?",
+      () => promise,
+    );
+    expect(box.state.questions).toMatchObject([
+      { from: "glm", to: "sonnet", subtaskId: "s1", text: "Which font?", status: "open" },
+    ]);
+    resolve("Inter");
+    expect(await answered).toBe("Inter");
+    expect(box.state.questions).toEqual([]);
+  });
+
+  it("leaves when its subtask's run is stopped, the answer still coming", async () => {
+    const { box, questions } = inbox();
+    const failing = questions.toTeammate({ from: "glm", subtaskId: "s1" }, "sonnet", "?", () =>
+      Promise.reject(new Error("stopped")),
+    );
+    questions.cancelFor("s1");
+    expect(box.state.questions).toEqual([]);
+    await expect(failing).rejects.toThrow("stopped");
+  });
+});
