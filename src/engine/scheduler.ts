@@ -339,14 +339,9 @@ export class Scheduler {
   private async startRun(subtask: Subtask) {
     const { core } = this;
     const { abort, end } = this.begin(subtask, "run");
-    // What it goes on with in its last session; with none kept, what you asked for goes into the brief.
+    // What it goes on with in its last session; with none kept, your words for it go into the brief.
     const goOn = subtask.session ? subtask.goOn : undefined;
-    const revision = goOn
-      ? ""
-      : (subtask.goOn ?? [])
-          .filter((g) => g.why === "revised")
-          .map((g) => g.note)
-          .join("\n\n");
+    const notes = goOn ? [] : (subtask.goOn ?? []);
     subtask.goOn = undefined;
     this.move(subtask, "start");
     subtask.startedAt = Date.now();
@@ -370,7 +365,7 @@ export class Scheduler {
               cwd: desk,
               branch: subtaskBranch(goal.slug, subtask.id),
               upstream: this.upstreamOf(subtask),
-              ...(revision && { revision }),
+              notes,
             }),
         ...(goOn && { resume: subtask.session }),
         gate: this.questions.gate({

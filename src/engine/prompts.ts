@@ -37,8 +37,9 @@ export interface Upstream {
 
 /**
  * The first message of a subtask's run: the goal, the task, the subtask,
- * where to work, what came from upstream, and what you want changed when its
- * task came back with no session to go on in.
+ * where to work, what came from upstream, and your words for it from before
+ * it had a session to go on in (`notes`: you added to it, or sent its task
+ * back).
  */
 export function taskBrief(input: {
   goal: Goal;
@@ -47,7 +48,7 @@ export function taskBrief(input: {
   cwd: string;
   branch: string;
   upstream: readonly Upstream[];
-  revision?: string;
+  notes: readonly GoOn[];
 }): string {
   const { goal, task, subtask } = input;
   const lines = [
@@ -67,8 +68,10 @@ export function taskBrief(input: {
   if (direct.length)
     lines.push("", "It builds on this work, merged into the goal's branch:", ...direct);
   if (further.length) lines.push("", "Which built on:", ...further);
-  if (input.revision)
-    lines.push("", `The user sent this task back before, asking for:\n${input.revision}`);
+  for (const { why, note } of input.notes)
+    if (why === "revised")
+      lines.push("", `The user sent this task back before, asking for:\n${note ?? ""}`);
+    else if (why === "carried") lines.push("", `The user adds to your subtask:\n${note ?? ""}`);
   return lines.join("\n");
 }
 

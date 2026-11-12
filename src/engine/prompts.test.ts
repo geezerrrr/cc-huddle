@@ -41,7 +41,7 @@ describe("systemPrompt", () => {
 });
 
 describe("taskBrief", () => {
-  it("gives the work, where to do it, and what it builds on", () => {
+  it("gives the work, where to do it, what it builds on, and your words for it", () => {
     const brief = taskBrief({
       goal: { id: "g1", name: "Dice game", slug: "dice-game", status: "active", createdAt: 0 },
       task: { id: "t1", goalId: "g1", title: "Board", outcome: "A board to roll on", createdAt: 0 },
@@ -58,7 +58,11 @@ describe("taskBrief", () => {
           direct: false,
         },
       ],
-      revision: "Bigger numbers",
+      notes: [
+        { why: "revised", note: "Bigger numbers" },
+        { why: "held" },
+        { why: "carried", note: "Use blue" },
+      ],
     });
     expect(brief).toBe(`Goal: Dice game
 Task: Board. A board to roll on
@@ -76,7 +80,10 @@ Which built on:
 - Setup, by sonnet: Set up.
 
 The user sent this task back before, asking for:
-Bigger numbers`);
+Bigger numbers
+
+The user adds to your subtask:
+Use blue`);
   });
 });
 
