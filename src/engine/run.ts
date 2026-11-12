@@ -11,6 +11,7 @@ import {
   type Options,
 } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
+import { errorText } from "./core.ts";
 import { DELIVER_REMINDER, SESSION_ONLY } from "./prompts.ts";
 import { claudeProcess, turnDecoder, type TurnListener, type TurnOutcome } from "./turns.ts";
 
@@ -170,10 +171,6 @@ export async function runSubtask(params: {
   } catch (error) {
     if (handover) return { status: "delivered", handover, tokens };
     if (signal.aborted) return { status: "stopped", tokens };
-    return {
-      status: "failed",
-      error: error instanceof Error ? error.message : String(error),
-      tokens,
-    };
+    return { status: "failed", error: errorText(error), tokens };
   }
 }
