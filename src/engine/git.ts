@@ -5,8 +5,9 @@
  * signing. Members use git in their worktrees as they would anywhere.
  */
 import { spawn } from "node:child_process";
-import { realpath, stat } from "node:fs/promises";
+import { realpath, rm, stat } from "node:fs/promises";
 import path from "node:path";
+import { serialBy } from "./serial.ts";
 
 /** Every command: nothing from the repository's config runs, and paths come out as they are. */
 const FLAGS = [
@@ -166,4 +167,43 @@ export async function openGoal(places: Places, slug: string): Promise<string> {
     await git({ cwd: repo.top }, ["worktree", "add", "-q", folder, branch]);
   }
   return folder;
+}
+
+/** The branch a subtask works on. */
+export const subtaskBranch = (slug: string, subtaskId: string) => `openplan/${slug}/${subtaskId}`;
+
+/** The worktree a subtask works in. */
+export const deskFolder = (places: Places, subtaskId: string) =>
+  path.join(places.root, "desks", subtaskId);
+
+/** One git operation per goal at a time: its branch and its worktrees are shared. */
+const serial = serialBy();
+const perGoal = <T>(places: Places, slug: string, task: () => Promise<T>) =>
+  serial(goalFolder(places, slug), task);
+
+/**
+ * A subtask's worktree: its own if there (a run going on keeps it), its
+ * branch checked out again if only that is (the folder deleted by hand), else
+ * a new branch cut from the goal's branch as it stands now.
+ */
+export function openDesk(places: Places, slug: string, subtaskId: string): Promise<string> {
+  return perGoal(places, slug, async () => {
+    const { repo } = places;
+    const desk = deskFolder(places, subtaskId);
+    await openGoal(places, slug);
+    if (await exists(path.join(desk, ".git"))) return desk;
+    await rm(desk, { recursive: true, force: true });
+    await unlist(repo, desk);
+    const branch = subtaskBranch(slug, subtaskId);
+    const kept = await git({ cwd: repo.top }, ["rev-parse", "--verify", "-q", branch], {
+      allow: [1],
+    });
+    await git(
+      { cwd: repo.top },
+      kept.code === 0
+        ? ["worktree", "add", "-q", desk, branch]
+        : ["worktree", "add", "-q", "-b", branch, desk, goalBranch(slug)],
+    );
+    return desk;
+  });
 }

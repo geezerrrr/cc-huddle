@@ -1,8 +1,18 @@
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { git, GitError, goalBranch, openGoal, openRepository, slugFor, takenSlugs } from "./git.ts";
+import {
+  git,
+  GitError,
+  goalBranch,
+  openDesk,
+  openGoal,
+  openRepository,
+  slugFor,
+  subtaskBranch,
+  takenSlugs,
+} from "./git.ts";
 
 const ME = {
   GIT_AUTHOR_NAME: "you",
@@ -112,5 +122,38 @@ describe("goals", () => {
     await openGoal(await placesOf(), "dice");
     const current = await git({ cwd: repo }, ["branch", "--show-current"]);
     expect(current.stdout.trim()).toBe("main");
+  });
+});
+
+describe("desks", () => {
+  const placesOf = async () => ({ repo: await openRepository(repo), root: path.join(dir, "data") });
+
+  it("cuts a subtask's branch from the goal's and checks it out in its own folder", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    const desk = await openDesk(places, "dice", "s1");
+    const checkedOut = await git({ cwd: desk }, ["branch", "--show-current"]);
+    expect(checkedOut.stdout.trim()).toBe(subtaskBranch("dice", "s1"));
+  });
+
+  it("keeps a desk and what is in it while it is there", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    const desk = await openDesk(places, "dice", "s1");
+    await writeFile(path.join(desk, "work.txt"), "half done\n");
+    expect(await openDesk(places, "dice", "s1")).toBe(desk);
+    expect(await readFile(path.join(desk, "work.txt"), "utf8")).toBe("half done\n");
+  });
+
+  it("checks a desk deleted by hand out again from its branch", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    const desk = await openDesk(places, "dice", "s1");
+    await writeFile(path.join(desk, "work.txt"), "done\n");
+    await git({ cwd: desk, env: ME }, ["add", "-A"]);
+    await git({ cwd: desk, env: ME }, ["commit", "-q", "-m", "work"]);
+    await rm(desk, { recursive: true });
+    await openDesk(places, "dice", "s1");
+    expect(await readFile(path.join(desk, "work.txt"), "utf8")).toBe("done\n");
   });
 });
