@@ -139,7 +139,15 @@ process.once("exit", () => {
   pane.close();
 });
 
-const server = new McpServer({ name: "openplan", version: plugin.version });
+// openplan's prompts and tool results are in English, for the model; what it
+// says to you follows your language, not theirs (§7.3).
+const server = new McpServer(
+  { name: "openplan", version: plugin.version },
+  {
+    instructions:
+      "Talk to the user in the language they write to you in, whatever language openplan's messages and tool results are in.",
+  },
+);
 // Your session's tools and the pane's answers are using openplan.
 const use = () => team(true);
 const listMembers = addTools(server, use);
