@@ -8508,7 +8508,7 @@ function viewer(session2) {
     return {
       revision,
       ...asked2.revision !== revision && { team },
-      ...spoken && { speaking: { speaker: spoken.speaker, text: spoken.text } },
+      ...spoken && { speaking: spoken },
       ...record2 && engine && {
         record: {
           subtask: record2.subtask,
@@ -10480,6 +10480,53 @@ var Questions = class {
 import { appendFile, mkdir as mkdir4, open } from "node:fs/promises";
 import path9 from "node:path";
 var OUTPUT_MAX = 4e3;
+var liveOf = (now) => ({
+  ...now.streaming && { streaming: now.streaming },
+  ...now.starting && { starting: now.starting },
+  running: [...now.running.values()]
+});
+function tracking(now, keep) {
+  return {
+    session: (session2, model) => {
+      keep({ at: Date.now(), kind: "run", session: session2, model });
+    },
+    thinking: (delta) => {
+      now.streaming = delta === "" || now.streaming?.kind !== "thinking" ? { kind: "thinking", text: delta } : { kind: "thinking", text: now.streaming.text + delta };
+    },
+    text: (delta, fresh2) => {
+      now.streaming = fresh2 || now.streaming?.kind !== "text" ? { kind: "text", text: delta } : { kind: "text", text: now.streaming.text + delta };
+    },
+    toolStarting: (name) => {
+      now.starting = name;
+    },
+    block: (block) => {
+      if (block.kind === "tool") {
+        now.starting = void 0;
+        now.running.set(block.id, block);
+        return;
+      }
+      if (now.streaming?.kind === block.kind) now.streaming = void 0;
+      keep({ at: Date.now(), kind: block.kind, text: block.text });
+    },
+    toolDone: (call) => {
+      now.running.delete(call.id);
+      keep({
+        at: Date.now(),
+        kind: "tool",
+        name: call.name,
+        input: call.input,
+        state: call.state === "error" ? "error" : "done",
+        output: (call.output ?? "").slice(0, OUTPUT_MAX)
+      });
+    },
+    steps: (steps) => {
+      keep({ at: Date.now(), kind: "steps", steps });
+    },
+    notice: (notice) => {
+      keep({ at: Date.now(), kind: "notice", notice });
+    }
+  };
+}
 var recordFile = (places, subtaskId) => path9.join(places.root, "records", `${subtaskId}.jsonl`);
 var Records = class {
   constructor(places, failed) {
@@ -10505,46 +10552,7 @@ var Records = class {
 `);
       }).catch(this.failed);
     };
-    return {
-      session: (session2, model) => {
-        write({ at: Date.now(), kind: "run", session: session2, model });
-      },
-      thinking: (delta) => {
-        now.streaming = delta === "" || now.streaming?.kind !== "thinking" ? { kind: "thinking", text: delta } : { kind: "thinking", text: now.streaming.text + delta };
-      },
-      text: (delta, fresh2) => {
-        now.streaming = fresh2 || now.streaming?.kind !== "text" ? { kind: "text", text: delta } : { kind: "text", text: now.streaming.text + delta };
-      },
-      toolStarting: (name) => {
-        now.starting = name;
-      },
-      block: (block) => {
-        if (block.kind === "tool") {
-          now.starting = void 0;
-          now.running.set(block.id, block);
-          return;
-        }
-        if (now.streaming?.kind === block.kind) now.streaming = void 0;
-        write({ at: Date.now(), kind: block.kind, text: block.text });
-      },
-      toolDone: (call) => {
-        now.running.delete(call.id);
-        write({
-          at: Date.now(),
-          kind: "tool",
-          name: call.name,
-          input: call.input,
-          state: call.state === "error" ? "error" : "done",
-          output: (call.output ?? "").slice(0, OUTPUT_MAX)
-        });
-      },
-      steps: (steps) => {
-        write({ at: Date.now(), kind: "steps", steps });
-      },
-      notice: (notice) => {
-        write({ at: Date.now(), kind: "notice", notice });
-      }
-    };
+    return tracking(now, write);
   }
   /**
    * A subtask's record from byte `from` of its file on: the whole entries
@@ -10552,11 +10560,7 @@ var Records = class {
    */
   async read(subtaskId, from = 0) {
     const now = this.live.get(subtaskId);
-    const live = now && {
-      ...now.streaming && { streaming: now.streaming },
-      ...now.starting && { starting: now.starting },
-      running: [...now.running.values()]
-    };
+    const live = now && liveOf(now);
     let handle;
     try {
       handle = await open(recordFile(this.places, subtaskId));
@@ -10575,21 +10579,28 @@ var Records = class {
       await handle.close();
     }
   }
-  /** Where a meeting turn tells its words as they are said. */
+  /**
+   * Where a meeting turn tells what it does as it is spoken, as a run tells
+   * its record; kept until it is the meeting's. A turn's start isn't kept:
+   * the meeting says who speaks.
+   */
   speech(meeting2, speaker) {
-    const spoken = { speaker, text: "", turn: meeting2.turns.length };
-    this.spoken.set(meeting2.id, spoken);
-    return {
-      // What a turn says before it looks something up isn't what it ends up saying.
-      text: (delta, fresh2) => {
-        spoken.text = fresh2 ? delta : spoken.text + delta;
-      }
+    const speaking = {
+      speaker,
+      turn: meeting2.turns.length,
+      entries: [],
+      now: { running: /* @__PURE__ */ new Map() }
     };
+    this.spoken.set(meeting2.id, speaking);
+    return tracking(speaking.now, (entry) => {
+      if (entry.kind !== "run") speaking.entries.push(entry);
+    });
   }
   /** The turn being spoken at `meeting` now, if one is. */
   speaking(meeting2) {
-    const spoken = this.spoken.get(meeting2.id);
-    return meeting2.status === "running" && spoken?.turn === meeting2.turns.length ? spoken : void 0;
+    const speaking = this.spoken.get(meeting2.id);
+    if (meeting2.status !== "running" || speaking?.turn !== meeting2.turns.length) return void 0;
+    return { speaker: speaking.speaker, entries: speaking.entries, live: liveOf(speaking.now) };
   }
   /** Every entry written so far is in its file. */
   flush() {
