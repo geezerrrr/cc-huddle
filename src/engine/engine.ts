@@ -7,14 +7,13 @@ import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import type { PermissionMode } from "@anthropic-ai/claude-agent-sdk";
 import { workOf, type Core, type Team } from "./core.ts";
-import { errorText } from "../shared/errors.ts";
 import type { Work } from "./derive.ts";
 import { newGoalFolder, readState, stateWriter, type StateWriter } from "./data.ts";
 import { goalFiles, repoFolder, goalFolder } from "../shared/layout.ts";
 import { openGoal, openRepository, takenSlugs, type Places } from "./git.ts";
 import { Goals } from "./goals.ts";
 import { Meetings } from "./meetings.ts";
-import { memberSettings, sessionOptions, writeSettings } from "./policy.ts";
+import { sessionOptions, teamSettings, writeSettings } from "./policy.ts";
 import { recordMembersIn, stopRecording } from "./processes.ts";
 import { systemPrompt } from "./prompts.ts";
 import { Questions, type Answer } from "./questions.ts";
@@ -58,28 +57,11 @@ export interface EngineOptions {
 /** Where a goal's files are. */
 type Files = ReturnType<typeof goalFiles>;
 
-/**
- * Each member's settings: the team's settings, their environment filled in,
- * and the guards. Throws when a member's environment names a variable that
- * isn't set.
- */
-function filledSettings({ team, settings }: TeamFiles, options: EngineOptions) {
-  return team.members.map((member) => {
-    try {
-      return [member.name, memberSettings(settings, member, options.env, options.plugins)] as const;
-    } catch (error) {
-      throw new Error(`${member.name}: ${errorText(error)}`, { cause: error });
-    }
-  });
-}
-
 export class Engine {
   readonly questions: Questions;
   readonly scheduler: Scheduler;
   readonly meetings: Meetings;
   readonly goals: Goals;
-  /** The team's settings set the members' permission mode, over your session's. */
-  private teamMode = false;
 
   private constructor(
     private readonly core: Core,
@@ -104,7 +86,7 @@ export class Engine {
     const repo = await openRepository(options.cwd);
     const copy = await loadTeam(options.userTeam, repo.top);
     // What a member's environment lacks is said before anything is made.
-    filledSettings(copy, options);
+    teamSettings(copy.settings, copy.team.members, options.env, options.plugins);
     const { slug, folder } = await newGoalFolder(
       repoFolder(options.dataFolder, repo),
       name,
@@ -151,7 +133,8 @@ export class Engine {
     if (!existsSync(files.state)) throw new Error(`There is no goal "${slug}" in this repository`);
     // What this openplan can't read, or a member's environment lacks, is said before the goal is taken from where it runs.
     await readState(files.state);
-    filledSettings(await readCopy(files.team), options);
+    const { settings, team } = await readCopy(files.team);
+    teamSettings(settings, team.members, options.env, options.plugins);
     const me: Runner = { session: options.session, address: options.address };
     const handed = await takeLock(files.lock, me, (holder) => options.takeOver(holder, slug));
     const stopped = handed.flatMap((h) => h.meetings);
@@ -314,11 +297,11 @@ export class Engine {
 
   private readonly allowing = serialBy();
 
-  /** Writes each member's settings file (filledSettings); throws before writing any when one can't be filled in. */
-  private async writeMemberSettings(copy: TeamFiles) {
-    for (const [name, filled] of filledSettings(copy, this.options))
+  /** Writes each member's settings file (teamSettings); throws before writing any when one can't be filled in. */
+  private async writeMemberSettings({ settings, team }: TeamFiles) {
+    const { env, plugins } = this.options;
+    for (const [name, filled] of teamSettings(settings, team.members, env, plugins))
       await writeSettings(this.files.settings(name), filled);
-    this.teamMode = copy.settings.permissions?.defaultMode !== undefined;
   }
 
   private turnOptions(...[member, kind, cwd]: Parameters<Core["options"]>) {
@@ -330,7 +313,7 @@ export class Engine {
       settings: this.files.settings(member.name),
       system: systemPrompt(kind, member, this.core.team.members),
       ...(sessionMode && { sessionMode }),
-      teamMode: this.teamMode,
+      team: this.copy.settings,
     };
     return sessionOptions(seat, kind, this.options.env);
   }

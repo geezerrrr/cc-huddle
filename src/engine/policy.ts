@@ -5,6 +5,7 @@
  * runs under flag settings on top, which outrank both.
  */
 import type { Options, PermissionMode, Settings } from "@anthropic-ai/claude-agent-sdk";
+import { errorText } from "../shared/errors.ts";
 import { writeWhole } from "../shared/files.ts";
 import { authorEnv, memberSigner } from "./git.ts";
 import type { SessionKind } from "./prompts.ts";
@@ -86,6 +87,25 @@ export function memberSettings(
 }
 
 /**
+ * Each member's flag settings (memberSettings), by name. Throws, naming the
+ * member, when their environment names a variable that isn't set.
+ */
+export function teamSettings(
+  team: Settings,
+  members: readonly Member[],
+  from: Env,
+  plugins: readonly string[],
+): (readonly [string, Settings])[] {
+  return members.map((member) => {
+    try {
+      return [member.name, memberSettings(team, member, from, plugins)] as const;
+    } catch (error) {
+      throw new Error(`${member.name}: ${errorText(error)}`, { cause: error });
+    }
+  });
+}
+
+/**
  * Writes a member's settings to a file only you can read and gives its path:
  * settings passed inline end up on a command line, keys and all.
  */
@@ -106,8 +126,8 @@ export interface Seat {
   system: string;
   /** Your session's permission mode as it is now; undefined before it is known. */
   sessionMode?: PermissionMode;
-  /** Whether the team's settings set a permission mode of their own, which then wins over yours. */
-  teamMode: boolean;
+  /** The team's settings: a permission mode of their own wins over yours. */
+  team: Settings;
 }
 
 /** A member turn's options: always with its settings file, which tells its process from others (processes.ts). */
@@ -125,7 +145,8 @@ export const sessionOptions = (seat: Seat, kind: SessionKind, from: Env): Member
  * on the commits they make and in `claude agents`.
  */
 function workOptions(seat: Seat, from: Env): MemberOptions {
-  return memberOptions(seat, from, seat.teamMode ? undefined : seat.sessionMode);
+  const teamMode = seat.team.permissions?.defaultMode !== undefined;
+  return memberOptions(seat, from, teamMode ? undefined : seat.sessionMode);
 }
 
 /** What every member turn runs with, in permission mode `mode` (Claude Code's default for none). */

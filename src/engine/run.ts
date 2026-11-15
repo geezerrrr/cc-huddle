@@ -12,11 +12,11 @@ import {
   keepingSession,
   runTurn,
   toolText,
-  TURN_SERVER,
   turnDecoder,
   turnServer,
   turnToolName,
   type TurnListener,
+  withTurn,
 } from "./turns.ts";
 
 const OWN_TOOLS = new Set([turnToolName("ask_teammate"), turnToolName("deliver")]);
@@ -110,15 +110,11 @@ export async function runSubtask(params: {
   const turn = (prompt: string) =>
     runTurn(
       prompt,
-      {
-        ...options,
+      withTurn(options, {
         ...(session !== undefined && { resume: session }),
-        mcpServers: {
-          ...options.mcpServers,
-          [TURN_SERVER]: teamServer(params.collaboration, (given) => (handover = given)),
-        },
+        server: teamServer(params.collaboration, (given) => (handover = given)),
         canUseTool,
-      },
+      }),
       signal,
       decode,
     );

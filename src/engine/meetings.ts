@@ -37,11 +37,11 @@ import type { Scheduler } from "./scheduler.ts";
 import {
   askOnce,
   toolText,
-  TURN_SERVER,
   turnServer,
   turnToolName,
   type Reply,
   type TurnListener,
+  withTurn,
 } from "./turns.ts";
 import type {
   Meeting,
@@ -374,14 +374,10 @@ export class Meetings {
         const seat = meeting.seats?.[member.name];
         const reply = await askOnce({
           prompt,
-          options: {
-            ...options,
+          options: withTurn(options, {
             ...(seat && { resume: seat.session }),
-            ...(turn.tool && {
-              mcpServers: { ...options.mcpServers, [TURN_SERVER]: turn.tool.server },
-              allowedTools: [turn.tool.name],
-            }),
-          },
+            ...(turn.tool && { server: turn.tool.server, allowed: [turn.tool.name] }),
+          }),
           ...(turn.schema && { schema: turn.schema }),
           signal: turn.signal ?? signal,
           spent: (tokens) => {

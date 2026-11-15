@@ -98,7 +98,7 @@ describe("session options", () => {
     cwd: "/desk",
     settings: "/data/glm.json",
     system: "Your duties",
-    teamMode: false,
+    team: {},
   };
   const work = (fields: Partial<Seat> = {}) => sessionOptions({ ...seat, ...fields }, "work", from);
   const from = {
@@ -137,9 +137,12 @@ describe("session options", () => {
       permissionMode: "bypassPermissions",
       allowDangerouslySkipPermissions: true,
     });
-    expect(work({ sessionMode: "bypassPermissions", teamMode: true })).not.toHaveProperty(
-      "permissionMode",
-    );
+    expect(
+      work({
+        sessionMode: "bypassPermissions",
+        team: { permissions: { defaultMode: "acceptEdits" } },
+      }),
+    ).not.toHaveProperty("permissionMode");
   });
 
   it("keeps a read-only turn to the read-only tools and its own MCP server, and asks nobody", () => {
