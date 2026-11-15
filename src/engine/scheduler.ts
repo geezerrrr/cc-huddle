@@ -353,21 +353,16 @@ export class Scheduler {
   }
 
   /**
-   * Takes up whatever can go on, as the rules say (derive.ts waitsIn): what
-   * goes on in its session first, then new work, and delivered work reviewed
-   * and merged in the order it was delivered. Each start is seen by the next:
-   * its member is busy, its review or merge under way.
+   * Takes up whatever the rules leave waiting on nothing (derive.ts
+   * waitsIn), one at a time: each start is seen by the next, its member
+   * busy, its review or merge under way.
    */
   pump() {
     if (this.closed) return;
-    // Reviews and merges go in delivery order as the rules say (derive.ts ahead).
-    const order = [...this.core.state.subtasks].sort(
-      (a, b) => Number(Boolean(b.goOn)) - Number(Boolean(a.goOn)),
-    );
     for (;;) {
       const work = workOf(this.core);
       const busy = busyMembers(work);
-      const next = order.find(
+      const next = work.subtasks.find(
         (s) =>
           !this.live.has(s.id) && TAKEN_UP.includes(s.status) && !waitsIn(work, s, busy).length,
       );

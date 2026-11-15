@@ -335,6 +335,8 @@ export type Wait =
   | { kind: "goal"; status: "paused" | "archived" }
   | { kind: "upstream"; by: string; subtaskId: string; halted: boolean }
   | { kind: "busy"; by: string }
+  /** Its member's work going on in its session goes before new work of theirs. */
+  | { kind: "after"; subtaskId: string }
   /** Merges go one at a time: one under way, or delivered before it. */
   | { kind: "merge"; subtaskId: string }
   | { kind: "teammate"; by: string; questionId: string }

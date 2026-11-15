@@ -96,6 +96,19 @@ describe("waitsIn", () => {
     expect(waitsIn(state, down, busyMembers(state))).toEqual([{ kind: "busy", by: "ann" }]);
   });
 
+  it("has new work wait for its member's work going on in its session, while that can start", () => {
+    const fresh = subtask("fresh");
+    const held = subtask("held", { goOn: [{ why: "held" }] });
+    const state = work({ subtasks: [fresh, held] });
+    expect(waitsIn(state, fresh, busyMembers(state))).toEqual([
+      { kind: "after", subtaskId: "held" },
+    ]);
+    expect(waitsIn(state, held, busyMembers(state))).toEqual([]);
+    held.dependsOn = ["up"];
+    state.subtasks.push(subtask("up", { assignee: "bob" }));
+    expect(waitsIn(state, fresh, busyMembers(state))).toEqual([]);
+  });
+
   it("waits on the acceptance of another task you accept before building on it", () => {
     const task = (ownerAccepts: boolean) => ({
       id: "t0",

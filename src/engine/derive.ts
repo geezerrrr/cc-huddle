@@ -1,7 +1,7 @@
 /**
  * What the rules make of the state (docs/design.md §4.5): what each subtask
  * waits on, who is busy, who reviews a delivery, whose upstream was redone,
- * and what you can do to a subtask. Worked out here only and never stored:
+ * which tasks are accepted, and what you can do to a subtask. Worked out here only and never stored:
  * the scheduler acts on it, and the plugin shows it.
  */
 import { actionEvent, can, MEETING_MACHINE } from "./machines.ts";
@@ -59,9 +59,20 @@ function acceptanceOf(state: Pick<GoalState, "questions" | "subtasks">, taskId: 
   );
 }
 
-/** Whether a subtask in review can be reviewed: its goal is active and you aren't deciding on it. */
-const underReview = (state: Pick<GoalState, "goal" | "questions">, subtask: Subtask) =>
-  subtask.status === "reviewing" &&
+/** Whether a task you accept is accepted: done, with no acceptance waiting on you (§7.1). */
+export const accepted = (state: Pick<GoalState, "questions" | "subtasks">, taskId: string) =>
+  taskDone(state, taskId) && !acceptanceOf(state, taskId);
+
+/**
+ * Whether a subtask handed over is taken up in `stage`: it is there, its
+ * goal is active and you aren't deciding on it.
+ */
+const takenUpIn = (
+  state: Pick<GoalState, "goal" | "questions">,
+  subtask: Subtask,
+  stage: "reviewing" | "merging",
+) =>
+  subtask.status === stage &&
   isActive(state) &&
   !openQuestions(state, subtask.id).some((q) => q.kind === "decision");
 
@@ -74,7 +85,7 @@ export function busyMembers(state: Work): Set<string> {
   const busy = new Set<string>();
   for (const s of state.subtasks) {
     if (s.status === "running") busy.add(s.assignee);
-    if (underReview(state, s)) busy.add(s.assignee).add(reviewerOf(state, s));
+    if (takenUpIn(state, s, "reviewing")) busy.add(s.assignee).add(reviewerOf(state, s));
   }
   for (const m of state.meetings)
     if (m.status === "running") for (const id of m.participants) busy.add(id);
@@ -113,16 +124,10 @@ function reviewerAway(state: Work, subtask: Subtask): string | undefined {
   const reviewing = ahead(
     state,
     subtask,
-    (s) => underReview(state, s) && reviewerOf(state, s) === reviewer,
+    (s) => takenUpIn(state, s, "reviewing") && reviewerOf(state, s) === reviewer,
   );
   return working || meeting || reviewing ? reviewer : undefined;
 }
-
-/** Whether a subtask being merged can be merged: its goal is active and you aren't deciding on it. */
-const mergeable = (state: Pick<GoalState, "goal" | "questions">, subtask: Subtask) =>
-  subtask.status === "merging" &&
-  isActive(state) &&
-  !openQuestions(state, subtask.id).some((q) => q.kind === "decision");
 
 /** What a subtask waits on in its stage; `busy` is busyMembers. */
 export function waitsIn(state: Work, subtask: Subtask, busy: Set<string>): Wait[] {
@@ -152,7 +157,8 @@ export function waitsIn(state: Work, subtask: Subtask, busy: Set<string>): Wait[
         if (d.taskId === subtask.taskId) return [];
         // Done in another task you accept: that whole task is yours to accept
         // first, so the rest of it is waited for, then your acceptance.
-        if (!state.tasks.find((t) => t.id === d.taskId)?.ownerAccepts) return [];
+        if (!state.tasks.find((t) => t.id === d.taskId)?.ownerAccepts || accepted(state, d.taskId))
+          return [];
         const rest = state.subtasks.find((s) => s.taskId === d.taskId && s.status !== "done");
         if (rest) return [unmerged(rest)];
         const acceptance = acceptanceOf(state, d.taskId);
@@ -161,7 +167,17 @@ export function waitsIn(state: Work, subtask: Subtask, busy: Set<string>): Wait[
       // Several upstreams in one other task wait on the same thing: once each.
       if (upstream.length)
         return [...new Map(upstream.map((w) => [JSON.stringify(w), w])).values()];
-      return busy.has(subtask.assignee) ? [{ kind: "busy", by: subtask.assignee }] : [];
+      if (busy.has(subtask.assignee)) return [{ kind: "busy", by: subtask.assignee }];
+      if (subtask.goOn) return [];
+      // Their work going on in its session goes first, while it can start too.
+      const first = state.subtasks.find(
+        (s) =>
+          s.goOn &&
+          s.status === "pending" &&
+          s.assignee === subtask.assignee &&
+          !waitsIn(state, s, busy).length,
+      );
+      return first ? [{ kind: "after", subtaskId: first.id }] : [];
     }
     // A done subtask, the last of its task, carries the task's acceptance waiting on you.
     case "running":
@@ -170,8 +186,8 @@ export function waitsIn(state: Work, subtask: Subtask, busy: Set<string>): Wait[
     // A merge under way finishes (§3.2); one yet to start waits for its goal, and its turn.
     case "merging": {
       if (state.underWay.includes(subtask.id)) return asked();
-      const before = mergeable(state, subtask)
-        ? ahead(state, subtask, (s) => mergeable(state, s))
+      const before = takenUpIn(state, subtask, "merging")
+        ? ahead(state, subtask, (s) => takenUpIn(state, s, "merging"))
         : undefined;
       return [
         ...held,
@@ -181,7 +197,9 @@ export function waitsIn(state: Work, subtask: Subtask, busy: Set<string>): Wait[
     }
     case "reviewing": {
       if (state.underWay.includes(subtask.id)) return asked();
-      const reviewer = underReview(state, subtask) ? reviewerAway(state, subtask) : undefined;
+      const reviewer = takenUpIn(state, subtask, "reviewing")
+        ? reviewerAway(state, subtask)
+        : undefined;
       return [...held, ...asked(), ...(reviewer ? [{ kind: "busy" as const, by: reviewer }] : [])];
     }
     case "failed":
