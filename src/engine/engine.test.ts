@@ -86,7 +86,7 @@ beforeEach(async () => {
     address: "here",
     takeOver: () => Promise.reject(new Error("not asked")),
     sessionMode: () => undefined,
-    plugin: "openplan@inline",
+    plugins: ["openplan@inline"],
     userTeam: path.join(dir, "user-team"),
     env: { GLM_KEY: "key-1" },
     failed: vi.fn(),

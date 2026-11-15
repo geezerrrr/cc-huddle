@@ -51,8 +51,8 @@ export interface EngineOptions {
   takeOver: (holder: Holder, slug: string) => Promise<HandedOver>;
   /** Your session's permission mode as it is now, which members work in (§8); undefined before it is known. */
   sessionMode: () => PermissionMode | undefined;
-  /** openplan's id as `enabledPlugins` names it, turned off in members' sessions. */
-  plugin: string;
+  /** openplan's ids as `enabledPlugins` names them, turned off in members' sessions. */
+  plugins: readonly string[];
   /** Your own team's folder, under the repository's (team.ts userTeamFolder). */
   userTeam: string;
   /** The environment members' `${VAR}`s are filled in from. */
@@ -72,7 +72,7 @@ type Files = ReturnType<typeof goalFiles>;
 function filledSettings({ team, settings }: TeamFiles, options: EngineOptions) {
   return team.members.map((member) => {
     try {
-      return [member.name, memberSettings(settings, member, options.env, options.plugin)] as const;
+      return [member.name, memberSettings(settings, member, options.env, options.plugins)] as const;
     } catch (error) {
       throw new Error(`${member.name}: ${errorText(error)}`, { cause: error });
     }

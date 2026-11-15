@@ -10,10 +10,10 @@ import plugin from "../../plugin/.claude-plugin/plugin.json" with { type: "json"
 import { errorText } from "../engine/core.ts";
 import { openRepository } from "../engine/git.ts";
 import { stopMembers } from "../engine/processes.ts";
-import { loadTeam, userTeamFolder } from "../engine/team.ts";
+import { claudeFolder, loadTeam, userTeamFolder } from "../engine/team.ts";
 import { executableOf } from "./claude.ts";
 import { dataFolder } from "./data-folder.ts";
-import { pluginId } from "./plugin-id.ts";
+import { pluginIds } from "./plugin-id.ts";
 import { askToLetGo, servePane } from "./pane-server.ts";
 import { modeOf } from "./session-mode.ts";
 import { addPaneTools } from "./pane-tools.ts";
@@ -26,6 +26,7 @@ const say = (text: string) => {
 
 const cwd = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
 const userTeam = userTeamFolder(process.env);
+const plugins = await pluginIds(dataFolder, claudeFolder(process.env), cwd);
 
 const pane = await servePane(() => session);
 
@@ -46,7 +47,7 @@ const session: Session = new Session(
         );
       }),
     sessionMode: () => modeOf(dataFolder, process.ppid),
-    plugin: pluginId(dataFolder),
+    plugins,
     userTeam,
     env: process.env,
     failed(error) {

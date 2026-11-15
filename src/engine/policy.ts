@@ -68,12 +68,15 @@ export function memberSettings(
   team: Settings,
   member: Member,
   from: Env,
-  plugin: string,
+  plugins: readonly string[],
 ): Settings {
   return {
     ...team,
     env: { ...team.env, ...expandEnv(member.env, from) },
-    enabledPlugins: { ...team.enabledPlugins, [plugin]: false },
+    enabledPlugins: {
+      ...team.enabledPlugins,
+      ...Object.fromEntries(plugins.map((id) => [id, false])),
+    },
     crossSessionInbound: "refuse",
     permissions: {
       ...team.permissions,

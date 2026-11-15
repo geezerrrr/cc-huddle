@@ -18,9 +18,13 @@ import { MEETING_SIZES, type MeetingSize, type Member, type Role } from "./types
 /** The team's folder in a repository. */
 export const teamFolder = (top: string) => path.join(top, ".claude", "openplan");
 
-/** Your own team's folder, for every repository: in Claude Code's user folder, as it finds it. */
+/** Claude Code's user folder, as it finds it. */
+export const claudeFolder = (env: Record<string, string | undefined>) =>
+  env.CLAUDE_CONFIG_DIR ?? path.join(homedir(), ".claude");
+
+/** Your own team's folder, for every repository: in Claude Code's user folder. */
 export const userTeamFolder = (env: Record<string, string | undefined>) =>
-  path.join(env.CLAUDE_CONFIG_DIR ?? path.join(homedir(), ".claude"), "openplan");
+  path.join(claudeFolder(env), "openplan");
 
 const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const satisfies EffortLevel[];
 

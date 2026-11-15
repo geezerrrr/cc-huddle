@@ -52,7 +52,7 @@ beforeEach(async () => {
       // Another session of the test, at the same socket.
       takeOver: (holder, slug) => askToLetGo(holder.address, slug),
       sessionMode: () => undefined,
-      plugin: "openplan@inline",
+      plugins: ["openplan@inline"],
       userTeam: path.join(dir, "user-team"),
       env: {},
       failed: vi.fn(),

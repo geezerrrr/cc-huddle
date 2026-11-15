@@ -40,7 +40,7 @@ describe("memberSettings", () => {
       },
       glm,
       { GLM_KEY: "secret" },
-      "openplan@openplan",
+      ["openplan@openplan", "openplan@acme.tools"],
     );
     expect(settings).toEqual({
       permissions: {
@@ -48,7 +48,11 @@ describe("memberSettings", () => {
         deny: ["Bash(git push:*)", "SendMessage", "ListAgents"],
       },
       env: { CI: "1", ANTHROPIC_BASE_URL: "https://glm.example", ANTHROPIC_AUTH_TOKEN: "secret" },
-      enabledPlugins: { "other@market": true, "openplan@openplan": false },
+      enabledPlugins: {
+        "other@market": true,
+        "openplan@openplan": false,
+        "openplan@acme.tools": false,
+      },
       crossSessionInbound: "refuse",
     });
   });
@@ -58,7 +62,7 @@ describe("memberSettings", () => {
       { permissions: { defaultMode: "default" }, sandbox: { enabled: false } },
       glm,
       { GLM_KEY: "secret" },
-      "openplan@openplan",
+      ["openplan@openplan"],
     );
     expect(settings).toMatchObject({
       permissions: { defaultMode: "default" },
