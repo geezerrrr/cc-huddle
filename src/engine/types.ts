@@ -299,7 +299,8 @@ export interface Permission {
  */
 export type Question = {
   id: string;
-  subtaskId?: string;
+  /** The subtask it is about: whose run asks, or that you decide on. */
+  subtaskId: string;
   /** Who asks. */
   from: string;
   text: string;
@@ -310,8 +311,8 @@ export type Ask =
   | { kind: "teammate"; to: string }
   | { kind: "choices"; choices: Choice[] }
   | { kind: "permission"; permission: Permission }
-  /** A decision is always on a subtask: one stuck in review or a merge, or the last one done of a task. */
-  | { kind: "decision"; decision: Decision; subtaskId: string };
+  /** On a subtask stuck in review or a merge, or the last one done of a task. */
+  | { kind: "decision"; decision: Decision };
 
 /** A question put to you: every kind but a teammate's. */
 export type QuestionToYou = Exclude<Question, { kind: "teammate" }>;

@@ -17,7 +17,7 @@ const subtask = (id: string, fields: Partial<Subtask>): Subtask => ({
 
 const question = (
   id: string,
-  fields: Partial<Pick<Question, "subtaskId" | "text">> & Ask,
+  fields: Pick<Question, "subtaskId"> & Partial<Pick<Question, "text">> & Ask,
 ): Question => ({
   id,
   from: "glm",

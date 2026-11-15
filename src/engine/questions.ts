@@ -35,7 +35,7 @@ const CALLED_OFF = "Stopped.";
 /** A member waiting, on a subtask's run, until `signal` ends the run. */
 interface Asker {
   from: string;
-  subtaskId?: string;
+  subtaskId: string;
   signal: AbortSignal;
 }
 
@@ -141,8 +141,8 @@ export class Questions {
    */
   openDecision(subtask: Subtask, decision: Decision, text: string) {
     this.open(
-      { from: subtask.assignee },
-      { text, kind: "decision", decision, subtaskId: subtask.id },
+      { from: subtask.assignee, subtaskId: subtask.id },
+      { text, kind: "decision", decision },
     );
   }
 
@@ -289,7 +289,7 @@ export class Questions {
   private open(asker: Omit<Asker, "signal">, ask: { text: string } & Ask): Question {
     const question: Question = {
       id: randomUUID(),
-      ...(asker.subtaskId !== undefined && { subtaskId: asker.subtaskId }),
+      subtaskId: asker.subtaskId,
       from: asker.from,
       ...ask,
     };

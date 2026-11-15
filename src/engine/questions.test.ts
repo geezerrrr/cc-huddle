@@ -66,7 +66,11 @@ describe("a call outside the rules", () => {
 
   it("allowed always, saves the rule Claude Code suggests for the team and this turn", async () => {
     const { box, allowed, questions } = inbox();
-    const gate = questions.gate({ from: "glm", signal: new AbortController().signal });
+    const gate = questions.gate({
+      from: "glm",
+      subtaskId: "s1",
+      signal: new AbortController().signal,
+    });
     const result = gate("Bash", command, request({ suggestions: [ruleFor] }));
     const question = await opened(box);
     expect(question).toMatchObject({ permission: { options: ["once", "always", "deny"] } });
@@ -81,7 +85,11 @@ describe("a call outside the rules", () => {
 
   it("offers no always where a rule would grant more, or an ask rule forced the prompt", async () => {
     const { box, questions } = inbox();
-    const gate = questions.gate({ from: "glm", signal: new AbortController().signal });
+    const gate = questions.gate({
+      from: "glm",
+      subtaskId: "s1",
+      signal: new AbortController().signal,
+    });
     void gate("Bash", command, request({ suggestions: [ruleFor], suppressAlwaysAllowRule: true }));
     void gate(
       "Bash",
@@ -100,7 +108,11 @@ describe("a call outside the rules", () => {
 
   it("denied, tells the member what you said", async () => {
     const { box, questions } = inbox();
-    const gate = questions.gate({ from: "glm", signal: new AbortController().signal });
+    const gate = questions.gate({
+      from: "glm",
+      subtaskId: "s1",
+      signal: new AbortController().signal,
+    });
     const result = gate("Bash", command, request());
     questions.answer((await opened(box)).id, {
       kind: "permission",
@@ -116,7 +128,11 @@ describe("a call outside the rules", () => {
   it("is called off when the member's run ends first", async () => {
     const { box, questions } = inbox();
     const run = new AbortController();
-    const result = questions.gate({ from: "glm", signal: run.signal })("Bash", command, request());
+    const result = questions.gate({ from: "glm", subtaskId: "s1", signal: run.signal })(
+      "Bash",
+      command,
+      request(),
+    );
     await opened(box);
     run.abort();
     expect(await result).toEqual({ behavior: "deny", message: "Stopped." });
@@ -150,7 +166,11 @@ describe("questions with choices", () => {
 
   it("go back to the member as the tool's answers", async () => {
     const { box, questions } = inbox();
-    const gate = questions.gate({ from: "glm", signal: new AbortController().signal });
+    const gate = questions.gate({
+      from: "glm",
+      subtaskId: "s1",
+      signal: new AbortController().signal,
+    });
     const result = gate("AskUserQuestion", input, request());
     const question = await opened(box);
     expect(question.text).toBe("Where does the score go?\nWhich sounds?");
@@ -167,7 +187,7 @@ describe("questions with choices", () => {
 
   it("take one pick per question", async () => {
     const { box, questions } = inbox();
-    void questions.gate({ from: "glm", signal: new AbortController().signal })(
+    void questions.gate({ from: "glm", subtaskId: "s1", signal: new AbortController().signal })(
       "AskUserQuestion",
       input,
       request(),
@@ -192,7 +212,7 @@ describe("answer", () => {
 
   it("refuses an option the request didn't offer", async () => {
     const { box, questions } = inbox();
-    void questions.gate({ from: "glm", signal: new AbortController().signal })(
+    void questions.gate({ from: "glm", subtaskId: "s1", signal: new AbortController().signal })(
       "Bash",
       command,
       request(),
@@ -283,6 +303,7 @@ describe("calling off", () => {
     box.state.questions.push(
       {
         id: "q1",
+        subtaskId: "s1",
         from: "glm",
         text: "Allow?",
         kind: "permission",
@@ -290,6 +311,7 @@ describe("calling off", () => {
       },
       {
         id: "q2",
+        subtaskId: "s1",
         from: "glm",
         text: "Font?",
         kind: "teammate",

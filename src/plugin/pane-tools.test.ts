@@ -206,6 +206,7 @@ describe("the pane's socket and tools", () => {
   it("answer what waits on you as it was pressed, and refuse what doesn't fit", async () => {
     const question: Question = {
       id: "q1",
+      subtaskId: "s1",
       from: "glm",
       text: "Which board?",
       kind: "choices",
