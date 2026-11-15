@@ -10,7 +10,6 @@ import { z } from "zod";
 import type { Team } from "../engine/core.ts";
 import { goalBranch } from "../engine/git.ts";
 import { planSchema } from "../engine/plan.ts";
-import { listOf } from "../engine/prompts.ts";
 import type { Answer } from "../engine/questions.ts";
 import { toolText } from "../engine/turns.ts";
 import {
@@ -24,7 +23,7 @@ import {
 } from "../engine/types.ts";
 import type { Session } from "./session.ts";
 import { othersText, statusText } from "./status.ts";
-import { rosterOf } from "./words.ts";
+import { attendanceText, plural, rosterOf } from "./words.ts";
 
 /** A decision as the tools take it: `sentBack`, the subtask a revised task goes back to. */
 export const decisionOf = (decision: DecisionOption, note?: string, sentBack?: string): Answer => ({
@@ -134,9 +133,7 @@ export function addTools(server: McpServer, session: Session) {
         attendees,
         hostOnly: host_only,
       });
-      return toolText(
-        `The meeting [${held.id}] has begun: ${listOf(held.participants)}, hosted by ${held.host}${held.hostOnly ? ", who only runs it" : ""}.`,
-      );
+      return toolText(`The meeting [${held.id}] has begun: ${attendanceText(held)}.`);
     },
   );
 
@@ -177,9 +174,7 @@ export function addTools(server: McpServer, session: Session) {
     },
     async ({ meeting: id }) => {
       const added = await session.goal.meetings.approve(id);
-      return toolText(
-        `Approved: ${String(added.length)} ${added.length === 1 ? "subtask goes" : "subtasks go"} to work.`,
-      );
+      return toolText(`Approved: ${plural(added.length, "subtask goes", "subtasks go")} to work.`);
     },
   );
 

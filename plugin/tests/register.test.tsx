@@ -44,7 +44,7 @@ const permission = (id: string, call: string): OpenplanNeed => ({
     { value: "once", label: "Allow once", primary: true },
     { value: "deny", label: "Deny" },
   ],
-  note: { option: "deny", prompt: "Or deny it, saying why", needed: false },
+  note: { option: "deny", label: "Deny", prompt: "Or deny it, saying why" },
 });
 
 const NEED = permission("q1", "Bash: npm test");
@@ -172,9 +172,8 @@ test("a member's record shows in place of the team as it grows, and Back shows t
       record: {
         subtask: "s1",
         entries: [
-          { at: 0, kind: "thinking", text: "Look at\nthe rules" },
+          { kind: "thinking", text: "Look at\nthe rules" },
           {
-            at: 0,
             kind: "tool",
             name: "Read",
             argument: "README.md",
@@ -230,8 +229,7 @@ test("the meeting shows the turn being spoken as a record, and your scrolling re
           about: "Dice",
           agenda: "Plan the game",
           status: "glm speaks",
-          host: "glm",
-          participants: ["glm", "sonnet"],
+          attendance: "glm and sonnet, hosted by glm",
           turns: [{ speaker: "glm", text: "A grid board" }],
           hands: [],
         },
@@ -240,7 +238,6 @@ test("the meeting shows the turn being spoken as a record, and your scrolling re
         speaker: "sonnet",
         entries: [
           {
-            at: 0,
             kind: "tool",
             name: "Grep",
             argument: "board",
@@ -352,7 +349,7 @@ test("each need is asked as it comes, in turn, and answered as you said; a task 
               {
                 question: "Which board?",
                 header: "Board",
-                options: ["Grid", "Hex"],
+                options: [{ label: "Grid", description: "Squares" }, { label: "Hex" }],
                 multiSelect: false,
               },
             ],
@@ -369,7 +366,7 @@ test("each need is asked as it comes, in turn, and answered as you said; a task 
               { value: "skip", label: "Skip the review" },
               { value: "sendBack", label: "Send back" },
             ],
-            note: { option: "sendBack", prompt: "Or send it back", needed: false },
+            note: { option: "sendBack", label: "Send back", prompt: "Or send it back" },
           },
           {
             id: "q5",
@@ -377,11 +374,8 @@ test("each need is asked as it comes, in turn, and answered as you said; a task 
             headline: 'The task "Game" is done. Accept it?',
             ask: false,
             kind: "options",
-            options: [
-              { value: "accept", label: "Accept" },
-              { value: "revise", label: "Send back" },
-            ],
-            note: { option: "revise", prompt: "What to change", needed: true },
+            options: [{ value: "accept", label: "Accept" }],
+            note: { option: "revise", label: "Send back", prompt: "What to change" },
           },
         ],
       },
@@ -392,7 +386,7 @@ test("each need is asked as it comes, in turn, and answered as you said; a task 
   expect(questions).toEqual([
     'glm asks to use Bash: npm test for "Rules". Allow it?',
     'glm asks to use Bash: rm -rf dist for "Rules". Allow it?',
-    "glm asks: Which board?",
+    "glm asks: Which board?\n- Grid: Squares",
     'The review of "Rules" is stuck. What now?\nToo small',
   ]);
   expect(calls.filter((c) => c.tool === "answer").map((c) => c.args)).toEqual([

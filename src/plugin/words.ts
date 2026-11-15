@@ -5,11 +5,14 @@
  */
 import type { GoalEntry } from "../engine/data.ts";
 import type { Work } from "../engine/derive.ts";
+import { listOf } from "../engine/prompts.ts";
+import type { Notice } from "../engine/turns.ts";
 import type {
   DecisionOption,
   GoalState,
   Member,
   Meeting,
+  NoteOption,
   Permission,
   PermissionOption,
   QuestionToYou,
@@ -26,6 +29,37 @@ export const PLAN_TO_REVIEW = "plan to review";
 /** The team, each member with their role. */
 export const rosterOf = (members: readonly Member[]) =>
   members.map((m) => `${m.name} (${m.role.title})`).join(", ");
+
+/** Who hosts a meeting: "hosted by ann", ", who only runs it" for a host who does. */
+export const hostText = (meeting: Pick<Meeting, "host" | "hostOnly">) =>
+  `hosted by ${meeting.host}${meeting.hostOnly ? ", who only runs it" : ""}`;
+
+/** Who is at a meeting: everyone at it, and who hosts it. */
+export const attendanceText = (meeting: Pick<Meeting, "host" | "hostOnly" | "participants">) =>
+  `${listOf(meeting.participants)}, ${hostText(meeting)}`;
+
+/** What the Agent SDK reported while a run went on, in words. */
+export function noticeText(notice: Notice): string {
+  const seconds = (ms: number) => `${String(Math.round(ms / 1000))}s`;
+  switch (notice.kind) {
+    case "retry":
+      return `the API call failed: attempt ${String(notice.attempt)} of ${String(notice.max)} in ${seconds(notice.delayMs)}`;
+    case "subagent-retry":
+      return `a subagent's API call failed: attempt ${String(notice.attempt)} of ${String(notice.max)} in ${seconds(notice.delayMs)}`;
+    case "compacted":
+      return `the conversation was compacted from ${notice.before.toLocaleString()} tokens${notice.after === undefined ? "" : ` to ${notice.after.toLocaleString()}`}`;
+    case "compaction-failed":
+      return `compacting the conversation failed${notice.error ? `: ${notice.error}` : ""}`;
+    case "fallback":
+      return `${notice.from} declined: ${notice.to} goes on`;
+    case "refusal":
+      return `${notice.model} declined, with no model to go on`;
+    case "task":
+      return `background task "${notice.title}" ${notice.state}`;
+    case "rate-limit":
+      return notice.status === "rejected" ? "rate limited" : "close to the rate limit";
+  }
+}
 
 /** What a subtask waits on, in words. */
 export function waitText(wait: Wait, work: Work): string {
@@ -62,11 +96,14 @@ export function stepText({ done, total, current }: Subtask["progress"]): string 
   return current ? `${step}: ${current}` : step;
 }
 
-/**
- * A subtask under way, in words: worked on and how far, in review, or being
- * merged; undefined for one that isn't under way.
- */
-export function underWay(subtask: Subtask): string | undefined {
+/** A subtask under way: worked on, in review, or being merged. */
+export type UnderWay = Subtask & { status: "running" | "reviewing" | "merging" };
+
+export const isUnderWay = (subtask: Subtask): subtask is UnderWay =>
+  subtask.status === "running" || subtask.status === "reviewing" || subtask.status === "merging";
+
+/** A subtask under way, in words: worked on and how far, in review, or being merged. */
+export function underWay(subtask: UnderWay): string {
   switch (subtask.status) {
     case "running": {
       const step = stepText(subtask.progress);
@@ -76,8 +113,6 @@ export function underWay(subtask: Subtask): string | undefined {
       return `"${subtask.title}" in review`;
     case "merging":
       return `"${subtask.title}" being merged`;
-    default:
-      return undefined;
   }
 }
 
@@ -139,7 +174,7 @@ export const OPTION_LABELS: Record<PermissionOption | DecisionOption, string> = 
 };
 
 /** What a note typed instead of a pick says, for the option it goes with. */
-export const NOTE_PROMPTS: Partial<Record<PermissionOption | DecisionOption, string>> = {
+export const NOTE_PROMPTS: Record<NoteOption, string> = {
   deny: "Or deny it, saying why",
   sendBack: "Or send it back, saying what to change",
   revise: "What to change",
@@ -219,6 +254,12 @@ export const noGoalText = (moved: string | undefined) =>
   moved
     ? `"${moved}" moved to another Claude Code session. Bring it back here with /openplan resume.`
     : "This session runs no goal. Hand the team a task with /openplan <task>, or take a goal up with /openplan resume.";
+
+/** Why a session runs no goal, and what to do, as its model is told: `moved`, the goal that moved to another session. */
+export const noGoalForModel = (moved: string | undefined) =>
+  moved
+    ? `The goal "${moved}" moved to another Claude Code session. The user brings it back with /openplan resume.`
+    : "This session runs no goal: start one (start_goal), or the user takes one up with /openplan resume.";
 
 /**
  * What `/openplan <task>` gives your session: the task, for the team and not

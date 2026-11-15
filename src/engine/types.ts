@@ -225,7 +225,7 @@ export type DecisionOption = (typeof DECISION_OPTIONS)[number];
 export interface Decision {
   kind: "review" | "merge" | "delivery";
   options: DecisionOption[];
-  note?: { option: DecisionOption; needed?: true };
+  note?: { option: Extract<NoteOption, DecisionOption>; needed?: true };
   files?: string[];
 }
 
@@ -266,7 +266,10 @@ export const noteNeeded = (decision: Decision, option: DecisionOption) =>
 /** The answers a permission request offers; a note typed instead denies it, saying why. */
 export const PERMISSION_OPTIONS = ["once", "always", "deny"] as const;
 export type PermissionOption = (typeof PERMISSION_OPTIONS)[number];
-export const PERMISSION_NOTE: PermissionOption = "deny";
+export const PERMISSION_NOTE = "deny" satisfies PermissionOption;
+
+/** The answers a note typed instead of a pick goes with: denying a permission, sending work back. */
+export type NoteOption = typeof PERMISSION_NOTE | "sendBack" | "revise";
 
 /**
  * A tool call waiting to be allowed: the tool, and its input as the member

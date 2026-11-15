@@ -9,6 +9,7 @@ import { listGoals, repoFolder } from "../engine/data.ts";
 import { Engine, type EngineOptions } from "../engine/engine.ts";
 import { openRepository } from "../engine/git.ts";
 import { serialBy } from "../engine/serial.ts";
+import { noGoalForModel } from "./words.ts";
 
 /** The key the session's changes of goal take turns on. */
 const TURN = "goal";
@@ -50,9 +51,7 @@ export class Session {
 
   /** Why the session runs no goal, and what to do. */
   get none(): string {
-    return this.movedAway
-      ? `The goal "${this.movedAway}" moved to another Claude Code session. The user brings it back with /openplan resume.`
-      : "This session runs no goal: start one (start_goal), or the user takes one up with /openplan resume.";
+    return noGoalForModel(this.movedAway);
   }
 
   /** Starts a goal here: refused while this session's goal is active; a paused or archived one is let go. */

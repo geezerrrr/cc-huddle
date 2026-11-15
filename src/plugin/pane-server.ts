@@ -17,6 +17,7 @@ import { z } from "zod";
 import type { OpenplanTeam, OpenplanView } from "../../plugin/types/index.d.ts";
 import { errorCode, errorText } from "../engine/core.ts";
 import type { GoalEntry, HandedOver } from "../engine/data.ts";
+import { GitError } from "../engine/git.ts";
 import { paneTeam, shownMeeting, viewEntries, viewLive } from "./pane.ts";
 import type { Session } from "./session.ts";
 
@@ -127,8 +128,16 @@ export async function servePane(session: () => Session): Promise<PaneServer> {
         response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(answer));
       },
       (error: unknown) => {
-        // The goals can't be read or let go, or the ask doesn't fit: the asker shows why.
-        response.writeHead(409, { "content-type": "text/plain" }).end(errorText(error));
+        // An ask that doesn't fit (400); not in a repository, so there are no goals
+        // to read (409: the pane stops asking until you turn to openplan); anything
+        // else, the asker shows why (500).
+        const status =
+          error instanceof z.ZodError || error instanceof SyntaxError
+            ? 400
+            : error instanceof GitError
+              ? 409
+              : 500;
+        response.writeHead(status, { "content-type": "text/plain" }).end(errorText(error));
       },
     );
   });

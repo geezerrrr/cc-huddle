@@ -158,8 +158,7 @@ describe("paneTeam", () => {
       about: "Dice",
       agenda: "Plan a dice game for two, as the user put it",
       status: "plan approved",
-      host: "sonnet",
-      participants: ["sonnet", "glm"],
+      attendance: "sonnet and glm, hosted by sonnet",
       turns: [{ speaker: "sonnet", text: "Two dice." }],
       hands: [],
       plan: "A dice game",
@@ -193,7 +192,7 @@ describe("paneTeam", () => {
           { value: "always", label: "Always allow" },
           { value: "deny", label: "Deny" },
         ],
-        note: { option: "deny", prompt: "Or deny it, saying why", needed: false },
+        note: { option: "deny", label: "Deny", prompt: "Or deny it, saying why" },
       },
       {
         id: "q2",
@@ -202,7 +201,12 @@ describe("paneTeam", () => {
         ask: true,
         kind: "choices",
         choices: [
-          { question: "Which board?", header: "Board", options: ["Grid"], multiSelect: false },
+          {
+            question: "Which board?",
+            header: "Board",
+            options: [{ label: "Grid" }],
+            multiSelect: false,
+          },
         ],
       },
       {
@@ -211,11 +215,8 @@ describe("paneTeam", () => {
         headline: 'The task "Game" is done. Accept it?',
         ask: false,
         kind: "options",
-        options: [
-          { value: "accept", label: "Accept" },
-          { value: "revise", label: "Send back" },
-        ],
-        note: { option: "revise", prompt: "What to change", needed: true },
+        options: [{ value: "accept", label: "Accept" }],
+        note: { option: "revise", label: "Send back", prompt: "What to change" },
         sendBack: [{ id: "board", title: "board" }],
       },
     ]);
@@ -351,7 +352,11 @@ Tell the user what was done, and ask whether to accept it or send it back with w
       headline: 'The review of "rules" is stuck. What now?',
       detail: "Too small",
       ask: true,
-      note: { option: "sendBack", prompt: "Or send it back, saying what to change", needed: false },
+      note: {
+        option: "sendBack",
+        label: "Send back",
+        prompt: "Or send it back, saying what to change",
+      },
     });
     expect(merge).toMatchObject({
       headline: 'Merging "rules" needs you. What now?',
@@ -382,9 +387,9 @@ describe("viewEntries and viewLive", () => {
         { at: 0, kind: "tool", name: "TodoWrite", input: {}, state: "error", output: "" },
       ]),
     ).toEqual([
-      { at: 0, kind: "text", text: "Done." },
-      { at: 0, kind: "tool", name: "Bash", argument: "npm test", state: "done", output: "ok" },
-      { at: 0, kind: "tool", name: "TodoWrite", state: "error", output: "" },
+      { kind: "text", text: "Done." },
+      { kind: "tool", name: "Bash", argument: "npm test", state: "done", output: "ok" },
+      { kind: "tool", name: "TodoWrite", state: "error", output: "" },
     ]);
     expect(
       viewLive({

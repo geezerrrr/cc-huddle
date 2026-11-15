@@ -7,7 +7,15 @@ import type { GoalEntry } from "../engine/data.ts";
 import { derive, type Work } from "../engine/derive.ts";
 import { goalBranch } from "../engine/git.ts";
 import { toYou, type Derived, type QuestionToYou, type Subtask } from "../engine/types.ts";
-import { entryLabel, meetingStatus, needWords, redoneText, stepText, waitText } from "./words.ts";
+import {
+  entryLabel,
+  hostText,
+  meetingStatus,
+  needWords,
+  redoneText,
+  stepText,
+  waitText,
+} from "./words.ts";
 
 /** A subtask on one line: its status, how far it is, what it waits on, what it is built on that was redone, what went wrong. */
 function subtaskLine(
@@ -48,7 +56,7 @@ export function statusText(work: Work): string {
   ];
   for (const meeting of work.meetings.filter((m) => m.status !== "approved"))
     lines.push(
-      `  Meeting [${meeting.id}], hosted by ${meeting.host}${meeting.hostOnly ? ", who only runs it" : ""}: ${meetingStatus(meeting)}${meeting.status === "review" ? ": approve it, change it, or cancel it" : ""}${derived.resumable.includes(meeting.id) ? "; it can go on" : ""}`,
+      `  Meeting [${meeting.id}], ${hostText(meeting)}: ${meetingStatus(meeting)}${meeting.status === "review" ? ": approve it, change it, or cancel it" : ""}${derived.resumable.includes(meeting.id) ? "; it can go on" : ""}`,
     );
   for (const task of work.tasks) {
     lines.push(

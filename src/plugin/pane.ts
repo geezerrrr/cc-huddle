@@ -24,23 +24,28 @@ import {
   type Derived,
   type Member,
   type Meeting,
+  type NoteOption,
   type PermissionOption,
   type QuestionToYou,
   type Subtask,
 } from "../engine/types.ts";
 import { resumableOf } from "./status.ts";
 import {
+  attendanceText,
   goalLabel,
   mainArgument,
   meetingStatus,
   needWords,
   noGoalText,
   NOTE_PROMPTS,
+  noticeText,
   OPTION_LABELS,
   PLAN_TO_REVIEW,
   plural,
   resumeRefusal,
+  isUnderWay,
   underWay,
+  type UnderWay,
   waitText,
   whereOf,
 } from "./words.ts";
@@ -57,8 +62,7 @@ const meetingOf = (meeting: Meeting, work: Work): OpenplanMeeting => ({
   about: work.goal.name,
   agenda: meeting.agenda,
   status: meetingStatus(meeting),
-  host: meeting.host,
-  participants: meeting.participants,
+  attendance: attendanceText(meeting),
   turns: meeting.turns.map((t) => ({
     speaker: t.speaker,
     text: t.text,
@@ -70,17 +74,18 @@ const meetingOf = (meeting: Meeting, work: Work): OpenplanMeeting => ({
 
 function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>): OpenplanMember {
   const own = work.subtasks.filter((s) => s.assignee === member.name);
-  const at = (status: Subtask["status"]) => own.find((s) => s.status === status);
+  const at = (...statuses: UnderWay["status"][]) =>
+    own.find((s): s is UnderWay => isUnderWay(s) && statuses.includes(s.status));
   const reviewing = work.subtasks.find(
     (s) => s.assignee !== member.name && derived.subtasks[s.id]?.reviewedBy === member.name,
   );
   const meeting = work.meetings.find(
     (m) => m.status === "running" && m.participants.includes(member.name),
   );
-  const next = at("pending");
+  const next = own.find((s) => s.status === "pending");
   const running = at("running");
   const handedOver = at("reviewing") ?? at("merging");
-  let doing: string | undefined;
+  let doing: string;
   if (running) doing = underWay(running);
   else if (meeting) doing = `at the meeting on "${work.goal.name}"`;
   else if (reviewing) doing = `reviews "${reviewing.title}" by ${reviewing.assignee}`;
@@ -96,7 +101,7 @@ function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>
     name: member.name,
     role: member.role.title,
     ...(member.model && { model: member.model }),
-    doing: doing ?? "free",
+    doing,
     ...(followed && { subtask: followed.id }),
     tokens: work.tokens[member.name] ?? 0,
   };
@@ -108,16 +113,24 @@ const optionOf = (value: PermissionOption | DecisionOption) => ({
   label: OPTION_LABELS[value],
 });
 
-/** The answer a note typed instead of a pick goes with, if `options` offers it. */
-function noteOf(
+/**
+ * The answers a need offers as buttons, and the one a note typed instead of
+ * a pick goes with: one that is no answer without a note (`needed`) is only
+ * the note's.
+ */
+function answersOf(
   options: readonly (PermissionOption | DecisionOption)[],
-  note: { option: PermissionOption | DecisionOption; needed?: true } | undefined,
+  note: { option: NoteOption; needed?: true } | undefined,
 ) {
-  if (!note || !options.includes(note.option)) return undefined;
   return {
-    option: note.option,
-    prompt: NOTE_PROMPTS[note.option] ?? OPTION_LABELS[note.option],
-    needed: note.needed === true,
+    options: options.filter((o) => !(note?.needed && o === note.option)).map(optionOf),
+    ...(note && {
+      note: {
+        option: note.option,
+        label: OPTION_LABELS[note.option],
+        prompt: NOTE_PROMPTS[note.option],
+      },
+    }),
   };
 }
 
@@ -132,14 +145,13 @@ function needOf(question: QuestionToYou, work: Work): OpenplanNeed {
   };
   switch (question.kind) {
     case "permission": {
-      const { options } = question.permission;
-      const note = noteOf(options, { option: PERMISSION_NOTE });
+      const { options, note } = answersOf(question.permission.options, { option: PERMISSION_NOTE });
       return {
         ...head,
         kind: "options",
         options: options.map((o) => ({
-          ...optionOf(o),
-          ...(o === "once" && { primary: true as const }),
+          ...o,
+          ...(o.value === "once" && { primary: true as const }),
         })),
         ...(note && { note }),
       };
@@ -151,20 +163,21 @@ function needOf(question: QuestionToYou, work: Work): OpenplanNeed {
         choices: question.choices.map((c) => ({
           question: c.question,
           header: c.header,
-          options: c.options.map((o) => o.label),
+          options: c.options.map((o) => ({
+            label: o.label,
+            ...(o.description && { description: o.description }),
+          })),
           multiSelect: c.multiSelect,
         })),
       };
     case "decision": {
-      const { kind, options } = question.decision;
-      const note = noteOf(options, question.decision.note);
+      const { kind } = question.decision;
       const subtask = work.subtasks.find((s) => s.id === question.subtaskId);
       const done = work.subtasks.filter((s) => s.taskId === subtask?.taskId && s.status === "done");
       return {
         ...head,
         kind: "options",
-        options: options.map(optionOf),
-        ...(note && { note }),
+        ...answersOf(question.decision.options, question.decision.note),
         ...(kind === "delivery" && {
           sendBack: done.map((s) => ({ id: s.id, title: s.title })),
         }),
@@ -234,17 +247,12 @@ const BAND_TASKS = 5;
 
 /** Where a task's work is, in words: the subtask under way, else the next one and what it waits on. */
 function taskWhere(work: Work, derived: Derived, subtasks: Subtask[]): string | undefined {
-  const at =
-    subtasks.find(
-      (s) => s.status === "running" || s.status === "reviewing" || s.status === "merging",
-    ) ?? subtasks.find((s) => s.status !== "done");
+  const going = subtasks.find(isUnderWay);
+  if (going)
+    return going.status === "running" ? `${going.assignee} ${underWay(going)}` : underWay(going);
+  const at = subtasks.find((s) => s.status !== "done");
   if (!at) return undefined;
   switch (at.status) {
-    case "running":
-      return `${at.assignee} ${underWay(at) ?? ""}`;
-    case "reviewing":
-    case "merging":
-      return underWay(at);
     case "pending": {
       const [wait] = derived.subtasks[at.id]?.waits ?? [];
       return `"${at.title}" ${wait ? waitText(wait, work) : "starts next"}`;
@@ -355,13 +363,31 @@ const callOf = (name: string, input: unknown): OpenplanCall => {
   return { name, ...(argument !== undefined && { argument }) };
 };
 
-/** A record's entries as the pane draws them: each tool call by its main argument. */
+/** A record's entry as the pane draws it: a tool call by its main argument, a notice in words. */
+function viewEntry(entry: RecordEntry): OpenplanEntry {
+  switch (entry.kind) {
+    case "run":
+      return { kind: "run", model: entry.model };
+    case "thinking":
+    case "text":
+      return { kind: entry.kind, text: entry.text };
+    case "tool":
+      return {
+        kind: "tool",
+        state: entry.state,
+        output: entry.output,
+        ...callOf(entry.name, entry.input),
+      };
+    case "steps":
+      return { kind: "steps", steps: entry.steps };
+    case "notice":
+      return { kind: "notice", text: noticeText(entry.notice) };
+  }
+}
+
+/** A record's entries as the pane draws them. */
 export const viewEntries = (entries: readonly RecordEntry[]): OpenplanEntry[] =>
-  entries.map((entry) => {
-    if (entry.kind !== "tool") return entry;
-    const { input, name, ...rest } = entry;
-    return { ...rest, ...callOf(name, input) };
-  });
+  entries.map(viewEntry);
 
 /** What a run does now, as the pane draws it. */
 export const viewLive = (live: LiveRun): OpenplanLive => ({

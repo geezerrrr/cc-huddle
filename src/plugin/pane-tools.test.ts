@@ -159,7 +159,7 @@ describe("the pane's socket and tools", () => {
 
   it("serve only the view and the release, and say why an ask doesn't fit", async () => {
     expect((await ask("/answer", "{}")).status).toBe(404);
-    expect(await ask("/view", '{ "revision": "one" }')).toMatchObject({ status: 409 });
+    expect(await ask("/view", '{ "revision": "one" }')).toMatchObject({ status: 400 });
     const { address } = pane;
     pane.close();
     expect(existsSync(address)).toBe(false);

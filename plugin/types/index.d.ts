@@ -38,9 +38,8 @@ export type OpenplanMeeting = {
   agenda: string;
   /** Its state in words: who speaks, the host writing the plan, the plan out for review. */
   status: string;
-  host: string;
-  /** The host first. */
-  participants: string[];
+  /** Who is at it, and who hosts it, in words. */
+  attendance: string;
   turns: { speaker: string; text: string; to?: string }[];
   /** Raised hands: who, and what they'd say. */
   hands: { member: string; point: string }[];
@@ -72,14 +71,19 @@ export type OpenplanNeed = {
 } & (
   | {
       kind: "choices";
-      choices: { question: string; header: string; options: string[]; multiSelect: boolean }[];
+      choices: {
+        question: string;
+        header: string;
+        options: { label: string; description?: string }[];
+        multiSelect: boolean;
+      }[];
     }
   | {
       kind: "options";
-      /** What the `answer` tool takes as `option`, and its label; the one to press first is `primary`. */
+      /** The buttons: what the `answer` tool takes as `option`, and its label; the one to press first is `primary`. */
       options: { value: string; label: string; primary?: true }[];
-      /** The option a note typed instead of a pick goes with; `needed`, it is no answer without one. */
-      note?: { option: string; prompt: string; needed: boolean };
+      /** The option a note typed instead of a pick goes with, which may be no button: it is no answer without a note. */
+      note?: { option: string; label: string; prompt: string };
       /** The subtasks a task can be sent back to, for its note's option. */
       sendBack?: { id: string; title: string }[];
     }
@@ -89,13 +93,13 @@ export type OpenplanNeed = {
 export type OpenplanCall = { name: string; argument?: string };
 
 /** One whole thing a member's run did, as its record keeps it (src/engine/records.ts). */
-export type OpenplanEntry = { at: number } & (
-  | { kind: "run"; session: string; model: string }
+export type OpenplanEntry =
+  | { kind: "run"; model: string }
   | { kind: "thinking" | "text"; text: string }
   | ({ kind: "tool"; state: "done" | "error"; output: string } & OpenplanCall)
   | { kind: "steps"; steps: { content: string; status: "pending" | "in_progress" | "completed" }[] }
-  | { kind: "notice"; notice: { kind: string } & Record<string, unknown> }
-);
+  /** What the Agent SDK reported, in words. */
+  | { kind: "notice"; text: string };
 
 /** What a run does now, not in its entries yet. */
 export type OpenplanLive = {

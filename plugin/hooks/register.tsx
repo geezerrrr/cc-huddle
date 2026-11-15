@@ -45,11 +45,11 @@ const OUTPUT_LINES = 3;
 const KEYS =
   "1 meeting · 2 team · 3 needs you · tab or ↑/↓ to select · enter to press · esc to the prompt";
 
-const team = atom({ plugin: "openplan", key: "team" } as const, null, { shape: "team-3" });
+const team = atom({ plugin: "openplan", key: "team" } as const, null, { shape: "team-4" });
 const speaking = atom({ plugin: "openplan", key: "speaking" } as const, null, {
-  shape: "speaking-2",
+  shape: "speaking-3",
 });
-const record = atom({ plugin: "openplan", key: "record" } as const, null, { shape: "record-2" });
+const record = atom({ plugin: "openplan", key: "record" } as const, null, { shape: "record-3" });
 const problem = atom({ plugin: "openplan", key: "problem" } as const, null);
 const tab = atom({ plugin: "openplan", key: "tab" } as const, "team");
 const picks = atom({ plugin: "openplan", key: "picks" } as const, {});
@@ -80,14 +80,13 @@ const asked = new Set<string>();
 /** The asks, one after another in the order the needs came. */
 let asking = Promise.resolve();
 /**
- * The poll, while it runs. It stops when the server can't read the goals (the
- * session isn't in a repository), and starts again when you or your session
- * turn to openplan.
+ * The poll, while it runs. It stops when the session isn't in a repository,
+ * and starts again when you or your session turn to openplan.
  */
 let ticking: Timer | undefined;
 
-/** What the server answered with an error: the goals can't be read, or it refused what was asked. */
-class Refused extends Error {}
+/** The session isn't in a repository: there are no goals to read until it is. */
+class NoRepository extends Error {}
 
 const clip = (text: string) => (text.length > ROW_TEXT ? `${text.slice(0, ROW_TEXT)}…` : text);
 
@@ -99,10 +98,6 @@ const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
 /** A question dialog's chip holds this many characters. */
 const ASK_HEADER = 12;
 
-/** The options a need's buttons and dialog offer: all but one that is no answer without a note. */
-const pickable = (need: Extract<OpenplanNeed, { kind: "options" }>) =>
-  need.options.filter((o) => !(need.note?.needed && o.value === need.note.option));
-
 /**
  * Puts a need to you in Claude Code's question dialog, and gives what the
  * `answer` tool takes for what you said; undefined when what you typed
@@ -113,8 +108,8 @@ async function askedAnswer($: $, need: OpenplanNeed): Promise<Record<string, unk
     const chosen: string[] = [];
     for (const choice of need.choices)
       chosen.push(
-        await $.ui.ask(`${need.headline} ${choice.question}`, {
-          options: choice.options,
+        await $.ui.ask(questionOf(`${need.headline} ${choice.question}`, choice.options), {
+          options: choice.options.map((o) => o.label),
           header: (choice.header || need.from).slice(0, ASK_HEADER),
           ...(choice.multiSelect && { multiSelect: true as const }),
         }),
@@ -123,13 +118,20 @@ async function askedAnswer($: $, need: OpenplanNeed): Promise<Record<string, unk
   }
   const said = await $.ui.ask(
     need.detail ? `${need.headline}\n${clip(need.detail)}` : need.headline,
-    { options: pickable(need).map((o) => o.label), header: need.from.slice(0, ASK_HEADER) },
+    { options: need.options.map((o) => o.label), header: need.from.slice(0, ASK_HEADER) },
   );
   const option = need.options.find((o) => o.label === said);
   if (option) return { option: option.value };
   // What you type instead goes with the option a note goes with, where there is one.
   return need.note ? { option: need.note.option, note: said } : undefined;
 }
+
+/** A member's question with what each option means, where they said. */
+const questionOf = (question: string, options: { label: string; description?: string }[]) =>
+  [
+    question,
+    ...options.flatMap((o) => (o.description ? [`- ${o.label}: ${clip(o.description)}`] : [])),
+  ].join("\n");
 
 /** Asks a need that is still open, and answers it as you said; dismissed, it waits in the pane. */
 async function askNeed($: $, need: OpenplanNeed) {
@@ -139,10 +141,11 @@ async function askNeed($: $, need: OpenplanNeed) {
   try {
     args = await askedAnswer($, need);
   } catch {
-    // Dismissed: it waits in "Needs you".
+    // Dismissed, or nobody to ask (a -p run), as the dialog rejects: it waits in "Needs you".
     return;
   }
   if (args) await answer($, need, args);
+  else $.ui.toast("openplan: what you typed answers none of it; it waits in Needs you");
 }
 
 /** Calls one of openplan's server's tools: its text, or its error thrown. */
@@ -154,7 +157,7 @@ async function call($: $, tool: string, args: Record<string, unknown> = {}): Pro
   }
   const result = await $.mcp.call(server, tool, args);
   const text = result.content.find((block) => block.type === "text")?.text ?? "";
-  if (result.isError) throw new Refused(text);
+  if (result.isError) throw new Error(text);
   return text;
 }
 
@@ -177,7 +180,8 @@ async function view($: $, args: Record<string, unknown>): Promise<OpenplanView> 
     socket = undefined;
     throw error;
   }
-  if (!response.ok) throw new Refused(response.text);
+  if (response.status === 409) throw new NoRepository(response.text);
+  if (!response.ok) throw new Error(response.text);
   return JSON.parse(response.text) as OpenplanView;
 }
 
@@ -217,9 +221,20 @@ async function resumeGoal($: $, number?: number): Promise<string> {
         : await picked($, listed);
   if (!goal)
     return number === undefined ? "Nothing resumed." : `No goal is numbered ${String(number)}.`;
-  const said = await call($, "resume_goal", { goal: goal.slug });
+  // Before the call: the view may have the goal before it returns.
   takenUp = goal.slug;
-  return said;
+  try {
+    return await call($, "resume_goal", { goal: goal.slug });
+  } catch (error) {
+    takenUp = undefined;
+    throw error;
+  }
+}
+
+/** Pauses your session's goal; with none, says why, as the pane does. */
+async function pauseGoal($: $): Promise<string> {
+  const now = (await view($, {})).team;
+  return now?.goal ? call($, "goal_action", { action: "pause" }) : (now?.noGoal ?? "");
 }
 
 /** The goal you pick in the question dialog; none when you dismiss it or type something else. */
@@ -271,18 +286,30 @@ async function showRecord($: $, shown: OpenplanRecord | null) {
   scrollPane($, (await following($)) ? "end" : "start");
 }
 
-/** Moves the pane's window; one the engine can't move stays where it is, all a scroll can lose. */
+/** Moves the pane's window; one the engine won't move (`deny`) stays where it is, all a scroll can lose. */
 function scrollPane($: $, to: "start" | "end") {
-  $.ui.scroll({ in: PANE, to }).catch(() => undefined);
+  $.ui.scroll({ in: PANE, to }).catch((error: unknown) => {
+    $.ui.toast(`openplan: the pane couldn't scroll: ${words(error)}`);
+  });
 }
 
-/** Answers a need as it was pressed; what the team refuses is shown. */
+/**
+ * Answers a need as it was pressed, and looks again at once, so the pane
+ * doesn't show it open; what the team refuses is shown.
+ */
 async function answer($: $, need: OpenplanNeed, args: Record<string, unknown>) {
   try {
     await call($, "answer", { question: need.id, ...args });
   } catch (error) {
     $.ui.toast(`openplan: ${words(error)}`);
+    return;
   }
+  await update($, picks, (all) =>
+    Object.fromEntries(
+      Object.entries(all).filter(([id]) => id !== need.id && id !== `${need.id}:back`),
+    ),
+  );
+  await poll($);
 }
 
 /**
@@ -351,8 +378,8 @@ async function poll($: $) {
     await update($, speaking, (was) => (JSON.stringify(was) === JSON.stringify(said) ? was : said));
     await update($, record, (was) => followed(was, now));
   } catch (error) {
-    // A server still starting is asked again; goals it can't read wait for you.
-    if (error instanceof Refused) {
+    // Outside a repository it waits for you; anything else is asked again.
+    if (error instanceof NoRepository) {
       ticking?.cancel();
       ticking = undefined;
       await update($, team, () => null);
@@ -375,9 +402,7 @@ async function meetingTab($: $, ui: Ui, meeting: OpenplanMeeting | undefined) {
         <Text bold>
           {meeting.about} · {meeting.status}
         </Text>
-        <Text dimColor>
-          {meeting.participants.join(", ")}, hosted by {meeting.host}
-        </Text>
+        <Text dimColor>{meeting.attendance}</Text>
         <Markdown key="agenda" text={meeting.agenda} dimColor />
       </Box>
       {meeting.turns.map((turn, i) => (
@@ -487,7 +512,7 @@ function entryRow(ui: Ui, entry: OpenplanEntry, key: string) {
     case "notice":
       return (
         <Text key={key} dimColor>
-          · {entry.notice.kind}
+          · {entry.text}
         </Text>
       );
   }
@@ -598,15 +623,17 @@ async function needView($: $, ui: Ui, need: OpenplanNeed) {
   const mine = await read($, picks);
   if (need.kind === "choices") {
     const chosen = mine[need.id] ?? [];
-    // Answered once every question has its pick.
-    const pick = (index: number, value: string) =>
-      update($, picks, (all) => {
-        const now = [...(all[need.id] ?? [])];
+    // Answered once every question has its pick; `update` may run its closure again, so the answer waits for it.
+    const pick = async (index: number, value: string) => {
+      let all: string[] | undefined;
+      await update($, picks, (was) => {
+        const now = [...(was[need.id] ?? [])];
         now[index] = value;
-        if (need.choices.some((_, i) => now[i] === undefined)) return { ...all, [need.id]: now };
-        void answer($, need, { picks: now });
-        return Object.fromEntries(Object.entries(all).filter(([id]) => id !== need.id));
+        all = need.choices.every((_, i) => now[i] !== undefined) ? now : undefined;
+        return { ...was, [need.id]: now };
       });
+      if (all) await answer($, need, { picks: all });
+    };
     return (
       <Box key={`n-${need.id}`} flexDirection="column">
         {head}
@@ -617,16 +644,26 @@ async function needView($: $, ui: Ui, need: OpenplanNeed) {
               <Input
                 key={`${need.id}-${i}-many`}
                 label={choice.header}
-                placeholder={`Any of: ${choice.options.join(", ")}`}
+                placeholder={`Any of: ${choice.options.map((o) => o.label).join(", ")}`}
                 onSubmit={(value) => pick(i, value)}
               />
             ) : (
               <Select
                 key={`${need.id}-${i}-one`}
                 label={choice.header}
-                options={choice.options.map((label) => ({ value: label, label }))}
+                options={choice.options.map((o) => ({
+                  value: o.label,
+                  label: o.description ? `${o.label}: ${o.description}` : o.label,
+                }))}
                 value={chosen[i]}
                 onSelect={(value) => pick(i, value)}
+              />
+            )}
+            {!choice.multiSelect && (
+              <Input
+                key={`${need.id}-${i}-other`}
+                placeholder="Or type an answer"
+                onSubmit={(value) => pick(i, value)}
               />
             )}
           </Box>
@@ -635,14 +672,13 @@ async function needView($: $, ui: Ui, need: OpenplanNeed) {
     );
   }
   const { note, sendBack } = need;
-  const noteLabel = note && need.options.find((o) => o.value === note.option)?.label;
   // A revised task goes back to the subtask that asked, unless you pick another.
   const [back] = mine[`${need.id}:back`] ?? [];
   return (
     <Box key={`n-${need.id}`} flexDirection="column">
       {head}
       <Box gap={1}>
-        {pickable(need).map((option) => (
+        {need.options.map((option) => (
           <Button
             key={`${need.id}-${option.value}`}
             label={option.label}
@@ -654,7 +690,7 @@ async function needView($: $, ui: Ui, need: OpenplanNeed) {
       {note && sendBack && sendBack.length > 1 && (
         <Select
           key={`${need.id}-back`}
-          label={noteLabel}
+          label={note.label}
           options={sendBack.map((s) => ({ value: s.id, label: s.title }))}
           value={back}
           onSelect={(value) =>
@@ -666,7 +702,7 @@ async function needView($: $, ui: Ui, need: OpenplanNeed) {
         <Input
           key={`${need.id}-note`}
           placeholder={note.prompt}
-          submitLabel={noteLabel}
+          submitLabel={note.label}
           onSubmit={(text) =>
             answer($, need, { option: note.option, note: text, ...(back && { sent_back: back }) })
           }
@@ -706,7 +742,7 @@ export const register: Register = (on) => {
     // Certain, so said without a model turn.
     const certain: Record<string, () => Promise<string>> = {
       status: () => call($, "status"),
-      pause: () => call($, "goal_action", { action: "pause" }),
+      pause: () => pauseGoal($),
       resume: () => resumeGoal($),
     };
     const numbered = /^resume\s+(\d+)$/.exec(task);
