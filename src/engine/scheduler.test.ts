@@ -322,7 +322,7 @@ describe("Scheduler", () => {
     });
     const told: string[] = [];
     vi.mocked(runSubtask).mockImplementation(async (run) => {
-      told.push(await run.collaboration.askTeammate(" sonnet ", "Which font?"));
+      told.push(await run.collaboration.askTeammate("sonnet", "Which font?"));
       told.push(await run.collaboration.askTeammate("ann", "?"));
       told.push(await run.collaboration.askTeammate("glm", "?"));
       return { status: "failed", error: "enough", tokens: 0 };

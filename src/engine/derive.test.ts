@@ -109,6 +109,16 @@ describe("waitsIn", () => {
     expect(waitsIn(state, fresh, busyMembers(state))).toEqual([]);
   });
 
+  it("has a member's new work that could start wait for the first of it", () => {
+    const first = subtask("first");
+    const second = subtask("second");
+    const state = work({ subtasks: [first, second] });
+    expect(waitsIn(state, first, busyMembers(state))).toEqual([]);
+    expect(waitsIn(state, second, busyMembers(state))).toEqual([
+      { kind: "after", subtaskId: "first" },
+    ]);
+  });
+
   it("waits on the acceptance of another task you accept before building on it", () => {
     const task = (ownerAccepts: boolean) => ({
       id: "t0",
@@ -117,7 +127,7 @@ describe("waitsIn", () => {
       ownerAccepts,
     });
     const up = subtask("up", { taskId: "t0", status: "done" });
-    const rest = subtask("rest", { taskId: "t0", assignee: "bob" });
+    const rest = subtask("rest", { taskId: "t0", assignee: "ann" });
     const down = subtask("down", { dependsOn: ["up"], assignee: "bob" });
     const accept = question({
       id: "q1",
@@ -133,7 +143,7 @@ describe("waitsIn", () => {
     const unfinished = (ownerAccepts: boolean) =>
       work({ tasks: [task(ownerAccepts)], subtasks: [up, rest, down] });
     expect(waitsIn(unfinished(true), down, new Set())).toEqual([
-      { kind: "upstream", by: "bob", subtaskId: "rest", halted: false },
+      { kind: "upstream", by: "ann", subtaskId: "rest", halted: false },
     ]);
     expect(waitsIn(unfinished(false), down, new Set())).toEqual([]);
   });

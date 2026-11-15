@@ -27,7 +27,7 @@ How openplan behaves is `docs/design.md`: change it first, then the code. This f
 - One job per module, said in its header. A module that grows a second job is split along that seam.
 - A function says its job in its name and does that one job; a method that needs nested closures to read is a class or a module of its own.
 - Paths in the data folder are named in `src/shared/layout.ts` only.
-- Agent SDK options are composed in `src/engine/policy.ts` only; a turn adds only its own `resume`, `canUseTool` and turn server, through `turns.ts`.
+- Agent SDK options are composed in `src/engine/policy.ts` only; a turn adds, in `turns.ts`, only what is its own: `resume`, `canUseTool`, its turn server and the tools it allows, an output schema, and the abort and the Claude Code process it runs under.
 - What a format is written as and read back from (a plan, the state) is in one module, both ways.
 
 ## Words

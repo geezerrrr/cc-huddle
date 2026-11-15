@@ -138,6 +138,38 @@ function reviewerAway(state: Work, subtask: Subtask): string | undefined {
   return working || meeting || reviewing ? reviewer : undefined;
 }
 
+/**
+ * What a pending subtask waits on before it could start, its member's other
+ * work aside: its goal, its upstream, and its member while busy.
+ */
+function startWaits(state: Work, subtask: Subtask, busy: Set<string>): Wait[] {
+  const { goal } = state;
+  if (goal.status !== "active") return [{ kind: "goal", status: goal.status }];
+  const unmerged = (d: Subtask): Wait => ({
+    kind: "upstream",
+    by: d.assignee,
+    subtaskId: d.id,
+    halted: isHalted(d.status),
+  });
+  const upstream = subtask.dependsOn.flatMap((id): Wait[] => {
+    const d = state.subtasks.find((s) => s.id === id);
+    if (!d) return [];
+    if (d.status !== "done") return [unmerged(d)];
+    if (d.taskId === subtask.taskId) return [];
+    // Done in another task you accept: that whole task is yours to accept
+    // first, so the rest of it is waited for, then your acceptance.
+    if (!state.tasks.find((t) => t.id === d.taskId)?.ownerAccepts || accepted(state, d.taskId))
+      return [];
+    const rest = state.subtasks.find((s) => s.taskId === d.taskId && s.status !== "done");
+    if (rest) return [unmerged(rest)];
+    const acceptance = acceptanceOf(state, d.taskId);
+    return acceptance ? [{ kind: "acceptance", questionId: acceptance.id }] : [];
+  });
+  // Several upstreams in one other task wait on the same thing: once each.
+  if (upstream.length) return [...new Map(upstream.map((w) => [JSON.stringify(w), w])).values()];
+  return busy.has(subtask.assignee) ? [{ kind: "busy", by: subtask.assignee }] : [];
+}
+
 /** What a subtask waits on in its stage; `busy` is busyMembers. */
 export function waitsIn(state: Work, subtask: Subtask, busy: Set<string>): Wait[] {
   const { goal } = state;
@@ -152,41 +184,18 @@ export function waitsIn(state: Work, subtask: Subtask, busy: Set<string>): Wait[
     );
   switch (subtask.status) {
     case "pending": {
-      if (held.length) return held;
-      const unmerged = (d: Subtask): Wait => ({
-        kind: "upstream",
-        by: d.assignee,
-        subtaskId: d.id,
-        halted: isHalted(d.status),
-      });
-      const upstream = subtask.dependsOn.flatMap((id): Wait[] => {
-        const d = state.subtasks.find((s) => s.id === id);
-        if (!d) return [];
-        if (d.status !== "done") return [unmerged(d)];
-        if (d.taskId === subtask.taskId) return [];
-        // Done in another task you accept: that whole task is yours to accept
-        // first, so the rest of it is waited for, then your acceptance.
-        if (!state.tasks.find((t) => t.id === d.taskId)?.ownerAccepts || accepted(state, d.taskId))
-          return [];
-        const rest = state.subtasks.find((s) => s.taskId === d.taskId && s.status !== "done");
-        if (rest) return [unmerged(rest)];
-        const acceptance = acceptanceOf(state, d.taskId);
-        return acceptance ? [{ kind: "acceptance", questionId: acceptance.id }] : [];
-      });
-      // Several upstreams in one other task wait on the same thing: once each.
-      if (upstream.length)
-        return [...new Map(upstream.map((w) => [JSON.stringify(w), w])).values()];
-      if (busy.has(subtask.assignee)) return [{ kind: "busy", by: subtask.assignee }];
-      if (subtask.goOn) return [];
-      // Their work going on in its session goes first, while it can start too.
-      const first = state.subtasks.find(
+      const waits = startWaits(state, subtask, busy);
+      if (waits.length) return waits;
+      // A member starts one thing at a time: of theirs that could start, one
+      // going on in its session first, else the first in the list.
+      const could = state.subtasks.filter(
         (s) =>
-          s.goOn &&
           s.status === "pending" &&
           s.assignee === subtask.assignee &&
-          !waitsIn(state, s, busy).length,
+          !startWaits(state, s, busy).length,
       );
-      return first ? [{ kind: "after", subtaskId: first.id }] : [];
+      const first = could.find((s) => s.goOn) ?? could[0];
+      return first && first !== subtask ? [{ kind: "after", subtaskId: first.id }] : [];
     }
     // A done subtask, the last of its task, carries the task's acceptance waiting on you.
     case "running":

@@ -50,7 +50,7 @@ export function waitText(wait: Wait, work: Work): string {
       return `waits until ${wait.by} is free`;
     case "after": {
       const first = work.subtasks.find((s) => s.id === wait.subtaskId);
-      return `waits for "${first?.title ?? ""}" to go on first`;
+      return `waits for "${first?.title ?? ""}" to start first`;
     }
     case "merge": {
       const ahead = work.subtasks.find((s) => s.id === wait.subtaskId);
