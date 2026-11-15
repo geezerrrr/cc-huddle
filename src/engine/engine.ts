@@ -3,7 +3,7 @@
  * its parts, put together. It knows nothing of the plugin: what it is to run
  * with, and where its failures go, come in its options.
  */
-import type { Settings } from "@anthropic-ai/claude-agent-sdk";
+import type { PermissionMode, Settings } from "@anthropic-ai/claude-agent-sdk";
 import { errorText, type Core, type Team } from "./core.ts";
 import {
   dataFiles,
@@ -45,6 +45,8 @@ export interface EngineOptions {
    * stopped (§3.2). Without it, the team opens only when nobody holds it.
    */
   takeOver?: (holder: Holder) => Promise<HandedOver>;
+  /** Your session's permission mode as it is now, which members work in (§8); undefined before it is known. */
+  sessionMode: () => PermissionMode | undefined;
   /** openplan's id as `enabledPlugins` names it, turned off in members' sessions. */
   plugin: string;
   /** Your own team's folder, under the repository's (team.ts userTeamFolder). */
@@ -64,6 +66,8 @@ export class Engine {
   readonly goals: Goals;
   /** How many times the state has changed since the team opened. */
   private changes = 0;
+  /** The team's settings set the members' permission mode, over your session's. */
+  private teamMode = false;
 
   private constructor(
     private readonly core: Core,
@@ -232,6 +236,7 @@ export class Engine {
       }
     });
     for (const [name, filled] of each) await writeSettings(this.files.settings(name), filled);
+    this.teamMode = settings.permissions?.defaultMode !== undefined;
   }
 
   private turnOptions(...[member, kind, cwd]: Parameters<Core["options"]>) {
@@ -242,8 +247,8 @@ export class Engine {
       settings: this.files.settings(member.name),
       system: systemPrompt(kind, member, this.core.team.members),
     };
-    return kind === "task"
-      ? workOptions(seat, this.options.env)
-      : readOnlyOptions(seat, this.options.env);
+    if (kind !== "task") return readOnlyOptions(seat, this.options.env);
+    const mode = this.teamMode ? undefined : this.options.sessionMode();
+    return workOptions({ ...seat, ...(mode && { mode }) }, this.options.env);
   }
 }

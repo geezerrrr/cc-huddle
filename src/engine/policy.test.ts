@@ -49,9 +49,7 @@ describe("memberSettings", () => {
       "openplan@openplan",
     );
     expect(settings).toEqual({
-      sandbox: { enabled: true },
       permissions: {
-        defaultMode: "acceptEdits",
         allow: ["Bash(pnpm test)"],
         deny: ["Bash(git push:*)", "SendMessage", "ListAgents"],
       },
@@ -126,6 +124,20 @@ describe("session options", () => {
       GIT_AUTHOR_EMAIL: "glm@openplan.local",
       GIT_COMMITTER_NAME: "glm",
       GIT_COMMITTER_EMAIL: "glm@openplan.local",
+    });
+  });
+
+  it("works in your session's permission mode, bypassing as the SDK takes it only when that is yours", () => {
+    expect(workOptions(seat, from)).not.toHaveProperty("permissionMode");
+    expect(workOptions({ ...seat, mode: "acceptEdits" }, from)).toMatchObject({
+      permissionMode: "acceptEdits",
+    });
+    expect(workOptions({ ...seat, mode: "acceptEdits" }, from)).not.toHaveProperty(
+      "allowDangerouslySkipPermissions",
+    );
+    expect(workOptions({ ...seat, mode: "bypassPermissions" }, from)).toMatchObject({
+      permissionMode: "bypassPermissions",
+      allowDangerouslySkipPermissions: true,
     });
   });
 

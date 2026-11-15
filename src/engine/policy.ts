@@ -4,7 +4,7 @@
  * repository: it loads your user and project settings like any session, and
  * runs under flag settings on top, which outrank both.
  */
-import type { Options, Settings } from "@anthropic-ai/claude-agent-sdk";
+import type { Options, PermissionMode, Settings } from "@anthropic-ai/claude-agent-sdk";
 import { writeWhole } from "./files.ts";
 import { authorEnv, memberSigner } from "./git.ts";
 import type { Member } from "./types.ts";
@@ -57,11 +57,11 @@ export function expandEnv(env: Record<string, string>, from: Env): Record<string
 
 /**
  * The flag settings a member's sessions run under: the team's settings, the
- * member's environment, and the guards every member has. Unless the team says
- * otherwise, a member edits freely in its worktree (`acceptEdits`) and runs
- * commands in Claude Code's sandbox, or unsandboxed with a warning where the
- * system has none. openplan is off in them, so a member never starts a team
- * of its own, and they take no message from your sessions and send none.
+ * member's environment, and the guards every member has. No permission mode
+ * or sandbox of openplan's own: what isn't the team's is your settings' and
+ * your session's mode (workOptions). openplan is off in them, so a member
+ * never starts a team of its own, and they take no message from your
+ * sessions and send none.
  */
 export function memberSettings(
   team: Settings,
@@ -71,12 +71,10 @@ export function memberSettings(
 ): Settings {
   return {
     ...team,
-    sandbox: { enabled: true, ...team.sandbox },
     env: { ...team.env, ...expandEnv(member.env, from) },
     enabledPlugins: { ...team.enabledPlugins, [plugin]: false },
     crossSessionInbound: "refuse",
     permissions: {
-      defaultMode: "acceptEdits",
       ...team.permissions,
       deny: [...(team.permissions?.deny ?? []), "SendMessage", "ListAgents"],
     },
@@ -102,13 +100,15 @@ export interface Seat {
   settings: string;
   /** Appended to Claude Code's own system prompt. */
   system: string;
+  /** Your session's permission mode, for a working turn; none when the team sets its own, or none is known yet. */
+  mode?: PermissionMode;
 }
 
 /**
  * Agent SDK options for a member's working turn: their model and effort,
- * their settings file, Claude Code's system prompt with ours appended, the
- * reply streamed as it is written, their name on the commits they make and in
- * `claude agents`.
+ * their settings file, your session's permission mode, Claude Code's system
+ * prompt with ours appended, the reply streamed as it is written, their name
+ * on the commits they make and in `claude agents`.
  */
 export function workOptions(seat: Seat, from: Env): Options {
   const { member } = seat;
@@ -120,6 +120,11 @@ export function workOptions(seat: Seat, from: Env): Options {
     model: member.model,
     effort: member.effort,
     settings: seat.settings,
+    ...(seat.mode && {
+      permissionMode: seat.mode,
+      // The SDK takes bypassPermissions only so: your session runs in it, as you chose.
+      ...(seat.mode === "bypassPermissions" && { allowDangerouslySkipPermissions: true }),
+    }),
     env: { ...env, ...authorEnv(memberSigner(member.name)) },
     systemPrompt: { type: "preset", preset: "claude_code", append: seat.system },
     includePartialMessages: true,

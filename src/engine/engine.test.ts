@@ -3,7 +3,9 @@ import { once } from "node:events";
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import type { PermissionMode } from "@anthropic-ai/claude-agent-sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Core } from "./core.ts";
 import { dataFiles, holderOf, repoFolder } from "./data.ts";
 import { Engine, type EngineOptions } from "./engine.ts";
 import { git, openRepository } from "./git.ts";
@@ -54,6 +56,7 @@ beforeEach(async () => {
     claude: "claude",
     session: 41,
     address: "here",
+    sessionMode: () => undefined,
     plugin: "openplan@inline",
     userTeam: path.join(dir, "user-team"),
     env: { GLM_KEY: "key-1" },
@@ -85,6 +88,25 @@ describe("Engine", () => {
       address: "here",
       open: true,
     });
+  });
+
+  it("works members in your session's permission mode, unless the team sets theirs", async () => {
+    const session: { mode?: PermissionMode } = {};
+    const engine = await open({ sessionMode: () => session.mode });
+    const { core } = engine as unknown as { core: Core };
+    const [glm] = engine.team.members;
+    if (!glm) throw new Error("no member");
+    const working = () => core.options(glm, "task", repo).permissionMode;
+    expect(working()).toBeUndefined();
+    session.mode = "bypassPermissions";
+    expect(working()).toBe("bypassPermissions");
+    expect(core.options(glm, "meeting", repo).permissionMode).toBe("dontAsk");
+    await teamFile(
+      "settings.json",
+      JSON.stringify({ permissions: { defaultMode: "acceptEdits" } }),
+    );
+    await engine.reloadTeam();
+    expect(working()).toBeUndefined();
   });
 
   it("leaves a repository without a team as it is", async () => {
