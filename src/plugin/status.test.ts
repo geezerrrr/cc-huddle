@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Ask, Question, Subtask } from "../engine/types.ts";
+import { DECISIONS, type Ask, type Question, type Subtask } from "../engine/types.ts";
 import { statusText } from "./status.ts";
 
 const subtask = (id: string, fields: Partial<Subtask>): Subtask => ({
@@ -61,7 +61,7 @@ describe("statusText", () => {
           subtaskId: "Score",
           text: "Game",
           kind: "decision",
-          decision: { kind: "delivery", options: ["accept", "revise"] },
+          decision: DECISIONS.delivery(),
         }),
       ],
       tokens: {},

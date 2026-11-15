@@ -86,7 +86,7 @@ interface Live {
 export class Scheduler {
   /** Subtask id → its stage under way. */
   private live = new Map<string, Live>();
-  /** Closing: nothing starts, and what stopped work still reports goes nowhere. */
+  /** Closing: nothing starts. */
   private closed = false;
   /**
    * Runs stopped to go on in their sessions (their goal was paused, or you
@@ -339,13 +339,15 @@ export class Scheduler {
       else if (pick === "sendBack") {
         this.move(subtask, "reject");
         if (subtask.session) {
-          goOnWith(subtask, { why: "rejected", note: subtask.review.notes ?? "" });
+          const { notes } = subtask.review;
+          if (notes) goOnWith(subtask, { why: "rejected", note: notes });
           if (note) goOnWith(subtask, { why: "carried", note });
         }
       }
     } else if (subtask.status === "merging") {
       const { slug } = this.goal;
       if (pick === "retry") await abortMerge(this.core.places, slug, subtask.id);
+      else if (pick === "stop") await this.stop(subtask);
       else if (pick === "ours" || pick === "theirs")
         await pickSide(this.core.places, slug, subtask.id, question.decision.files ?? [], pick);
     }
@@ -475,7 +477,7 @@ export class Scheduler {
     subtask.finishedAt = undefined;
     core.changed();
 
-    let outcome: RunOutcome;
+    let outcome: RunOutcome | undefined;
     try {
       const member = this.memberOf(subtask.assignee);
       const { goal } = this;
@@ -532,8 +534,8 @@ export class Scheduler {
           `${subtask.title}\n\n${outcome.handover.summary}`,
         );
     } catch (error) {
-      // Never left running: a worktree that can't be made, a commit that fails.
-      outcome = { status: "failed", error: errorText(error), tokens: 0 };
+      // Never left running: a worktree that can't be made, a commit that fails (the run's tokens still spent).
+      outcome = { status: "failed", error: errorText(error), tokens: outcome?.tokens ?? 0 };
     }
 
     // Nothing waits on your answers any more.
@@ -542,8 +544,7 @@ export class Scheduler {
     spend(core.state, subtask.assignee, outcome.tokens);
     const held = this.held.get(subtask.id);
     this.held.delete(subtask.id);
-    if (this.closed) return;
-    // Held with its goal, it goes on if it stopped; added to by you, even if it delivered just before.
+    // Recorded even while closing, so a goal let go keeps how its runs ended. Held with its goal, it goes on if it stopped; added to by you, even if it delivered just before.
     if (held && (outcome.status === "stopped" || held.some((g) => g.why === "carried"))) {
       this.move(subtask, "hold");
       for (const reason of held) goOnWith(subtask, reason);
@@ -593,9 +594,11 @@ export class Scheduler {
             }),
             options: core.options(target, "readOnly", await openGoal(core.places, this.goal.slug)),
             signal,
+            spent: (tokens) => {
+              spend(core.state, target.name, tokens);
+            },
           }),
       );
-      spend(core.state, target.name, reply.tokens);
       core.changed();
       return `${target.name} answered: ${reply.text}`;
     } catch (error) {
@@ -660,36 +663,30 @@ export class Scheduler {
         options: core.options(reviewer, "readOnly", desk),
         schema: verdictSchema,
         signal: abort.signal,
+        spent: (tokens) => {
+          spend(core.state, reviewer.name, tokens);
+        },
       });
-      spend(core.state, reviewer.name, reply.tokens);
       if (subtask.status !== "reviewing") return;
       const verdict = verdictSchema.parse(reply.structured);
       const rounds = (subtask.review?.rounds ?? 0) + (verdict.pass ? 0 : 1);
       subtask.review = { rounds, notes: verdict.notes };
       if (verdict.pass) this.move(subtask, "merge");
       else if (rounds >= REVIEW_ROUNDS)
-        this.questions.openDecision(
-          subtask,
-          { kind: "review", options: [...DECISIONS.review.options] },
-          verdict.notes,
-        );
+        this.questions.openDecision(subtask, DECISIONS.stuckReview(), verdict.notes);
       else {
         this.move(subtask, "reject");
         if (subtask.session) goOnWith(subtask, { why: "rejected", note: verdict.notes });
       }
     } catch (error) {
       if (abort.signal.aborted || subtask.status !== "reviewing") return;
-      this.questions.openDecision(
-        subtask,
-        { kind: "review", options: [...DECISIONS.review.options] },
-        errorText(error),
-      );
+      // The last review gave no word: earlier notes are no longer what it says.
+      subtask.review = { rounds: subtask.review?.rounds ?? 0 };
+      this.questions.openDecision(subtask, DECISIONS.failedReview(), errorText(error));
     } finally {
       end();
-      if (!this.closed) {
-        core.changed();
-        this.pump();
-      }
+      core.changed();
+      this.pump();
     }
   }
 
@@ -717,7 +714,7 @@ export class Scheduler {
       } else if (merged.other.length) {
         this.questions.openDecision(
           subtask,
-          { kind: "merge", options: [...DECISIONS.merge.options], files: merged.other },
+          DECISIONS.mergeFiles(merged.other),
           merged.other.join("\n"),
         );
       } else {
@@ -726,13 +723,11 @@ export class Scheduler {
         if (subtask.session) goOnWith(subtask, { why: "conflict" });
       }
     } catch (error) {
-      this.questions.openDecision(subtask, { kind: "merge", options: ["retry"] }, errorText(error));
+      this.questions.openDecision(subtask, DECISIONS.failedMerge(), errorText(error));
     } finally {
       end();
-      if (!this.closed) {
-        core.changed();
-        this.pump();
-      }
+      core.changed();
+      this.pump();
     }
   }
 
@@ -744,10 +739,6 @@ export class Scheduler {
     subtask.finishedAt = Date.now();
     subtask.progress = { done: subtask.progress.total, total: subtask.progress.total };
     if (!taskDone(this.core.state, subtask.taskId) || !this.taskOf(subtask).ownerAccepts) return;
-    this.questions.openDecision(
-      subtask,
-      { kind: "delivery", options: [...DECISIONS.delivery.options] },
-      this.taskOf(subtask).title,
-    );
+    this.questions.openDecision(subtask, DECISIONS.delivery(), this.taskOf(subtask).title);
   }
 }

@@ -211,44 +211,62 @@ export const DECISION_OPTIONS = [
   "ours",
   "theirs",
   "retry",
+  "stop",
   "accept",
   "revise",
 ] as const;
 export type DecisionOption = (typeof DECISION_OPTIONS)[number];
 
-type DecisionKind = "review" | "merge" | "delivery";
-
 /**
- * What a decision of each kind offers, and the option a note typed instead
- * of a pick goes with, `needed` where that option is no answer without one.
- * A merge that failed for another reason than its files offers `retry` alone.
+ * A decision on a subtask: what it offers, and the option a note typed
+ * instead of a pick goes with, `needed` where that option is no answer
+ * without one. `files`: a merge's files that can't be merged line by line.
  */
-export const DECISIONS: Record<
-  DecisionKind,
-  { options: readonly DecisionOption[]; note?: { option: DecisionOption; needed?: true } }
-> = {
-  review: { options: ["rereview", "skip", "sendBack"], note: { option: "sendBack" } },
-  merge: { options: ["ours", "theirs", "retry"] },
-  delivery: { options: ["accept", "revise"], note: { option: "revise", needed: true } },
+export interface Decision {
+  kind: "review" | "merge" | "delivery";
+  options: DecisionOption[];
+  note?: { option: DecisionOption; needed?: true };
+  files?: string[];
+}
+
+/** The decisions there are, each as it is put to you. */
+export const DECISIONS = {
+  /** A review that sent the delivery back too often: send it back with its notes, and your words if you add some. */
+  stuckReview: (): Decision => ({
+    kind: "review",
+    options: ["rereview", "skip", "sendBack"],
+    note: { option: "sendBack" },
+  }),
+  /** A review that failed: with no notes of its own, it goes back only with your words. */
+  failedReview: (): Decision => ({
+    kind: "review",
+    options: ["rereview", "skip", "sendBack"],
+    note: { option: "sendBack", needed: true },
+  }),
+  /** Files a merge can't take line by line: keep one side, or merge again. */
+  mergeFiles: (files: string[]): Decision => ({
+    kind: "merge",
+    options: ["ours", "theirs", "retry"],
+    files,
+  }),
+  /** A merge git failed on: try again, or stop the subtask, its delivery standing. */
+  failedMerge: (): Decision => ({ kind: "merge", options: ["retry", "stop"] }),
+  /** A task done that you accept: accept it, or send it back saying what to change. */
+  delivery: (): Decision => ({
+    kind: "delivery",
+    options: ["accept", "revise"],
+    note: { option: "revise", needed: true },
+  }),
 };
 
-/** Whether picking `option` is no answer to a decision of `kind` without a note. */
-export function noteNeeded(kind: DecisionKind, option: DecisionOption): boolean {
-  const { note } = DECISIONS[kind];
-  return note?.option === option && note.needed === true;
-}
+/** Whether picking `option` is no answer to `decision` without a note. */
+export const noteNeeded = (decision: Decision, option: DecisionOption) =>
+  decision.note?.option === option && decision.note.needed === true;
 
 /** The answers a permission request offers; a note typed instead denies it, saying why. */
 export const PERMISSION_OPTIONS = ["once", "always", "deny"] as const;
 export type PermissionOption = (typeof PERMISSION_OPTIONS)[number];
 export const PERMISSION_NOTE: PermissionOption = "deny";
-
-/** A decision on a subtask. `files`: conflicts that can't be merged line by line. */
-export interface Decision {
-  kind: DecisionKind;
-  options: DecisionOption[];
-  files?: string[];
-}
 
 /**
  * A tool call waiting to be allowed: the tool, and its input as the member
@@ -306,7 +324,7 @@ export type Wait =
   /** Merges go one at a time: one under way, or delivered before it. */
   | { kind: "merge"; subtaskId: string }
   | { kind: "teammate"; by: string; questionId: string }
-  | { kind: "you"; questionId: string; decision?: DecisionKind }
+  | { kind: "you"; questionId: string; decision?: Decision["kind"] }
   /** Upstream work in another task you accept, done, whose task waits for your acceptance. */
   | { kind: "acceptance"; questionId: string };
 

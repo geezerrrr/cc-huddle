@@ -1,3 +1,4 @@
+import { DECISIONS } from "./types.ts";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
@@ -340,11 +341,7 @@ describe("Engine", () => {
       tokens: 0,
     };
     engine.state.subtasks.push(subtask);
-    engine.questions.openDecision(
-      subtask,
-      { kind: "delivery", options: ["accept", "revise"] },
-      "Game",
-    );
+    engine.questions.openDecision(subtask, DECISIONS.delivery(), "Game");
     const [question] = engine.state.questions;
     await expect(engine.answer(question?.id ?? "", { decision: "revise" })).rejects.toThrow(
       "doesn't fit",

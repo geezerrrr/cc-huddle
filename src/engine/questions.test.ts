@@ -1,7 +1,7 @@
 import type { CanUseTool, PermissionUpdate } from "@anthropic-ai/claude-agent-sdk";
 import { describe, expect, it, vi } from "vitest";
 import { Questions, type Inbox } from "./questions.ts";
-import type { Question, Subtask } from "./types.ts";
+import { DECISIONS, type Question, type Subtask } from "./types.ts";
 
 /** An inbox over an empty state, recording the rules allowed always. */
 function inbox() {
@@ -218,7 +218,7 @@ describe("decisions", () => {
     const { box, questions } = inbox();
     questions.openDecision(
       subtask("s1", { status: "reviewing" }),
-      { kind: "review", options: ["rereview", "skip", "sendBack"] },
+      DECISIONS.stuckReview(),
       "Sent back three times",
     );
     const question = await opened(box);
@@ -236,11 +236,7 @@ describe("decisions", () => {
       subtask("s3", { status: "pending" }),
       subtask("x", { taskId: "t2" }),
     );
-    questions.openDecision(
-      subtask("s1"),
-      { kind: "delivery", options: ["accept", "revise"] },
-      "Dice game",
-    );
+    questions.openDecision(subtask("s1"), DECISIONS.delivery(), "Dice game");
     const { id } = await opened(box);
     for (const answer of [
       { decision: "revise" as const },
@@ -260,7 +256,7 @@ describe("calling off", () => {
       subtaskId: "s1",
       signal: new AbortController().signal,
     })("Bash", command, request());
-    questions.openDecision(subtask("s1"), { kind: "merge", options: ["retry"] }, "git failed");
+    questions.openDecision(subtask("s1"), DECISIONS.failedMerge(), "git failed");
     await vi.waitFor(() => {
       expect(box.state.questions).toHaveLength(2);
     });
@@ -289,7 +285,7 @@ describe("calling off", () => {
         to: "sonnet",
       },
     );
-    questions.openDecision(subtask("s1"), { kind: "merge", options: ["retry"] }, "git failed");
+    questions.openDecision(subtask("s1"), DECISIONS.failedMerge(), "git failed");
     questions.recover();
     expect(box.state.questions).toMatchObject([{ decision: { kind: "merge" } }]);
   });
@@ -297,12 +293,8 @@ describe("calling off", () => {
   it("a task's delivery leaves its other decisions", () => {
     const { box, questions } = inbox();
     box.state.subtasks.push(subtask("s1"), subtask("x", { taskId: "t2" }));
-    questions.openDecision(subtask("s1"), { kind: "delivery", options: ["accept", "revise"] }, "");
-    questions.openDecision(
-      subtask("x", { taskId: "t2" }),
-      { kind: "delivery", options: ["accept", "revise"] },
-      "",
-    );
+    questions.openDecision(subtask("s1"), DECISIONS.delivery(), "");
+    questions.openDecision(subtask("x", { taskId: "t2" }), DECISIONS.delivery(), "");
     questions.cancelDelivery("t1");
     expect(box.state.questions.map((q) => q.subtaskId)).toEqual(["x"]);
   });

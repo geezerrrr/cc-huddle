@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { busyMembers, derive, meetingResumes, reviewerOf, waitsIn, type Work } from "./derive.ts";
-import type { Ask, Meeting, Question, Subtask } from "./types.ts";
+import { DECISIONS, type Ask, type Meeting, type Question, type Subtask } from "./types.ts";
 
 const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
   id,
@@ -102,7 +102,7 @@ describe("waitsIn", () => {
       id: "q1",
       subtaskId: "up",
       kind: "decision",
-      decision: { kind: "delivery", options: ["accept", "revise"] },
+      decision: DECISIONS.delivery(),
     });
     const accepted = work({ tasks: [task(true)], subtasks: [up, down], questions: [accept] });
     expect(waitsIn(accepted, down, busyMembers(accepted))).toEqual([
@@ -166,7 +166,7 @@ describe("waitsIn", () => {
           id: "q1",
           subtaskId: "first",
           kind: "decision",
-          decision: { kind: "merge", options: ["retry"] },
+          decision: DECISIONS.failedMerge(),
         }),
       ],
     });
@@ -208,7 +208,7 @@ describe("derive", () => {
           id: "q1",
           subtaskId: "s1",
           kind: "decision",
-          decision: { kind: "merge", options: ["retry"] },
+          decision: DECISIONS.failedMerge(),
         }),
       ],
     });

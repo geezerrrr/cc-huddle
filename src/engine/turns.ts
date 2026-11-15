@@ -411,12 +411,12 @@ export interface Reply {
   text: string;
   structured?: unknown;
   session: string;
-  tokens: number;
 }
 
 /**
  * Runs one turn to its end (a meeting turn, a teammate's answer, a review)
- * and gives what it said, or throws why it failed. Given a `schema`, the turn
+ * and gives what it said, or throws why it failed; `spent` is told the
+ * tokens it used either way. Given a `schema`, the turn
  * hands its result back in that shape, and one that answers in words instead
  * has failed too. Claude Code checks a schema against draft-07, and refuses
  * one that names a later draft, zod's own.
@@ -426,9 +426,10 @@ export async function askOnce(params: {
   options: MemberOptions;
   schema?: z.ZodType;
   signal: AbortSignal;
+  spent: (tokens: number) => void;
   listener?: TurnListener;
 }): Promise<Reply> {
-  const { prompt, options, schema, signal, listener = {} } = params;
+  const { prompt, options, schema, signal, spent, listener = {} } = params;
   let session = "";
   const outcome = await runTurn(
     prompt,
@@ -444,8 +445,9 @@ export async function askOnce(params: {
     signal,
     turnDecoder(keepingSession(listener, (id) => (session = id))),
   );
+  spent(outcome.tokens);
   if (!outcome.ok) throw new Error(outcome.error);
   if (schema && outcome.structured === undefined)
     throw new Error("The model answered in words instead of the result asked for");
-  return { text: outcome.text, structured: outcome.structured, session, tokens: outcome.tokens };
+  return { text: outcome.text, structured: outcome.structured, session };
 }

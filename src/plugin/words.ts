@@ -129,6 +129,7 @@ export const OPTION_LABELS: Record<PermissionOption | DecisionOption, string> = 
   ours: "Keep ours",
   theirs: "Take theirs",
   retry: "Retry",
+  stop: "Stop",
   accept: "Accept",
   revise: "Send back",
 };

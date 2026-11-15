@@ -243,7 +243,7 @@ export class Questions {
         return (
           "decision" in answer &&
           question.decision.options.includes(answer.decision) &&
-          (answer.note !== undefined || !noteNeeded(question.decision.kind, answer.decision)) &&
+          (answer.note !== undefined || !noteNeeded(question.decision, answer.decision)) &&
           (answer.decision !== "revise" || this.revisable(question, answer))
         );
       case "teammate":

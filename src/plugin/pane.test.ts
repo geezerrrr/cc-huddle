@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { GoalEntry } from "../engine/data.ts";
 import type { Work } from "../engine/derive.ts";
-import type { Ask, Member, Meeting, Question, Subtask } from "../engine/types.ts";
+import {
+  DECISIONS,
+  type Ask,
+  type Member,
+  type Meeting,
+  type Question,
+  type Subtask,
+} from "../engine/types.ts";
 import { paneTeam as paneOf, viewEntries, viewLive } from "./pane.ts";
 
 /** The pane for a session running the goal of `work`, with no other goals. */
@@ -104,7 +111,7 @@ const work = (): Work => ({
       from: "sonnet",
       text: "Game",
       kind: "decision",
-      decision: { kind: "delivery", options: ["accept", "revise"] },
+      decision: DECISIONS.delivery(),
     }),
     question("q4", { kind: "teammate", to: "sonnet", text: "Which colour?" }),
   ],
@@ -329,16 +336,12 @@ Tell the user what was done, and ask whether to accept it or send it back with w
       question("q5", {
         text: "Too small",
         kind: "decision",
-        decision: { kind: "review", options: ["rereview", "skip", "sendBack"] },
+        decision: DECISIONS.stuckReview(),
       }),
       question("q6", {
         text: "a.png\nb.png",
         kind: "decision",
-        decision: {
-          kind: "merge",
-          options: ["ours", "theirs", "retry"],
-          files: ["a.png", "b.png"],
-        },
+        decision: DECISIONS.mergeFiles(["a.png", "b.png"]),
       }),
     ];
     const [review, merge] = paneTeam(now, members).needs;

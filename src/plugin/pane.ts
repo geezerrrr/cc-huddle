@@ -18,7 +18,6 @@ import type { GoalEntry } from "../engine/data.ts";
 import { derive, taskDone, type Work } from "../engine/derive.ts";
 import type { LiveRun, RecordEntry } from "../engine/records.ts";
 import {
-  DECISIONS,
   PERMISSION_NOTE,
   toYou,
   type DecisionOption,
@@ -158,7 +157,7 @@ function needOf(question: QuestionToYou, work: Work): OpenplanNeed {
       };
     case "decision": {
       const { kind, options } = question.decision;
-      const note = noteOf(options, DECISIONS[kind].note);
+      const note = noteOf(options, question.decision.note);
       const subtask = work.subtasks.find((s) => s.id === question.subtaskId);
       const done = work.subtasks.filter((s) => s.taskId === subtask?.taskId && s.status === "done");
       return {

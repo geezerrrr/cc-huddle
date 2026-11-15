@@ -300,7 +300,10 @@ describe("Scheduler", () => {
   it("has a teammate answer in a read-only session in the goal's worktree", async () => {
     const s1 = subtask("s1");
     core.state.subtasks.push(s1);
-    vi.mocked(askOnce).mockResolvedValue({ text: "Inter", session: "x", tokens: 5 });
+    vi.mocked(askOnce).mockImplementation((ask) => {
+      ask.spent(5);
+      return Promise.resolve({ text: "Inter", session: "x" });
+    });
     const told: string[] = [];
     vi.mocked(runSubtask).mockImplementation(async (run) => {
       told.push(await run.collaboration.askTeammate(" sonnet ", "Which font?"));
@@ -333,11 +336,13 @@ describe("Scheduler", () => {
       const s1 = subtask("s1", { acceptance: "Shows both scores" });
       core.state.subtasks.push(s1);
       vi.mocked(runSubtask).mockImplementation(delivering({ "score.txt": "0:0\n" }));
-      vi.mocked(askOnce).mockResolvedValue({
-        text: "",
-        structured: { pass: true, notes: "Fine." },
-        session: "r",
-        tokens: 7,
+      vi.mocked(askOnce).mockImplementation((ask) => {
+        ask.spent(7);
+        return Promise.resolve({
+          text: "",
+          structured: { pass: true, notes: "Fine." },
+          session: "r",
+        });
       });
       scheduler.pump();
       await settled(s1, "done");
@@ -362,7 +367,6 @@ describe("Scheduler", () => {
         text: "",
         structured: { pass: false, notes: "Scores overlap" },
         session: "r",
-        tokens: 0,
       });
       scheduler.pump();
       await eventually(() => {
@@ -389,17 +393,27 @@ describe("Scheduler", () => {
       );
     });
 
-    it("puts a review that fails to you", async () => {
-      const s1 = subtask("s1");
+    it("puts a review that fails to you, to send back with your words alone", async () => {
+      const s1 = subtask("s1", { session: "glm-1", review: { rounds: 1, notes: "Old notes" } });
       core.state.subtasks.push(s1);
       vi.mocked(runSubtask).mockImplementation(delivering({ "score.txt": "0:0\n" }));
       vi.mocked(askOnce).mockRejectedValue(new Error("API Error: 529"));
       scheduler.pump();
       await eventually(() => {
         expect(core.state.questions).toMatchObject([
-          { text: "API Error: 529", decision: { kind: "review" } },
+          {
+            text: "API Error: 529",
+            decision: { kind: "review", note: { option: "sendBack", needed: true } },
+          },
         ]);
       });
+      await decide(core.state.questions[0]?.id ?? "", { decision: "sendBack", note: "Bigger" });
+      await eventually(() => {
+        expect(vi.mocked(runSubtask).mock.calls.length).toBe(2);
+      });
+      expect(vi.mocked(runSubtask).mock.calls[1]?.[0].opening).toBe(
+        "The user adds to your subtask:\nBigger",
+      );
     });
   });
 
@@ -488,7 +502,6 @@ describe("Scheduler", () => {
           text: "",
           structured: { pass: true, notes: "" },
           session: "r",
-          tokens: 0,
         });
       scheduler.pump();
       await eventually(() => {
@@ -647,6 +660,20 @@ describe("Scheduler", () => {
         resume: "glm-1",
         opening: "The user adds to your subtask:\nTop right",
       });
+    });
+
+    it("keeps how a run held as its session closes ended, what you added to it too", async () => {
+      const s1 = subtask("s1", { session: "glm-1" });
+      core.state.subtasks.push(s1);
+      vi.mocked(runSubtask).mockImplementation(working);
+      scheduler.pump();
+      await started(1);
+      expect(scheduler.carry("s1", "Top right")).toBe("goes");
+      core.state.goal.status = "paused";
+      scheduler.hold();
+      await scheduler.close();
+      expect(s1.status).toBe("pending");
+      expect(s1.goOn).toEqual([{ why: "carried", note: "Top right" }, { why: "held" }]);
     });
 
     it("isn't added to while handed over, while its goal is paused, or when there is none", () => {

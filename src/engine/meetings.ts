@@ -383,10 +383,12 @@ export class Meetings {
           },
           ...(turn.schema && { schema: turn.schema }),
           signal: turn.signal ?? signal,
+          spent: (tokens) => {
+            spend(core.state, member.name, tokens);
+          },
           ...(turn.listener && { listener: turn.listener }),
         });
         meeting.seats = { ...meeting.seats, [member.name]: { session: reply.session, heard } };
-        spend(core.state, member.name, reply.tokens);
         return reply;
       };
       /**

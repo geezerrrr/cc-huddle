@@ -276,7 +276,7 @@ export function addTools(server: McpServer, session: Session) {
     "decide",
     {
       description:
-        "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask), a stuck review (rereview, skip, sendBack), or a merge (ours, theirs, retry).",
+        "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask), a stuck review (rereview, skip, sendBack; one that failed goes back only with a note), or a merge (ours, theirs, retry; one git failed on: retry, stop).",
       inputSchema: {
         question: z.string().describe("The id of what waits on the user"),
         decision: z.enum(DECISION_OPTIONS),

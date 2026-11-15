@@ -123,8 +123,8 @@ function scripted(script: Partial<Record<"hand" | "steer", (ask: Ask) => Promise
       text,
       ...(structured !== undefined && { structured }),
       session: `${String(ask.options.model)}#${String(n)}`,
-      tokens: 1,
     });
+    ask.spent(1);
     const { prompt } = ask;
     if (prompt.includes("Open the meeting")) return reply("What do we build it with?");
     // The host's steer goes first: it speaks of the first judgments too.
@@ -305,7 +305,7 @@ describe("Meetings", () => {
       if (ask.prompt.includes("Everyone now gives a first judgment"))
         drafting.push(core.state.meetings[0]?.drafting);
       if (ask.prompt.includes("final plan"))
-        return Promise.resolve({ text: "", structured: sonnets, session: "glm#9", tokens: 1 });
+        return Promise.resolve({ text: "", structured: sonnets, session: "glm#9" });
       return original?.(ask) ?? Promise.reject(new Error("no script"));
     });
     const meeting = meetings.start({

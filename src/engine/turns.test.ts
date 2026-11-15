@@ -250,20 +250,25 @@ describe("askOnce", () => {
     return close;
   };
   const init = msg({ type: "system", subtype: "init", session_id: "s1", model: "glm-5" });
-  const ask = (schema?: z.ZodType, signal = new AbortController().signal) =>
-    askOnce({
+  let spent: number[] = [];
+  const ask = (schema?: z.ZodType, signal = new AbortController().signal) => {
+    spent = [];
+    return askOnce({
       prompt: "Review it",
       options: { cwd: "/desk", settings: "glm.json" },
       schema,
       signal,
+      spent: (tokens) => spent.push(tokens),
     });
+  };
 
   it("gives the turn's words, its session and its tokens, and closes the query", async () => {
     const close = streams(
       init,
       result({ subtype: "success", is_error: false, result: "Looks good" }),
     );
-    expect(await ask()).toEqual({ text: "Looks good", session: "s1", tokens: 100 });
+    expect(await ask()).toEqual({ text: "Looks good", session: "s1" });
+    expect(spent).toEqual([100]);
     expect(close).toHaveBeenCalled();
   });
 
@@ -286,6 +291,8 @@ describe("askOnce", () => {
   it("throws why the turn failed", async () => {
     streams(init, result({ subtype: "success", is_error: true, result: "API Error: 529" }));
     await expect(ask()).rejects.toThrow("API Error: 529");
+    // A failed turn's tokens are spent all the same.
+    expect(spent).toEqual([100]);
   });
 
   it("starts nothing once stopped", async () => {
