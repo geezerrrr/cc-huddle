@@ -14,6 +14,18 @@ import type { OpenplanView } from "../../plugin/types/index.d.ts";
 import { askToLetGo, servePane, type PaneServer } from "./pane-server.ts";
 import { addPaneTools } from "./pane-tools.ts";
 import { Session } from "./session.ts";
+import type { Core } from "../engine/core.ts";
+import type { Engine } from "../engine/engine.ts";
+import type { Questions } from "../engine/questions.ts";
+import type { Records } from "../engine/records.ts";
+import type { Scheduler } from "../engine/scheduler.ts";
+
+/** The engine's own state and parts, which a test sets work up through. */
+const inside = (engine: Engine) =>
+  engine as unknown as {
+    core: Core;
+    parts: { questions: Questions; scheduler: Scheduler; records: Records };
+  };
 
 let dir: string;
 let session: Session;
@@ -102,7 +114,7 @@ describe("the pane's socket and tools", () => {
   it("let the session's goal go to a session taking it up, and say what that stopped", async () => {
     await session.start("Dice");
     expect(await askToLetGo(pane.address, "chess")).toEqual({ meetings: [] });
-    expect(session.current?.state.goal.status).toBe("active");
+    expect(session.current?.work.goal.status).toBe("active");
     expect(await askToLetGo(pane.address, "dice")).toEqual({ meetings: [] });
     expect(session.current).toBeUndefined();
     // Nothing listening: the server that held it has ended.
@@ -121,7 +133,7 @@ describe("the pane's socket and tools", () => {
       { slug: "dice", label: "Dice · no plan yet · paused, in this session" },
     ]);
     expect((await call("resume_goal", { goal: "dice" })).text).toBe('Resumed "Dice".');
-    expect(session.current?.state.goal.status).toBe("active");
+    expect(session.current?.work.goal.status).toBe("active");
     await dice.goals.pause();
     const chess = await session.start("Chess");
     expect((await view()).team?.resumeRefused).toContain('"Chess" is under way');
@@ -190,8 +202,8 @@ describe("the pane's socket and tools", () => {
 
   it("follow a subtask's record from where the pane read up to", async () => {
     const engine = await session.start("Dice");
-    engine.records.recorder("s1").block?.({ kind: "text", text: "Done." });
-    await engine.records.flush();
+    inside(engine).parts.records.recorder("s1").block?.({ kind: "text", text: "Done." });
+    await inside(engine).parts.records.flush();
     const { record } = await view({ record: { subtask: "s1", from: 0 } });
     expect(record).toMatchObject({
       subtask: "s1",
@@ -219,7 +231,7 @@ describe("the pane's socket and tools", () => {
         },
       ],
     };
-    (await session.start("Dice")).state.questions.push(question);
+    inside(await session.start("Dice")).core.state.questions.push(question);
     expect(await call("answer", { question: "q1", option: "once" })).toEqual({
       text: "That answer doesn't fit the question.",
       error: true,
@@ -228,6 +240,6 @@ describe("the pane's socket and tools", () => {
       text: "Answered q1.",
       error: false,
     });
-    expect(session.current?.state.questions).toEqual([]);
+    expect(session.current?.work.questions).toEqual([]);
   });
 });

@@ -4,9 +4,13 @@
  * asks that session to let it go; this one lets its own go the same way.
  * Each change to which goal it runs waits for the one before.
  */
-import type { GoalEntry } from "../engine/data.ts";
-import { Engine, type EngineOptions, type HandedOver } from "../engine/engine.ts";
-import { RepositoryGoals } from "../engine/repository.ts";
+import {
+  Engine,
+  type EngineOptions,
+  type GoalEntry,
+  type HandedOver,
+  RepositoryGoals,
+} from "../engine/index.ts";
 import { serialBy } from "../shared/serial.ts";
 import { noGoalForModel } from "./words.ts";
 
@@ -67,7 +71,7 @@ export class Session {
    */
   takeUp(slug: string): Promise<Engine> {
     return this.turn(TURN, async () => {
-      if (this.engine?.state.goal.slug === slug) {
+      if (this.engine?.work.goal.slug === slug) {
         await this.engine.goals.resume();
         return this.engine;
       }
@@ -80,9 +84,9 @@ export class Session {
   letGo(slug: string): Promise<HandedOver> {
     return this.turn(TURN, async () => {
       const was = this.engine;
-      if (was?.state.goal.slug !== slug) return { meetings: [] };
+      if (was?.work.goal.slug !== slug) return { meetings: [] };
       this.engine = undefined;
-      this.movedAway = was.state.goal.name;
+      this.movedAway = was.work.goal.name;
       this.changed(undefined);
       return was.close();
     });
@@ -119,7 +123,7 @@ export class Session {
 
   /** Of the repository's goals (`goals`), those this session doesn't run. */
   othersOf(goals: readonly GoalEntry[]): GoalEntry[] {
-    const mine = this.engine?.state.goal.slug;
+    const mine = this.engine?.work.goal.slug;
     return goals.filter((entry) => entry.slug !== mine);
   }
 
@@ -132,7 +136,7 @@ export class Session {
   private async leave() {
     const was = this.engine;
     if (!was) return;
-    const { goal } = was.state;
+    const { goal } = was.work;
     if (goal.status === "active")
       throw new Error(
         `This session's goal "${goal.name}" is under way, and a session runs one goal: ask the user whether to pause it first (goal_action pause), or to run the other in another session`,

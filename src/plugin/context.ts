@@ -4,8 +4,7 @@
  * can take up, read from their folders, as context. A repository with no
  * goals adds nothing.
  */
-import { GitError } from "../engine/git.ts";
-import { RepositoryGoals } from "../engine/repository.ts";
+import { GitError, RepositoryGoals } from "../engine/index.ts";
 import { othersText, statusText } from "./status.ts";
 
 /** The context for session `session` (its pid) in `cwd`. */

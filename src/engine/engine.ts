@@ -58,24 +58,43 @@ export interface EngineOptions {
 /** Where a goal's files are. */
 type Files = ReturnType<typeof goalFiles>;
 
+/** The engine's parts, each a module of its own. */
+interface Parts {
+  questions: Questions;
+  scheduler: Scheduler;
+  meetings: Meetings;
+  goals: Goals;
+  records: Records;
+}
+
 export class Engine {
-  readonly questions: Questions;
-  readonly scheduler: Scheduler;
-  readonly meetings: Meetings;
-  readonly goals: Goals;
+  /** Your actions on the goal's subtasks, a message to one, and work given directly. */
+  readonly scheduler: Pick<Scheduler, "act" | "carry" | "assignOne">;
+  /** Calling meetings, and their plans in review. */
+  readonly meetings: Pick<Meetings, "start" | "change" | "approve" | "cancel" | "resume">;
+  /** Pausing, resuming and archiving the goal; deleting it is the engine's own (delete). */
+  readonly goals: Pick<Goals, "pause" | "resume" | "archive">;
+  /** What the subtasks' runs and the meeting turns did and do. */
+  readonly records: Pick<Records, "read" | "speaking">;
+  private readonly parts: Parts;
 
   private constructor(
     private readonly core: Core,
-    readonly records: Records,
+    records: Records,
     private readonly files: Files,
     private readonly writer: StateWriter,
     private readonly options: EngineOptions,
     private copy: TeamFiles,
   ) {
-    this.questions = new Questions(core);
-    this.scheduler = new Scheduler(core, this.questions);
-    this.meetings = new Meetings(core, this.scheduler);
-    this.goals = new Goals(core, this.scheduler, this.meetings);
+    const questions = new Questions(core);
+    const scheduler = new Scheduler(core, questions);
+    const meetings = new Meetings(core, scheduler);
+    const goals = new Goals(core, scheduler, meetings);
+    this.parts = { questions, scheduler, meetings, goals, records };
+    this.scheduler = scheduler;
+    this.meetings = meetings;
+    this.goals = goals;
+    this.records = records;
   }
 
   /**
@@ -143,8 +162,8 @@ export class Engine {
       const places = { repo: goals.repo, slug, root: folder };
       engine = await Engine.ready(options, places, files, copy, state);
       // A session killed outright couldn't pause it: it is paused first, as if it had.
-      if (state.goal.status === "active") await engine.goals.pause();
-      await engine.goals.resume(stopped);
+      if (state.goal.status === "active") await engine.parts.goals.pause();
+      await engine.parts.goals.resume(stopped);
       await engine.writer.flush();
       return engine;
     } catch (error) {
@@ -185,19 +204,15 @@ export class Engine {
       options: (member, kind, cwd) => engine.turnOptions(member, kind, cwd),
       recorder: (subtask) => records.recorder(subtask.id),
       speech: (meeting) => records.speech(meeting),
-      underWay: () => engine.scheduler.underWay(),
-      meetingsNow: () => engine.meetings.now(),
+      underWay: () => engine.parts.scheduler.underWay(),
+      meetingsNow: () => engine.parts.meetings.now(),
     };
     const engine = new Engine(core, records, files, writer, options, copy);
     await engine.writeMemberSettings(copy);
-    engine.questions.recover();
-    engine.scheduler.recover();
-    engine.meetings.recover();
+    engine.parts.questions.recover();
+    engine.parts.scheduler.recover();
+    engine.parts.meetings.recover();
     return engine;
-  }
-
-  get state(): GoalState {
-    return this.core.state;
   }
 
   /** The goal as the rules read it (derive.ts). */
@@ -221,8 +236,8 @@ export class Engine {
    * answer doesn't fit it.
    */
   async answer(id: string, answer: Answer) {
-    if (answer.kind === "decision") await this.scheduler.decide(id, answer);
-    else this.questions.answer(id, answer);
+    if (answer.kind === "decision") await this.parts.scheduler.decide(id, answer);
+    else this.parts.questions.answer(id, answer);
   }
 
   /**
@@ -232,12 +247,12 @@ export class Engine {
    * way, which pausing cancels.
    */
   async close(): Promise<HandedOver> {
-    const { goal, meetings } = this.state;
+    const { goal, meetings } = this.core.state;
     const stopped: HandedOver = {
       meetings: meetings.filter((m) => m.status === "running").map((m) => m.id),
     };
     try {
-      if (goal.status === "active") await this.goals.pause();
+      if (goal.status === "active") await this.parts.goals.pause();
     } finally {
       await this.shut();
     }
@@ -249,7 +264,7 @@ export class Engine {
    * branches, then its folder. Its branch stays, yours to merge or delete.
    */
   async delete() {
-    await this.goals.delete();
+    await this.parts.goals.delete();
     await this.shut();
     await rm(this.core.places.root, { recursive: true, force: true });
   }
@@ -271,8 +286,8 @@ export class Engine {
    */
   private async shut() {
     try {
-      await Promise.all([this.scheduler.close(), this.meetings.close()]);
-      await Promise.all([this.writer.close(), this.records.flush()]);
+      await Promise.all([this.parts.scheduler.close(), this.parts.meetings.close()]);
+      await Promise.all([this.writer.close(), this.parts.records.flush()]);
     } finally {
       await stopRecording();
       releaseLock(this.files.lock);

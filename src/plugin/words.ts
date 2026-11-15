@@ -3,25 +3,25 @@
  * (status.ts), the pane, the band and the question dialog (pane.ts) all say a
  * thing the same way, from here.
  */
-import type { GoalEntry } from "../engine/data.ts";
-import type { Work } from "../engine/derive.ts";
-import { listOf } from "../shared/text.ts";
-import type { Notice } from "../engine/turns.ts";
 import {
-  hostOf,
   type DecisionOption,
+  type GoalEntry,
   type GoalState,
-  type Member,
+  hostOf,
   type Meeting,
   type MeetingNow,
+  type Member,
   type NoteOption,
+  type Notice,
   type Permission,
   type PermissionOption,
   type QuestionToYou,
   type Subtask,
   type SubtaskStatus,
   type Wait,
-} from "../engine/types.ts";
+  type Work,
+} from "../engine/index.ts";
+import { listOf } from "../shared/text.ts";
 
 export const plural = (n: number, one: string, many: string) =>
   `${String(n)} ${n === 1 ? one : many}`;

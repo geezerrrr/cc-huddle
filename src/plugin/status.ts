@@ -3,10 +3,16 @@
  * reads from the `status` tool and the SessionStart hook, and what
  * `/openplan status` prints. Ids are given in brackets, for the tools.
  */
-import type { GoalEntry } from "../engine/data.ts";
-import { derive, type Work } from "../engine/derive.ts";
-import { goalBranch } from "../engine/git.ts";
-import { toYou, type Derived, type QuestionToYou, type Subtask } from "../engine/types.ts";
+import {
+  derive,
+  type Derived,
+  goalBranch,
+  type GoalEntry,
+  type QuestionToYou,
+  type Subtask,
+  toYou,
+  type Work,
+} from "../engine/index.ts";
 import {
   entryLabel,
   hostText,

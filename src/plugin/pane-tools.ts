@@ -9,12 +9,16 @@
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { DECISION_OPTIONS, PERMISSION_OPTIONS, type PermissionOption } from "../engine/types.ts";
+import {
+  DECISION_OPTIONS,
+  PERMISSION_OPTIONS,
+  type PermissionOption,
+  SLUG,
+} from "../engine/index.ts";
 
 import type { PaneServer } from "./pane-server.ts";
 import type { Session } from "./session.ts";
 import { handOffText } from "./words.ts";
-import { SLUG } from "../engine/git.ts";
 import { toolText } from "../shared/text.ts";
 
 const isPermission = (option: string): option is PermissionOption =>
@@ -71,7 +75,7 @@ export function addPaneTools(server: McpServer, session: Session, pane: PaneServ
     ({ task }) => {
       const engine = session.current;
       return toolText(
-        handOffText(task, engine && { goal: engine.state.goal, members: engine.team.members }),
+        handOffText(task, engine && { goal: engine.work.goal, members: engine.team.members }),
       );
     },
   );
@@ -85,7 +89,7 @@ export function addPaneTools(server: McpServer, session: Session, pane: PaneServ
       },
     },
     async ({ goal: slug }) => {
-      const { goal } = (await session.takeUp(slug)).state;
+      const { goal } = (await session.takeUp(slug)).work;
       return toolText(`Resumed "${goal.name}".`);
     },
   );

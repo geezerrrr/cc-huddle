@@ -7,17 +7,18 @@
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { Team } from "../engine/core.ts";
-import { goalBranch } from "../engine/git.ts";
-import { planSchema, writtenPlan } from "../engine/plan.ts";
-
 import {
   DECISION_OPTIONS,
   GOAL_ACTIONS,
+  goalBranch,
   MEETING_SIZES,
-  SUBTASK_ACTIONS,
   type Member,
-} from "../engine/types.ts";
+  planSchema,
+  SUBTASK_ACTIONS,
+  type Team,
+  writtenPlan,
+} from "../engine/index.ts";
+
 import type { Session } from "./session.ts";
 import { othersText, statusText } from "./status.ts";
 import { attendanceText, plural, rosterOf, STATUS_WORDS } from "./words.ts";
@@ -89,7 +90,7 @@ export function addTools(server: McpServer, session: Session) {
       inputSchema: { name: z.string().trim().min(1).describe("A few words for what is wanted") },
     },
     async ({ name }) => {
-      const { goal } = (await session.start(name)).state;
+      const { goal } = (await session.start(name)).work;
       return toolText(`Started the goal "${goal.name}" on branch ${goalBranch(goal.slug)}.`);
     },
   );
@@ -122,7 +123,7 @@ export function addTools(server: McpServer, session: Session) {
       annotations: { readOnlyHint: true },
     },
     ({ meeting: id }) => {
-      const found = session.goal.state.meetings.find((m) => m.id === id);
+      const found = session.goal.work.meetings.find((m) => m.id === id);
       if (!found?.plan) throw new Error("That meeting has no plan");
       return toolText(JSON.stringify(writtenPlan(found.plan), null, 2));
     },
@@ -202,7 +203,7 @@ export function addTools(server: McpServer, session: Session) {
     },
     async ({ action }) => {
       const engine = session.goal;
-      const { name } = engine.state.goal;
+      const { name } = engine.work.goal;
       if (action === "delete") await session.delete();
       else await engine.goals[action]();
       return toolText(`The goal "${name}": ${action} done.`);
@@ -219,7 +220,7 @@ export function addTools(server: McpServer, session: Session) {
     async ({ subtask: id, action }) => {
       const engine = session.goal;
       await engine.scheduler.act(id, action);
-      const acted = engine.state.subtasks.find((s) => s.id === id);
+      const acted = engine.work.subtasks.find((s) => s.id === id);
       return toolText(
         acted ? `"${acted.title}" is ${STATUS_WORDS[acted.status]} now.` : "It is gone now.",
       );

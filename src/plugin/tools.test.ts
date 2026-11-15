@@ -11,6 +11,18 @@ import { runSubtask, type RunOutcome } from "../engine/run.ts";
 import { teamFolder } from "../engine/team.ts";
 import { Session } from "./session.ts";
 import { addTools } from "./tools.ts";
+import type { Core } from "../engine/core.ts";
+import type { Engine } from "../engine/engine.ts";
+import type { Questions } from "../engine/questions.ts";
+import type { Records } from "../engine/records.ts";
+import type { Scheduler } from "../engine/scheduler.ts";
+
+/** The engine's own state and parts, which a test sets work up through. */
+const inside = (engine: Engine) =>
+  engine as unknown as {
+    core: Core;
+    parts: { questions: Questions; scheduler: Scheduler; records: Records };
+  };
 
 vi.mock("../engine/run.ts", () => ({ runSubtask: vi.fn() }));
 
@@ -123,7 +135,7 @@ describe("tools", () => {
       description: "Two dice",
     });
     expect(assigned.text).toMatch(/^Assigned "Rules" \[.+\] to glm\.$/);
-    const [subtask] = goal().state.subtasks;
+    const [subtask] = goal().work.subtasks;
     expect(subtask?.status).toBe("running");
     const id = subtask?.id ?? "";
 
@@ -151,7 +163,7 @@ describe("tools", () => {
       dependsOn: [],
       acceptance: "",
     };
-    goal().state.meetings.push({
+    inside(goal()).core.state.meetings.push({
       id: "m1",
       agenda: "Dice",
       size: "small",
@@ -178,7 +190,7 @@ describe("tools", () => {
     expect((await call("approve_plan", { meeting: "m1" })).text).toBe(
       "Approved: 1 subtask goes to work.",
     );
-    expect(goal().state.subtasks).toMatchObject([{ title: "Rules", assignee: "sonnet" }]);
+    expect(goal().work.subtasks).toMatchObject([{ title: "Rules", assignee: "sonnet" }]);
   });
 
   it("act on the session's one goal: another starts only once it is paused, and it is deleted once archived", async () => {

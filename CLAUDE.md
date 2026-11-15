@@ -10,7 +10,7 @@ How openplan behaves is `docs/design.md`: change it first, then the code. This f
 
 - `src/shared/`: leaves any part uses (errors, whole-file writes and reads, pids, serial queues, text). They import nothing of openplan's.
 - `src/engine/`: knows nothing of Claude Code's interface or of the plugin. Its modules import `src/shared/` and each other, never `src/plugin/`.
-- `src/plugin/`: imports the engine only from `src/engine/index.ts`, the engine's one public surface, and `src/shared/`. Lint enforces it.
+- `src/plugin/`: imports the engine only from `src/engine/index.ts`, the engine's one public surface, and `src/shared/`; its tests may set work up through the engine's own modules. Lint enforces it.
 - `plugin/hooks/` (the mod): runs in Claude Code, imports `claude-code`, its own files and the types in `plugin/types/`; never `src/`.
 - A module imports only what its own job needs. No module imports another's internals to rebuild what that module could give.
 

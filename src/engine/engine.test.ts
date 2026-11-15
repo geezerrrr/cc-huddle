@@ -14,6 +14,16 @@ import { Goals } from "./goals.ts";
 import { runSubtask, type RunOutcome } from "./run.ts";
 import { readCopy, teamFolder } from "./team.ts";
 import { holderOf } from "./lock.ts";
+import type { Questions } from "./questions.ts";
+import type { Records } from "./records.ts";
+import type { Scheduler } from "./scheduler.ts";
+
+/** The engine's own state and parts, which a test sets work up through. */
+const inside = (engine: Engine) =>
+  engine as unknown as {
+    core: Core;
+    parts: { questions: Questions; scheduler: Scheduler; records: Records };
+  };
 
 vi.mock("./run.ts", () => ({ runSubtask: vi.fn() }));
 
@@ -104,7 +114,7 @@ afterEach(async () => {
 describe("Engine", () => {
   it("starts a goal in a folder of its own: its copy of the team, its branch and worktree, the lock", async () => {
     const engine = await start("Dice game");
-    const { goal } = engine.state;
+    const { goal } = engine.work;
     expect(goal).toMatchObject({ name: "Dice game", slug: "dice-game", status: "active" });
     expect(engine.team.members.map((m) => m.name)).toEqual(["glm"]);
     expect(engine.meetingSize).toBe("discussion");
@@ -133,7 +143,7 @@ describe("Engine", () => {
     await engine.goals.pause();
     await close(engine);
     const second = await start("Dice game");
-    expect(second.state.goal.slug).toBe("dice-game-2");
+    expect(second.work.goal.slug).toBe("dice-game-2");
     const refs = await git({ cwd: repo }, [
       "for-each-ref",
       "--format=%(refname:short)",
@@ -204,15 +214,15 @@ describe("Engine", () => {
     expect(await close(engine)).toEqual({ meetings: [] });
     expect(await saved("dice")).toMatchObject({ state: { goal: { status: "paused" } } });
     expect(holderOf(filesOf("dice").lock)).toBeUndefined();
-    engine.state.goal.name = "Gone";
-    (engine as unknown as { core: Core }).core.changed();
+    inside(engine).core.state.goal.name = "Gone";
+    inside(engine).core.changed();
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(await saved("dice")).toMatchObject({ state: { goal: { name: "Dice" } } });
   });
 
   it("lets its goal go even when stopping what runs fails", async () => {
     const engine = await start();
-    vi.spyOn(engine.scheduler, "close").mockRejectedValueOnce(new Error("stuck"));
+    vi.spyOn(inside(engine).parts.scheduler, "close").mockRejectedValueOnce(new Error("stuck"));
     await expect(close(engine)).rejects.toThrow("stuck");
     expect(holderOf(filesOf("dice").lock)).toBeUndefined();
   });
@@ -251,7 +261,7 @@ describe("Engine", () => {
     });
     other.kill();
     expect(asked).toEqual(["there dice"]);
-    expect(engine.state.goal.status).toBe("active");
+    expect(engine.work.goal.status).toBe("active");
     expect(holderOf(files.lock)).toMatchObject({ session: 41, address: "here" });
     await expect(takeUp("chess")).rejects.toThrow('There is no goal "chess"');
   });
@@ -302,7 +312,7 @@ describe("Engine", () => {
     was.state.subtasks.push(subtask);
     await writeFile(filesOf("dice").state, JSON.stringify(was));
     const again = await takeUp("dice");
-    expect(again.state.goal.status).toBe("active");
+    expect(again.work.goal.status).toBe("active");
     await vi.waitFor(() => {
       expect(runSubtask).toHaveBeenCalledWith(
         expect.objectContaining({ resume: "glm-1" }) as unknown,
@@ -328,7 +338,7 @@ describe("Engine", () => {
   it("answers a question put to you and carries out the decision", async () => {
     const engine = await start();
     await engine.goals.pause();
-    engine.state.tasks.push({
+    inside(engine).core.state.tasks.push({
       id: "t1",
       title: "Game",
       outcome: "",
@@ -346,9 +356,9 @@ describe("Engine", () => {
       progress: { done: 0, total: 0 },
       tokens: 0,
     };
-    engine.state.subtasks.push(subtask);
-    engine.questions.openDecision(subtask, DECISIONS.delivery(), "Game");
-    const [question] = engine.state.questions;
+    inside(engine).core.state.subtasks.push(subtask);
+    inside(engine).parts.questions.openDecision(subtask, DECISIONS.delivery(), "Game");
+    const [question] = engine.work.questions;
     await expect(
       engine.answer(question?.id ?? "", { kind: "decision", option: "revise" }),
     ).rejects.toThrow("doesn't fit");
@@ -357,8 +367,8 @@ describe("Engine", () => {
       option: "revise",
       note: "Bigger dice",
     });
-    expect(engine.state.questions).toEqual([]);
-    expect(engine.state.subtasks[0]).toMatchObject({
+    expect(engine.work.questions).toEqual([]);
+    expect(engine.work.subtasks[0]).toMatchObject({
       status: "pending",
       goOn: [{ why: "revised", note: "Bigger dice" }],
     });
