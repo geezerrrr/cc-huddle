@@ -27355,7 +27355,7 @@ function can(machine, state, event) {
 }
 
 // src/engine/derive.ts
-var openQuestions = (state, subtaskId) => state.questions.filter((q) => q.subtaskId === subtaskId && q.status === "open");
+var openQuestions = (state, subtaskId) => state.questions.filter((q) => q.subtaskId === subtaskId);
 var isActive = (state) => state.goal.status === "active";
 function reviewerOf(state, subtask) {
   const meetingId = state.tasks.find((t) => t.id === subtask.taskId)?.meetingId;
@@ -27365,7 +27365,7 @@ function reviewerOf(state, subtask) {
 }
 function acceptanceOf(state, taskId) {
   return state.questions.find(
-    (q) => q.status === "open" && q.kind === "decision" && q.decision.kind === "delivery" && state.subtasks.find((s) => s.id === q.subtaskId)?.taskId === taskId
+    (q) => q.kind === "decision" && q.decision.kind === "delivery" && state.subtasks.find((s) => s.id === q.subtaskId)?.taskId === taskId
   );
 }
 var underReview = (state, subtask) => subtask.status === "reviewing" && isActive(state) && !openQuestions(state, subtask.id).some((q) => q.kind === "decision");
@@ -27615,7 +27615,7 @@ function statusText(work) {
     for (const subtask of work.subtasks.filter((s) => s.taskId === task.id))
       lines.push(subtaskLine(subtask, derived2.subtasks[subtask.id]?.waits ?? [], work));
   }
-  const open2 = work.questions.filter(toYou).filter((q) => q.status === "open");
+  const open2 = work.questions.filter(toYou);
   if (open2.length) lines.push("", "Waiting on you:", ...open2.map((q) => questionLine(q, work)));
   return lines.join("\n");
 }

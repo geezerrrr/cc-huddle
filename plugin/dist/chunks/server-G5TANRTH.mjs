@@ -8016,10 +8016,6 @@ var SUBTASK_MACHINE = {
   /** Done, then redone in its session: its upstream changed, you added to it, or you sent its task back. */
   redo: { from: ["done"], to: "pending" }
 };
-var QUESTION_MACHINE = {
-  answer: { from: ["open"], to: "answered" },
-  cancel: { from: ["open"], to: "cancelled" }
-};
 function can(machine, state, event) {
   return machine[event]?.from.includes(state) ?? false;
 }
@@ -8030,7 +8026,7 @@ function step(machine, state, event) {
 }
 
 // src/engine/derive.ts
-var openQuestions = (state, subtaskId) => state.questions.filter((q) => q.subtaskId === subtaskId && q.status === "open");
+var openQuestions = (state, subtaskId) => state.questions.filter((q) => q.subtaskId === subtaskId);
 var isActive = (state) => state.goal.status === "active";
 function reviewerOf(state, subtask2) {
   const meetingId = state.tasks.find((t) => t.id === subtask2.taskId)?.meetingId;
@@ -8040,7 +8036,7 @@ function reviewerOf(state, subtask2) {
 }
 function acceptanceOf(state, taskId) {
   return state.questions.find(
-    (q) => q.status === "open" && q.kind === "decision" && q.decision.kind === "delivery" && state.subtasks.find((s) => s.id === q.subtaskId)?.taskId === taskId
+    (q) => q.kind === "decision" && q.decision.kind === "delivery" && state.subtasks.find((s) => s.id === q.subtaskId)?.taskId === taskId
   );
 }
 var underReview = (state, subtask2) => subtask2.status === "reviewing" && isActive(state) && !openQuestions(state, subtask2.id).some((q) => q.kind === "decision");
@@ -8336,7 +8332,7 @@ function statusText(work) {
     for (const subtask2 of work.subtasks.filter((s) => s.taskId === task.id))
       lines.push(subtaskLine(subtask2, derived.subtasks[subtask2.id]?.waits ?? [], work));
   }
-  const open2 = work.questions.filter(toYou).filter((q) => q.status === "open");
+  const open2 = work.questions.filter(toYou);
   if (open2.length) lines.push("", "Waiting on you:", ...open2.map((q) => questionLine(q, work)));
   return lines.join("\n");
 }
@@ -8540,7 +8536,7 @@ function taskLines(work, derived) {
   for (const task of work.tasks) {
     const subtasks = work.subtasks.filter((s) => s.taskId === task.id);
     const accepting = work.questions.some(
-      (q) => q.kind === "decision" && q.decision.kind === "delivery" && q.status === "open" && subtasks.some((s) => s.id === q.subtaskId)
+      (q) => q.kind === "decision" && q.decision.kind === "delivery" && subtasks.some((s) => s.id === q.subtaskId)
     );
     const where = accepting ? "waits for you to accept it" : taskWhere(work, derived, subtasks);
     if (where) lines.push(`${task.title} \xB7 ${where}`);
@@ -8586,7 +8582,7 @@ function paneTeam(mine, others, moved) {
   }
   const { work, members } = mine;
   const derived = derive(work);
-  const needs = work.questions.filter(toYou).filter((q) => q.status === "open").map((q) => needOf(q, work));
+  const needs = work.questions.filter(toYou).map((q) => needOf(q, work));
   const meeting2 = shownMeeting(work);
   const { goal } = work;
   const here = goal.status === "active" ? [] : [{ slug: goal.slug, label: goalLabel(work, `${goal.status}, in this session`) }];
@@ -9793,7 +9789,6 @@ async function listGoals(repoFolder2) {
 }
 
 // src/engine/engine.ts
-import { randomUUID as randomUUID4 } from "node:crypto";
 import { existsSync } from "node:fs";
 import { rm as rm3 } from "node:fs/promises";
 import path12 from "node:path";
@@ -9831,7 +9826,6 @@ var Goals = class {
       const { goal } = this;
       if (goal.status === "archived") return;
       goal.status = step(GOAL_MACHINE, goal.status, "archive");
-      goal.archivedAt = Date.now();
       this.hold(true);
     });
   }
@@ -9889,7 +9883,6 @@ var Goals = class {
     const { goal } = this;
     if (goal.status === "active") return false;
     goal.status = step(GOAL_MACHINE, goal.status, "resume");
-    goal.archivedAt = void 0;
     return true;
   }
   get goal() {
@@ -9958,10 +9951,7 @@ var quiet = (meeting2) => Object.assign(meeting2, {
   weighing: void 0,
   hands: void 0
 });
-var meetingMembers = ({
-  participants,
-  hostOnly
-}) => hostOnly ? participants.slice(1) : participants;
+var meetingMembers = ({ participants, hostOnly }) => hostOnly ? participants.slice(1) : participants;
 function nextMove(meeting2) {
   const { turns, participants, size } = meeting2;
   const last = turns.at(-1);
@@ -10005,8 +9995,7 @@ var Meetings = class {
       ...call.hostOnly && { hostOnly: true },
       status: "running",
       turns: [],
-      tokens: 0,
-      createdAt: Date.now()
+      tokens: 0
     };
     core.state.meetings.push(meeting2);
     core.changed();
@@ -10040,16 +10029,14 @@ var Meetings = class {
     return this.ongoing.get(id);
   }
   /**
-   * Your changes to a plan under review: `raw` is the whole plan, which may
-   * give work to any member and names the tasks you accept (planSchema).
-   * Dependencies that loop are refused.
+   * Your changes to a plan under review: `plan` is the whole plan, which may
+   * give work to any member and names the tasks you accept, as the
+   * change_plan tool took it (planSchema). Dependencies that loop are refused.
    */
-  change(id, raw) {
-    const { core } = this;
+  change(id, plan) {
     const { meeting: meeting2 } = this.underReview(id, "change");
-    const names = core.team.members.map((m) => m.name);
-    meeting2.plan = soundPlan(planSchema(z7.enum(names)).parse(raw), "refuse");
-    core.changed();
+    meeting2.plan = soundPlan(plan, "refuse");
+    this.core.changed();
   }
   /**
    * Approves a plan under review: its document is saved in the goal's folder,
@@ -10130,81 +10117,81 @@ var Meetings = class {
   }
   async run(meeting2, signal) {
     const { core } = this;
-    const named = (names) => names.flatMap((name) => core.team.members.filter((m) => m.name === name));
-    const [host, ...others] = named(meeting2.participants);
-    const [member, ...more] = named(meetingMembers(meeting2));
-    const { goal } = core.state;
-    if (!host || !member) return;
-    let ctx = {
-      meeting: meeting2,
-      goal,
-      attendees: [host, ...others],
-      members: [member, ...more],
-      cwd: ""
-    };
-    const ask = async (member2, prompt, turn = {}) => {
-      const heard = turn.heard ?? meeting2.turns.length;
-      const options = core.options(member2, "readOnly", ctx.cwd);
-      const seat = meeting2.seats?.[member2.name];
-      const reply = await askOnce({
-        prompt,
-        options: {
-          ...options,
-          ...seat && { resume: seat.session },
-          ...turn.tool && {
-            mcpServers: { ...options.mcpServers, [TURN_SERVER]: turn.tool.server },
-            allowedTools: [turn.tool.name]
-          }
-        },
-        ...turn.schema && { schema: turn.schema },
-        signal: turn.signal ?? signal,
-        ...turn.listener && { listener: turn.listener }
-      });
-      meeting2.seats = { ...meeting2.seats, [member2.name]: { session: reply.session, heard } };
-      meeting2.tokens += reply.tokens;
-      return reply;
-    };
-    const speak = async (member2, prompt, turn = {}) => {
-      const { saying, ...asked2 } = turn;
-      meeting2.speaking = member2.name;
-      meeting2.planning = turn.schema !== void 0;
-      core.changed();
-      const speech = core.speech(meeting2, member2.name);
-      let words = "";
-      try {
-        return await ask(member2, prompt, {
-          ...asked2,
-          listener: {
-            ...speech,
-            text: (delta, fresh2) => {
-              speech.text?.(delta, fresh2);
-              words = fresh2 ? delta : words + delta;
-              saying?.(words);
-            }
-          }
-        });
-      } finally {
-        meeting2.speaking = void 0;
-        meeting2.planning = void 0;
-      }
-    };
-    const said = (speaker, { text: text2, tokens }, phase, calls) => {
-      meeting2.turns.push({
-        speaker: speaker.name,
-        text: text2,
-        at: Date.now(),
-        phase,
-        tokens,
-        ...calls !== void 0 && { calls }
-      });
-      core.changed();
-    };
-    const attendee = (name) => {
-      const found = ctx.attendees.find((m) => m.name === name);
-      if (!found) throw new Error(`${name} isn't at this meeting`);
-      return found;
-    };
     try {
+      const named = (names2) => names2.flatMap((name) => core.team.members.filter((m) => m.name === name));
+      const [host, ...others] = named(meeting2.participants);
+      const [member, ...more] = named(meetingMembers(meeting2));
+      const { goal } = core.state;
+      if (!host || !member) throw new Error("The meeting's host or members aren't on the team");
+      let ctx = {
+        meeting: meeting2,
+        goal,
+        attendees: [host, ...others],
+        members: [member, ...more],
+        cwd: ""
+      };
+      const ask = async (member2, prompt, turn = {}) => {
+        const heard = turn.heard ?? meeting2.turns.length;
+        const options = core.options(member2, "readOnly", ctx.cwd);
+        const seat = meeting2.seats?.[member2.name];
+        const reply = await askOnce({
+          prompt,
+          options: {
+            ...options,
+            ...seat && { resume: seat.session },
+            ...turn.tool && {
+              mcpServers: { ...options.mcpServers, [TURN_SERVER]: turn.tool.server },
+              allowedTools: [turn.tool.name]
+            }
+          },
+          ...turn.schema && { schema: turn.schema },
+          signal: turn.signal ?? signal,
+          ...turn.listener && { listener: turn.listener }
+        });
+        meeting2.seats = { ...meeting2.seats, [member2.name]: { session: reply.session, heard } };
+        meeting2.tokens += reply.tokens;
+        return reply;
+      };
+      const speak = async (member2, prompt, turn = {}) => {
+        const { saying, ...asked2 } = turn;
+        meeting2.speaking = member2.name;
+        meeting2.planning = turn.schema !== void 0;
+        core.changed();
+        const speech = core.speech(meeting2, member2.name);
+        let words = "";
+        try {
+          return await ask(member2, prompt, {
+            ...asked2,
+            listener: {
+              ...speech,
+              text: (delta, fresh2) => {
+                speech.text?.(delta, fresh2);
+                words = fresh2 ? delta : words + delta;
+                saying?.(words);
+              }
+            }
+          });
+        } finally {
+          meeting2.speaking = void 0;
+          meeting2.planning = void 0;
+        }
+      };
+      const said = (speaker, { text: text2, tokens }, phase, calls) => {
+        meeting2.turns.push({
+          speaker: speaker.name,
+          text: text2,
+          at: Date.now(),
+          phase,
+          tokens,
+          ...calls !== void 0 && { calls }
+        });
+        core.changed();
+      };
+      const attendee = (name) => {
+        const found = ctx.attendees.find((m) => m.name === name);
+        if (!found) throw new Error(`${name} isn't at this meeting`);
+        return found;
+      };
       ctx = { ...ctx, cwd: await openGoal(core.places, goal.slug) };
       const answer = async (name) => {
         const member2 = attendee(name);
@@ -10441,12 +10428,10 @@ var Questions = class {
    * task sent back without what to change, or with a subtask not done in it.
    */
   answer(id, answer) {
-    const question = this.inbox.state.questions.find(
-      (q) => q.id === id && q.kind !== "teammate" && q.status === "open"
-    );
+    const question = this.inbox.state.questions.find((q) => q.id === id && q.kind !== "teammate");
     if (!question) throw new Error("That question is no longer open.");
     if (!this.fits(question, answer)) throw new Error("That answer doesn't fit the question.");
-    this.close(question, "answer", answer);
+    this.close(question, answer);
     return question;
   }
   /**
@@ -10460,7 +10445,7 @@ var Questions = class {
     try {
       return await answering();
     } finally {
-      if (question.status === "open") this.close(question, "answer");
+      if (this.inbox.state.questions.includes(question)) this.close(question);
     }
   }
   /**
@@ -10578,7 +10563,7 @@ var Questions = class {
     const question = this.open(asker, ask);
     return new Promise((resolve) => {
       const callOff = () => {
-        this.close(question, "cancel");
+        this.close(question);
       };
       asker.signal.addEventListener("abort", callOff, { once: true });
       this.waiting.set(question.id, (answer) => {
@@ -10593,8 +10578,6 @@ var Questions = class {
       id: randomUUID2(),
       ...asker.subtaskId !== void 0 && { subtaskId: asker.subtaskId },
       from: asker.from,
-      status: "open",
-      createdAt: Date.now(),
       ...ask
     };
     this.inbox.state.questions.push(question);
@@ -10603,12 +10586,11 @@ var Questions = class {
   }
   /** Calls off every open question that `which` picks. */
   cancelAll(which) {
-    const picked = this.inbox.state.questions.filter((q) => q.status === "open" && which(q));
-    for (const question of picked) this.close(question, "cancel");
+    const picked = this.inbox.state.questions.filter(which);
+    for (const question of picked) this.close(question);
   }
   /** Answers or calls off a question: it leaves the state, and whoever waits on it hears. */
-  close(question, event, answer) {
-    question.status = step(QUESTION_MACHINE, question.status, event);
+  close(question, answer) {
     this.waiting.get(question.id)?.(answer);
     this.waiting.delete(question.id);
     this.inbox.state.questions = this.inbox.state.questions.filter((q) => q !== question);
@@ -10903,7 +10885,6 @@ var Scheduler = class {
    */
   assign(tasks, meetingId) {
     const { state } = this.core;
-    const now = Date.now();
     const ids = /* @__PURE__ */ new Map();
     const added = tasks.flatMap(({ title, outcome, ownerAccepts, subtasks }) => {
       const task = {
@@ -10911,7 +10892,6 @@ var Scheduler = class {
         title,
         outcome,
         ownerAccepts,
-        createdAt: now,
         ...meetingId !== void 0 && { meetingId }
       };
       state.tasks.push(task);
@@ -10923,7 +10903,6 @@ var Scheduler = class {
           id,
           taskId: task.id,
           status: "pending",
-          createdAt: now,
           progress: { done: 0, total: 0 },
           tokens: 0
         };
@@ -11531,7 +11510,7 @@ var Engine = class _Engine {
       const places = { repo, root: folder };
       await openGoal(places, slug);
       const state = {
-        goal: { id: randomUUID4(), name, slug, status: "active", createdAt: Date.now() },
+        goal: { name, slug, status: "active", createdAt: Date.now() },
         tasks: [],
         subtasks: [],
         meetings: [],
