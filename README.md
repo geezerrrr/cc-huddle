@@ -98,8 +98,8 @@ The members meet, and the host writes a plan of tasks with owners, dependencies 
 
 - `@sonnet put the scoreboard top right` passes a member a message, in their session.
 - `/openplan` with no task opens the pane: the meeting as it goes, each member at what they do (select one to follow their record), and what needs you, answered there with a button. Permissions are granted only there, by you.
-- `/openplan status` prints where the team stands.
-- The band above the prompt says what goes on: `openplan · meeting · 3 working · 1 needs you`.
+- `/openplan status` prints where the team stands; `/openplan pause` and `/openplan resume` pause or resume every goal at once.
+- The band above the prompt says what goes on: `openplan · meeting · 3 working · 1 needs you`, with a line for each task not yet done.
 
 The team runs while your session does. Closing the session pauses its goals; resume the session and a goal to go on where it stopped.
 
@@ -108,7 +108,7 @@ openplan works only on `openplan/*` branches: each goal has `openplan/<goal>/mai
 ## What runs, and what it may do
 
 - **Processes and tokens.** Each member's turn is a Claude Code process of its own, started by the plugin's MCP server: one per running subtask, review and meeting turn, several at once. Each uses tokens on its member's provider; the pane shows how many each member has used.
-- **Settings.** A member loads your user and project Claude Code settings, as any session of yours does, with the team's `settings.json` and its own `env` on top. Meetings, answers to teammates and reviews run read-only, with none of your MCP servers. Unless `settings.json` says otherwise, it edits freely in its worktree (`acceptEdits`) and runs commands in Claude Code's sandbox. A call its rules don't allow waits for you in the pane, and so does any git command that writes: members leave committing to delivery.
+- **Settings.** A member loads your user and project Claude Code settings, as any session of yours does, with the team's `settings.json` and its own `env` on top. Meetings, answers to teammates and reviews run read-only, with none of your MCP servers. Working, a member is in your session's permission mode, switched with it, unless `settings.json` sets `permissions.defaultMode`; openplan adds no default of its own. A call Claude Code asks about waits for you in the pane, and so does any git command that writes: members leave committing to delivery.
 - **Who answers.** Permissions and members' questions are answered in the pane, by you: the plugin keeps your session's model from the pane's tools. That guard is one of the plugin's hooks, so where `allowManagedHooksOnly` keeps a user's plugins from loading hooks, install openplan as a managed plugin. `claude -p` draws no pane: what needs you waits for an interactive session.
 - **Uninstalling** removes the plugin's data folder, worktrees included, and with them any work a member hasn't delivered. Delivered work stays on the `openplan/*` branches. `claude plugin uninstall openplan --keep-data` keeps the folder.
 
