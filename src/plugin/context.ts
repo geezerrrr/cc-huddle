@@ -33,7 +33,9 @@ export async function sessionContext(
   if (mine && "state" in mine) {
     const { team } = await readCopy(goalFiles(goalFolder(root, mine.slug)).team);
     // Read from the goal's file: what is under way is the server's, not known here.
-    const status = statusText(workOf({ state: mine.state, team, underWay: () => [] }));
+    const status = statusText(
+      workOf({ state: mine.state, team, underWay: () => [], meetingsNow: () => ({}) }),
+    );
     parts.push(
       `This session runs openplan's goal "${mine.state.goal.name}", as it stands:\n\n${status}`,
     );

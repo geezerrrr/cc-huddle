@@ -72,6 +72,7 @@ beforeEach(async () => {
     recorder: () => ({}),
     speech: () => ({}),
     underWay: () => scheduler.underWay(),
+    meetingsNow: () => ({}),
   };
   questions = new Questions(core);
   scheduler = new Scheduler(core, questions);

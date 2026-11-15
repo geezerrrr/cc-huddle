@@ -60,7 +60,8 @@ function viewer(session: () => Session) {
       revision++;
     }
     const meeting = mine && shownMeeting(mine.work);
-    const spoken = meeting && engine.records.speaking(meeting);
+    const speaker = meeting && mine.work.meetingsNow[meeting.id]?.speaking?.member;
+    const spoken = speaker !== undefined && meeting && engine.records.speaking(meeting);
     const { record } = asked;
     const read = record && engine && (await engine.records.read(record.subtask, record.from));
     return {
@@ -68,7 +69,7 @@ function viewer(session: () => Session) {
       ...(asked.revision !== revision && { team }),
       ...(spoken && {
         speaking: {
-          speaker: spoken.speaker,
+          speaker,
           entries: viewEntries(spoken.entries),
           live: viewLive(spoken.live),
         },

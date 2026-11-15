@@ -46,6 +46,7 @@ import {
 import type {
   Meeting,
   MeetingHand,
+  MeetingNow,
   MeetingSize,
   MeetingTurn,
   Member,
@@ -110,16 +111,6 @@ const floorTool = (
     ),
   );
 
-/** A meeting no longer under way: nobody speaks, writes the plan, forms a judgment, weighs it or has a hand up. */
-const quiet = (meeting: Meeting) =>
-  Object.assign(meeting, {
-    speaking: undefined,
-    planning: undefined,
-    drafting: undefined,
-    weighing: undefined,
-    hands: undefined,
-  });
-
 /** Who takes part as a member (§4.2): everyone at it, but a host who only runs it. */
 const meetingMembers = ({ participants, hostOnly }: Pick<Meeting, "participants" | "hostOnly">) =>
   hostOnly ? participants.slice(1) : participants;
@@ -168,11 +159,16 @@ interface MeetingCall {
   hostOnly?: boolean;
 }
 
+/** A meeting under way: how to stop it, when it has ended, and what goes on at it. */
+interface Live {
+  abort: AbortController;
+  ended: Promise<void>;
+  now: MeetingNow;
+}
+
 export class Meetings {
-  /** Meeting id → stops its run. */
-  private aborts = new Map<string, AbortController>();
-  /** Meeting id → its run, settling once it has ended. */
-  private ongoing = new Map<string, Promise<void>>();
+  /** Meeting id → its run under way. */
+  private live = new Map<string, Live>();
 
   constructor(
     private readonly core: Core,
@@ -234,8 +230,9 @@ export class Meetings {
     }
     if (!can(MEETING_MACHINE, meeting.status, "cancel"))
       throw new Error(`The meeting is ${meeting.status}: there is nothing to cancel`);
-    this.aborts.get(id)?.abort();
-    await this.ongoing.get(id);
+    const live = this.live.get(id);
+    live?.abort.abort();
+    await live?.ended;
   }
 
   /**
@@ -269,24 +266,27 @@ export class Meetings {
     return this.scheduler.assign(plan.tasks, meeting.id);
   }
 
+  /** What goes on at each meeting under way, by its id. */
+  now(): Record<string, MeetingNow> {
+    return Object.fromEntries([...this.live].map(([id, live]) => [id, live.now]));
+  }
+
   /** Settles once no meeting is under way: one being cancelled has ended. */
   async settled() {
-    await Promise.all(this.ongoing.values());
+    await Promise.all([...this.live.values()].map((live) => live.ended));
   }
 
   /** Stops every meeting under way, as cancelled; settles once they have ended. */
   async close() {
-    for (const abort of this.aborts.values()) abort.abort();
-    await Promise.all(this.ongoing.values());
+    for (const live of this.live.values()) live.abort.abort();
+    await this.settled();
   }
 
   /** After a restart no meeting is under way: one that was is cancelled, to go on from where it was. */
   recover() {
-    for (const meeting of this.core.state.meetings) {
-      if (meeting.status !== "running") continue;
-      meeting.status = step(MEETING_MACHINE, meeting.status, "cancel");
-      quiet(meeting);
-    }
+    for (const meeting of this.core.state.meetings)
+      if (meeting.status === "running")
+        meeting.status = step(MEETING_MACHINE, meeting.status, "cancel");
   }
 
   /**
@@ -327,15 +327,14 @@ export class Meetings {
   /** Runs a meeting, kept as under way until it ends. */
   private track(meeting: Meeting) {
     const abort = new AbortController();
-    this.aborts.set(meeting.id, abort);
-    const run = this.run(meeting, abort.signal).finally(() => {
-      this.aborts.delete(meeting.id);
-      this.ongoing.delete(meeting.id);
+    const now: MeetingNow = { hands: [] };
+    const ended = this.run(meeting, now, abort.signal).finally(() => {
+      this.live.delete(meeting.id);
     });
-    this.ongoing.set(meeting.id, run);
+    this.live.set(meeting.id, { abort, ended, now });
   }
 
-  private async run(meeting: Meeting, signal: AbortSignal) {
+  private async run(meeting: Meeting, now: MeetingNow, signal: AbortSignal) {
     const { core } = this;
     try {
       // All there: admit() has just checked, and nothing was awaited since.
@@ -405,11 +404,9 @@ export class Meetings {
         } = {},
       ) => {
         const { saying, ...asked } = turn;
-        meeting.speaking = member.name;
         // The closing turn hands the plan back in its shape, with no words to stream.
-        meeting.planning = turn.schema !== undefined;
-        core.changed();
-        const speech = core.speech(meeting, member.name);
+        now.speaking = { member: member.name, planning: turn.schema !== undefined };
+        const speech = core.speech(meeting);
         let words = "";
         try {
           return await ask(member, prompt, {
@@ -424,8 +421,7 @@ export class Meetings {
             },
           });
         } finally {
-          meeting.speaking = undefined;
-          meeting.planning = undefined;
+          now.speaking = undefined;
         }
       };
       const said = (speaker: Member, text: string, phase: MeetingTurn["phase"], calls?: string) => {
@@ -448,21 +444,20 @@ export class Meetings {
       /** Whoever has the floor speaks: about what they raised their hand for, if they did. */
       const answer = async (name: string) => {
         const member = attendee(name);
-        const point = meeting.hands?.find((hand) => hand.member === name)?.point;
-        meeting.hands = undefined;
+        const point = now.hands.find((hand) => hand.member === name)?.point;
+        now.hands = [];
         said(member, (await speak(member, meetingAnswer(ctx, member, point))).text, "answer");
       };
       /**
-       * Each of `who` at once, with `flag` up meanwhile: one failing stops
+       * Each of `who` at once, doing `what` meanwhile: one failing stops
        * the others, and fails the lot.
        */
       const allAtOnce = async (
         who: Member[],
-        flag: "weighing" | "drafting",
+        what: NonNullable<MeetingNow["together"]>,
         each: (member: Member, signal: AbortSignal) => Promise<unknown>,
       ) => {
-        meeting[flag] = true;
-        core.changed();
+        now.together = what;
         const stop = new AbortController();
         const together = AbortSignal.any([signal, stop.signal]);
         const settled = await Promise.allSettled(
@@ -473,23 +468,21 @@ export class Meetings {
             }),
           ),
         );
-        meeting[flag] = undefined;
-        core.changed();
+        now.together = undefined;
         const failed = settled.find((r) => r.status === "rejected");
         if (failed) throw failed.reason;
       };
       /** Those who may speak next each decide whether to. */
       const weigh = (who: Member[]) => {
-        meeting.hands = [];
+        now.hands = [];
         return allAtOnce(who, "weighing", (member, weighing) =>
           ask(member, meetingHand(ctx, member), {
             signal: weighing,
             tool: handTool((hand) => {
-              meeting.hands = [
-                ...(meeting.hands ?? []).filter((h) => h.member !== member.name),
+              now.hands = [
+                ...now.hands.filter((h) => h.member !== member.name),
                 { member: member.name, ...hand },
               ];
-              core.changed();
             }),
           }),
         );
@@ -516,7 +509,7 @@ export class Meetings {
         let saying = "";
         // What the host says before handing the floor over is said to the room, as what follows is.
         let before = "";
-        const steer = await speak(host, meetingSteer(ctx, left), {
+        const steer = await speak(host, meetingSteer(ctx, left, now.hands), {
           tool: floorTool(others, (given) => {
             floor = given;
             before = saying.trim();
@@ -553,7 +546,7 @@ export class Meetings {
             talking = await discuss(move.left);
         }
       }
-      meeting.hands = undefined;
+      now.hands = [];
       // Who gets work in the plan: a host who only runs the meeting gets none.
       const names = ctx.members.map((m) => m.name) as [string, ...string[]];
       const schema = hostPlanSchema(names);
@@ -571,7 +564,6 @@ export class Meetings {
         if (!signal.aborted) meeting.error = errorText(error);
       }
     } finally {
-      quiet(meeting);
       core.changed();
       // Its attendees are free again.
       this.scheduler.pump();

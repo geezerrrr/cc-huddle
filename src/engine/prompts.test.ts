@@ -196,9 +196,8 @@ describe("meeting prompts", () => {
         turn("glm", "x", "round"),
         turn("glm", "y", "answer"),
       ],
-      hands: [{ member: "glm", point: "Use canvas", to: "sonnet" }],
     });
-    const steer = meetingSteer(ctx, 1);
+    const steer = meetingSteer(ctx, 1, [{ member: "glm", point: "Use canvas", to: "sonnet" }]);
     expect(steer).toContain("Hands up:\n- glm (to sonnet): Use canvas");
     expect(steer).toContain("Times each has had the floor in the discussion: glm 1.");
     expect(steer).toContain("You can give the floor 1 more time at most.");
@@ -210,10 +209,10 @@ describe("meeting prompts", () => {
     expect(meetingRound(brief({ turns: [turn("sonnet", "?", "opening")] }), sonnet)).toMatch(
       /You opened with:\n\?/,
     );
-    expect(meetingSteer(ctx(false), 1)).toContain("yours among them");
-    expect(meetingSteer(ctx(false), 1)).toContain("You're also a member");
-    expect(meetingSteer(ctx(true), 1)).toContain("without taking a side");
-    expect(meetingSteer(ctx(true), 1)).not.toContain("You're also a member");
+    expect(meetingSteer(ctx(false), 1, [])).toContain("yours among them");
+    expect(meetingSteer(ctx(false), 1, [])).toContain("You're also a member");
+    expect(meetingSteer(ctx(true), 1, [])).toContain("without taking a side");
+    expect(meetingSteer(ctx(true), 1, [])).not.toContain("You're also a member");
     expect(meetingOpening(brief({ hostOnly: true }))).toMatch(
       /^You're only running this; you're not one of its members and take no work in the planning meeting\./,
     );

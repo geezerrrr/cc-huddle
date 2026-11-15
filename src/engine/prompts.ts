@@ -9,6 +9,7 @@ import {
   type Goal,
   type GoOn,
   type Meeting,
+  type MeetingHand,
   type MeetingSize,
   type Member,
   type Subtask,
@@ -291,13 +292,14 @@ ${news(ctx, member)}
 You have the floor${point ? `, for what you raised your hand about: ${point}` : ": the host has called on you"}. Say it to the person it's for and take up what they actually said. Agree only where you have a reason of your own; if you disagree, say so and why; don't make up a disagreement. Keep to what the meeting settles: don't add what an interface should hold or how you'll build your piece. ${SPOKEN}`;
 }
 
-/** The host gives the floor, or ends the discussion; `left`: how many more times they can give it. */
-export function meetingSteer(ctx: MeetingBrief, left: number) {
+/**
+ * The host gives the floor, or ends the discussion: `left`, how many more
+ * times they can give it; `raised`, the hands up.
+ */
+export function meetingSteer(ctx: MeetingBrief, left: number, raised: readonly MeetingHand[]) {
   const { meeting, attendees } = ctx;
   const host = attendees[0];
-  const hands = (meeting.hands ?? []).map(
-    (h) => `- ${h.member}${h.to ? ` (to ${h.to})` : ""}: ${h.point}`,
-  );
+  const hands = raised.map((h) => `- ${h.member}${h.to ? ` (to ${h.to})` : ""}: ${h.point}`);
   const had = attendees
     .slice(1)
     .map(

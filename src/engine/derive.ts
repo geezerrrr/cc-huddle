@@ -11,6 +11,7 @@ import {
   isHalted,
   type Derived,
   type Meeting,
+  type MeetingNow,
   type Subtask,
   type SubtaskAction,
   type GoalState,
@@ -18,13 +19,15 @@ import {
 } from "./types.ts";
 
 /**
- * What the rules read: the state, the team's members in their order, and the
- * subtasks whose review or merge is under way, which the state doesn't keep:
- * after a restart none is.
+ * What the rules read: the state, the team's members in their order, and
+ * what is under way, which the state doesn't keep (after a restart none is):
+ * the subtasks whose review or merge is, and what goes on at each running
+ * meeting, by its id.
  */
 export interface Work extends GoalState {
   members: readonly string[];
   underWay: readonly string[];
+  meetingsNow: Readonly<Record<string, MeetingNow>>;
 }
 
 const openQuestions = (state: Pick<GoalState, "questions">, subtaskId: string) =>

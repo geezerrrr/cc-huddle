@@ -186,8 +186,9 @@ export class Engine {
       allowAlways: (rules) => engine.allow(rules),
       options: (member, kind, cwd) => engine.turnOptions(member, kind, cwd),
       recorder: (subtask) => records.recorder(subtask.id),
-      speech: (meeting, speaker) => records.speech(meeting, speaker),
+      speech: (meeting) => records.speech(meeting),
       underWay: () => engine.scheduler.underWay(),
+      meetingsNow: () => engine.meetings.now(),
     };
     const engine = new Engine(core, records, files, writer, options, copy);
     await engine.writeMemberSettings(copy);

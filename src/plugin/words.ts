@@ -13,6 +13,7 @@ import {
   type GoalState,
   type Member,
   type Meeting,
+  type MeetingNow,
   type NoteOption,
   type Permission,
   type PermissionOption,
@@ -135,17 +136,20 @@ export function underWay(subtask: UnderWay): string {
   }
 }
 
-/** Where a meeting is, in words: who speaks, the plan being written or waiting for you, how it ended. */
-export function meetingStatus(meeting: Meeting): string {
+/**
+ * Where a meeting is, in words: who speaks, the plan being written or
+ * waiting for you, how it ended. `now`: what goes on at it, while it runs.
+ */
+export function meetingStatus(meeting: Meeting, now: MeetingNow | undefined): string {
   switch (meeting.status) {
     case "running":
-      return meeting.planning
-        ? `${hostOf(meeting)} writes the plan`
-        : meeting.speaking
-          ? `${meeting.speaking} speaks`
-          : meeting.drafting
+      return now?.speaking?.planning
+        ? `${now.speaking.member} writes the plan`
+        : now?.speaking
+          ? `${now.speaking.member} speaks`
+          : now?.together === "drafting"
             ? "the members form their first judgments"
-            : meeting.weighing
+            : now?.together === "weighing"
               ? "deciding who speaks next"
               : "under way";
     case "review":

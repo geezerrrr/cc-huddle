@@ -97,7 +97,7 @@ describe("Records", () => {
       turns: [] as Meeting["turns"],
     } as Meeting;
     vi.useFakeTimers({ now: 5 });
-    const speech = records.speech(meeting, "glm");
+    const speech = records.speech(meeting);
     const read = {
       kind: "tool",
       id: "t1",
@@ -113,7 +113,6 @@ describe("Records", () => {
     speech.text?.("Two dice", true);
     speech.text?.(", one reroll.", false);
     expect(records.speaking(meeting)).toEqual({
-      speaker: "glm",
       entries: [
         { at: 5, kind: "text", text: "Let me look." },
         {

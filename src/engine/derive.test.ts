@@ -42,6 +42,7 @@ const question = (fields: Pick<Question, "id" | "subtaskId"> & Ask): Question =>
 const work = (fields: Partial<Work> = {}): Work => ({
   members: ["host", "ann", "bob"],
   underWay: [],
+  meetingsNow: {},
   goal: { name: "dice", slug: "dice", status: "active", createdAt: 0 },
   tasks: [
     {

@@ -71,6 +71,7 @@ beforeEach(async () => {
     recorder: () => ({}),
     speech: () => ({}),
     underWay: () => [],
+    meetingsNow: () => ({}),
   };
   goals = new Goals(core, scheduler as unknown as Scheduler, meetings as unknown as Meetings);
   vi.clearAllMocks();

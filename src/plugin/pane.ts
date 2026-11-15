@@ -58,20 +58,23 @@ export function shownMeeting(work: Work): Meeting | undefined {
   return latest("running") ?? latest("review") ?? latest();
 }
 
-const meetingOf = (meeting: Meeting, work: Work): OpenplanMeeting => ({
-  // Its agenda is the brief your session wrote for it, too long for a line.
-  about: work.goal.name,
-  agenda: meeting.agenda,
-  status: meetingStatus(meeting),
-  attendance: attendanceText(meeting),
-  turns: meeting.turns.map((t) => ({
-    speaker: t.speaker,
-    text: t.text,
-    ...(t.calls && { to: t.calls }),
-  })),
-  hands: (meeting.hands ?? []).map((h) => ({ member: h.member, point: h.point })),
-  ...(meeting.plan && { plan: meeting.plan.summary }),
-});
+function meetingOf(meeting: Meeting, work: Work): OpenplanMeeting {
+  const now = work.meetingsNow[meeting.id];
+  return {
+    // Its agenda is the brief your session wrote for it, too long for a line.
+    about: work.goal.name,
+    agenda: meeting.agenda,
+    status: meetingStatus(meeting, now),
+    attendance: attendanceText(meeting),
+    turns: meeting.turns.map((t) => ({
+      speaker: t.speaker,
+      text: t.text,
+      ...(t.calls && { to: t.calls }),
+    })),
+    hands: (now?.hands ?? []).map((h) => ({ member: h.member, point: h.point })),
+    ...(meeting.plan && { plan: meeting.plan.summary }),
+  };
+}
 
 function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>): OpenplanMember {
   const own = work.subtasks.filter((s) => s.assignee === member.name);

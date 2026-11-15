@@ -36,9 +36,8 @@ export interface LiveRun {
   running: ToolCall[];
 }
 
-/** A meeting turn as it is spoken: who, what it did so far, and what it does now. */
+/** A meeting turn as it is spoken: what it did so far, and what it does now. */
 interface Spoken {
-  speaker: string;
   entries: RecordEntry[];
   live: LiveRun;
 }
@@ -112,7 +111,6 @@ function tracking(now: Now, keep: (entry: RecordEntry) => void): TurnListener {
 
 /** A meeting turn being spoken: the turn it becomes, and what it did and does. */
 interface Speaking {
-  speaker: string;
   turn: number;
   entries: RecordEntry[];
   now: Now;
@@ -187,9 +185,8 @@ export class Records {
    * its record; kept until it is the meeting's. A turn's start isn't kept:
    * the meeting says who speaks.
    */
-  speech(meeting: Meeting, speaker: string): TurnListener {
+  speech(meeting: Meeting): TurnListener {
     const speaking: Speaking = {
-      speaker,
       turn: meeting.turns.length,
       entries: [],
       now: { running: new Map() },
@@ -204,7 +201,7 @@ export class Records {
   speaking(meeting: Meeting): Spoken | undefined {
     const speaking = this.spoken.get(meeting.id);
     if (meeting.status !== "running" || speaking?.turn !== meeting.turns.length) return undefined;
-    return { speaker: speaking.speaker, entries: speaking.entries, live: liveOf(speaking.now) };
+    return { entries: speaking.entries, live: liveOf(speaking.now) };
   }
 
   /** Every entry written so far is in its file. */

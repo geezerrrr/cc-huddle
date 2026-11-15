@@ -64,6 +64,7 @@ beforeEach(async () => {
     recorder: () => ({}),
     speech: () => ({}),
     underWay: () => [],
+    meetingsNow: () => meetings.now(),
   };
   meetings = new Meetings(core, { pump, assign } as unknown as Scheduler);
   vi.mocked(askOnce).mockReset();
@@ -293,7 +294,7 @@ describe("Meetings", () => {
   it("with a host who only runs it, hear only the members' judgments and give them all the work", async () => {
     scripted();
     const original = vi.mocked(askOnce).getMockImplementation();
-    const drafting: (boolean | undefined)[] = [];
+    const drafting: (string | undefined)[] = [];
     const sonnets = {
       ...plan,
       tasks: plan.tasks.map((t) => ({
@@ -303,7 +304,7 @@ describe("Meetings", () => {
     };
     vi.mocked(askOnce).mockImplementation((ask) => {
       if (ask.prompt.includes("Everyone now gives a first judgment"))
-        drafting.push(core.state.meetings[0]?.drafting);
+        drafting.push(meetings.now()[core.state.meetings[0]?.id ?? ""]?.together);
       if (ask.prompt.includes("final plan"))
         return Promise.resolve({ text: "", structured: sonnets, session: "glm#9" });
       return original?.(ask) ?? Promise.reject(new Error("no script"));
@@ -316,7 +317,7 @@ describe("Meetings", () => {
     });
     expect(meeting.hostOnly).toBe(true);
     await ended(meeting);
-    expect(drafting).toEqual([true]);
+    expect(drafting).toEqual(["drafting"]);
     expect(phases(meeting)).toEqual(["opening:glm", "round:sonnet", "steer:glm", "summary:glm"]);
     const closing = vi.mocked(askOnce).mock.calls.at(-1)?.[0];
     expect(closing?.schema?.safeParse(plan).success).toBe(false);
@@ -376,12 +377,13 @@ describe("Meetings", () => {
       expect(askOnce).toHaveBeenCalled();
     });
     await meetings.cancel(meeting.id);
-    expect(meeting).toMatchObject({ status: "cancelled", speaking: undefined });
+    expect(meeting.status).toBe("cancelled");
+    expect(meetings.now()).toEqual({});
     expect(meeting.error).toBeUndefined();
 
-    core.state.meetings.push({ ...meeting, id: "m2", status: "running", speaking: "sonnet" });
+    core.state.meetings.push({ ...meeting, id: "m2", status: "running" });
     meetings.recover();
-    expect(core.state.meetings[1]).toMatchObject({ status: "cancelled", speaking: undefined });
+    expect(core.state.meetings[1]?.status).toBe("cancelled");
   });
 
   it("can't be held with a busy member, a stranger, or a goal on hold", () => {

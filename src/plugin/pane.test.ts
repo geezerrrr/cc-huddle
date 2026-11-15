@@ -58,6 +58,7 @@ const question = (
 const work = (): Work => ({
   members: ["glm", "sonnet"],
   underWay: [],
+  meetingsNow: {},
   goal: { name: "Dice", slug: "dice", status: "active", createdAt: 0 },
   tasks: [
     {
@@ -242,7 +243,8 @@ Tell the user what was done, and ask whether to accept it or send it back with w
 
   it("says who speaks at a meeting under way, and a plan to review", () => {
     const now = work();
-    now.meetings = [{ ...meeting, status: "running", speaking: "glm" }];
+    now.meetings = [{ ...meeting, status: "running" }];
+    now.meetingsNow = { m1: { speaking: { member: "glm", planning: false }, hands: [] } };
     now.subtasks = [];
     now.questions = [];
     const team = paneTeam(now, members);
@@ -252,7 +254,7 @@ Tell the user what was done, and ask whether to accept it or send it back with w
       'at the meeting on "Dice"',
       'at the meeting on "Dice"',
     ]);
-    now.meetings = [{ ...meeting, status: "running", drafting: true }];
+    now.meetingsNow = { m1: { together: "drafting", hands: [] } };
     expect(paneTeam(now, members).meeting?.status).toBe("the members form their first judgments");
     now.meetings = [{ ...meeting, status: "review" }];
     const review = paneTeam(now, members);

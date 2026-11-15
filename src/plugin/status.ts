@@ -57,7 +57,7 @@ export function statusText(work: Work): string {
   ];
   for (const meeting of work.meetings.filter((m) => m.status !== "approved"))
     lines.push(
-      `  Meeting [${meeting.id}], ${hostText(meeting)}: ${meetingStatus(meeting)}${meeting.status === "review" ? ": approve it, change it, or cancel it" : ""}${derived.resumable.includes(meeting.id) ? "; it can go on" : ""}`,
+      `  Meeting [${meeting.id}], ${hostText(meeting)}: ${meetingStatus(meeting, work.meetingsNow[meeting.id])}${meeting.status === "review" ? ": approve it, change it, or cancel it" : ""}${derived.resumable.includes(meeting.id) ? "; it can go on" : ""}`,
     );
   for (const task of work.tasks) {
     lines.push(

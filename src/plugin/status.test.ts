@@ -30,6 +30,7 @@ describe("statusText", () => {
     const text = statusText({
       members: ["glm", "sonnet"],
       underWay: [],
+      meetingsNow: {},
       goal: { name: "Dice", slug: "dice", status: "active", createdAt: 0 },
       meetings: [
         {

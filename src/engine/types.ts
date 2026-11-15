@@ -192,18 +192,22 @@ export interface Meeting {
   hostOnly?: boolean;
   status: MeetingStatus;
   turns: MeetingTurn[];
-  /** Who is speaking now. */
-  speaking?: string;
-  /** The host is writing the plan. */
-  planning?: boolean;
-  /** The members are each forming their first judgment, all at once. */
-  drafting?: boolean;
-  /** The participants are deciding whether to speak next. */
-  weighing?: boolean;
-  hands?: MeetingHand[];
   seats?: Record<string, MeetingSeat>;
   plan?: Plan;
   error?: string;
+}
+
+/**
+ * What is under way at a running meeting (§4.2), which its owner keeps and
+ * the state doesn't: after a restart none is.
+ */
+export interface MeetingNow {
+  /** Who speaks now, and whether it is the plan they write. */
+  speaking?: { member: string; planning: boolean };
+  /** Everyone at once: forming their first judgments, or deciding whether to speak next. */
+  together?: "drafting" | "weighing";
+  /** The hands up, from when who speaks next is weighed until the floor is given. */
+  hands: MeetingHand[];
 }
 
 /** Who hosts a meeting: the first at it. */
