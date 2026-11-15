@@ -531,4 +531,21 @@ test("/openplan with a task hands it to your session for the team, with who is o
   expect(prompts[0]).toContain("The team: glm (Developer).");
   expect(prompts[0]).toContain("\nmake a dice game, @glm on the rules\n");
   expect(calls.filter((c) => c.tool === "ui.open")).toEqual([]);
+  expect(prompts[0]).toContain('This session runs the goal "Dice", under way: ask the user too');
+});
+
+test("/openplan with a task, in a session with no goal, has your session start one", async ($, on) => {
+  const clock = mock.clock(on);
+  serve(on, [{ revision: 1, team: NO_GOAL }]);
+  const prompts: string[] = [];
+  on("prompt.submit", (_, e) => {
+    prompts.push(e.text);
+    return { text: e.text };
+  });
+  await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
+  await clock.advance(500);
+  await openplan($, "make a dice game");
+  await clock.advance(1);
+  expect(prompts[0]).toContain("Don't do any of it yourself.\n");
+  expect(prompts[0]).toContain("Then start a goal (start_goal)");
 });

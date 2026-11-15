@@ -130,6 +130,20 @@ describe("the pane's socket and tools", () => {
     ]);
   });
 
+  it("take up only a goal named by its slug", async () => {
+    expect(await call("resume_goal", { goal: "../dice" })).toMatchObject({ error: true });
+  });
+
+  it("read the repository's goals again every so often as the pane polls, and at once on a look", async () => {
+    const goals = vi.spyOn(session, "goals");
+    const { revision } = await view();
+    await view({ revision });
+    await view({ revision });
+    expect(goals).toHaveBeenCalledTimes(1);
+    await view();
+    expect(goals).toHaveBeenCalledTimes(2);
+  });
+
   it("serve only the view and the release, and say why an ask doesn't fit", async () => {
     expect((await ask("/answer", "{}")).status).toBe(404);
     expect(await ask("/view", '{ "revision": "one" }')).toMatchObject({ status: 409 });

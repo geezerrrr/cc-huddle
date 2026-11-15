@@ -9,6 +9,7 @@ import type { Core } from "./core.ts";
 import { goalFiles, goalsFolder, holderOf, repoFolder } from "./data.ts";
 import { Engine, type EngineOptions } from "./engine.ts";
 import { git, goalBranch, goalFolder, openRepository } from "./git.ts";
+import { Goals } from "./goals.ts";
 import { runSubtask, type RunOutcome } from "./run.ts";
 import { readCopy, teamFolder } from "./team.ts";
 
@@ -209,6 +210,34 @@ describe("Engine", () => {
     (engine as unknown as { core: Core }).core.changed();
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(await saved("dice")).toMatchObject({ state: { goal: { name: "Dice" } } });
+  });
+
+  it("lets its goal go even when stopping what runs fails", async () => {
+    const engine = await start();
+    vi.spyOn(engine.scheduler, "close").mockRejectedValueOnce(new Error("stuck"));
+    await expect(close(engine)).rejects.toThrow("stuck");
+    expect(holderOf(filesOf("dice").lock)).toBeUndefined();
+  });
+
+  it("goes on with the meetings the session that let the goal go stopped", async () => {
+    await close(await start());
+    const files = filesOf("dice");
+    const other = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
+    await once(other, "spawn");
+    await writeFile(
+      files.lock,
+      JSON.stringify({ pid: other.pid, session: 7, address: "there", open: true }),
+    );
+    const resume = vi.spyOn(Goals.prototype, "resume").mockResolvedValueOnce();
+    await takeUp("dice", {
+      takeOver: async () => {
+        await rm(files.lock);
+        return { meetings: ["m1"] };
+      },
+    });
+    other.kill();
+    expect(resume).toHaveBeenCalledWith(["m1"]);
+    resume.mockRestore();
   });
 
   it("takes a goal up, asking the session that holds it to let it go, and resumes it", async () => {
