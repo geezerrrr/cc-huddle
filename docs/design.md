@@ -18,16 +18,16 @@ openplan comes out of [Crewloft](https://playcrewloft.com), a game in which the 
 
 ## 2. Concepts
 
-| Concept       | What it is                                                                                                                                                 |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Role          | A job and its duties, e.g. `gameplay-programmer`. A file in the team folder.                                                                               |
-| Member        | Someone on the team: a name, a role, a provider, a model and an effort. A file in the team folder.                                                         |
-| Goal          | What you want done, with its own branch `openplan/<goal>/main` cut from your `HEAD` when it starts.                                                        |
-| Meeting       | A read-only discussion among chosen members that ends in a plan for a goal.                                                                                |
-| Plan          | The host's document plus a tree: tasks, their subtasks, an owner, dependencies and acceptance criteria for each.                                           |
-| Task, subtask | A task groups subtasks; a subtask is one member's piece of work, done in one worktree.                                                                     |
-| Question      | Anything that waits on someone: a member asking a teammate or you, a permission request, a decision on a stuck review or merge, a finished task to accept. |
-| Your session  | The Claude Code session you talk in. It relays what you want and acts on it through tools. It never does the team's work.                                  |
+| Concept       | What it is                                                                                                                                                           |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Role          | A job and its duties, e.g. `gameplay-programmer`. A file in the team folder.                                                                                         |
+| Member        | Someone on the team: a name, a role, a provider, a model and an effort. A file in the team folder.                                                                   |
+| Goal          | What you want done, with its own branch `openplan/<goal>/main` cut from your `HEAD` when it starts.                                                                  |
+| Meeting       | A read-only discussion among chosen members that ends in a plan for a goal.                                                                                          |
+| Plan          | The host's document plus a tree: tasks, their subtasks, an owner, dependencies and acceptance criteria for each.                                                     |
+| Task, subtask | A task is one result for you, its subtasks done; a subtask is one member's piece of work, done in one worktree. You accept a task yourself only where you chose to.  |
+| Question      | Anything that waits on someone: a member asking a teammate or you, a permission request, a decision on a stuck review or merge, a finished task you chose to accept. |
+| Your session  | The Claude Code session you talk in. It relays what you want and acts on it through tools. It never does the team's work.                                            |
 
 A member is busy while a subtask of theirs runs or waits on its review, while they review a delivery, or while they sit in a meeting. A busy member starts nothing new. Everyone does one thing at a time.
 
@@ -124,9 +124,15 @@ Pausing holds its running subtasks in their sessions and cancels its running mee
 | review            | you cancel, goal archived                  | cancelled                      |
 | failed, cancelled | you go on (no plan yet)                    | running, from where it stopped |
 
-The flow is Crewloft's (its `team.md` §4): the host opens with the questions to settle; everyone else answers independently; members raise a hand to speak; the host gives the floor, closes when every question is settled or the size's turn budget is spent, and writes the plan. Sizes (`small`, `discussion`, `large`) set only how many turns each member gets. Meeting sessions are read-only.
+The flow is Crewloft's (its `team.md` §4): the host opens with the questions to settle; every member gives a first judgment, all at once and without hearing each other; members raise a hand to speak; the host gives the floor, closes when every question is settled or the size's turn budget is spent, and writes the plan. Sizes (`small`, `discussion`, `large`) set only how many turns each member gets. Meeting sessions are read-only.
 
-You name who attends, and the first named hosts; with nobody named, everyone attends and the first member by name hosts. Each attendee keeps one session for the whole meeting, in the goal's worktree. An approved plan's document is saved in the data folder, and the first run of each of its subtasks gets it in its brief, since members work in their worktrees and not in the data folder.
+A meeting is for lining up, not for working out details. It settles the direction (what to make and the few choices that shape it), who does which piece, and which interfaces there are between the pieces (names, conventions or formats one piece defines and another uses) and who defines each. What an interface holds and how a piece is built are worked out afterwards by whoever does it; whoever needs it asks them (`ask_teammate`). Every turn keeps to that: the opening, the first judgments, what the host asks of whom, a hand worth the floor. A turn says only what hasn't been said, its conclusion and its reason.
+
+- **The host.** You name who attends, and the first named hosts; with nobody named, everyone attends and the first member by name hosts. A host takes part as well, by default: they give a first judgment like everyone, answer for their own piece in the talk, have their view weighed like anyone's, and get work in the plan. A host who only runs it (`hostOnly`) gives no judgment, takes no side and gets no work; it takes someone else to run it for. The members are everyone attending but a host who only runs it; the first judgments and the plan's assignees are theirs.
+- **The floor.** The host gives it to one member with `give_floor`, saying what they need from them, or gives it to nobody, which closes the talk, hands up or not. A hand about what an interface holds or how a piece is built isn't worth the floor. With no hand worth it, the host checks what they set out to decide one thing at a time against what was said (nobody objecting isn't it), then puts the split to the room once (the pieces, who takes each, the interfaces and who defines each) before closing. What the host says before handing over the floor is said to the room, as what follows is.
+- **The plan.** Subtasks follow what each piece needs from another: a subtask depends only on those whose results it uses. An interface others wait on is defined first, in a quick subtask of its own by whoever defines it; putting the pieces together and checking the whole is a subtask at the end. Beyond that, one member's piece is one subtask, since each subtask carries a fixed cost (a new session getting to know the repository, a review, a merge). No task comes for you to accept: which ones you accept yourself is yours to tick in review (§7.1).
+
+Each attendee keeps one session for the whole meeting, in the goal's worktree. An approved plan's document is saved in the data folder, and the first run of each of its subtasks gets it in its brief, since members work in their worktrees and not in the data folder.
 
 ### 4.3 Subtask
 
@@ -160,11 +166,11 @@ A running subtask's member has two tools beyond Claude Code's own, from an in-pr
 | open | answered                | answered  |
 | open | the asker stops waiting | cancelled |
 
-Kinds: a teammate's question (answered by that teammate in a read-only session), a question to you (Claude Code's own `AskUserQuestion`, intercepted), a permission request, a decision (stuck review, binary conflict, git error), and a finished task to accept. Answered and cancelled questions leave the state.
+Kinds: a teammate's question (answered by that teammate in a read-only session), a question to you (Claude Code's own `AskUserQuestion`, intercepted), a permission request, a decision (stuck review, binary conflict, git error), and a finished task you chose to accept. Answered and cancelled questions leave the state.
 
 ### 4.5 Derived, never stored
 
-- What a subtask waits on: an upstream subtask, another task's acceptance, a busy owner or reviewer, a paused goal, a teammate's or your answer.
+- What a subtask waits on: an upstream subtask, a busy owner or reviewer, a paused goal, a teammate's or your answer. Upstream work in a task you accept yourself is waited on as that whole task, done and accepted; in any other task, only the subtasks depended on, merged.
 - Who is busy, who reviews a delivery (the meeting's host, else another member), whose upstream was redone after it started.
 - What you can do to each subtask, meeting and goal: asked of the same tables with `can`.
 
@@ -175,7 +181,7 @@ Kinds: a teammate's question (answered by that teammate in a read-only session),
 - Delivering commits what is uncommitted in the worktree as the member (`<name> <member-id>@openplan.local`). Members don't commit: Claude Code asks before any git command that writes, even in the sandbox, so a commit of theirs would wait on you.
 - Merges run one at a time per goal, in delivery order: the goal branch is merged into the worktree, then the goal branch fast-forwards to it. Text conflicts go back to the member who delivered last, in their session. Binary and delete/modify conflicts and git errors become your decision.
 - Git runs with hooks, fsmonitor and signing off for the engine's own commands. It is the `git` on your `PATH`; members use it as they would anywhere.
-- openplan never pushes, never checks out anything in your repository, never runs `worktree prune`, and touches only `openplan/*` branches. When a task is accepted, its goal branch is yours to merge or review.
+- openplan never pushes, never checks out anything in your repository, never runs `worktree prune`, and touches only `openplan/*` branches. The goal branch is yours to merge or review whenever you like.
 
 ## 6. Team configuration
 
@@ -215,16 +221,16 @@ A member session loads your user and project settings like any session of yours.
 ### 7.1 A goal, end to end
 
 1. You hand the team a task: `/openplan build a two-player dice game, GLM on the art`, or ask your session in words. The command makes it the team's for certain: the mod gives your session the task, the team's roster, and the rule not to do it itself.
-2. Your session proposes who takes it, keeping to anyone you named: a meeting (who attends, the host first, what each brings) or one member for work that needs no planning. It asks with `AskUserQuestion`: start, or say what to change; it proposes again until you start. Then it starts the goal and holds the meeting or assigns the work, and returns at once.
+2. Your session proposes who takes it, keeping to anyone you named: a meeting (who attends, the host first and whether they only run it, what each brings) or one member for work that needs no planning. It asks with `AskUserQuestion`: start, or say what to change; it proposes again until you start. Then it starts the goal and holds the meeting or assigns the work, and returns at once.
 3. The meeting runs in the background. You watch it live in the pane.
-4. The plan is ready: your session wakes, shows the plan's summary and asks with `AskUserQuestion`: approve, change it, or drop it. Changes are said in words, and your session rewrites the plan with them; any member can be given work, not only those who attended.
+4. The plan is ready: your session wakes, shows the plan's summary and asks with `AskUserQuestion`: approve, change it, or drop it, and which tasks, if any, you want to accept yourself once done. None is by default: code is checked by its reviewer and its checks, and you would rarely read it line by line; a task is worth your own acceptance when only looking at it or trying it can judge it. Changes are said in words, and your session rewrites the plan with them; any member can be given work, not only those who attended.
 5. Members work. Everything that needs you lands in the pane's "Needs you" tab with a toast, and the pane opens where it docks beside the transcript; you answer there with its own options.
-6. A task is done: its delivery waits for your acceptance. Accepting it unblocks work that depends on it.
+6. A task is done once its last subtask merges, and the transcript says so. One you chose to accept waits for you instead: your session wakes to ask, and work in other tasks that builds on it waits until you accept it. Either way, to change a done task, pass its member a message (§7.3); work built on it is marked as built on something redone. Work you assign directly is a task you don't accept.
 
 ### 7.2 What you see
 
 - **Pane** (`/openplan`), beside the transcript in a wide fullscreen terminal, above the prompt otherwise. Three tabs:
-  - **Meeting**: the discussion word by word, who speaks, raised hands, whom the host calls.
+  - **Meeting**: the discussion word by word, who speaks, raised hands, whom the host calls. The first judgments are formed all at once, so they don't stream: the pane says the members are forming them, and each shows once given.
   - **Team**: one line per member: what they do, which step, whom they wait on, tokens. Select a member to follow their record live: thinking, tool calls, files changed.
   - **Needs you**: each open question with its options as buttons. Pressing one answers it. Nothing goes through a model, so a permission is granted only by you.
 - **Band** above the prompt, always: `openplan · meeting · 3 working · 1 needs you`.
@@ -234,7 +240,7 @@ A member session loads your user and project settings like any session of yours.
 
 ### 7.3 Your session
 
-Your session talks; the pane shows and answers. The tools your session has: see where the team stands (`status`); start a goal (`start_goal`); hold a meeting (`hold_meeting`), cancel one (`cancel_meeting`) or resume one that failed or was cancelled (`resume_meeting`); show a plan under review (`show_plan`), change it (`change_plan`) or approve it (`approve_plan`); assign a subtask directly (`assign`); pause, resume, archive or delete a goal (`goal_action`); stop, go on, retry or redo a subtask (`subtask_action`); pass a message to a member (`message`: `@GLM put the scoreboard top right`), which goes on in that member's session; and carry out your decision on a task done, a stuck review or a merge (`decide`).
+Your session talks; the pane shows and answers. The tools your session has: see where the team stands (`status`); start a goal (`start_goal`); hold a meeting (`hold_meeting`, its host the first attendee, `host_only` if they only run it), cancel one (`cancel_meeting`) or resume one that failed or was cancelled (`resume_meeting`); show a plan under review (`show_plan`), change it (`change_plan`, which also ticks the tasks you accept) or approve it (`approve_plan`); assign a subtask directly (`assign`); pause, resume, archive or delete a goal (`goal_action`); stop, go on, retry or redo a subtask (`subtask_action`); pass a message to a member (`message`: `@GLM put the scoreboard top right`), which goes on in that member's session; and carry out your decision on a task done, a stuck review or a merge (`decide`).
 
 A tool that names a member (a meeting's attendees, an assignee, a plan's owners) takes only the team's members, each listed with their role in its schema, so your session matches what you said against the team as it would against any tool's options. When the team is read again, the server tells Claude Code its tools changed (`notifications/tools/list_changed`).
 

@@ -94,7 +94,7 @@ Start Claude Code in the repository and hand the team a task, in your own words:
 
 Your session proposes who takes it: a meeting, with who attends and what each brings, or one member for a job that needs no planning. It keeps to anyone you named, and asks you to start with that or say what to change. Once you start it, the team works in the background and your session is free. You can also just ask your session ("have glm do the scoreboard"); `/openplan` makes sure the task goes to the team.
 
-The members meet, and the host writes a plan of tasks with owners, dependencies and acceptance criteria. Your session shows you the plan and asks you to approve it, change it or drop it. Then the members work in parallel, each subtask in its own worktree, reviewed and merged into the goal's branch. A finished task waits for you to accept it.
+The members meet, and the host writes a plan of tasks with owners, dependencies and acceptance criteria. Your session shows you the plan and asks you to approve it, change it or drop it, and which tasks you want to accept yourself; none, unless you say. Then the members work in parallel, each subtask in its own worktree, reviewed and merged into the goal's branch. A task is done once its last subtask merges; one you chose to accept waits for you first.
 
 - `@sonnet put the scoreboard top right` passes a member a message, in their session.
 - `/openplan` with no task opens the pane: the meeting as it goes, each member at what they do (select one to follow their record), and what needs you, answered there with a button. Permissions are granted only there, by you.
