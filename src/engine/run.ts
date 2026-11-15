@@ -42,7 +42,7 @@ function teamServer(collaboration: Collaboration, delivered: (handover: Handover
       "ask_teammate",
       RUN_TOOLS.askTeammate.what,
       {
-        teammate: z.string().describe(RUN_TOOLS.askTeammate.teammate),
+        teammate: z.string().trim().describe(RUN_TOOLS.askTeammate.teammate),
         question: z.string().describe(RUN_TOOLS.askTeammate.question),
       },
       async ({ teammate, question }) =>

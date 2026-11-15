@@ -7,6 +7,7 @@
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { errorText } from "../shared/errors.ts";
+import { ifThere } from "../shared/files.ts";
 import { spend, type Core } from "./core.ts";
 import { openGoal, unresolved } from "./git.ts";
 import { DELIVERY_REFUSED, TEAMMATE_REPLIES, teammateQuestion } from "./prompts.ts";
@@ -36,9 +37,9 @@ async function askTeammate(
   question: string,
 ): Promise<string> {
   const others = core.team.members.filter((m) => m.name !== from.name);
-  const target = others.find((m) => m.name === name.trim());
+  const target = others.find((m) => m.name === name);
   if (!target)
-    return name.trim() === from.name
+    return name === from.name
       ? TEAMMATE_REPLIES.self
       : TEAMMATE_REPLIES.unknown(
           name,
@@ -79,11 +80,7 @@ async function checkDelivery(core: Core, subtask: Subtask, desk: string, files: 
     const relative = path.relative(desk, path.resolve(desk, file));
     const inside = relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
     const there =
-      inside &&
-      (await stat(path.join(desk, relative)).then(
-        (found) => found.isFile(),
-        () => false,
-      ));
+      inside && (await ifThere(stat(path.join(desk, relative)), undefined))?.isFile() === true;
     if (there) kept.push(relative.split(path.sep).join("/"));
     else missing.push(file);
   }

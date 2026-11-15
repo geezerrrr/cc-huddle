@@ -5,9 +5,9 @@
  * signing. Members use git in their worktrees as they would anywhere.
  */
 import { spawn } from "node:child_process";
-import { readdir, readFile, realpath, rm } from "node:fs/promises";
+import { readFile, realpath, rm } from "node:fs/promises";
 import path from "node:path";
-import { exists } from "../shared/files.ts";
+import { exists, ifThere, namesIfThere } from "../shared/files.ts";
 import { goalFiles } from "../shared/layout.ts";
 import { serialBy } from "../shared/serial.ts";
 
@@ -25,14 +25,10 @@ const FLAGS = [
   "core.longpaths=true",
 ];
 
-/** A git command that failed: its arguments and what git said. */
+/** A git command that failed, named by its subcommand, with what git said. */
 export class GitError extends Error {
-  constructor(
-    readonly args: readonly string[],
-    readonly code: number,
-    readonly output: string,
-  ) {
-    super(`git ${args[0] ?? ""}: ${output}`);
+  constructor(command: string, output: string) {
+    super(`git ${command}: ${output}`);
     this.name = "GitError";
   }
 }
@@ -52,8 +48,6 @@ interface Result {
 interface GitOptions {
   /** Exit codes that are answers, not failures (`rev-parse --verify` answers 1). */
   allow?: number[];
-  /** What the command reads on stdin. */
-  input?: string;
 }
 
 /** Runs git and resolves with what it printed; rejects with a GitError on an exit code not allowed. */
@@ -71,9 +65,9 @@ export function git(at: At, args: string[], options: GitOptions = {}): Promise<R
     child.on("close", (code) => {
       const exit = code ?? -1;
       if (exit === 0 || options.allow?.includes(exit)) resolve({ code: exit, stdout, stderr });
-      else reject(new GitError(args, exit, (stderr || stdout).trim()));
+      else reject(new GitError(args[0] ?? "", (stderr || stdout).trim()));
     });
-    child.stdin.end(options.input);
+    child.stdin.end();
   });
 }
 
@@ -114,10 +108,9 @@ export async function openRepository(folder: string): Promise<Repository> {
   });
   const [top, common] = found.stdout.split("\n");
   if (found.code !== 0 || !top || !common)
-    throw new GitError(["rev-parse"], found.code, `${folder} is not in a git repository`);
+    throw new GitError("rev-parse", `${folder} is not in a git repository`);
   const head = await git(at, ["rev-parse", "--verify", "-q", "HEAD"], { allow: [1] });
-  if (head.code !== 0)
-    throw new GitError(["rev-parse"], head.code, `${top} has no commit to start from yet`);
+  if (head.code !== 0) throw new GitError("rev-parse", `${top} has no commit to start from yet`);
   return { top: await realpath(top), common: await realpath(path.resolve(folder, common)) };
 }
 
@@ -249,12 +242,12 @@ export function openDesk(places: Places, subtaskId: string): Promise<string> {
  * lost track of it is repaired from the repository's side first.
  */
 async function worktreeAt(repo: Repository, tree: string): Promise<At> {
-  const real = (file: string) => realpath(file).catch(() => path.resolve(file));
+  const real = (file: string) => ifThere(realpath(file), path.resolve(file));
   const here = await real(tree);
   const entries = path.join(repo.common, "worktrees");
   const find = async () => {
-    for (const name of await readdir(entries).catch(() => [] as string[])) {
-      const gitdir = await readFile(path.join(entries, name, "gitdir"), "utf8").catch(() => "");
+    for (const name of await namesIfThere(entries)) {
+      const gitdir = await ifThere(readFile(path.join(entries, name, "gitdir"), "utf8"), "");
       if (gitdir && (await real(path.dirname(gitdir.trim()))) === here)
         return path.join(entries, name);
     }
@@ -262,7 +255,7 @@ async function worktreeAt(repo: Repository, tree: string): Promise<At> {
   const entry =
     (await find()) ??
     (await git({ cwd: repo.top }, ["worktree", "repair", tree], { allow: [128] }).then(find));
-  if (!entry) throw new GitError(["worktree"], 128, `${tree} isn't a worktree of ${repo.top}`);
+  if (!entry) throw new GitError("worktree", `${tree} isn't a worktree of ${repo.top}`);
   return { cwd: tree, env: { GIT_DIR: entry, GIT_WORK_TREE: tree } };
 }
 
@@ -305,11 +298,9 @@ export async function unresolved(
 ): Promise<string[]> {
   const desk = goalFiles(places.root).desk(subtaskId);
   const marked = await Promise.all(
-    files.map((file) =>
-      readFile(path.join(desk, file), "utf8").then(
-        (text) => MARKERS.test(text),
-        () => false,
-      ),
+    // One deleted on a side has no markers.
+    files.map(async (file) =>
+      MARKERS.test(await ifThere(readFile(path.join(desk, file), "utf8"), "")),
     ),
   );
   return files.filter((_, i) => marked[i]);
@@ -377,7 +368,7 @@ export function mergeDesk(places: Places, subtaskId: string, by: Signer): Promis
       if (merge.code === 1) {
         const found = await conflicts(places, subtaskId, desk);
         if (found) return found;
-        throw new GitError(["merge"], 1, (merge.stderr || merge.stdout).trim());
+        throw new GitError("merge", (merge.stderr || merge.stdout).trim());
       }
     }
     const head = (await git(desk, ["rev-parse", "HEAD"])).stdout.trim();

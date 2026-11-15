@@ -9,6 +9,16 @@ import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { errorCode } from "./errors.ts";
 
+/** What `reading` gives, or `missing` when the file it reads isn't there; anything else is thrown. */
+export async function ifThere<T, M>(reading: Promise<T>, missing: M): Promise<T | M> {
+  try {
+    return await reading;
+  } catch (error) {
+    if (errorCode(error) === "ENOENT" || errorCode(error) === "ENOTDIR") return missing;
+    throw error;
+  }
+}
+
 /** Whether `file` is there; anything but its absence is thrown. */
 export async function exists(file: string): Promise<boolean> {
   try {

@@ -106,12 +106,11 @@ export function teamSettings(
 }
 
 /**
- * Writes a member's settings to a file only you can read and gives its path:
- * settings passed inline end up on a command line, keys and all.
+ * Writes a member's settings to a file only you can read: settings passed
+ * inline end up on a command line, keys and all.
  */
-export async function writeSettings(file: string, settings: Settings): Promise<string> {
+export async function writeSettings(file: string, settings: Settings): Promise<void> {
   await writeWhole(file, JSON.stringify(settings), 0o600);
-  return file;
 }
 
 /** Where and as whom a member's turn runs. */

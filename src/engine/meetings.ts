@@ -5,9 +5,9 @@
  * talk itself is meeting-run.ts.
  */
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
+
 import { errorText } from "../shared/errors.ts";
+import { writeWhole } from "../shared/files.ts";
 import { goalFiles } from "../shared/layout.ts";
 import { workOf, type Core } from "./core.ts";
 import { busyMembers, meetingResumes } from "./derive.ts";
@@ -127,8 +127,7 @@ export class Meetings {
     const { meeting, plan } = this.underReview(id, "approve");
     this.activeGoal();
     const file = goalFiles(core.places.root).plan(meeting.id);
-    await mkdir(path.dirname(file), { recursive: true });
-    await writeFile(file, plan.markdown);
+    await writeWhole(file, plan.markdown);
     // Changed, called off or approved meanwhile, or its goal held: not approved now (the file stays).
     if (meeting.plan !== plan || !can(MEETING_MACHINE, meeting.status, "approve"))
       throw new Error("The plan changed while it was being approved");

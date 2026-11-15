@@ -7,6 +7,7 @@
  */
 import { execFile, type ChildProcess } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
+import { errorCode } from "../shared/errors.ts";
 import { writeWhole, jsonIfThere } from "../shared/files.ts";
 import { running, windowsProcessField } from "../shared/running.ts";
 import { inOrder } from "../shared/serial.ts";
@@ -51,13 +52,16 @@ export function stopMembers() {
 
 /** A process's command line; undefined when there is no such process. */
 const commandLine = (pid: number) =>
-  new Promise<string | undefined>((resolve) => {
+  new Promise<string | undefined>((resolve, reject) => {
     const [command, args] =
       process.platform === "win32"
         ? windowsProcessField(pid, "CommandLine")
         : (["ps", ["-o", "command=", "-p", String(pid)]] as const);
     execFile(command, args, (error, stdout) => {
-      resolve(error ? undefined : stdout);
+      // ps exits with a status of its own when there is no such process; one that can't run at all is thrown.
+      if (!error) resolve(stdout);
+      else if (typeof error.code === "number") resolve(undefined);
+      else reject(new Error(`${command}: ${error.message}`, { cause: error }));
     });
   });
 
@@ -84,8 +88,9 @@ async function stopLeft(pid: number) {
   const signal = (name: NodeJS.Signals) => {
     try {
       process.kill(pid, name);
-    } catch {
+    } catch (error) {
       // Ended meanwhile.
+      if (errorCode(error) !== "ESRCH") throw error;
     }
   };
   signal("SIGTERM");

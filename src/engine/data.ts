@@ -4,7 +4,6 @@
  * folder, and the goals listed with who holds each.
  */
 import { mkdir, readdir, readFile } from "node:fs/promises";
-import path from "node:path";
 import { errorCode, errorText } from "../shared/errors.ts";
 import { writeWhole, namesIfThere } from "../shared/files.ts";
 import { goalFiles, goalsFolder, goalFolder } from "../shared/layout.ts";
@@ -130,7 +129,7 @@ export async function listGoals(repoFolder: string): Promise<GoalEntry[]> {
   const slugs = await namesIfThere(folder);
   const found = await Promise.all(
     slugs.map(async (slug): Promise<GoalEntry | undefined> => {
-      const files = goalFiles(path.join(folder, slug));
+      const files = goalFiles(goalFolder(repoFolder, slug));
       const holder = holderOf(files.lock);
       const held = holder && { holder };
       try {

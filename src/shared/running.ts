@@ -1,4 +1,5 @@
 /** Processes by pid: a leaf, for the MCP server's bootstrap too, before its dependencies are in. */
+import { errorCode } from "./errors.ts";
 
 /** Whether process `pid` runs. */
 export function running(pid: number): boolean {
@@ -7,7 +8,7 @@ export function running(pid: number): boolean {
     return true;
   } catch (error) {
     // There, but not ours to signal.
-    return (error as NodeJS.ErrnoException).code === "EPERM";
+    return errorCode(error) === "EPERM";
   }
 }
 

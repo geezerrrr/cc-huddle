@@ -29,6 +29,12 @@ export const sessionsFolder = (dataFolder: string) => path.join(dataFolder, "ses
 /** Where the MCP server's npm dependencies are installed, by version (bootstrap.ts). */
 export const depsFolder = (dataFolder: string) => path.join(dataFolder, "deps");
 
+/** The files a lock is taken through, beside it (lock.ts): a taker's own, by its pid, and the claim on an ended holder's. */
+export const lockFiles = (lock: string) => ({
+  mine: (pid: number) => `${lock}.${String(pid)}`,
+  claim: (holder: string) => `${lock}.ended-${holder}`,
+});
+
 /** The files and folders in a goal's folder. */
 export const goalFiles = (folder: string) => ({
   state: path.join(folder, "state.json"),

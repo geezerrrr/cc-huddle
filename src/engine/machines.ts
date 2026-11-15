@@ -1,7 +1,7 @@
 /**
  * The state machines (docs/design.md §4): each a table of events and the
  * states they move from and to. Each table is moved by one owner module only
- * (goals, meetings, the scheduler, questions) through `step`; a move the
+ * (goals, meetings, the scheduler) through `step`; a move the
  * table lacks is refused. What you can be offered is asked of the same table
  * with `can`, in derive.ts.
  */
