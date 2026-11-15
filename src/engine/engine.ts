@@ -47,7 +47,7 @@ export interface EngineOptions {
   /** Where this process is asked to let the goal go to another session, which the lock names too. */
   address: string;
   /** Asks the session that holds the goal `slug` to let it go, and gives what it stopped (§3.2). */
-  takeOver: (holder: Holder, slug: string) => Promise<HandedOver>;
+  takeOver: (holder: Holder, slug: string) => Promise<HandedOver | undefined>;
   /** Your session's permission mode as it is now, which members work in (§8); undefined before it is known. */
   sessionMode: () => PermissionMode | undefined;
   /** openplan's ids as `enabledPlugins` names them, turned off in members' sessions. */

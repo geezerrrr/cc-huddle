@@ -15,7 +15,7 @@ import path from "node:path";
 import { text } from "node:stream/consumers";
 import { z } from "zod";
 import type { OpenplanTeam, OpenplanView } from "../../plugin/types/index.d.ts";
-import { errorText } from "../engine/core.ts";
+import { errorCode, errorText } from "../engine/core.ts";
 import type { GoalEntry, HandedOver } from "../engine/data.ts";
 import { paneTeam, shownMeeting, viewEntries, viewLive } from "./pane.ts";
 import type { Session } from "./session.ts";
@@ -144,8 +144,8 @@ export async function servePane(session: () => Session): Promise<PaneServer> {
   };
 }
 
-/** Asks the server at `address` to let the goal `slug` go to this one: what it stopped, or why it can't. */
-export function askToLetGo(address: string, slug: string): Promise<HandedOver> {
+/** Asks the server at `address` to let the goal `slug` go to this one: what it stopped, or why it can't; undefined when nothing answers there, the server having ended. */
+export function askToLetGo(address: string, slug: string): Promise<HandedOver | undefined> {
   return new Promise((resolve, reject) => {
     const asking = request({ socketPath: address, path: "/release", method: "POST" }, (answer) => {
       text(answer).then((body) => {
@@ -153,6 +153,13 @@ export function askToLetGo(address: string, slug: string): Promise<HandedOver> {
         else reject(new Error(body));
       }, reject);
     });
-    asking.once("error", reject).end(JSON.stringify({ goal: slug }));
+    asking
+      .once("error", (error) => {
+        // Nothing listens there: the server that held the goal has ended.
+        if (errorCode(error) === "ENOENT" || errorCode(error) === "ECONNREFUSED")
+          resolve(undefined);
+        else reject(error);
+      })
+      .end(JSON.stringify({ goal: slug }));
   });
 }

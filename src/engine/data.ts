@@ -159,7 +159,8 @@ const REPLACING_WAIT_MS = 10;
 
 /**
  * Takes a goal for this process as `me`. A holder that runs is asked to let
- * it go (`takeOver`), and what it stopped is given back. A lock is put in
+ * it go (`takeOver`), and what it stopped is given back; one that doesn't
+ * answer (undefined) has ended, its pid another process's since. A lock is put in
  * place whole or not at all, so of several sessions starting at once one
  * takes it. A lock whose holder has ended is replaced by one taker only: the
  * one that claims that ending, which replaces the lock only if it is still
@@ -168,7 +169,7 @@ const REPLACING_WAIT_MS = 10;
 export async function takeGoal(
   lock: string,
   me: Runner,
-  takeOver: (holder: Holder) => Promise<HandedOver>,
+  takeOver: (holder: Holder) => Promise<HandedOver | undefined>,
 ): Promise<HandedOver> {
   const mine = await holding(lock, me);
   // What every holder asked stopped: another taker may get in between.
@@ -191,8 +192,11 @@ export async function takeGoal(
           return handed;
         }
         const stopped = await takeOver(holder);
-        handed.meetings.push(...stopped.meetings);
-        continue;
+        if (stopped) {
+          handed.meetings.push(...stopped.meetings);
+          continue;
+        }
+        // Nothing answers where it is asked: its server ended, and its pid is another process's since.
       }
       const claim = `${lock}.ended-${String(holder?.pid ?? "unread")}`;
       try {

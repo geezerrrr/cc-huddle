@@ -134,6 +134,19 @@ describe("the lock", () => {
     releaseGoal(lock);
   });
 
+  it("takes a goal over from a holder whose pid another process has taken since", async () => {
+    const lock = path.join(dir, "repo", "lock");
+    const other = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
+    await once(other, "spawn");
+    await mkdir(path.dirname(lock), { recursive: true });
+    await writeFile(lock, JSON.stringify({ pid: other.pid, session: 7, address: "gone" }));
+    // Nothing answers at its address.
+    expect(await takeGoal(lock, ME, () => Promise.resolve(undefined))).toEqual({ meetings: [] });
+    other.kill();
+    expect(holderOf(lock)).toEqual({ pid: process.pid, ...ME });
+    releaseGoal(lock);
+  });
+
   it("goes to one of several sessions starting at once, also over one that has ended", async () => {
     const lock = path.join(dir, "repo", "lock");
     const take = `

@@ -105,6 +105,10 @@ describe("the pane's socket and tools", () => {
     expect(session.current?.state.goal.status).toBe("active");
     expect(await askToLetGo(pane.address, "dice")).toEqual({ meetings: [] });
     expect(session.current).toBeUndefined();
+    // Nothing listening: the server that held it has ended.
+    expect(
+      await askToLetGo(path.join(path.dirname(pane.address), "gone.sock"), "dice"),
+    ).toBeUndefined();
     expect((await view()).team?.resumable).toEqual([
       { slug: "dice", label: "Dice · no plan yet · paused" },
     ]);
