@@ -9450,7 +9450,10 @@ function addPaneTools(server2, session2, pane2) {
     "resume_goal",
     {
       description: `${PANE_ONLY} Takes up the goal you picked in this session and resumes it, as /openplan resume.`,
-      inputSchema: { goal: z6.string().describe("The goal's slug") }
+      inputSchema: {
+        // A slug names a folder: nothing that reaches out of the goals' folder.
+        goal: z6.string().regex(/^[a-z0-9-]+$/).describe("The goal's slug")
+      }
     },
     async ({ goal: slug }) => {
       const { goal } = (await session2.takeUp(slug)).state;
@@ -11490,8 +11493,11 @@ var Engine = class _Engine {
     const stopped = {
       meetings: meetings.filter((m) => m.status === "running").map((m) => m.id)
     };
-    if (goal.status === "active") await this.goals.pause();
-    await this.shut();
+    try {
+      if (goal.status === "active") await this.goals.pause();
+    } finally {
+      await this.shut();
+    }
     return stopped;
   }
   /**
@@ -11512,12 +11518,19 @@ var Engine = class _Engine {
     stopMembers();
     releaseGoal(this.files.lock);
   }
-  /** Stops what runs, writes the state for the last time, and lets the goal go. */
+  /**
+   * Stops what runs, writes the state for the last time, and lets the goal
+   * go, however that went: a goal still held by a session that let it go
+   * would have the session taking it up ask again and again.
+   */
   async shut() {
-    await Promise.all([this.scheduler.close(), this.meetings.close()]);
-    await Promise.all([this.writer.close(), this.records.flush()]);
-    stopRecording();
-    releaseGoal(this.files.lock);
+    try {
+      await Promise.all([this.scheduler.close(), this.meetings.close()]);
+      await Promise.all([this.writer.close(), this.records.flush()]);
+    } finally {
+      stopRecording();
+      releaseGoal(this.files.lock);
+    }
   }
   /**
    * Allows rules always (Questions): in the repository's team settings, for
