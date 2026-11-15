@@ -3,7 +3,7 @@ import {
   dataFolder,
   renameOver,
   running
-} from "./chunks/chunk-GCIRGWII.mjs";
+} from "./chunks/chunk-RMXRUWYN.mjs";
 
 // src/plugin/bootstrap.ts
 import { execFile } from "node:child_process";
@@ -65,4 +65,4 @@ registerHooks({
     return bare && context.parentURL?.startsWith(ours) ? next(specifier, { ...context, parentURL: from }) : next(specifier, context);
   }
 });
-await import("./chunks/server-FSXPRZJE.mjs");
+await import("./chunks/server-5ULKTV3T.mjs");

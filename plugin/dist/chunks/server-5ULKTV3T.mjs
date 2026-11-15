@@ -8,10 +8,11 @@ import {
   errorText,
   renameOver,
   running,
+  spend,
   workOf,
   writeWhole,
   writeWholeSync
-} from "./chunk-GCIRGWII.mjs";
+} from "./chunk-RMXRUWYN.mjs";
 
 // node_modules/.pnpm/yaml@2.9.1/node_modules/yaml/dist/nodes/identity.js
 var require_identity = __commonJS({
@@ -8409,14 +8410,13 @@ function memberOf(member, work, derived) {
     doing = `next: "${next.title}"${waits.length ? `, ${waits.map((w) => waitText(w, work)).join(", ")}` : ""}`;
   } else doing = "free";
   const followed = running3 ?? own.filter((s) => s.startedAt).sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0))[0];
-  const spoken = work.meetings.flatMap((m) => m.turns).filter((t) => t.speaker === member.name).reduce((sum, t) => sum + t.tokens, 0);
   return {
     name: member.name,
     role: member.role.title,
     ...member.model && { model: member.model },
     doing: doing ?? "free",
     ...followed && { subtask: followed.id },
-    tokens: own.reduce((sum, s) => sum + s.tokens, 0) + spoken
+    tokens: work.tokens[member.name] ?? 0
   };
 }
 var optionOf = (value) => ({
@@ -9641,7 +9641,7 @@ function repoFolder(dataFolder2, repo) {
   return path7.join(dataFolder2, "repos", `${name}-${hash}`);
 }
 var goalsFolder = (repoFolder2) => path7.join(repoFolder2, "goals");
-var STATE_VERSION = 1;
+var STATE_VERSION = 2;
 var SAVE_DELAY_MS = 200;
 async function readState(file) {
   const text2 = await readFile5(file, "utf8");
@@ -9655,6 +9655,10 @@ async function readState(file) {
   }
   if (saved.version > STATE_VERSION)
     throw new Error(`${file} was written by a newer openplan: update openplan to go on`);
+  if (saved.version < STATE_VERSION)
+    throw new Error(
+      `${file} was written by an openplan before its first release: move it away to start over`
+    );
   return saved.state;
 }
 function stateWriter(file, state, failed) {
@@ -10014,8 +10018,7 @@ var Meetings = class {
       host,
       ...call.hostOnly && { hostOnly: true },
       status: "running",
-      turns: [],
-      tokens: 0
+      turns: []
     };
     core.state.meetings.push(meeting2);
     core.changed();
@@ -10173,7 +10176,7 @@ var Meetings = class {
           ...turn.listener && { listener: turn.listener }
         });
         meeting2.seats = { ...meeting2.seats, [member2.name]: { session: reply.session, heard } };
-        meeting2.tokens += reply.tokens;
+        spend(core.state, member2.name, reply.tokens);
         return reply;
       };
       const speak = async (member2, prompt, turn = {}) => {
@@ -10200,13 +10203,12 @@ var Meetings = class {
           meeting2.planning = void 0;
         }
       };
-      const said = (speaker, { text: text2, tokens }, phase, calls) => {
+      const said = (speaker, text2, phase, calls) => {
         meeting2.turns.push({
           speaker: speaker.name,
           text: text2,
           at: Date.now(),
           phase,
-          tokens,
           ...calls !== void 0 && { calls }
         });
         core.changed();
@@ -10221,7 +10223,7 @@ var Meetings = class {
         const member2 = attendee(name);
         const point = meeting2.hands?.find((hand) => hand.member === name)?.point;
         meeting2.hands = void 0;
-        said(member2, await speak(member2, meetingAnswer(ctx, member2, point)), "answer");
+        said(member2, (await speak(member2, meetingAnswer(ctx, member2, point))).text, "answer");
       };
       const allAtOnce = async (who, flag, each) => {
         meeting2[flag] = true;
@@ -10259,11 +10261,11 @@ var Meetings = class {
         );
       };
       const round = (who) => allAtOnce(who, "drafting", async (member2, drafting) => {
-        said(
-          member2,
-          await ask(member2, meetingRound(ctx, member2), { heard: 1, signal: drafting }),
-          "round"
-        );
+        const judged = await ask(member2, meetingRound(ctx, member2), {
+          heard: 1,
+          signal: drafting
+        });
+        said(member2, judged.text, "round");
       });
       const discuss = async (left) => {
         const last = meeting2.turns.at(-1);
@@ -10281,7 +10283,7 @@ var Meetings = class {
         const called2 = floor?.member;
         const after = steer.text.trim();
         const text2 = before && before !== after ? [before, after].filter(Boolean).join("\n\n") : after;
-        if (text2 && !floor?.quiet) said(host, { text: text2, tokens: steer.tokens }, "steer", called2);
+        if (text2 && !floor?.quiet) said(host, text2, "steer", called2);
         else if (called2) await answer(called2);
         else return false;
         return true;
@@ -10290,7 +10292,7 @@ var Meetings = class {
       for (let move = nextMove(meeting2); talking && move.kind !== "close"; move = nextMove(meeting2)) {
         switch (move.kind) {
           case "open":
-            said(host, await speak(host, meetingOpening(ctx)), "opening");
+            said(host, (await speak(host, meetingOpening(ctx))).text, "opening");
             break;
           case "round":
             await round(move.members.map(attendee));
@@ -10308,7 +10310,7 @@ var Meetings = class {
       const closing = await speak(host, meetingClosing(ctx), { schema });
       signal.throwIfAborted();
       meeting2.plan = soundPlan(hostWritten(schema.parse(closing.structured)), "drop");
-      said(host, { text: meeting2.plan.summary, tokens: closing.tokens }, "summary");
+      said(host, meeting2.plan.summary, "summary");
       meeting2.status = step(MEETING_MACHINE, meeting2.status, "plan");
       meeting2.seats = void 0;
     } catch (error) {
@@ -10905,8 +10907,7 @@ var Scheduler = class {
           id,
           taskId: task.id,
           status: "pending",
-          progress: { done: 0, total: 0 },
-          tokens: 0
+          progress: { done: 0, total: 0 }
         };
       });
     });
@@ -11261,7 +11262,7 @@ ${outcome.handover.summary}`
     }
     this.questions.cancelFor(subtask2.id);
     end2();
-    subtask2.tokens += outcome.tokens;
+    spend(core.state, subtask2.assignee, outcome.tokens);
     const held = this.held.get(subtask2.id);
     this.held.delete(subtask2.id);
     if (this.closed) return;
@@ -11306,7 +11307,7 @@ ${outcome.handover.summary}`
           signal
         })
       );
-      subtask2.tokens += reply.tokens;
+      spend(core.state, target.name, reply.tokens);
       core.changed();
       return `${target.name} answered: ${reply.text}`;
     } catch (error) {
@@ -11366,7 +11367,7 @@ ${outcome.handover.summary}`
         schema: verdictSchema,
         signal: abort.signal
       });
-      subtask2.tokens += reply.tokens;
+      spend(core.state, reviewer.name, reply.tokens);
       if (subtask2.status !== "reviewing") return;
       const verdict = verdictSchema.parse(reply.structured);
       const rounds = (subtask2.review?.rounds ?? 0) + (verdict.pass ? 0 : 1);
@@ -11516,7 +11517,8 @@ var Engine = class _Engine {
         tasks: [],
         subtasks: [],
         meetings: [],
-        questions: []
+        questions: [],
+        tokens: {}
       };
       const engine = await _Engine.ready(options, places, files, copy, state);
       engine.core.changed();

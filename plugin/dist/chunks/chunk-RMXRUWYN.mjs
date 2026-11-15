@@ -41,6 +41,9 @@ var workOf = (core) => ({
   members: core.team.members.map((m) => m.name),
   underWay: core.underWay()
 });
+function spend(state, member, tokens) {
+  state.tokens[member] = (state.tokens[member] ?? 0) + tokens;
+}
 var errorText = (error) => error instanceof Error ? error.message : String(error);
 var errorCode = (error) => error.code;
 
@@ -95,6 +98,7 @@ export {
   __commonJS,
   __toESM,
   workOf,
+  spend,
   errorText,
   errorCode,
   renameOver,

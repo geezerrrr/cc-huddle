@@ -7506,7 +7506,7 @@ function repoFolder(dataFolder2, repo) {
   return path3.join(dataFolder2, "repos", `${name}-${hash2}`);
 }
 var goalsFolder = (repoFolder2) => path3.join(repoFolder2, "goals");
-var STATE_VERSION = 1;
+var STATE_VERSION = 2;
 async function readState(file2) {
   const text2 = await readFile2(file2, "utf8");
   let saved;
@@ -7519,6 +7519,10 @@ async function readState(file2) {
   }
   if (saved.version > STATE_VERSION)
     throw new Error(`${file2} was written by a newer openplan: update openplan to go on`);
+  if (saved.version < STATE_VERSION)
+    throw new Error(
+      `${file2} was written by an openplan before its first release: move it away to start over`
+    );
   return saved.state;
 }
 function lockText(file2) {
