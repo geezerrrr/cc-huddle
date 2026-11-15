@@ -72,7 +72,13 @@ export function addPaneTools(server: McpServer, session: Session, pane: PaneServ
     "resume_goal",
     {
       description: `${PANE_ONLY} Takes up the goal you picked in this session and resumes it, as /openplan resume.`,
-      inputSchema: { goal: z.string().describe("The goal's slug") },
+      inputSchema: {
+        // A slug names a folder: nothing that reaches out of the goals' folder.
+        goal: z
+          .string()
+          .regex(/^[a-z0-9-]+$/)
+          .describe("The goal's slug"),
+      },
     },
     async ({ goal: slug }) => {
       const { goal } = (await session.takeUp(slug)).state;
