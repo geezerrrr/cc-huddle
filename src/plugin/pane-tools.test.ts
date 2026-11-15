@@ -9,7 +9,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { git } from "../engine/git.ts";
 import { teamFolder } from "../engine/team.ts";
-import type { Question, Subtask } from "../engine/types.ts";
+import { DECISIONS, type DecisionQuestion, type Subtask } from "../engine/types.ts";
 import type { OpenplanAsk, OpenplanView } from "../../plugin/types/index.d.ts";
 import { askToLetGo, servePane, type PaneServer } from "./pane-server.ts";
 import { addPaneTools } from "./pane-tools.ts";
@@ -242,20 +242,13 @@ describe("the pane's socket and tools", () => {
   });
 
   it("answer what waits on you as it was pressed, and refuse what doesn't fit", async () => {
-    const question: Question = {
+    const question: DecisionQuestion = {
       id: "q1",
       subtaskId: "s1",
       from: "glm",
-      text: "Which board?",
-      kind: "choices",
-      choices: [
-        {
-          question: "Which board?",
-          header: "Board",
-          options: [{ label: "Grid", description: "" }],
-          multiSelect: false,
-        },
-      ],
+      text: "Board",
+      kind: "decision",
+      decision: DECISIONS.delivery(),
     };
     inside(await session.start("Dice")).core.state.questions.push(question);
     expect(
@@ -265,7 +258,7 @@ describe("the pane's socket and tools", () => {
       error: true,
     });
     expect(
-      await call("answer", { question: "q1", answer: { kind: "choices", picks: ["Grid"] } }),
+      await call("answer", { question: "q1", answer: { kind: "option", option: "accept" } }),
     ).toEqual({
       text: "Answered q1.",
       error: false,

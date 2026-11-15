@@ -204,8 +204,10 @@ function progressOf({ subtasks, meetings }: Pick<GoalState, "subtasks" | "meetin
 }
 
 /** A goal named with how far it got and `where` it is, as `/openplan resume` lists it. */
-export const goalLabel = (state: GoalState, where: string) =>
-  `${state.goal.name} · ${progressOf(state)} · ${where}`;
+export const goalLabel = (
+  state: Pick<GoalState, "goal" | "subtasks" | "meetings">,
+  where: string,
+) => `${state.goal.name} · ${progressOf(state)} · ${where}`;
 
 /** One of the repository's goals as `/openplan resume` lists it: one that can't be read by its folder, and why. */
 const entryLabel = (entry: GoalEntry) =>

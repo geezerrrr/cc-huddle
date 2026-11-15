@@ -181,7 +181,7 @@ A running subtask's member has two tools beyond Claude Code's own, from an in-pr
 
 ### 4.4 Question
 
-A question has no status: it is in the state while it is open, and leaves it once answered, or called off when the asker stops waiting.
+A question has no status: it is open until answered, or called off when the asker stops waiting. What a member's turn waits on (a teammate's answer, your picks, your leave for a call) ends with the turn, so it lives with the questions and not in the state; only decisions, which no turn waits on, are in the state and outlive a restart.
 
 Kinds: a teammate's question (answered by that teammate in a read-only session), a question to you (Claude Code's own `AskUserQuestion`, intercepted), a permission request, a decision (stuck review, binary conflict, git error), and a finished task you chose to accept.
 

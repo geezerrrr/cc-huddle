@@ -9,7 +9,7 @@ import type { MemberOptions } from "./policy.ts";
 import type { SessionKind } from "./prompts.ts";
 import type { Inbox } from "./questions.ts";
 import type { TurnListener } from "./turns.ts";
-import type { GoalState, Meeting, MeetingNow, Member, Subtask } from "./types.ts";
+import type { GoalState, Meeting, MeetingNow, Member, Question, Subtask } from "./types.ts";
 
 /** The team as configured (§6): its members in order, and openplan's own settings. */
 export interface Team {
@@ -32,11 +32,16 @@ export interface Core extends Inbox {
   underWay(): readonly string[];
   /** What goes on at each running meeting now (Meetings.now). */
   meetingsNow(): Readonly<Record<string, MeetingNow>>;
+  /** What members' turns wait on now (Questions.now). */
+  questionsNow(): readonly Question[];
 }
 
 /** The state as the rules read it (derive.ts). */
-export const workOf = (core: Pick<Core, "state" | "team" | "underWay" | "meetingsNow">): Work => ({
+export const workOf = (
+  core: Pick<Core, "state" | "team" | "underWay" | "meetingsNow" | "questionsNow">,
+): Work => ({
   ...core.state,
+  questions: [...core.state.questions, ...core.questionsNow()],
   members: core.team.members.map((m) => m.name),
   underWay: core.underWay(),
   meetingsNow: core.meetingsNow(),

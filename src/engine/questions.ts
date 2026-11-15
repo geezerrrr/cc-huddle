@@ -3,9 +3,10 @@
  * member's calls outside its rules and its questions with choices
  * (AskUserQuestion) come here through the Agent SDK's `canUseTool`, wait in
  * "Needs you" until you answer, and are called off when the member's turn
- * ends first. Decisions on a subtask wait there too, with no turn behind
- * them: the scheduler acts on your answer. Answered and called-off questions
- * leave the state; nothing here changes a subtask.
+ * ends first: they live here, as the turn does. Decisions on a subtask wait
+ * there too, with no turn behind them, in the state: the scheduler acts on
+ * your answer. Answered and called-off questions leave; nothing here changes
+ * a subtask.
  */
 import { randomUUID } from "node:crypto";
 import type {
@@ -22,6 +23,7 @@ import {
   type Choice,
   type Decision,
   type DecisionOption,
+  type DecisionQuestion,
   type PermissionOption,
   toYou,
   type Question,
@@ -54,9 +56,6 @@ export type Answer =
 /** Your answer to a decision, which the scheduler carries out. */
 export type DecisionAnswer = Extract<Answer, { kind: "decision" }>;
 
-/** What a decision put to you is. */
-export type DecisionQuestion = Extract<Question, { kind: "decision" }>;
-
 /** Why an answer is refused: it isn't one the question can take. */
 export const DOESNT_FIT = "That answer doesn't fit the question.";
 
@@ -88,10 +87,17 @@ const alwaysRules = (request: Request): PermissionRuleValue[] =>
       );
 
 export class Questions {
+  /** What members' turns wait on now. */
+  private live: Question[] = [];
   /** Questions a member's turn waits on: question id → resume it (undefined: called off). */
   private waiting = new Map<string, (answer: Answer | undefined) => void>();
 
   constructor(private readonly inbox: Inbox) {}
+
+  /** What members' turns wait on now: they end with the turn, and aren't in the state. */
+  now(): readonly Question[] {
+    return this.live;
+  }
 
   /**
    * The `canUseTool` of a member's turn: its questions with choices and
@@ -109,9 +115,7 @@ export class Questions {
 
   /** A question put to you, open still; throws when it is no longer open. */
   find(id: string): QuestionToYou {
-    const question = this.inbox.state.questions.find(
-      (q): q is QuestionToYou => q.id === id && toYou(q),
-    );
+    const question = this.all().find((q): q is QuestionToYou => q.id === id && toYou(q));
     if (!question) throw new Error("That question is no longer open.");
     return question;
   }
@@ -145,7 +149,7 @@ export class Questions {
       return await answering();
     } finally {
       // Called off meanwhile, it left already.
-      if (this.inbox.state.questions.includes(question)) this.close(question);
+      if (this.live.includes(question)) this.close(question);
     }
   }
 
@@ -154,10 +158,16 @@ export class Questions {
    * what, in `text`): it waits for your answer, no turn behind it.
    */
   openDecision(subtask: Subtask, decision: Decision, text: string) {
-    this.open(
-      { from: subtask.assignee, subtaskId: subtask.id },
-      { text, kind: "decision", decision },
-    );
+    const question: DecisionQuestion = {
+      id: randomUUID(),
+      subtaskId: subtask.id,
+      from: subtask.assignee,
+      text,
+      kind: "decision",
+      decision,
+    };
+    this.inbox.state.questions.push(question);
+    this.inbox.changed();
   }
 
   /**
@@ -167,11 +177,6 @@ export class Questions {
    */
   cancelFor(subtaskId: string, decisions = false) {
     this.cancelAll((q) => q.subtaskId === subtaskId && (decisions || q.kind !== "decision"));
-  }
-
-  /** After a restart no turn waits on anything: what members asked is called off; your decisions stand. */
-  recover() {
-    this.cancelAll((q) => q.kind !== "decision");
   }
 
   /** Calls off a task's delivery waiting on you, on one of `subtaskIds`, its subtasks: work in it is being done again. */
@@ -277,30 +282,38 @@ export class Questions {
     });
   }
 
-  /** Puts a question: to a teammate, or to you. */
-  private open(asker: Omit<Asker, "signal">, ask: { text: string } & Ask): Question {
+  /** A member's turn puts a question: to a teammate, or to you. */
+  private open(
+    asker: Omit<Asker, "signal">,
+    ask: { text: string } & Exclude<Ask, { kind: "decision" }>,
+  ): Question {
     const question: Question = {
       id: randomUUID(),
       subtaskId: asker.subtaskId,
       from: asker.from,
       ...ask,
     };
-    this.inbox.state.questions.push(question);
+    this.live.push(question);
     this.inbox.changed();
     return question;
   }
 
-  /** Calls off every open question that `which` picks. */
-  private cancelAll(which: (question: Question) => boolean) {
-    // Picked out first: each one called off leaves the list.
-    const picked = this.inbox.state.questions.filter(which);
-    for (const question of picked) this.close(question);
+  /** Every open question: your decisions, and what turns wait on. */
+  private all(): Question[] {
+    return [...this.inbox.state.questions, ...this.live];
   }
 
-  /** Answers or calls off a question: it leaves the state, and whoever waits on it hears. */
+  /** Calls off every open question that `which` picks. */
+  private cancelAll(which: (question: Question) => boolean) {
+    // Picked out first: each one called off leaves its list.
+    for (const question of this.all().filter(which)) this.close(question);
+  }
+
+  /** Answers or calls off a question: it leaves, and whoever waits on it hears. */
   private close(question: Question, answer?: Answer) {
     this.waiting.get(question.id)?.(answer);
     this.waiting.delete(question.id);
+    this.live = this.live.filter((q) => q !== question);
     this.inbox.state.questions = this.inbox.state.questions.filter((q) => q !== question);
     this.inbox.changed();
   }

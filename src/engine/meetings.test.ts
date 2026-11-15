@@ -66,6 +66,7 @@ beforeEach(async () => {
     speech: () => ({}),
     underWay: () => [],
     meetingsNow: () => meetings.now(),
+    questionsNow: () => [],
   };
   meetings = new Meetings(core, { pump, assign } as unknown as Scheduler);
   vi.mocked(askOnce).mockReset();

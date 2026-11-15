@@ -206,10 +206,10 @@ export class Engine {
       speech: (meeting) => records.speech(meeting),
       underWay: () => engine.parts.scheduler.underWay(),
       meetingsNow: () => engine.parts.meetings.now(),
+      questionsNow: () => engine.parts.questions.now(),
     };
     const engine = new Engine(core, records, files, writer, options, copy);
     await engine.writeMemberSettings(copy);
-    engine.parts.questions.recover();
     engine.parts.scheduler.recover();
     engine.parts.meetings.recover();
     return engine;

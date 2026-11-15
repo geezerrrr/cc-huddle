@@ -26,13 +26,15 @@ import {
  * the subtasks whose review or merge is, and what goes on at each running
  * meeting, by its id.
  */
-export interface Work extends GoalState {
+export interface Work extends Omit<GoalState, "questions"> {
+  /** Your decisions, and what members' turns wait on now. */
+  questions: readonly Question[];
   members: readonly string[];
   underWay: readonly string[];
   meetingsNow: Readonly<Record<string, MeetingNow>>;
 }
 
-const openQuestions = (state: Pick<GoalState, "questions">, subtaskId: string) =>
+const openQuestions = (state: Pick<Work, "questions">, subtaskId: string) =>
   state.questions.filter((q) => q.subtaskId === subtaskId);
 
 const isActive = (state: Pick<GoalState, "goal">) => state.goal.status === "active";
@@ -105,14 +107,14 @@ export function reviewerOf(
 }
 
 /** The acceptance a task waits for, its subtasks all done. */
-export function acceptanceOf(state: Pick<GoalState, "questions" | "subtasks">, taskId: string) {
+export function acceptanceOf(state: Pick<Work, "questions" | "subtasks">, taskId: string) {
   return state.questions.find(
     (q) => isAcceptance(q) && state.subtasks.find((s) => s.id === q.subtaskId)?.taskId === taskId,
   );
 }
 
 /** Whether a task you accept is accepted: done, with no acceptance waiting on you (§7.1). */
-export const accepted = (state: Pick<GoalState, "questions" | "subtasks">, taskId: string) =>
+export const accepted = (state: Pick<Work, "questions" | "subtasks">, taskId: string) =>
   taskDone(state, taskId) && !acceptanceOf(state, taskId);
 
 /** Whether a subtask handed over is taken up in `stage`: it is there and its goal is active. */

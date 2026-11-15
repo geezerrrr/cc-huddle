@@ -288,7 +288,7 @@ Take it to the user as openplan's team skill says.`,
     now.goal.status = "paused";
     const entry = (slug: string, status: "active" | "paused" | "archived", held = false) => ({
       slug,
-      state: { ...work(), goal: { ...now.goal, name: slug, slug, status } },
+      state: { ...work(), questions: [], goal: { ...now.goal, name: slug, slug, status } },
       ...(held && { holder: { pid: 1, session: 7, address: "there" } }),
     });
     const others = [
@@ -321,7 +321,12 @@ Take it to the user as openplan's team skill says.`,
   it("without a goal, has a band only for goals it can take up, archived ones aside", () => {
     const entry = (slug: string, status: "paused" | "archived", held = false) => ({
       slug,
-      state: { ...work(), subtasks: [], goal: { ...work().goal, name: slug, slug, status } },
+      state: {
+        ...work(),
+        questions: [],
+        subtasks: [],
+        goal: { ...work().goal, name: slug, slug, status },
+      },
       ...(held && { holder: { pid: 1, session: 7, address: "there" } }),
     });
     const none =

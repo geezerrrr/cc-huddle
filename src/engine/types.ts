@@ -308,7 +308,8 @@ export interface Permission {
  * Something a member waits on, or a decision that waits on you (§4.4): a
  * teammate's answer, or, put to you, your picks among choices, your leave for
  * a tool call, or a call the scheduler acts on, with no run waiting on it.
- * It is in the state while it is open; answered or called off, it leaves.
+ * It is open until answered or called off. What a turn waits on ends with
+ * the turn, so only decisions are in the state.
  */
 export type Question = {
   id: string;
@@ -327,6 +328,9 @@ export type Ask =
   /** On a subtask stuck in review or a merge, or the last one done of a task. */
   | { kind: "decision"; decision: Decision };
 
+/** A decision put to you, the one kind of question the state keeps. */
+export type DecisionQuestion = Extract<Question, { kind: "decision" }>;
+
 /** A question put to you: every kind but a teammate's. */
 export type QuestionToYou = Exclude<Question, { kind: "teammate" }>;
 
@@ -343,7 +347,8 @@ export interface GoalState {
   tasks: Task[];
   subtasks: Subtask[];
   meetings: Meeting[];
-  questions: Question[];
+  /** Your decisions open: what turns wait on is Questions.now. */
+  questions: DecisionQuestion[];
   /** The tokens each member's sessions have used, by name: their runs, reviews, answers to teammates and meeting turns. */
   tokens: Record<string, number>;
 }
