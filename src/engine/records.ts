@@ -5,6 +5,7 @@
  * not back yet. A meeting turn being spoken is followed the same way, its
  * entries kept in memory until it is the meeting's.
  */
+import { randomUUID } from "node:crypto";
 import { appendFile, mkdir, open } from "node:fs/promises";
 import path from "node:path";
 import { errorCode } from "../shared/errors.ts";
@@ -36,9 +37,14 @@ export interface LiveRun {
   running: ToolCall[];
 }
 
-/** A meeting turn as it is spoken: what it did so far, and what it does now. */
+/**
+ * A meeting turn as it is spoken: which speech it is, what it did since a
+ * read, where the next read starts, and what it does now.
+ */
 interface Spoken {
+  speech: string;
   entries: RecordEntry[];
+  next: number;
   live: LiveRun;
 }
 
@@ -109,8 +115,9 @@ function tracking(now: Now, keep: (entry: RecordEntry) => void): TurnListener {
   };
 }
 
-/** A meeting turn being spoken: the turn it becomes, and what it did and does. */
+/** A meeting turn being spoken: which speech it is, the turn it becomes, and what it did and does. */
 interface Speaking {
+  speech: string;
   turn: number;
   entries: RecordEntry[];
   now: Now;
@@ -187,6 +194,8 @@ export class Records {
    */
   speech(meeting: Meeting): TurnListener {
     const speaking: Speaking = {
+      // A turn spoken again, after a stop, is another speech.
+      speech: randomUUID(),
       turn: meeting.turns.length,
       entries: [],
       now: { running: new Map() },
@@ -197,11 +206,20 @@ export class Records {
     });
   }
 
-  /** The turn being spoken at `meeting` now, if one is. */
-  speaking(meeting: Meeting): Spoken | undefined {
+  /**
+   * The turn being spoken at `meeting` now, if one is: from where a read of
+   * it (`since`) left off, when it is the speech that read was of.
+   */
+  speaking(meeting: Meeting, since?: { speech: string; next: number }): Spoken | undefined {
     const speaking = this.spoken.get(meeting.id);
     if (meeting.status !== "running" || speaking?.turn !== meeting.turns.length) return undefined;
-    return { entries: speaking.entries, live: liveOf(speaking.now) };
+    const { speech, entries } = speaking;
+    return {
+      speech,
+      entries: entries.slice(since?.speech === speech ? since.next : 0),
+      next: entries.length,
+      live: liveOf(speaking.now),
+    };
   }
 
   /** Every entry written so far is in its file. */

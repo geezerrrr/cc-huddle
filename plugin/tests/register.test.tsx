@@ -50,17 +50,15 @@ const permission = (id: string, call: string): OpenplanNeed => ({
 const NEED = permission("q1", "Bash: npm test");
 
 const TEAM: OpenplanTeam = {
-  goal: { name: "Dice", slug: "dice" },
+  opened: 1,
   band: "1 working · 1 needs you",
   tasks: ['Rules · glm works on "Rules"'],
   members: [
     {
       name: "glm",
-      role: "Developer",
-      model: "glm-5",
+      line: "Developer · glm-5 · 1,200 tokens",
       doing: 'works on "Rules"',
-      subtask: "s1",
-      tokens: 1200,
+      followable: true,
     },
   ],
   needs: [NEED],
@@ -74,6 +72,7 @@ const TEAM: OpenplanTeam = {
 /** The team of a session that runs no goal. */
 const NO_GOAL: OpenplanTeam = {
   noGoal: "This session runs no goal. Hand the team a task with /openplan <task>.",
+  opened: 1,
   tasks: [],
   members: [],
   needs: [],
@@ -157,8 +156,8 @@ test("the band and the pane show the team, and a press answers what needs you", 
     await pane.unmount();
   }
   expect(calls.filter((c) => c.tool === "answer")).toEqual([
-    { tool: "answer", args: { question: "q1", option: "once" } },
-    { tool: "answer", args: { question: "q1", option: "once" } },
+    { tool: "answer", args: { question: "q1", answer: { kind: "option", option: "once" } } },
+    { tool: "answer", args: { question: "q1", answer: { kind: "option", option: "once" } } },
   ]);
   expect(calls.find((c) => c.tool === "view")?.args).toEqual({});
 });
@@ -185,6 +184,14 @@ test("a member's record shows in place of the team as it grows, and Back shows t
         live: { running: [], streaming: { kind: "text", text: "Reading it" } },
       },
     },
+    {
+      revision: 1,
+      record: { subtask: "s1", entries: [{ kind: "text", text: "Read." }], next: 150 },
+    },
+    {
+      revision: 1,
+      record: { subtask: "s2", entries: [{ kind: "text", text: "Fresh" }], next: 10 },
+    },
   ]);
   await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
   await clock.advance(500);
@@ -194,7 +201,7 @@ test("a member's record shows in place of the team as it grows, and Back shows t
   await clock.advance(500);
   expect(calls.at(-1)).toEqual({
     tool: "view",
-    args: { revision: 1, record: { subtask: "s1", from: 0 } },
+    args: { revision: 1, record: { member: "glm" } },
   });
   const opened = () => calls.filter((c) => c.tool === "ui.open").map((c) => c.args.title);
   expect(opened()).toEqual(["openplan · glm"]);
@@ -212,6 +219,17 @@ test("a member's record shows in place of the team as it grows, and Back shows t
   expect(texts).not.toContain("     four");
   expect((await pane.find({ key: "record-streaming-md" }))?.text).toBe("Reading it");
   expect(texts.at(-1)).toMatch(/^b back to the team · 1 meeting/);
+  // Read on from where it left off, and added to what it has.
+  await clock.advance(500);
+  expect(calls.at(-1)?.args).toEqual({
+    revision: 1,
+    record: { member: "glm", read: { subtask: "s1", next: 120 } },
+  });
+  expect((await pane.find({ key: "record-e2-md" }))?.text).toBe("Read.");
+  // Onto the member's new work: its record in place of the old.
+  await clock.advance(500);
+  expect((await pane.find({ key: "record-e0-md" }))?.text).toBe("Fresh");
+  expect(await pane.find({ type: "Text", text: "∴ Look at the rules" })).toBeUndefined();
   await pane.press({ key: "back" });
   expect(opened()).toEqual(["openplan · glm", "openplan"]);
   expect(await pane.find({ key: "follow-glm" })).toBeDefined();
@@ -220,22 +238,22 @@ test("a member's record shows in place of the team as it grows, and Back shows t
 
 test("the meeting shows the turn being spoken as a record, and your scrolling reaches the window as you moved it", async ($, on) => {
   const clock = mock.clock(on);
-  serve(on, [
+  const calls = serve(on, [
     {
       revision: 1,
       team: {
         ...TEAM,
         meeting: {
-          about: "Dice",
-          agenda: "Plan the game",
-          status: "glm speaks",
+          heading: "Dice · sonnet speaks",
           attendance: "glm and sonnet, hosted by glm",
-          turns: [{ speaker: "glm", text: "A grid board" }],
-          hands: [],
+          agenda: "Plan the game",
+          turns: [{ heading: "glm → sonnet", text: "A grid board" }],
         },
       },
       speaking: {
+        speech: "sp1",
         speaker: "sonnet",
+        next: 1,
         entries: [
           {
             kind: "tool",
@@ -246,6 +264,16 @@ test("the meeting shows the turn being spoken as a record, and your scrolling re
           },
         ],
         live: { running: [], streaming: { kind: "thinking", text: "Hex or\ngrid" } },
+      },
+    },
+    {
+      revision: 1,
+      speaking: {
+        speech: "sp1",
+        speaker: "sonnet",
+        entries: [{ kind: "text", text: "Hex it is" }],
+        next: 2,
+        live: { running: [] },
       },
     },
   ]);
@@ -276,6 +304,11 @@ test("the meeting shows the turn being spoken as a record, and your scrolling re
       origin: { kind: "person" },
     });
   expect(moved).toEqual([30, 60]);
+  // The speech read on from where it left off, and added to what it has.
+  await clock.advance(500);
+  expect(calls.at(-1)?.args).toEqual({ revision: 1, speaking: { speech: "sp1", next: 1 } });
+  expect((await pane.find({ key: "speaking-e1-md" }))?.text).toBe("Hex it is");
+  expect(await pane.find({ type: "Text", text: "⏺ Grep(board)" })).toBeDefined();
   await pane.unmount();
 });
 
@@ -390,10 +423,10 @@ test("each need is asked as it comes, in turn, and answered as you said; a task 
     'The review of "Rules" is stuck. What now?\nToo small',
   ]);
   expect(calls.filter((c) => c.tool === "answer").map((c) => c.args)).toEqual([
-    { question: "q1", option: "once" },
-    { question: "q2", option: "deny", note: "don't touch dist" },
-    { question: "q3", picks: ["Grid"] },
-    { question: "q4", option: "sendBack", note: "make it bigger" },
+    { question: "q1", answer: { kind: "option", option: "once" } },
+    { question: "q2", answer: { kind: "option", option: "deny", note: "don't touch dist" } },
+    { question: "q3", answer: { kind: "choices", picks: ["Grid"] } },
+    { question: "q4", answer: { kind: "option", option: "sendBack", note: "make it bigger" } },
   ]);
 });
 
@@ -461,7 +494,7 @@ test("a goal that moved to another session leaves the pane, and the band says wh
 test("the model can't call the pane's tools", async ($) => {
   const { decision } = await $.tool.check({
     tool: "mcp__plugin_openplan_openplan__answer",
-    input: { question: "q1", option: "always" },
+    input: { question: "q1", answer: { kind: "option", option: "always" } },
   });
   expect(decision).toBe("deny");
 });
@@ -513,12 +546,7 @@ test("/openplan pause pauses the session's goal, and resume takes up the only on
   const calls = serve(on, [
     {
       revision: 1,
-      team: {
-        ...TEAM,
-        goal: { name: "Dice", slug: "g1" },
-        resumable: resumable(1),
-        resumeRefused: undefined,
-      },
+      team: { ...TEAM, resumable: resumable(1), resumeRefused: undefined },
     },
   ]);
   await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
@@ -528,6 +556,13 @@ test("/openplan pause pauses the session's goal, and resume takes up the only on
     { tool: "goal_action", args: { action: "pause" } },
     { tool: "resume_goal", args: { goal: "g1" } },
   ]);
+});
+
+test("/openplan pause says why it pauses nothing, with no call", async ($, on) => {
+  const calls = serve(on, [{ revision: 1, team: { ...NO_GOAL, pauseRefused: NO_GOAL.noGoal } }]);
+  await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
+  expect(await openplan($, "pause")).toBe(NO_GOAL.noGoal);
+  expect(calls.filter((c) => c.tool === "goal_action")).toEqual([]);
 });
 
 test("/openplan resume says why it takes nothing up while the session's goal is under way", async ($, on) => {
@@ -592,7 +627,7 @@ test("a goal taken up puts what waits in it to your session at once; its milesto
   const taken: OpenplanTeam = {
     ...TEAM,
     needs: [],
-    goal: { name: "Dice", slug: "g1" },
+    opened: 2,
     milestones: [{ key: "plan:m1", text: 'Plan approved: "Dice"' }],
     prompts: [{ key: "accept:q2", text: "A task to accept" }],
   };

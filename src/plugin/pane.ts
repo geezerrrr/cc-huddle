@@ -63,20 +63,30 @@ export function shownMeeting(work: Work): Meeting | undefined {
 
 function meetingOf(meeting: Meeting, work: Work): OpenplanMeeting {
   const now = work.meetingsNow[meeting.id];
+  const hands = now?.hands ?? [];
   return {
-    // Its agenda is the brief your session wrote for it, too long for a line.
-    about: work.goal.name,
-    agenda: meeting.agenda,
-    status: meetingStatus(meeting, now),
+    // Named by its goal: its agenda is the brief your session wrote for it, too long for a line.
+    heading: `${work.goal.name} · ${meetingStatus(meeting, now)}`,
     attendance: attendanceText(meeting),
+    agenda: meeting.agenda,
     turns: meeting.turns.map((t) => ({
-      speaker: t.speaker,
+      heading: t.calls ? `${t.speaker} → ${t.calls}` : t.speaker,
       text: t.text,
-      ...(t.calls && { to: t.calls }),
     })),
-    hands: (now?.hands ?? []).map((h) => ({ member: h.member, point: h.point })),
-    ...(meeting.plan && { plan: meeting.plan.summary }),
+    ...(hands.length && {
+      hands: `Hands up: ${hands.map((h) => `${h.member} (${h.point})`).join(", ")}`,
+    }),
+    ...(meeting.plan && { plan: `Plan: ${meeting.plan.summary}` }),
   };
+}
+
+/** The subtask a member's record follows: the one they work on, else the one they started last. */
+export function followedOf(member: string, work: Work): Subtask | undefined {
+  const own = work.subtasks.filter((s) => s.assignee === member);
+  return (
+    own.find((s) => s.status === "running") ??
+    own.filter((s) => s.startedAt).sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0))[0]
+  );
 }
 
 function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>): OpenplanMember {
@@ -101,16 +111,14 @@ function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>
     const waits = derived.subtasks[next.id]?.waits ?? [];
     doing = `next: "${next.title}"${waits.length ? `, ${waits.map((w) => waitText(w, work)).join(", ")}` : ""}`;
   } else doing = "free";
-  const followed =
-    running ??
-    own.filter((s) => s.startedAt).sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0))[0];
+  const tokens = (work.tokens[member.name] ?? 0).toLocaleString();
   return {
     name: member.name,
-    role: member.role.title,
-    ...(member.model && { model: member.model }),
+    line: [member.role.title, ...(member.model ? [member.model] : []), `${tokens} tokens`].join(
+      " · ",
+    ),
     doing,
-    ...(followed && { subtask: followed.id }),
-    tokens: work.tokens[member.name] ?? 0,
+    followable: followedOf(member.name, work) !== undefined,
   };
 }
 
@@ -185,9 +193,11 @@ function needOf(question: QuestionToYou, work: Work): OpenplanNeed {
         ...head,
         kind: "options",
         ...answersOf(question.decision.options, question.decision.note),
-        ...(kind === "delivery" && {
-          sendBack: done.map((s) => ({ id: s.id, title: s.title })),
-        }),
+        // With one done subtask, a revised task goes back to it: nothing to pick.
+        ...(kind === "delivery" &&
+          done.length > 1 && {
+            sendBack: done.map((s) => ({ id: s.id, title: s.title })),
+          }),
       };
     }
   }
@@ -326,17 +336,21 @@ function othersBand(others: readonly GoalEntry[]): string | undefined {
 
 /**
  * The team as the pane shows it: the session's goal (`mine`), if it runs
- * one, and the repository's goals it doesn't run (`others`).
+ * one, and the repository's goals it doesn't run (`others`); `session`, the
+ * goal that moved from it to another session, and how many it opened.
  */
 export function paneTeam(
   mine: { work: Work; members: readonly Member[] } | undefined,
   others: readonly GoalEntry[],
-  moved: string | undefined,
+  session: { moved: string | undefined; opened: number },
 ): OpenplanTeam {
+  const { opened } = session;
   if (!mine) {
     const band = othersBand(others);
+    const noGoal = noGoalText(session.moved);
     return {
-      noGoal: noGoalText(moved),
+      noGoal,
+      opened,
       ...(band && { band }),
       tasks: [],
       members: [],
@@ -344,6 +358,7 @@ export function paneTeam(
       milestones: [],
       prompts: [],
       resumable: resumableOf(others),
+      pauseRefused: noGoal,
     };
   }
   const { work, members } = mine;
@@ -356,7 +371,7 @@ export function paneTeam(
       ? []
       : [{ slug: goal.slug, label: goalLabel(work, `${goal.status}, in this session`) }];
   return {
-    goal: { name: goal.name, slug: goal.slug },
+    opened,
     band: bandText(work, needs.length),
     tasks: taskLines(work, derived),
     ...(meeting && { meeting: meetingOf(meeting, work) }),
@@ -365,7 +380,9 @@ export function paneTeam(
     milestones: milestones(work),
     prompts: prompts(work),
     resumable: [...here, ...resumableOf(others)],
-    ...(goal.status === "active" && { resumeRefused: resumeRefusal(goal.name) }),
+    ...(goal.status === "active"
+      ? { resumeRefused: resumeRefusal(goal.name) }
+      : { pauseRefused: `"${goal.name}" isn't under way: it is ${goal.status}.` }),
   };
 }
 

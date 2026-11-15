@@ -23,6 +23,7 @@ export class Session {
   private repo: Promise<RepositoryGoals> | undefined;
   /** The goal that moved to another session, by name, until this one runs another. */
   private movedAway: string | undefined;
+  private openedCount = 0;
   private readonly turn = serialBy();
 
   /**
@@ -50,6 +51,11 @@ export class Session {
   /** The goal that moved to another session, by name, until this one runs another. */
   get moved(): string | undefined {
     return this.movedAway;
+  }
+
+  /** How many goals the session has started or taken up: each one opened here counts. */
+  get opened(): number {
+    return this.openedCount;
   }
 
   /** Why the session runs no goal, and what to do. */
@@ -153,6 +159,7 @@ export class Session {
   private run(engine: Engine): Engine {
     this.engine = engine;
     this.movedAway = undefined;
+    this.openedCount++;
     this.changed(engine);
     return engine;
   }

@@ -112,7 +112,11 @@ describe("Records", () => {
     speech.toolDone?.({ ...read, state: "done", output: "Two dice" });
     speech.text?.("Two dice", true);
     speech.text?.(", one reroll.", false);
-    expect(records.speaking(meeting)).toEqual({
+    const spoken = records.speaking(meeting);
+    expect(spoken?.speech).toMatch(/./);
+    expect(spoken).toEqual({
+      speech: spoken?.speech,
+      next: 2,
       entries: [
         { at: 5, kind: "text", text: "Let me look." },
         {
@@ -126,6 +130,11 @@ describe("Records", () => {
       ],
       live: { streaming: { kind: "text", text: "Two dice, one reroll." }, running: [] },
     });
+    expect(records.speaking(meeting, { speech: spoken?.speech ?? "", next: 2 })).toMatchObject({
+      entries: [],
+      next: 2,
+    });
+    expect(records.speaking(meeting, { speech: "another", next: 2 })?.entries).toHaveLength(2);
     meeting.turns.push({ speaker: "glm", text: "", at: 0, phase: "opening" });
     expect(records.speaking(meeting)).toBeUndefined();
     vi.useRealTimers();

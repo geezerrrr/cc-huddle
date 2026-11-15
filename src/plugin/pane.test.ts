@@ -13,7 +13,11 @@ import { paneTeam as paneOf, viewEntries, viewLive } from "./pane.ts";
 
 /** The pane for a session running the goal of `work`, with no other goals. */
 const paneTeam = (work: Work, team: readonly Member[], others: readonly GoalEntry[] = []) =>
-  paneOf({ work, members: team }, others, undefined);
+  paneOf({ work, members: team }, others, { moved: undefined, opened: 1 });
+
+/** The pane for a session running no goal, `moved` the one that moved to another session. */
+const noGoal = (others: readonly GoalEntry[] = [], moved?: string) =>
+  paneOf(undefined, others, { moved, opened: 0 });
 
 const role = { id: "dev", title: "Developer", duties: "" };
 const members: Member[] = [
@@ -155,29 +159,24 @@ describe("paneTeam", () => {
     const team = paneTeam(work(), members);
     expect(team.band).toBe("1 working · 3 need you");
     expect(team.meeting).toEqual({
-      about: "Dice",
-      agenda: "Plan a dice game for two, as the user put it",
-      status: "plan approved",
+      heading: "Dice · plan approved",
       attendance: "sonnet and glm, hosted by sonnet",
-      turns: [{ speaker: "sonnet", text: "Two dice." }],
-      hands: [],
-      plan: "A dice game",
+      agenda: "Plan a dice game for two, as the user put it",
+      turns: [{ heading: "sonnet", text: "Two dice." }],
+      plan: "Plan: A dice game",
     });
     expect(team.members).toEqual([
       {
         name: "glm",
-        role: "Developer",
-        model: "glm-5",
+        line: "Developer · glm-5 · 100 tokens",
         doing: 'works on "rules", step 2 of 3: Write the reroll',
-        subtask: "rules",
-        tokens: 100,
+        followable: true,
       },
       {
         name: "sonnet",
-        role: "Developer",
+        line: "Developer · 30 tokens",
         doing: 'next: "score", waits on "rules" by glm',
-        subtask: "board",
-        tokens: 30,
+        followable: true,
       },
     ]);
     expect(team.needs).toEqual([
@@ -217,7 +216,6 @@ describe("paneTeam", () => {
         kind: "options",
         options: [{ value: "accept", label: "Accept" }],
         note: { option: "revise", label: "Send back", prompt: "What to change" },
-        sendBack: [{ id: "board", title: "board" }],
       },
     ]);
     expect(team.milestones).toEqual([
@@ -230,6 +228,14 @@ describe("paneTeam", () => {
     expect(paneTeam(finished, members).milestones).toContainEqual({
       key: "task:t1",
       text: 'The task "Game" is done',
+    });
+    // With more than one done, you pick which a revised task goes back to.
+    expect(paneTeam(finished, members).needs.at(-1)).toMatchObject({
+      sendBack: [
+        { id: "rules", title: "rules" },
+        { id: "board", title: "board" },
+        { id: "score", title: "score" },
+      ],
     });
     expect(team.prompts).toEqual([
       {
@@ -244,18 +250,26 @@ Take it to the user as openplan's team skill says.`,
   it("says who speaks at a meeting under way, and a plan to review", () => {
     const now = work();
     now.meetings = [{ ...meeting, status: "running" }];
-    now.meetingsNow = { m1: { speaking: { member: "glm", planning: false }, hands: [] } };
+    now.meetingsNow = {
+      m1: {
+        speaking: { member: "glm", planning: false },
+        hands: [{ member: "ann", point: "dice" }],
+      },
+    };
     now.subtasks = [];
     now.questions = [];
     const team = paneTeam(now, members);
     expect(team.band).toBe("meeting");
-    expect(team.meeting?.status).toBe("glm speaks");
+    expect(team.meeting?.heading).toBe("Dice · glm speaks");
+    expect(team.meeting?.hands).toBe("Hands up: ann (dice)");
     expect(team.members.map((m) => m.doing)).toEqual([
       'at the meeting on "Dice"',
       'at the meeting on "Dice"',
     ]);
     now.meetingsNow = { m1: { together: "drafting", hands: [] } };
-    expect(paneTeam(now, members).meeting?.status).toBe("the members form their first judgments");
+    expect(paneTeam(now, members).meeting?.heading).toBe(
+      "Dice · the members form their first judgments",
+    );
     now.meetings = [{ ...meeting, status: "review" }];
     const review = paneTeam(now, members);
     expect(review.band).toBe("plan to review");
@@ -284,8 +298,8 @@ Take it to the user as openplan's team skill says.`,
     ];
     const team = paneTeam(now, members, others);
     expect(team.band).toBe("paused");
-    expect(team.goal).toEqual({ name: "Dice", slug: "dice" });
     expect(team.resumeRefused).toBeUndefined();
+    expect(team.pauseRefused).toBe('"Dice" isn\'t under way: it is paused.');
     expect(team.resumable).toEqual([
       { slug: "dice", label: "Dice · no plan yet · paused, in this session" },
       { slug: "chess", label: "chess · 1/3 subtasks done · paused" },
@@ -296,6 +310,7 @@ Take it to the user as openplan's team skill says.`,
     expect(paneTeam(now, members, others).resumeRefused).toBe(
       '"Dice" is under way in this session, which runs one goal: /openplan pause it first, or take the other up in another session.',
     );
+    expect(paneTeam(now, members, others).pauseRefused).toBeUndefined();
     expect(paneTeam(now, members, others).resumable.map((r) => r.slug)).toEqual([
       "chess",
       "go",
@@ -309,26 +324,25 @@ Take it to the user as openplan's team skill says.`,
       state: { ...work(), subtasks: [], goal: { ...work().goal, name: slug, slug, status } },
       ...(held && { holder: { pid: 1, session: 7, address: "there" } }),
     });
-    expect(paneOf(undefined, [], undefined)).toEqual({
-      noGoal:
-        "This session runs no goal. Hand the team a task with /openplan <task>, or take a goal up with /openplan resume.",
+    const none =
+      "This session runs no goal. Hand the team a task with /openplan <task>, or take a goal up with /openplan resume.";
+    expect(noGoal()).toEqual({
+      noGoal: none,
+      opened: 0,
       tasks: [],
       members: [],
       needs: [],
       milestones: [],
       prompts: [],
       resumable: [],
+      pauseRefused: none,
     });
-    expect(paneOf(undefined, [], "Dice").noGoal).toBe(
+    expect(noGoal([], "Dice").noGoal).toBe(
       '"Dice" moved to another Claude Code session. Bring it back here with /openplan resume.',
     );
-    expect(paneOf(undefined, [entry("old", "archived")], undefined).band).toBeUndefined();
+    expect(noGoal([entry("old", "archived")]).band).toBeUndefined();
     expect(
-      paneOf(
-        undefined,
-        [entry("a", "paused"), entry("b", "paused"), entry("c", "paused", true)],
-        undefined,
-      ).band,
+      noGoal([entry("a", "paused"), entry("b", "paused"), entry("c", "paused", true)]).band,
     ).toBe("2 goals paused · 1 goal in another session");
   });
 

@@ -14,18 +14,24 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { text } from "node:stream/consumers";
 import { z } from "zod";
-import type { OpenplanTeam, OpenplanView } from "../../plugin/types/index.d.ts";
+import type { OpenplanAsk, OpenplanTeam, OpenplanView } from "../../plugin/types/index.d.ts";
 import { errorCode, errorText } from "../shared/errors.ts";
 import { GitError, type GoalEntry, type HandedOver } from "../engine/index.ts";
-import { paneTeam, shownMeeting, viewEntries, viewLive } from "./pane.ts";
+import { followedOf, paneTeam, shownMeeting, viewEntries, viewLive } from "./pane.ts";
 import type { Session } from "./session.ts";
 
-const viewSchema = z.object({
-  /** The revision the pane has. */
+const next = z.number().int().min(0);
+
+const askSchema = z.object({
   revision: z.number().int().optional(),
-  /** The subtask whose record the pane follows, and the byte it read up to. */
-  record: z.object({ subtask: z.string(), from: z.number().int().min(0) }).optional(),
-});
+  record: z
+    .object({
+      member: z.string(),
+      read: z.object({ subtask: z.string(), next }).optional(),
+    })
+    .optional(),
+  speaking: z.object({ speech: z.string(), next }).optional(),
+}) satisfies z.ZodType<OpenplanAsk>;
 
 const releaseSchema = z.object({ goal: z.string() });
 
@@ -41,7 +47,7 @@ function viewer(session: () => Session) {
   let revision = 0;
   let shown = "";
   let goals: { at: number; entries: Promise<GoalEntry[]> } | undefined;
-  return async (asked: z.infer<typeof viewSchema>): Promise<OpenplanView> => {
+  return async (asked: OpenplanAsk): Promise<OpenplanView> => {
     if (!goals || asked.revision === undefined || Date.now() - goals.at >= GOALS_MS)
       goals = { at: Date.now(), entries: session().goals() };
     const all = await goals.entries.catch((error: unknown) => {
@@ -51,33 +57,43 @@ function viewer(session: () => Session) {
     const entries = session().othersOf(all);
     const engine = session().current;
     const mine = engine && { work: engine.work, members: engine.team.members };
-    const team: OpenplanTeam = paneTeam(mine, entries, session().moved);
+    const team: OpenplanTeam = paneTeam(mine, entries, session());
     const text = JSON.stringify(team);
     if (text !== shown) {
       shown = text;
       revision++;
     }
-    const meeting = mine && shownMeeting(mine.work);
-    const speaker = meeting && mine.work.meetingsNow[meeting.id]?.speaking?.member;
-    const spoken = speaker !== undefined && meeting && engine.records.speaking(meeting);
-    const { record } = asked;
-    const read = record && engine && (await engine.records.read(record.subtask, record.from));
+    const meeting = engine && shownMeeting(engine.work);
+    const speaker = meeting && engine.work.meetingsNow[meeting.id]?.speaking?.member;
+    const spoken =
+      engine &&
+      meeting &&
+      speaker !== undefined &&
+      engine.records.speaking(meeting, asked.speaking);
+    // The member's record from where the pane read it, or from its start once they are on other work.
+    const followed = asked.record && engine && followedOf(asked.record.member, engine.work);
+    const { read } = asked.record ?? {};
+    const record =
+      followed &&
+      (await engine.records.read(followed.id, read?.subtask === followed.id ? read.next : 0));
     return {
       revision,
       ...(asked.revision !== revision && { team }),
       ...(spoken && {
         speaking: {
+          speech: spoken.speech,
           speaker,
           entries: viewEntries(spoken.entries),
+          next: spoken.next,
           live: viewLive(spoken.live),
         },
       }),
-      ...(read && {
+      ...(record && {
         record: {
-          subtask: record.subtask,
-          entries: viewEntries(read.entries),
-          next: read.next,
-          ...(read.live && { live: viewLive(read.live) }),
+          subtask: followed.id,
+          entries: viewEntries(record.entries),
+          next: record.next,
+          ...(record.live && { live: viewLive(record.live) }),
         },
       }),
     };
@@ -115,7 +131,7 @@ export async function servePane(session: () => Session): Promise<PaneServer> {
   const view = viewer(session);
   const server = createServer((request, response) => {
     const routes: Record<string, () => Promise<unknown>> = {
-      "/view": async () => view(await asked(viewSchema, request)),
+      "/view": async () => view(await asked(askSchema, request)),
       "/release": async () => session().letGo((await asked(releaseSchema, request)).goal),
     };
     const route = request.method === "POST" && routes[request.url ?? ""];

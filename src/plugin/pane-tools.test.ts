@@ -9,8 +9,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { git } from "../engine/git.ts";
 import { teamFolder } from "../engine/team.ts";
-import type { Question } from "../engine/types.ts";
-import type { OpenplanView } from "../../plugin/types/index.d.ts";
+import type { Question, Subtask } from "../engine/types.ts";
+import type { OpenplanAsk, OpenplanView } from "../../plugin/types/index.d.ts";
 import { askToLetGo, servePane, type PaneServer } from "./pane-server.ts";
 import { addPaneTools } from "./pane-tools.ts";
 import { Session } from "./session.ts";
@@ -107,7 +107,7 @@ async function ask(path_: string, body: string) {
   });
 }
 
-const view = async (args: Record<string, unknown> = {}) =>
+const view = async (args: OpenplanAsk = {}) =>
   JSON.parse((await ask("/view", JSON.stringify(args))).text) as OpenplanView;
 
 describe("the pane's socket and tools", () => {
@@ -188,31 +188,56 @@ describe("the pane's socket and tools", () => {
       milestones: [],
       prompts: [],
       resumable: [],
+      opened: 0,
+      pauseRefused:
+        "This session runs no goal. Hand the team a task with /openplan <task>, or take a goal up with /openplan resume.",
     });
     expect(await view({ revision: first.revision })).toEqual({ revision: first.revision });
     await session.start("Dice");
     const next = await view({ revision: first.revision });
     expect(next.revision).toBeGreaterThan(first.revision);
     expect(next.team).toMatchObject({
-      goal: { name: "Dice", slug: "dice" },
+      opened: 1,
       band: "idle",
-      members: [{ name: "glm", role: "Developer", model: "glm-5", doing: "free", tokens: 0 }],
+      members: [
+        { name: "glm", line: "Developer · glm-5 · 0 tokens", doing: "free", followable: false },
+      ],
     });
   });
 
-  it("follow a subtask's record from where the pane read up to", async () => {
+  it("follow a member's record from where the pane read up to, and onto their new work", async () => {
     const engine = await session.start("Dice");
-    inside(engine).parts.records.recorder("s1").block?.({ kind: "text", text: "Done." });
-    await inside(engine).parts.records.flush();
-    const { record } = await view({ record: { subtask: "s1", from: 0 } });
+    const { records } = inside(engine).parts;
+    const started = (id: string, at: number): Subtask => ({
+      id,
+      taskId: "t1",
+      title: id,
+      description: "",
+      acceptance: "",
+      assignee: "glm",
+      dependsOn: [],
+      status: "done",
+      progress: { done: 0, total: 0 },
+      startedAt: at,
+    });
+    inside(engine).core.state.subtasks.push(started("s1", 1));
+    records.recorder("s1").block?.({ kind: "text", text: "Done." });
+    await records.flush();
+    const { record } = await view({ record: { member: "glm" } });
     expect(record).toMatchObject({
       subtask: "s1",
       entries: [{ kind: "text", text: "Done." }],
       live: { running: [] },
     });
-    expect((await view({ record: { subtask: "s1", from: record?.next } })).record?.entries).toEqual(
-      [],
-    );
+    const read = { subtask: "s1", next: record?.next ?? 0 };
+    expect((await view({ record: { member: "glm", read } })).record?.entries).toEqual([]);
+    inside(engine).core.state.subtasks.push(started("s2", 2));
+    records.recorder("s2").block?.({ kind: "text", text: "Next." });
+    await records.flush();
+    expect((await view({ record: { member: "glm", read } })).record).toMatchObject({
+      subtask: "s2",
+      entries: [{ kind: "text", text: "Next." }],
+    });
   });
 
   it("answer what waits on you as it was pressed, and refuse what doesn't fit", async () => {
@@ -232,11 +257,15 @@ describe("the pane's socket and tools", () => {
       ],
     };
     inside(await session.start("Dice")).core.state.questions.push(question);
-    expect(await call("answer", { question: "q1", option: "once" })).toEqual({
+    expect(
+      await call("answer", { question: "q1", answer: { kind: "option", option: "once" } }),
+    ).toEqual({
       text: "That answer doesn't fit the question.",
       error: true,
     });
-    expect(await call("answer", { question: "q1", picks: ["Grid"] })).toEqual({
+    expect(
+      await call("answer", { question: "q1", answer: { kind: "choices", picks: ["Grid"] } }),
+    ).toEqual({
       text: "Answered q1.",
       error: false,
     });
