@@ -1186,8 +1186,8 @@ var require_stringifyString = __commonJS({
             case "u":
               {
                 str += json2.slice(start, i);
-                const code2 = json2.substr(i + 2, 4);
-                switch (code2) {
+                const code = json2.substr(i + 2, 4);
+                switch (code) {
                   case "0000":
                     str += "\\0";
                     break;
@@ -1213,8 +1213,8 @@ var require_stringifyString = __commonJS({
                     str += "\\P";
                     break;
                   default:
-                    if (code2.substr(0, 2) === "00")
-                      str += "\\x" + code2.substr(2);
+                    if (code.substr(0, 2) === "00")
+                      str += "\\x" + code.substr(2);
                     else
                       str += json2.substr(i, 6);
                 }
@@ -3713,22 +3713,22 @@ var require_errors = __commonJS({
   "node_modules/.pnpm/yaml@2.9.1/node_modules/yaml/dist/errors.js"(exports) {
     "use strict";
     var YAMLError = class extends Error {
-      constructor(name, pos, code2, message) {
+      constructor(name, pos, code, message) {
         super();
         this.name = name;
-        this.code = code2;
+        this.code = code;
         this.message = message;
         this.pos = pos;
       }
     };
     var YAMLParseError = class extends YAMLError {
-      constructor(pos, code2, message) {
-        super("YAMLParseError", pos, code2, message);
+      constructor(pos, code, message) {
+        super("YAMLParseError", pos, code, message);
       }
     };
     var YAMLWarning = class extends YAMLError {
-      constructor(pos, code2, message) {
-        super("YAMLWarning", pos, code2, message);
+      constructor(pos, code, message) {
+        super("YAMLWarning", pos, code, message);
       }
     };
     var prettifyError2 = (src, lc) => (error62) => {
@@ -4637,7 +4637,7 @@ var require_resolve_flow_scalar = __commonJS({
       const { offset, type, source, end } = scalar;
       let _type;
       let value;
-      const _onError = (rel, code2, msg) => onError(offset + rel, code2, msg);
+      const _onError = (rel, code, msg) => onError(offset + rel, code, msg);
       switch (type) {
         case "scalar":
           _type = Scalar.Scalar.PLAIN;
@@ -4835,9 +4835,9 @@ var require_resolve_flow_scalar = __commonJS({
     function parseCharCode(source, offset, length, onError) {
       const cc = source.substr(offset, length);
       const ok = cc.length === length && /^[0-9a-fA-F]+$/.test(cc);
-      const code2 = ok ? parseInt(cc, 16) : NaN;
+      const code = ok ? parseInt(cc, 16) : NaN;
       try {
-        return String.fromCodePoint(code2);
+        return String.fromCodePoint(code);
       } catch {
         const raw = source.substr(offset - 2, length + 2);
         onError(offset - 2, "BAD_DQ_ESCAPE", `Invalid escape sequence ${raw}`);
@@ -5159,12 +5159,12 @@ var require_composer = __commonJS({
         this.prelude = [];
         this.errors = [];
         this.warnings = [];
-        this.onError = (source, code2, message, warning) => {
+        this.onError = (source, code, message, warning) => {
           const pos = getErrorPos(source);
           if (warning)
-            this.warnings.push(new errors.YAMLWarning(pos, code2, message));
+            this.warnings.push(new errors.YAMLWarning(pos, code, message));
           else
-            this.errors.push(new errors.YAMLParseError(pos, code2, message));
+            this.errors.push(new errors.YAMLParseError(pos, code, message));
         };
         this.directives = new directives.Directives({ version: options.version || "1.2" });
         this.options = options;
@@ -5326,12 +5326,12 @@ var require_cst_scalar = __commonJS({
     var stringifyString = require_stringifyString();
     function resolveAsScalar(token, strict = true, onError) {
       if (token) {
-        const _onError = (pos, code2, message) => {
+        const _onError = (pos, code, message) => {
           const offset = typeof pos === "number" ? pos : Array.isArray(pos) ? pos[0] : pos.offset;
           if (onError)
-            onError(offset, code2, message);
+            onError(offset, code, message);
           else
-            throw new errors.YAMLParseError([offset, offset + 1], code2, message);
+            throw new errors.YAMLParseError([offset, offset + 1], code, message);
         };
         switch (token.type) {
           case "scalar":
@@ -7375,14 +7375,20 @@ import { text } from "node:stream/consumers";
 // src/plugin/context.ts
 import path4 from "node:path";
 
+// src/engine/core.ts
+var workOf = (core) => ({
+  ...core.state,
+  members: core.team.members.map((m) => m.name),
+  underWay: core.underWay()
+});
+var errorText = (error62) => error62 instanceof Error ? error62.message : String(error62);
+var errorCode = (error62) => error62.code;
+
 // src/engine/data.ts
 import { createHash } from "node:crypto";
 import { link, mkdir, readdir as readdir2, readFile as readFile2, rename, rm as rm2, writeFile } from "node:fs/promises";
 import { readFileSync, unlinkSync } from "node:fs";
 import path3 from "node:path";
-
-// src/engine/core.ts
-var errorText = (error62) => error62 instanceof Error ? error62.message : String(error62);
 
 // src/engine/goal-files.ts
 import path from "node:path";
@@ -7404,11 +7410,6 @@ var goalFiles = (folder2) => ({
   plan: (meetingId) => path.join(folder2, "plans", `${meetingId}.md`)
 });
 
-// src/engine/git.ts
-import { spawn } from "node:child_process";
-import { readdir, readFile, realpath, rm, stat } from "node:fs/promises";
-import path2 from "node:path";
-
 // src/engine/serial.ts
 function serialBy() {
   const queues = /* @__PURE__ */ new Map();
@@ -7424,6 +7425,9 @@ function serialBy() {
 }
 
 // src/engine/git.ts
+import { spawn } from "node:child_process";
+import { readdir, readFile, realpath, rm, stat } from "node:fs/promises";
+import path2 from "node:path";
 var FLAGS = [
   "-c",
   "core.hooksPath=/dev/null",
@@ -7437,10 +7441,10 @@ var FLAGS = [
   "core.longpaths=true"
 ];
 var GitError = class extends Error {
-  constructor(args, code2, output2) {
+  constructor(args, code, output2) {
     super(`git ${args[0] ?? ""}: ${output2}`);
     this.args = args;
-    this.code = code2;
+    this.code = code;
     this.output = output2;
     this.name = "GitError";
   }
@@ -7459,8 +7463,8 @@ function git(at, args, options = {}) {
     child.stdout.setEncoding("utf8").on("data", (chunk) => stdout += chunk);
     child.stderr.setEncoding("utf8").on("data", (chunk) => stderr += chunk);
     child.on("error", reject);
-    child.on("close", (code2) => {
-      const exit = code2 ?? -1;
+    child.on("close", (code) => {
+      const exit = code ?? -1;
       if (exit === 0 || options.allow?.includes(exit)) resolve({ code: exit, stdout, stderr });
       else reject(new GitError(args, exit, (stderr || stdout).trim()));
     });
@@ -7480,7 +7484,9 @@ async function openRepository(folder2) {
     throw new GitError(["rev-parse"], head.code, `${top} has no commit to start from yet`);
   return { top: await realpath(top), common: await realpath(path2.resolve(folder2, common)) };
 }
-var goalBranch = (slug) => `openplan/${slug}/main`;
+var BRANCHES = "openplan/";
+var goalBranches = (slug) => `${BRANCHES}${slug}/`;
+var goalBranch = (slug) => `${goalBranches(slug)}main`;
 var serial = serialBy();
 
 // src/engine/running.ts
@@ -7534,14 +7540,13 @@ function holderOf(lock) {
   const holder = readHolder(lock);
   return holder && running(holder.pid) ? holder : void 0;
 }
-var code = (error62) => error62.code;
 async function listGoals(repoFolder2) {
   const folder2 = goalsFolder(repoFolder2);
   let slugs;
   try {
     slugs = await readdir2(folder2);
   } catch (error62) {
-    if (code(error62) === "ENOENT") return [];
+    if (errorCode(error62) === "ENOENT") return [];
     throw error62;
   }
   const found = await Promise.all(
@@ -7551,7 +7556,7 @@ async function listGoals(repoFolder2) {
       try {
         state = await readState(files.state);
       } catch (error62) {
-        if (code(error62) === "ENOENT" || code(error62) === "ENOTDIR") return void 0;
+        if (errorCode(error62) === "ENOENT" || errorCode(error62) === "ENOTDIR") return void 0;
         throw error62;
       }
       const holder = holderOf(files.lock);
@@ -10666,12 +10671,12 @@ function isIso7064Mod97(iban3) {
   let remainder = 0;
   const len = iban3.length;
   for (let i = 4; i < len; i++) {
-    const code2 = iban3.charCodeAt(i);
-    remainder = (code2 >= 65 ? remainder * 100 + (code2 - 55) : remainder * 10 + (code2 - 48)) % 97;
+    const code = iban3.charCodeAt(i);
+    remainder = (code >= 65 ? remainder * 100 + (code - 55) : remainder * 10 + (code - 48)) % 97;
   }
   for (let i = 0; i < 4; i++) {
-    const code2 = iban3.charCodeAt(i);
-    remainder = (code2 >= 65 ? remainder * 100 + (code2 - 55) : remainder * 10 + (code2 - 48)) % 97;
+    const code = iban3.charCodeAt(i);
+    remainder = (code >= 65 ? remainder * 100 + (code - 55) : remainder * 10 + (code - 48)) % 97;
   }
   return remainder === 1;
 }
@@ -20617,12 +20622,12 @@ function compileFn(schema, options) {
   doc.write(outputAccessor === null ? `return true;` : `return ${outputAccessor};`);
   const constantNames = ["INVALID", ...ctx.constants.keys()];
   const constantValues = [INVALID, ...ctx.constants.values()];
-  const code2 = doc.content.join("\n");
+  const code = doc.content.join("\n");
   const fullCode = options?.debug ? constantNames.length > 0 ? `// Constants: ${constantNames.join(", ")}
-${code2}` : code2 : "";
+${code}` : code : "";
   const F = Function;
   const factoryCode = `return (input) => {
-${code2}
+${code}
 }`;
   let fn;
   try {
@@ -27286,6 +27291,7 @@ function date4(params) {
 var isHalted = (status) => status === "failed" || status === "stopped";
 var MEETING_SIZES = ["small", "discussion", "large"];
 var toYou = (question) => question.kind !== "teammate";
+var SUBTASK_ACTIONS = ["stop", "continue", "retry", "redo"];
 var GOAL_ACTIONS = ["pause", "resume", "archive", "delete"];
 
 // src/engine/team.ts
@@ -27466,10 +27472,9 @@ function redoneUpstream(state, subtask) {
 }
 function actionsOf(state, subtask) {
   const deciding = openQuestions(state, subtask.id).length > 0;
-  const moves = ["stop", "continue", "retry"].filter(
-    (event) => can(SUBTASK_MACHINE, subtask.status, event) && (event !== "stop" || subtask.status !== "merging" || deciding)
+  return SUBTASK_ACTIONS.filter(
+    (action) => can(SUBTASK_MACHINE, subtask.status, action) && (action !== "stop" || subtask.status !== "merging" || deciding) && (action !== "redo" || redoneUpstream(state, subtask).length > 0)
   );
-  return redoneUpstream(state, subtask).length && can(SUBTASK_MACHINE, subtask.status, "redo") ? [...moves, "redo"] : moves;
 }
 function goalActions(goal) {
   return GOAL_ACTIONS.filter((event) => can(GOAL_MACHINE, goal.status, event));
@@ -27483,7 +27488,16 @@ function derive(state) {
     subtasks: Object.fromEntries(
       state.subtasks.map((s) => {
         const redone = redoneUpstream(state, s).map((d) => d.id);
-        return [s.id, { waits: waitsIn(state, s, busy), actions: actionsOf(state, s), redone }];
+        const reviewed = s.status === "reviewing" && state.underWay.includes(s.id);
+        return [
+          s.id,
+          {
+            waits: waitsIn(state, s, busy),
+            actions: actionsOf(state, s),
+            redone,
+            ...reviewed && { reviewedBy: reviewerOf(state, s) }
+          }
+        ];
       })
     ),
     goal: goalActions(state.goal),
@@ -27619,7 +27633,7 @@ function statusText(work) {
   if (open2.length) lines.push("", "Waiting on you:", ...open2.map((q) => questionLine(q, work)));
   return lines.join("\n");
 }
-var othersOf = (others) => others.map((entry) => ({
+var resumableOf = (others) => others.map((entry) => ({
   slug: entry.slug,
   label: goalLabel(entry.state, whereOf(entry))
 }));
@@ -27627,7 +27641,7 @@ function othersText(others) {
   if (!others.length) return void 0;
   return [
     "The repository's other goals, which the user takes up here with /openplan resume:",
-    ...othersOf(others).map((o) => `  - ${o.label}`)
+    ...resumableOf(others).map((o) => `  - ${o.label}`)
   ].join("\n");
 }
 
@@ -27645,11 +27659,7 @@ async function sessionContext(cwd, dataFolder2, session) {
   const parts = [];
   if (mine) {
     const { team } = await readCopy(goalFiles(path4.join(goalsFolder(root), mine.slug)).team);
-    const status = statusText({
-      ...mine.state,
-      members: team.members.map((m) => m.name),
-      underWay: []
-    });
+    const status = statusText(workOf({ state: mine.state, team, underWay: () => [] }));
     parts.push(
       `This session runs openplan's goal "${mine.state.goal.name}", as it stands:
 

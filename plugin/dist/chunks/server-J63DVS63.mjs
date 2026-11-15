@@ -1154,8 +1154,8 @@ var require_stringifyString = __commonJS({
             case "u":
               {
                 str += json.slice(start, i);
-                const code2 = json.substr(i + 2, 4);
-                switch (code2) {
+                const code = json.substr(i + 2, 4);
+                switch (code) {
                   case "0000":
                     str += "\\0";
                     break;
@@ -1181,8 +1181,8 @@ var require_stringifyString = __commonJS({
                     str += "\\P";
                     break;
                   default:
-                    if (code2.substr(0, 2) === "00")
-                      str += "\\x" + code2.substr(2);
+                    if (code.substr(0, 2) === "00")
+                      str += "\\x" + code.substr(2);
                     else
                       str += json.substr(i, 6);
                 }
@@ -3681,22 +3681,22 @@ var require_errors = __commonJS({
   "node_modules/.pnpm/yaml@2.9.1/node_modules/yaml/dist/errors.js"(exports) {
     "use strict";
     var YAMLError = class extends Error {
-      constructor(name, pos, code2, message) {
+      constructor(name, pos, code, message) {
         super();
         this.name = name;
-        this.code = code2;
+        this.code = code;
         this.message = message;
         this.pos = pos;
       }
     };
     var YAMLParseError = class extends YAMLError {
-      constructor(pos, code2, message) {
-        super("YAMLParseError", pos, code2, message);
+      constructor(pos, code, message) {
+        super("YAMLParseError", pos, code, message);
       }
     };
     var YAMLWarning = class extends YAMLError {
-      constructor(pos, code2, message) {
-        super("YAMLWarning", pos, code2, message);
+      constructor(pos, code, message) {
+        super("YAMLWarning", pos, code, message);
       }
     };
     var prettifyError = (src, lc) => (error) => {
@@ -4605,7 +4605,7 @@ var require_resolve_flow_scalar = __commonJS({
       const { offset, type, source, end: end2 } = scalar;
       let _type;
       let value;
-      const _onError = (rel, code2, msg) => onError(offset + rel, code2, msg);
+      const _onError = (rel, code, msg) => onError(offset + rel, code, msg);
       switch (type) {
         case "scalar":
           _type = Scalar.Scalar.PLAIN;
@@ -4803,9 +4803,9 @@ var require_resolve_flow_scalar = __commonJS({
     function parseCharCode(source, offset, length, onError) {
       const cc = source.substr(offset, length);
       const ok = cc.length === length && /^[0-9a-fA-F]+$/.test(cc);
-      const code2 = ok ? parseInt(cc, 16) : NaN;
+      const code = ok ? parseInt(cc, 16) : NaN;
       try {
-        return String.fromCodePoint(code2);
+        return String.fromCodePoint(code);
       } catch {
         const raw = source.substr(offset - 2, length + 2);
         onError(offset - 2, "BAD_DQ_ESCAPE", `Invalid escape sequence ${raw}`);
@@ -5127,12 +5127,12 @@ var require_composer = __commonJS({
         this.prelude = [];
         this.errors = [];
         this.warnings = [];
-        this.onError = (source, code2, message, warning) => {
+        this.onError = (source, code, message, warning) => {
           const pos = getErrorPos(source);
           if (warning)
-            this.warnings.push(new errors.YAMLWarning(pos, code2, message));
+            this.warnings.push(new errors.YAMLWarning(pos, code, message));
           else
-            this.errors.push(new errors.YAMLParseError(pos, code2, message));
+            this.errors.push(new errors.YAMLParseError(pos, code, message));
         };
         this.directives = new directives.Directives({ version: options.version || "1.2" });
         this.options = options;
@@ -5294,12 +5294,12 @@ var require_cst_scalar = __commonJS({
     var stringifyString = require_stringifyString();
     function resolveAsScalar(token, strict = true, onError) {
       if (token) {
-        const _onError = (pos, code2, message) => {
+        const _onError = (pos, code, message) => {
           const offset = typeof pos === "number" ? pos : Array.isArray(pos) ? pos[0] : pos.offset;
           if (onError)
-            onError(offset, code2, message);
+            onError(offset, code, message);
           else
-            throw new errors.YAMLParseError([offset, offset + 1], code2, message);
+            throw new errors.YAMLParseError([offset, offset + 1], code, message);
         };
         switch (token.type) {
           case "scalar":
@@ -7362,6 +7362,7 @@ var workOf = (core) => ({
   underWay: core.underWay()
 });
 var errorText = (error) => error instanceof Error ? error.message : String(error);
+var errorCode = (error) => error.code;
 
 // src/engine/git.ts
 import { spawn } from "node:child_process";
@@ -7401,6 +7402,15 @@ function serialBy() {
     return next;
   };
 }
+function inOrder(failed) {
+  let tail = Promise.resolve();
+  return {
+    run(task) {
+      tail = tail.then(task).catch(failed);
+    },
+    idle: () => tail
+  };
+}
 
 // src/engine/git.ts
 var FLAGS = [
@@ -7416,10 +7426,10 @@ var FLAGS = [
   "core.longpaths=true"
 ];
 var GitError = class extends Error {
-  constructor(args, code2, output) {
+  constructor(args, code, output) {
     super(`git ${args[0] ?? ""}: ${output}`);
     this.args = args;
-    this.code = code2;
+    this.code = code;
     this.output = output;
     this.name = "GitError";
   }
@@ -7438,8 +7448,8 @@ function git(at, args, options = {}) {
     child.stdout.setEncoding("utf8").on("data", (chunk) => stdout += chunk);
     child.stderr.setEncoding("utf8").on("data", (chunk) => stderr += chunk);
     child.on("error", reject);
-    child.on("close", (code2) => {
-      const exit = code2 ?? -1;
+    child.on("close", (code) => {
+      const exit = code ?? -1;
       if (exit === 0 || options.allow?.includes(exit)) resolve({ code: exit, stdout, stderr });
       else reject(new GitError(args, exit, (stderr || stdout).trim()));
     });
@@ -7469,13 +7479,15 @@ async function openRepository(folder) {
     throw new GitError(["rev-parse"], head.code, `${top} has no commit to start from yet`);
   return { top: await realpath(top), common: await realpath(path2.resolve(folder, common)) };
 }
-var goalBranch = (slug) => `openplan/${slug}/main`;
+var BRANCHES = "openplan/";
+var goalBranches = (slug) => `${BRANCHES}${slug}/`;
+var goalBranch = (slug) => `${goalBranches(slug)}main`;
 var goalFolder = (places) => goalFiles(places.root).checkout;
 async function takenSlugs(repo) {
   const refs = await git({ cwd: repo.top }, [
     "for-each-ref",
     "--format=%(refname:lstrip=3)",
-    "refs/heads/openplan/"
+    `refs/heads/${BRANCHES}`
   ]);
   return new Set(refs.stdout.split("\n").flatMap((ref) => ref ? [ref.split("/")[0] ?? ""] : []));
 }
@@ -7513,7 +7525,7 @@ async function openGoal(places, slug) {
   if (!await exists(folder)) await checkOut(repo, folder, branch);
   return folder;
 }
-var subtaskBranch = (slug, subtaskId) => `openplan/${slug}/${subtaskId}`;
+var subtaskBranch = (slug, subtaskId) => `${goalBranches(slug)}${subtaskId}`;
 var deskFolder = (places, subtaskId) => goalFiles(places.root).desk(subtaskId);
 var serial = serialBy();
 var perGoal = (places, task) => serial(goalFolder(places), task);
@@ -7654,7 +7666,7 @@ function removeGoal(places, slug) {
     const refs = await git({ cwd: repo.top }, [
       "for-each-ref",
       "--format=%(refname:lstrip=4)",
-      `refs/heads/openplan/${slug}/`
+      `refs/heads/${goalBranches(slug)}`
     ]);
     for (const id of refs.stdout.split("\n")) {
       if (id && id !== "main") await removeDesk(places, slug, id);
@@ -7801,13 +7813,12 @@ function parsed(schema, data, file) {
 ${z.prettifyError(result.error)}`);
   return result.data;
 }
-var missing = (error) => error.code === "ENOENT";
 async function jsonFile(file) {
   let text2;
   try {
     text2 = await readFile3(file, "utf8");
   } catch (error) {
-    if (missing(error)) return void 0;
+    if (errorCode(error) === "ENOENT") return void 0;
     throw error;
   }
   try {
@@ -7821,7 +7832,7 @@ async function markdownFiles(folder) {
   try {
     names = (await readdir2(folder)).filter((name) => name.endsWith(".md")).sort();
   } catch (error) {
-    if (missing(error)) return [];
+    if (errorCode(error) === "ENOENT") return [];
     throw error;
   }
   return Promise.all(
@@ -7853,11 +7864,12 @@ function mergeSettings(under, over) {
   return merged;
 }
 var isObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
-async function loadTeam(folders) {
+async function loadTeam(userTeam2, top) {
   const roles = /* @__PURE__ */ new Map();
   const written2 = /* @__PURE__ */ new Map();
   let own = {};
   let settings = {};
+  const folders = [userTeam2, teamFolder(top)];
   for (const folder of folders) {
     for (const { name, file, data, body } of await markdownFiles(path4.join(folder, "roles")))
       roles.set(name, {
@@ -8026,6 +8038,7 @@ function step(machine, state, event) {
 // src/engine/derive.ts
 var openQuestions = (state, subtaskId) => state.questions.filter((q) => q.subtaskId === subtaskId);
 var isActive = (state) => state.goal.status === "active";
+var taskDone = (state, taskId) => state.subtasks.every((s) => s.taskId !== taskId || s.status === "done");
 function reviewerOf(state, subtask2) {
   const meetingId = state.tasks.find((t) => t.id === subtask2.taskId)?.meetingId;
   const host = state.meetings.find((m) => m.id === meetingId)?.host;
@@ -8135,10 +8148,9 @@ function redoneUpstream(state, subtask2) {
 }
 function actionsOf(state, subtask2) {
   const deciding = openQuestions(state, subtask2.id).length > 0;
-  const moves = ["stop", "continue", "retry"].filter(
-    (event) => can(SUBTASK_MACHINE, subtask2.status, event) && (event !== "stop" || subtask2.status !== "merging" || deciding)
+  return SUBTASK_ACTIONS.filter(
+    (action) => can(SUBTASK_MACHINE, subtask2.status, action) && (action !== "stop" || subtask2.status !== "merging" || deciding) && (action !== "redo" || redoneUpstream(state, subtask2).length > 0)
   );
-  return redoneUpstream(state, subtask2).length && can(SUBTASK_MACHINE, subtask2.status, "redo") ? [...moves, "redo"] : moves;
 }
 function goalActions(goal) {
   return GOAL_ACTIONS.filter((event) => can(GOAL_MACHINE, goal.status, event));
@@ -8152,7 +8164,16 @@ function derive(state) {
     subtasks: Object.fromEntries(
       state.subtasks.map((s) => {
         const redone = redoneUpstream(state, s).map((d) => d.id);
-        return [s.id, { waits: waitsIn(state, s, busy), actions: actionsOf(state, s), redone }];
+        const reviewed = s.status === "reviewing" && state.underWay.includes(s.id);
+        return [
+          s.id,
+          {
+            waits: waitsIn(state, s, busy),
+            actions: actionsOf(state, s),
+            redone,
+            ...reviewed && { reviewedBy: reviewerOf(state, s) }
+          }
+        ];
       })
     ),
     goal: goalActions(state.goal),
@@ -8334,7 +8355,7 @@ function statusText(work) {
   if (open2.length) lines.push("", "Waiting on you:", ...open2.map((q) => questionLine(q, work)));
   return lines.join("\n");
 }
-var othersOf = (others) => others.map((entry) => ({
+var resumableOf = (others) => others.map((entry) => ({
   slug: entry.slug,
   label: goalLabel(entry.state, whereOf(entry))
 }));
@@ -8342,7 +8363,7 @@ function othersText(others) {
   if (!others.length) return void 0;
   return [
     "The repository's other goals, which the user takes up here with /openplan resume:",
-    ...othersOf(others).map((o) => `  - ${o.label}`)
+    ...resumableOf(others).map((o) => `  - ${o.label}`)
   ].join("\n");
 }
 
@@ -8370,7 +8391,7 @@ function memberOf(member, work, derived) {
   const own = work.subtasks.filter((s) => s.assignee === member.name);
   const at = (status) => own.find((s) => s.status === status);
   const reviewing = work.subtasks.find(
-    (s) => s.status === "reviewing" && s.assignee !== member.name && reviewerOf(work, s) === member.name && derived.busy.includes(member.name)
+    (s) => s.assignee !== member.name && derived.subtasks[s.id]?.reviewedBy === member.name
   );
   const meeting2 = work.meetings.find(
     (m) => m.status === "running" && m.participants.includes(member.name)
@@ -8481,7 +8502,7 @@ function milestones(work) {
       });
   }
   for (const task of work.tasks)
-    if (work.subtasks.every((s) => s.taskId !== task.id || s.status === "done"))
+    if (taskDone(work, task.id))
       said.push({ key: `task:${task.id}`, text: `The task "${task.title}" is done` });
   return said;
 }
@@ -8575,7 +8596,7 @@ function paneTeam(mine, others, moved) {
       needs: [],
       milestones: [],
       prompts: [],
-      resumable: othersOf(others)
+      resumable: resumableOf(others)
     };
   }
   const { work, members } = mine;
@@ -8593,7 +8614,7 @@ function paneTeam(mine, others, moved) {
     needs,
     milestones: milestones(work),
     prompts: prompts(work),
-    resumable: [...here, ...othersOf(others)],
+    resumable: [...here, ...resumableOf(others)],
     ...goal.status === "active" && { resumeRefused: resumeRefusal(goal.name) }
   };
 }
@@ -8737,12 +8758,14 @@ import { z as z6 } from "zod";
 // src/engine/turns.ts
 import { spawn as spawn2 } from "node:child_process";
 import {
+  createSdkMcpServer,
   query
 } from "@anthropic-ai/claude-agent-sdk";
 import { z as z3 } from "zod";
 var TURN_SERVER = "openplan";
 var turnToolName = (name) => `mcp__${TURN_SERVER}__${name}`;
 var toolText = (text2) => ({ content: [{ type: "text", text: text2 }] });
+var turnServer = (tools) => createSdkMcpServer({ name: TURN_SERVER, tools });
 var tokensOf = (usage) => usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens + usage.output_tokens;
 function resultOutcome(message, subagentTokens = 0) {
   const tokens = tokensOf(message.usage) + subagentTokens;
@@ -8756,6 +8779,13 @@ function resultOutcome(message, subagentTokens = 0) {
   const error = message.subtype === "success" ? message.result : message.subtype === "error_max_turns" ? `Stopped after ${String(message.num_turns)} turns, the most it may take` : message.subtype === "error_max_budget_usd" ? "Stopped at its spending limit" : message.subtype === "error_max_structured_output_retries" ? "The model didn't hand back a result in the shape asked for" : message.errors.join("\n");
   return { ok: false, error: error || "The turn failed without saying why", tokens };
 }
+var keepingSession = (listener, keep) => ({
+  ...listener,
+  session: (id, model) => {
+    keep(id);
+    listener.session?.(id, model);
+  }
+});
 function outputText(content) {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
@@ -8994,13 +9024,7 @@ async function askOnce(params) {
       }
     },
     signal,
-    turnDecoder({
-      ...listener,
-      session: (id, model) => {
-        session2 = id;
-        listener.session?.(id, model);
-      }
-    })
+    turnDecoder(keepingSession(listener, (id) => session2 = id))
   );
   if (!outcome.ok) throw new Error(outcome.error);
   if (schema && outcome.structured === void 0)
@@ -9635,11 +9659,11 @@ async function readState(file) {
 }
 function stateWriter(file, state, failed) {
   let timer;
-  let writing2 = Promise.resolve();
+  const writing2 = inOrder(failed);
   let closed = false;
   const write = () => {
     timer = void 0;
-    writing2 = writing2.then(() => writeWhole(file, JSON.stringify({ version: STATE_VERSION, state: state() }))).catch(failed);
+    writing2.run(() => writeWhole(file, JSON.stringify({ version: STATE_VERSION, state: state() })));
   };
   return {
     changed() {
@@ -9650,13 +9674,13 @@ function stateWriter(file, state, failed) {
         clearTimeout(timer);
         write();
       }
-      await writing2;
+      await writing2.idle();
     },
     async close() {
       clearTimeout(timer);
       write();
       closed = true;
-      await writing2;
+      await writing2.idle();
     }
   };
 }
@@ -9686,7 +9710,6 @@ async function holding(lock, me, open2) {
   await writeFile2(file, JSON.stringify(holder));
   return file;
 }
-var code = (error) => error.code;
 var REPLACING_WAIT_MS = 10;
 async function takeGoal(lock, me, takeOver) {
   const mine = await holding(lock, me, false);
@@ -9697,7 +9720,7 @@ async function takeGoal(lock, me, takeOver) {
         await link(mine, lock);
         return handed;
       } catch (error) {
-        if (code(error) !== "EEXIST") throw error;
+        if (errorCode(error) !== "EEXIST") throw error;
       }
       const ended = lockText(lock);
       if (ended === void 0) continue;
@@ -9715,7 +9738,7 @@ async function takeGoal(lock, me, takeOver) {
       try {
         await link(mine, claim);
       } catch (error) {
-        if (code(error) !== "EEXIST") throw error;
+        if (errorCode(error) !== "EEXIST") throw error;
         if (lockText(claim) === void 0) continue;
         const replacing = readHolder(claim);
         if (!replacing || !running(replacing.pid))
@@ -9755,7 +9778,7 @@ async function newGoalFolder(repoFolder2, name, taken) {
       await mkdir2(folder);
       return { slug, folder };
     } catch (error) {
-      if (code(error) !== "EEXIST") throw error;
+      if (errorCode(error) !== "EEXIST") throw error;
       taken.add(slug);
     }
   }
@@ -9766,7 +9789,7 @@ async function listGoals(repoFolder2) {
   try {
     slugs = await readdir3(folder);
   } catch (error) {
-    if (code(error) === "ENOENT") return [];
+    if (errorCode(error) === "ENOENT") return [];
     throw error;
   }
   const found = await Promise.all(
@@ -9776,7 +9799,7 @@ async function listGoals(repoFolder2) {
       try {
         state = await readState(files.state);
       } catch (error) {
-        if (code(error) === "ENOENT" || code(error) === "ENOTDIR") return void 0;
+        if (errorCode(error) === "ENOENT" || errorCode(error) === "ENOTDIR") return void 0;
         throw error;
       }
       const holder = holderOf(files.lock);
@@ -9901,7 +9924,6 @@ import { randomUUID } from "node:crypto";
 import { mkdir as mkdir3, writeFile as writeFile3 } from "node:fs/promises";
 import path9 from "node:path";
 import {
-  createSdkMcpServer,
   tool
 } from "@anthropic-ai/claude-agent-sdk";
 import { z as z7 } from "zod";
@@ -9911,7 +9933,7 @@ var MEETING_TURNS_EACH = {
   large: 4
 };
 var turnTool = (meetingTool) => ({
-  server: createSdkMcpServer({ name: TURN_SERVER, tools: [meetingTool] }),
+  server: turnServer([meetingTool]),
   name: turnToolName(meetingTool.name)
 });
 var handTool = (raise) => turnTool(
@@ -10201,60 +10223,48 @@ var Meetings = class {
         meeting2.hands = void 0;
         said(member2, await speak(member2, meetingAnswer(ctx, member2, point)), "answer");
       };
-      const weigh = async (who) => {
-        meeting2.weighing = true;
-        meeting2.hands = [];
+      const allAtOnce = async (who, flag, each) => {
+        meeting2[flag] = true;
         core.changed();
         const stop = new AbortController();
-        const weighing = AbortSignal.any([signal, stop.signal]);
-        const asked2 = await Promise.allSettled(
+        const together = AbortSignal.any([signal, stop.signal]);
+        const settled = await Promise.allSettled(
           who.map(
-            (member2) => ask(member2, meetingHand(ctx, member2), {
-              signal: weighing,
-              tool: handTool((hand) => {
-                meeting2.hands = [
-                  ...(meeting2.hands ?? []).filter((h) => h.member !== member2.name),
-                  { member: member2.name, ...hand }
-                ];
-                core.changed();
-              })
-            }).catch((error) => {
+            (member2) => each(member2, together).catch((error) => {
               stop.abort();
               throw error;
             })
           )
         );
-        meeting2.weighing = void 0;
+        meeting2[flag] = void 0;
         core.changed();
-        const failed = asked2.find((r) => r.status === "rejected");
+        const failed = settled.find((r) => r.status === "rejected");
         if (failed) throw failed.reason;
       };
-      const round = async (who) => {
-        meeting2.drafting = true;
-        core.changed();
-        const stop = new AbortController();
-        const drafting = AbortSignal.any([signal, stop.signal]);
-        const judged = await Promise.allSettled(
-          who.map(
-            (member2) => (
-              // What they heard is the opening alone: the others' first judgments reach them after.
-              ask(member2, meetingRound(ctx, member2), { heard: 1, signal: drafting }).then(
-                (reply) => {
-                  said(member2, reply, "round");
-                },
-                (error) => {
-                  stop.abort();
-                  throw error;
-                }
-              )
-            )
-          )
+      const weigh = (who) => {
+        meeting2.hands = [];
+        return allAtOnce(
+          who,
+          "weighing",
+          (member2, weighing) => ask(member2, meetingHand(ctx, member2), {
+            signal: weighing,
+            tool: handTool((hand) => {
+              meeting2.hands = [
+                ...(meeting2.hands ?? []).filter((h) => h.member !== member2.name),
+                { member: member2.name, ...hand }
+              ];
+              core.changed();
+            })
+          })
         );
-        meeting2.drafting = void 0;
-        core.changed();
-        const failed = judged.find((r) => r.status === "rejected");
-        if (failed) throw failed.reason;
       };
+      const round = (who) => allAtOnce(who, "drafting", async (member2, drafting) => {
+        said(
+          member2,
+          await ask(member2, meetingRound(ctx, member2), { heard: 1, signal: drafting }),
+          "round"
+        );
+      });
       const discuss = async (left) => {
         const last = meeting2.turns.at(-1);
         await weigh(others.filter((m) => last?.phase === "round" || m.name !== last?.speaker));
@@ -10329,7 +10339,7 @@ var SESSION_VARS = [
 ];
 var READ_ONLY_TOOLS = ["Read", "Glob", "Grep", "WebSearch", "WebFetch"];
 function expandEnv(env, from) {
-  const missing2 = /* @__PURE__ */ new Set();
+  const missing = /* @__PURE__ */ new Set();
   const filled = Object.fromEntries(
     Object.entries(env).map(([key, value]) => [
       key,
@@ -10337,13 +10347,13 @@ function expandEnv(env, from) {
         /\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}/g,
         (_, name, fallback) => {
           const found = from[name] ?? fallback;
-          if (found === void 0) missing2.add(name);
+          if (found === void 0) missing.add(name);
           return found ?? "";
         }
       )
     ])
   );
-  if (missing2.size) throw new Error(`Not set in the environment: ${[...missing2].join(", ")}`);
+  if (missing.size) throw new Error(`Not set in the environment: ${[...missing].join(", ")}`);
   return filled;
 }
 function memberSettings(team, member, from, plugin) {
@@ -10655,26 +10665,25 @@ var recordFile = (places, subtaskId) => goalFiles(places.root).record(subtaskId)
 var Records = class {
   constructor(places, failed) {
     this.places = places;
-    this.failed = failed;
+    this.writing = inOrder(failed);
   }
   places;
-  failed;
   /** What each subtask's run is doing now, by subtask id: its last run's, once it ends. */
   live = /* @__PURE__ */ new Map();
   spoken = /* @__PURE__ */ new Map();
   /** Entries are appended one at a time, in the order they came. */
-  writing = Promise.resolve();
+  writing;
   /** Where a run of `subtaskId` tells what it does: its record, and what goes on now. */
   recorder(subtaskId) {
     const now = { running: /* @__PURE__ */ new Map() };
     this.live.set(subtaskId, now);
     const file = recordFile(this.places, subtaskId);
     const write = (entry) => {
-      this.writing = this.writing.then(async () => {
+      this.writing.run(async () => {
         await mkdir4(path10.dirname(file), { recursive: true });
         await appendFile(file, `${JSON.stringify(entry)}
 `);
-      }).catch(this.failed);
+      });
     };
     return tracking(now, write);
   }
@@ -10689,7 +10698,7 @@ var Records = class {
     try {
       handle = await open(recordFile(this.places, subtaskId));
     } catch (error) {
-      if (error.code !== "ENOENT") throw error;
+      if (errorCode(error) !== "ENOENT") throw error;
       return { entries: [], next: 0, ...live && { live } };
     }
     try {
@@ -10728,7 +10737,7 @@ var Records = class {
   }
   /** Every entry written so far is in its file. */
   flush() {
-    return this.writing;
+    return this.writing.idle();
   }
 };
 
@@ -10739,52 +10748,43 @@ import path11 from "node:path";
 import { z as z9 } from "zod";
 
 // src/engine/run.ts
-import { createSdkMcpServer as createSdkMcpServer2, tool as tool2 } from "@anthropic-ai/claude-agent-sdk";
+import { tool as tool2 } from "@anthropic-ai/claude-agent-sdk";
 import { z as z8 } from "zod";
 var OWN_TOOLS = /* @__PURE__ */ new Set([turnToolName("ask_teammate"), turnToolName("deliver")]);
 function teamServer(collaboration, delivered) {
-  return createSdkMcpServer2({
-    name: TURN_SERVER,
-    tools: [
-      tool2(
-        "ask_teammate",
-        "Asks a teammate a question and waits for the answer. Use it only when you need their information or decision.",
-        {
-          teammate: z8.string().describe("The teammate's name"),
-          question: z8.string().describe("The question, with the context they need")
-        },
-        async ({ teammate, question }) => toolText(await collaboration.askTeammate(teammate, question))
-      ),
-      tool2(
-        "deliver",
-        "Hands over your finished work: your subtask is done only once you call it. Then end your turn. If you deliver again, the last delivery counts.",
-        {
-          summary: z8.string().trim().min(1).describe("A few sentences: what you did, and anything to watch out for"),
-          files: z8.array(z8.string()).describe(
-            "The files that are the result, as paths in your worktree (not scratch files); empty when the result is the summary itself"
-          )
-        },
-        async ({ summary, files }) => {
-          const checked = await collaboration.checkDelivery(files);
-          if ("refused" in checked) return toolText(checked.refused);
-          delivered({ summary, files: checked.files });
-          return toolText("Delivered. End your turn now.");
-        }
-      )
-    ]
-  });
+  return turnServer([
+    tool2(
+      "ask_teammate",
+      "Asks a teammate a question and waits for the answer. Use it only when you need their information or decision.",
+      {
+        teammate: z8.string().describe("The teammate's name"),
+        question: z8.string().describe("The question, with the context they need")
+      },
+      async ({ teammate, question }) => toolText(await collaboration.askTeammate(teammate, question))
+    ),
+    tool2(
+      "deliver",
+      "Hands over your finished work: your subtask is done only once you call it. Then end your turn. If you deliver again, the last delivery counts.",
+      {
+        summary: z8.string().trim().min(1).describe("A few sentences: what you did, and anything to watch out for"),
+        files: z8.array(z8.string()).describe(
+          "The files that are the result, as paths in your worktree (not scratch files); empty when the result is the summary itself"
+        )
+      },
+      async ({ summary, files }) => {
+        const checked = await collaboration.checkDelivery(files);
+        if ("refused" in checked) return toolText(checked.refused);
+        delivered({ summary, files: checked.files });
+        return toolText("Delivered. End your turn now.");
+      }
+    )
+  ]);
 }
 async function runSubtask(params) {
   const { options, gate, signal } = params;
   let handover;
   let session2 = params.resume;
-  const decode = turnDecoder({
-    ...params.listener,
-    session: (id, model) => {
-      session2 = id;
-      params.listener.session?.(id, model);
-    }
-  });
+  const decode = turnDecoder(keepingSession(params.listener, (id) => session2 = id));
   const canUseTool = (name, input, request2) => {
     if (!OWN_TOOLS.has(name)) return gate(name, input, request2);
     return Promise.resolve(
@@ -11316,7 +11316,7 @@ ${outcome.handover.summary}`
    */
   async checkDelivery(subtask2, desk, files) {
     const kept = [];
-    const missing2 = [];
+    const missing = [];
     for (const file of files) {
       const relative = path11.relative(desk, path11.resolve(desk, file));
       const inside = relative !== "" && !relative.startsWith("..") && !path11.isAbsolute(relative);
@@ -11325,11 +11325,11 @@ ${outcome.handover.summary}`
         () => false
       );
       if (there) kept.push(relative.split(path11.sep).join("/"));
-      else missing2.push(file);
+      else missing.push(file);
     }
-    if (missing2.length)
+    if (missing.length)
       return {
-        refused: `Not delivered: these aren't files in your worktree (${desk}): ${missing2.join(", ")}. Deliver the files that are there.`
+        refused: `Not delivered: these aren't files in your worktree (${desk}): ${missing.join(", ")}. Deliver the files that are there.`
       };
     const left = subtask2.conflict ? await unresolved(this.core.places, subtask2.id, subtask2.conflict.files) : [];
     if (left.length)
@@ -11443,9 +11443,7 @@ ${outcome.handover.summary}`
   finished(subtask2) {
     subtask2.finishedAt = Date.now();
     subtask2.progress = { done: subtask2.progress.total, total: subtask2.progress.total };
-    if (this.core.state.subtasks.some((s) => s.taskId === subtask2.taskId && s.status !== "done"))
-      return;
-    if (!this.taskOf(subtask2).ownerAccepts) return;
+    if (!taskDone(this.core.state, subtask2.taskId) || !this.taskOf(subtask2).ownerAccepts) return;
     this.questions.openDecision(
       subtask2,
       { kind: "delivery", options: [...DECISIONS.delivery.options] },
@@ -11496,7 +11494,7 @@ var Engine = class _Engine {
    */
   static async start(options, name) {
     const repo = await openRepository(options.cwd);
-    const copy = await loadTeam([options.userTeam, teamFolder(repo.top)]);
+    const copy = await loadTeam(options.userTeam, repo.top);
     filledSettings(copy, options);
     const { slug, folder } = await newGoalFolder(
       repoFolder(options.dataFolder, repo),
@@ -11892,7 +11890,7 @@ addPaneTools(server, session, pane);
 async function listTeamFiles() {
   try {
     const repo = await openRepository(cwd);
-    listMembers((await loadTeam([userTeam, teamFolder(repo.top)])).team);
+    listMembers((await loadTeam(userTeam, repo.top)).team);
   } catch {
   }
 }
