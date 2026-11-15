@@ -180,7 +180,7 @@ describe("a repository's goals", () => {
     expect(next).toEqual({ slug: "dice-4", folder: path.join(goalsFolder(repo), "dice-4") });
   });
 
-  it("are listed oldest first, with who runs each, but a folder with no state yet", async () => {
+  it("are listed oldest first, with who runs each, but a folder with no state yet, and one that can't be read with why", async () => {
     const repo = path.join(dir, "repo");
     expect(await listGoals(repo)).toEqual([]);
     const write = async (slug: string, createdAt: number) => {
@@ -193,10 +193,15 @@ describe("a repository's goals", () => {
     const chess = await write("chess", 2);
     await write("dice", 1);
     await mkdir(path.join(goalsFolder(repo), "starting"));
+    const old = goalFiles(path.join(goalsFolder(repo), "old"));
+    await mkdir(path.dirname(old.state));
+    await writeFile(old.state, JSON.stringify({ version: 1, state: {} }));
     await takeGoal(chess.lock, ME, refuse);
     expect(await listGoals(repo)).toEqual([
       { slug: "dice", state: fresh("dice", 1) },
       { slug: "chess", state: fresh("chess", 2), holder: { pid: process.pid, ...ME } },
+      // One that can't be read is listed last, with why, the rest all the same.
+      { slug: "old", unreadable: expect.stringContaining("before its first release") as string },
     ]);
     releaseGoal(chess.lock);
   });

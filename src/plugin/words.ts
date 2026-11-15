@@ -177,13 +177,15 @@ export function needWords(
   }
 }
 
-/** Where a goal is: in another session, archived, or paused, as a session that ended left it too. */
+/** Where a goal is: in another session, archived, or paused, as a session that ended left it too; or unreadable here. */
 export const whereOf = (entry: GoalEntry) =>
   entry.holder
     ? "in another session"
-    : entry.state.goal.status === "archived"
-      ? "archived"
-      : "paused";
+    : !("state" in entry)
+      ? "unreadable"
+      : entry.state.goal.status === "archived"
+        ? "archived"
+        : "paused";
 
 /** How far a goal got, in words. */
 function progressOf({ subtasks, meetings }: Pick<GoalState, "subtasks" | "meetings">): string {
@@ -198,6 +200,12 @@ function progressOf({ subtasks, meetings }: Pick<GoalState, "subtasks" | "meetin
 /** A goal named with how far it got and `where` it is, as `/openplan resume` lists it. */
 export const goalLabel = (state: GoalState, where: string) =>
   `${state.goal.name} · ${progressOf(state)} · ${where}`;
+
+/** One of the repository's goals as `/openplan resume` lists it: one that can't be read by its folder, and why. */
+export const entryLabel = (entry: GoalEntry) =>
+  "state" in entry
+    ? goalLabel(entry.state, whereOf(entry))
+    : `${entry.slug} · can't be read: ${entry.unreadable}`;
 
 /**
  * Why a session runs no goal, and what to do, as the pane says it: `moved`,

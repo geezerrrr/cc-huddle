@@ -29,7 +29,8 @@ export async function sessionContext(
   const goals = await listGoals(root);
   const mine = goals.find((g) => g.holder?.session === session);
   const parts: string[] = [];
-  if (mine) {
+  // A goal this session runs was read as it was taken up.
+  if (mine && "state" in mine) {
     const { team } = await readCopy(goalFiles(path.join(goalsFolder(root), mine.slug)).team);
     // Read from the goal's file: what is under way is the server's, not known here.
     const status = statusText(workOf({ state: mine.state, team, underWay: () => [] }));

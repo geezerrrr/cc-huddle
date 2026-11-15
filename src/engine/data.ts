@@ -255,15 +255,19 @@ export async function newGoalFolder(
 }
 
 /** A goal of a repository as its folder has it: its slug, its state, and who runs it, if anyone. */
-export interface GoalEntry {
-  slug: string;
-  state: GoalState;
-  holder?: Holder;
-}
+/** One of a repository's goals: its state, or why this openplan can't read it. */
+export type GoalEntry = { slug: string; holder?: Holder } & (
+  { state: GoalState } | { unreadable: string }
+);
+
+/** When a goal was started; one that can't be read comes after the rest. */
+const startedAt = (entry: GoalEntry) =>
+  "state" in entry ? entry.state.goal.createdAt : Number.POSITIVE_INFINITY;
 
 /**
  * A repository's goals, oldest first, from their folders (`repoFolder`). A
- * folder with no state yet is a goal starting: it isn't one yet.
+ * folder with no state yet is a goal starting: it isn't one yet. A goal that
+ * can't be read is listed with why, so the rest are listed all the same.
  */
 export async function listGoals(repoFolder: string): Promise<GoalEntry[]> {
   const folder = goalsFolder(repoFolder);
@@ -277,18 +281,15 @@ export async function listGoals(repoFolder: string): Promise<GoalEntry[]> {
   const found = await Promise.all(
     slugs.map(async (slug): Promise<GoalEntry | undefined> => {
       const files = goalFiles(path.join(folder, slug));
-      let state: GoalState;
+      const holder = holderOf(files.lock);
+      const held = holder && { holder };
       try {
-        state = await readState(files.state);
+        return { slug, state: await readState(files.state), ...held };
       } catch (error) {
         if (errorCode(error) === "ENOENT" || errorCode(error) === "ENOTDIR") return undefined;
-        throw error;
+        return { slug, unreadable: errorText(error), ...held };
       }
-      const holder = holderOf(files.lock);
-      return { slug, state, ...(holder && { holder }) };
     }),
   );
-  return found
-    .filter((entry) => entry !== undefined)
-    .sort((a, b) => a.state.goal.createdAt - b.state.goal.createdAt);
+  return found.filter((entry) => entry !== undefined).sort((a, b) => startedAt(a) - startedAt(b));
 }

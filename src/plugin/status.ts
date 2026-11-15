@@ -7,7 +7,7 @@ import type { GoalEntry } from "../engine/data.ts";
 import { derive, type Work } from "../engine/derive.ts";
 import { goalBranch } from "../engine/git.ts";
 import { toYou, type QuestionToYou, type Subtask, type Wait } from "../engine/types.ts";
-import { goalLabel, meetingStatus, needWords, stepText, waitText, whereOf } from "./words.ts";
+import { entryLabel, meetingStatus, needWords, stepText, waitText } from "./words.ts";
 
 /** A subtask on one line: its status, how far it is, what it waits on, what went wrong. */
 function subtaskLine(subtask: Subtask, waits: Wait[], work: Work): string {
@@ -60,7 +60,7 @@ export function statusText(work: Work): string {
 export const resumableOf = (others: readonly GoalEntry[]): { slug: string; label: string }[] =>
   others.map((entry) => ({
     slug: entry.slug,
-    label: goalLabel(entry.state, whereOf(entry)),
+    label: entryLabel(entry),
   }));
 
 /** The repository's goals a session doesn't run, a line each; undefined when there are none. */
