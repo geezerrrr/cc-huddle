@@ -84,17 +84,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path10) {
-      const ctrl = callVisitor(key, node, visitor, path10);
+    function visit_(key, node, visitor, path11) {
+      const ctrl = callVisitor(key, node, visitor, path11);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path10, ctrl);
-        return visit_(key, ctrl, visitor, path10);
+        replaceNode(key, path11, ctrl);
+        return visit_(key, ctrl, visitor, path11);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path10 = Object.freeze(path10.concat(node));
+          path11 = Object.freeze(path11.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path10);
+            const ci = visit_(i, node.items[i], visitor, path11);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -105,13 +105,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path10 = Object.freeze(path10.concat(node));
-          const ck = visit_("key", node.key, visitor, path10);
+          path11 = Object.freeze(path11.concat(node));
+          const ck = visit_("key", node.key, visitor, path11);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path10);
+          const cv = visit_("value", node.value, visitor, path11);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -132,17 +132,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path10) {
-      const ctrl = await callVisitor(key, node, visitor, path10);
+    async function visitAsync_(key, node, visitor, path11) {
+      const ctrl = await callVisitor(key, node, visitor, path11);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path10, ctrl);
-        return visitAsync_(key, ctrl, visitor, path10);
+        replaceNode(key, path11, ctrl);
+        return visitAsync_(key, ctrl, visitor, path11);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path10 = Object.freeze(path10.concat(node));
+          path11 = Object.freeze(path11.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path10);
+            const ci = await visitAsync_(i, node.items[i], visitor, path11);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -153,13 +153,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path10 = Object.freeze(path10.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path10);
+          path11 = Object.freeze(path11.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path11);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path10);
+          const cv = await visitAsync_("value", node.value, visitor, path11);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -186,23 +186,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path10) {
+    function callVisitor(key, node, visitor, path11) {
       if (typeof visitor === "function")
-        return visitor(key, node, path10);
+        return visitor(key, node, path11);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path10);
+        return visitor.Map?.(key, node, path11);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path10);
+        return visitor.Seq?.(key, node, path11);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path10);
+        return visitor.Pair?.(key, node, path11);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path10);
+        return visitor.Scalar?.(key, node, path11);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path10);
+        return visitor.Alias?.(key, node, path11);
       return void 0;
     }
-    function replaceNode(key, path10, node) {
-      const parent = path10[path10.length - 1];
+    function replaceNode(key, path11, node) {
+      const parent = path11[path11.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -814,10 +814,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path10, value) {
+    function collectionFromPath(schema, path11, value) {
       let v = value;
-      for (let i = path10.length - 1; i >= 0; --i) {
-        const k = path10[i];
+      for (let i = path11.length - 1; i >= 0; --i) {
+        const k = path11[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -836,7 +836,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path10) => path10 == null || typeof path10 === "object" && !!path10[Symbol.iterator]().next().done;
+    var isEmptyPath = (path11) => path11 == null || typeof path11 === "object" && !!path11[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -866,11 +866,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path10, value) {
-        if (isEmptyPath(path10))
+      addIn(path11, value) {
+        if (isEmptyPath(path11))
           this.add(value);
         else {
-          const [key, ...rest] = path10;
+          const [key, ...rest] = path11;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -884,8 +884,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path10) {
-        const [key, ...rest] = path10;
+      deleteIn(path11) {
+        const [key, ...rest] = path11;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -899,8 +899,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path10, keepScalar) {
-        const [key, ...rest] = path10;
+      getIn(path11, keepScalar) {
+        const [key, ...rest] = path11;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -918,8 +918,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path10) {
-        const [key, ...rest] = path10;
+      hasIn(path11) {
+        const [key, ...rest] = path11;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -929,8 +929,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path10, value) {
-        const [key, ...rest] = path10;
+      setIn(path11, value) {
+        const [key, ...rest] = path11;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -3445,9 +3445,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path10, value) {
+      addIn(path11, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path10, value);
+          this.contents.addIn(path11, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3522,14 +3522,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path10) {
-        if (Collection.isEmptyPath(path10)) {
+      deleteIn(path11) {
+        if (Collection.isEmptyPath(path11)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path10) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path11) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3544,10 +3544,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path10, keepScalar) {
-        if (Collection.isEmptyPath(path10))
+      getIn(path11, keepScalar) {
+        if (Collection.isEmptyPath(path11))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path10, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path11, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3558,10 +3558,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path10) {
-        if (Collection.isEmptyPath(path10))
+      hasIn(path11) {
+        if (Collection.isEmptyPath(path11))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path10) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path11) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3578,13 +3578,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path10, value) {
-        if (Collection.isEmptyPath(path10)) {
+      setIn(path11, value) {
+        if (Collection.isEmptyPath(path11)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path10), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path11), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path10, value);
+          this.contents.setIn(path11, value);
         }
       }
       /**
@@ -5545,9 +5545,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path10) => {
+    visit.itemAtPath = (cst, path11) => {
       let item = cst;
-      for (const [field, index] of path10) {
+      for (const [field, index] of path11) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5556,23 +5556,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path10) => {
-      const parent = visit.itemAtPath(cst, path10.slice(0, -1));
-      const field = path10[path10.length - 1][0];
+    visit.parentCollection = (cst, path11) => {
+      const parent = visit.itemAtPath(cst, path11.slice(0, -1));
+      const field = path11[path11.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path10, item, visitor) {
-      let ctrl = visitor(item, path10);
+    function _visit(path11, item, visitor) {
+      let ctrl = visitor(item, path11);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path10.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path11.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -5583,10 +5583,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path10);
+            ctrl = ctrl(item, path11);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path10) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path11) : ctrl;
     }
     exports.visit = visit;
   }
@@ -9402,12 +9402,10 @@ function expandEnv(env, from) {
 function memberSettings(team2, member, from, plugin) {
   return {
     ...team2,
-    sandbox: { enabled: true, ...team2.sandbox },
     env: { ...team2.env, ...expandEnv(member.env, from) },
     enabledPlugins: { ...team2.enabledPlugins, [plugin]: false },
     crossSessionInbound: "refuse",
     permissions: {
-      defaultMode: "acceptEdits",
       ...team2.permissions,
       deny: [...team2.permissions?.deny ?? [], "SendMessage", "ListAgents"]
     }
@@ -9427,6 +9425,11 @@ function workOptions(seat, from) {
     model: member.model,
     effort: member.effort,
     settings: seat.settings,
+    ...seat.mode && {
+      permissionMode: seat.mode,
+      // The SDK takes bypassPermissions only so: your session runs in it, as you chose.
+      ...seat.mode === "bypassPermissions" && { allowDangerouslySkipPermissions: true }
+    },
     env: { ...env, ...authorEnv(memberSigner(member.name)) },
     systemPrompt: { type: "preset", preset: "claude_code", append: seat.system },
     includePartialMessages: true,
@@ -10569,6 +10572,8 @@ var Engine = class _Engine {
   goals;
   /** How many times the state has changed since the team opened. */
   changes = 0;
+  /** The team's settings set the members' permission mode, over your session's. */
+  teamMode = false;
   /**
    * Opens the team of the repository `cwd` is in, for this session alone:
    * what a server before left running is stopped, and the goals it left
@@ -10710,6 +10715,7 @@ var Engine = class _Engine {
       }
     });
     for (const [name, filled] of each) await writeSettings(this.files.settings(name), filled);
+    this.teamMode = settings.permissions?.defaultMode !== void 0;
   }
   turnOptions(...[member, kind, cwd]) {
     const seat = {
@@ -10719,7 +10725,9 @@ var Engine = class _Engine {
       settings: this.files.settings(member.name),
       system: systemPrompt(kind, member, this.core.team.members)
     };
-    return kind === "task" ? workOptions(seat, this.options.env) : readOnlyOptions(seat, this.options.env);
+    if (kind !== "task") return readOnlyOptions(seat, this.options.env);
+    const mode = this.teamMode ? void 0 : this.options.sessionMode();
+    return workOptions({ ...seat, ...mode && { mode } }, this.options.env);
   }
 };
 
@@ -10998,7 +11006,7 @@ function prompts(work) {
     if (meeting2.status === "review" && meeting2.plan)
       asked.push({
         key: `review:${meeting2.id}`,
-        text: `The meeting [${meeting2.id}] on "${aboutOf(work, meeting2)}" has a plan: ${meeting2.plan.summary}. Show it to the user with show_plan, and ask whether to approve it, change it, or cancel it, and which tasks, if any, they want to accept themselves once done: none is unless they say, since reviews and checks confirm the work; it is worth it for a result only looking at it or trying it can judge.`
+        text: `The meeting [${meeting2.id}] on "${aboutOf(work, meeting2)}" has a plan: ${meeting2.plan.summary}. Get it with show_plan and show it to the user in full: its document as it is written, then its tasks, each with its subtasks, who does them and what each waits on. Then ask whether to approve it, change it, or cancel it, and which tasks, if any, they want to accept themselves once done: none is unless they say, since reviews and checks confirm the work; it is worth it for a result only looking at it or trying it can judge.`
       });
   for (const question of work.questions) {
     if (question.kind !== "decision" || question.decision.kind !== "delivery") continue;
@@ -11014,6 +11022,44 @@ function prompts(work) {
     });
   }
   return asked;
+}
+var BAND_TASKS = 5;
+function taskWhere(work, derived, subtasks) {
+  const at = subtasks.find(
+    (s) => s.status === "running" || s.status === "reviewing" || s.status === "merging"
+  ) ?? subtasks.find((s) => s.status !== "done");
+  if (!at) return void 0;
+  switch (at.status) {
+    case "running":
+      return `${at.assignee} works on "${at.title}"`;
+    case "reviewing":
+      return `"${at.title}" in review`;
+    case "merging":
+      return `"${at.title}" merging`;
+    case "pending": {
+      const [wait] = derived.subtasks[at.id]?.waits ?? [];
+      return `"${at.title}" ${wait ? waitText(wait, work) : "starts next"}`;
+    }
+    default:
+      return `"${at.title}" ${at.status}`;
+  }
+}
+function taskLines(work, derived) {
+  const lines = [];
+  for (const task of work.tasks) {
+    const goal2 = work.goals.find((g) => g.id === task.goalId);
+    if (!goal2 || goal2.status === "archived") continue;
+    const subtasks = work.subtasks.filter((s) => s.taskId === task.id);
+    const accepting = work.questions.some(
+      (q) => q.kind === "decision" && q.decision.kind === "delivery" && q.status === "open" && subtasks.some((s) => s.id === q.subtaskId)
+    );
+    const where = accepting ? "waits for you to accept it" : taskWhere(work, derived, subtasks);
+    if (where) lines.push(`${task.title} \xB7 ${where}`);
+  }
+  return lines.length > BAND_TASKS ? [
+    ...lines.slice(0, BAND_TASKS),
+    `and ${plural(lines.length - BAND_TASKS, "more task", "more tasks")}`
+  ] : lines;
 }
 function bandText(work, needs) {
   if (!work.goals.length) return void 0;
@@ -11036,6 +11082,7 @@ function paneTeam(work, members) {
   const band = bandText(work, needs.length);
   return {
     ...band && { band },
+    tasks: taskLines(work, derived),
     ...meeting2 && { meeting: meetingOf(meeting2, work) },
     members: members.map((m) => memberOf(m, work, derived)),
     needs,
@@ -11117,6 +11164,19 @@ function askToLetGo(address) {
     });
     asking.once("error", reject).end();
   });
+}
+
+// src/plugin/session-mode.ts
+import { readFileSync as readFileSync2 } from "node:fs";
+import path10 from "node:path";
+var folderOf = (dataFolder2) => path10.join(dataFolder2, "sessions");
+var fileOf = (dataFolder2, session) => path10.join(folderOf(dataFolder2), `${String(session)}.mode`);
+function modeOf(dataFolder2, session) {
+  try {
+    return readFileSync2(fileOf(dataFolder2, session), "utf8");
+  } catch {
+    return void 0;
+  }
 }
 
 // src/plugin/pane-tools.ts
@@ -11391,6 +11451,23 @@ function addPaneTools(server2, team2, pane2) {
       return toolText(`Answered ${question}.`);
     }
   );
+  server2.registerTool(
+    "every_goal",
+    {
+      description: `${PANE_ONLY} Pauses every active goal, or resumes every paused one, as /openplan pause or resume.`,
+      inputSchema: { action: z9.enum(["pause", "resume"]) }
+    },
+    async ({ action }) => {
+      const engine2 = await team2();
+      const from = action === "pause" ? "active" : "paused";
+      const goals = engine2.state.goals.filter((g) => g.status === from);
+      for (const goal2 of goals) await engine2.goals[action](goal2.id);
+      const done = action === "pause" ? "Paused" : "Resumed";
+      return toolText(
+        goals.length ? `${done} ${goals.map((g) => `"${g.name}"`).join(", ")}.` : `No goal is ${from}.`
+      );
+    }
+  );
 }
 
 // src/plugin/server.ts
@@ -11414,6 +11491,7 @@ var openTeam = async (take) => Engine.open({
       );
     })
   },
+  sessionMode: () => modeOf(dataFolder, process.ppid),
   plugin: pluginId(dataFolder),
   userTeam: userTeamFolder(process.env),
   env: process.env,
