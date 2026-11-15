@@ -49,7 +49,9 @@ describe("statusText", () => {
           createdAt: 0,
         },
       ],
-      tasks: [{ id: "t1", goalId: "g1", title: "Game", outcome: "", createdAt: 0 }],
+      tasks: [
+        { id: "t1", goalId: "g1", title: "Game", outcome: "", createdAt: 0, ownerAccepts: true },
+      ],
       subtasks: [
         subtask("Rules", {
           status: "running",
@@ -77,7 +79,7 @@ describe("statusText", () => {
 
 Goal "Dice" [g1]: active, on branch openplan/dice/main
   Meeting [m1], hosted by sonnet: its plan waits for you: approve it, change it, or cancel it
-  Task "Game" [t1]
+  Task "Game" [t1], the user accepts it
     - Rules [Rules], glm: running, step 2 of 3: Write the rolls, waits on your answer
     - Board [Board], sonnet: pending, waits on "Rules" by glm
     - Score [Score], glm: failed, error: API Error: 529

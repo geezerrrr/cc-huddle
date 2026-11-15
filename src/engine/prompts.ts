@@ -303,7 +303,6 @@ Requirements:
 - Break the work into 1–4 tasks with 1–4 subtasks each; every subtask goes to exactly one attendee, whose name goes in assignee: ${listOf(attendees.map((m) => `"${m.name}"`))}. You decide who takes what, from their roles.
 - Spell out the dependencies between subtasks in depends_on (the keys of other subtasks); don't make sequential what can run in parallel.
 - Dependencies must not loop: no subtask may wait, directly or through others, on itself or on a subtask that waits on it.
-- A subtask that depends on one in another task starts only when that whole task is finished and the user has accepted it. So tasks can only wait on each other one way: work that needs every other task's result, such as a final integration, is a task of its own.
 - Give every subtask a clear description and acceptance criteria: its member reads them, and the plan document, before starting.
 - plan_markdown is the plan document for the user and the team: the goal and scope; what was decided, why, and what was turned down; where people didn't agree and how you ruled; what the meeting didn't get to; then who does what, dependencies and risks.
 - summary states the outcome in one sentence.`;

@@ -43,7 +43,17 @@ const question = (fields: Pick<Question, "id" | "subtaskId"> & Ask): Question =>
 const work = (fields: Partial<Work> = {}): Work => ({
   members: ["host", "ann", "bob"],
   goals: [{ id: "p1", name: "dice", slug: "dice", status: "active", createdAt: 0 }],
-  tasks: [{ id: "t1", goalId: "p1", title: "", outcome: "", createdAt: 0, meetingId: "m1" }],
+  tasks: [
+    {
+      id: "t1",
+      goalId: "p1",
+      title: "",
+      outcome: "",
+      createdAt: 0,
+      meetingId: "m1",
+      ownerAccepts: true,
+    },
+  ],
   subtasks: [],
   meetings: [meeting()],
   questions: [],
@@ -58,7 +68,7 @@ describe("reviewerOf", () => {
   it("is another member when the host is the assignee or there was no meeting", () => {
     expect(reviewerOf(work(), subtask("s1", { assignee: "host" }))).toBe("ann");
     const direct = work({
-      tasks: [{ id: "t1", goalId: "p1", title: "", outcome: "", createdAt: 0 }],
+      tasks: [{ id: "t1", goalId: "p1", title: "", outcome: "", createdAt: 0, ownerAccepts: true }],
     });
     expect(reviewerOf(direct, subtask("s1"))).toBe("host");
   });
@@ -86,8 +96,17 @@ describe("waitsIn", () => {
     expect(waitsIn(state, down, busyMembers(state))).toEqual([{ kind: "busy", by: "ann" }]);
   });
 
-  it("waits on another task's acceptance before building on it", () => {
+  it("waits on the acceptance of another task you accept before building on it", () => {
+    const task = (ownerAccepts: boolean) => ({
+      id: "t0",
+      goalId: "p1",
+      title: "",
+      outcome: "",
+      createdAt: 0,
+      ownerAccepts,
+    });
     const up = subtask("up", { taskId: "t0", status: "done" });
+    const rest = subtask("rest", { taskId: "t0", assignee: "bob" });
     const down = subtask("down", { dependsOn: ["up"], assignee: "bob" });
     const accept = question({
       id: "q1",
@@ -95,10 +114,17 @@ describe("waitsIn", () => {
       kind: "decision",
       decision: { kind: "delivery", options: ["accept", "revise"] },
     });
-    const state = work({ subtasks: [up, down], questions: [accept] });
-    expect(waitsIn(state, down, busyMembers(state))).toEqual([
+    const accepted = work({ tasks: [task(true)], subtasks: [up, down], questions: [accept] });
+    expect(waitsIn(accepted, down, busyMembers(accepted))).toEqual([
       { kind: "acceptance", questionId: "q1" },
     ]);
+    // The rest of a task you accept is waited for first; of any other, only what it uses.
+    const unfinished = (ownerAccepts: boolean) =>
+      work({ tasks: [task(ownerAccepts)], subtasks: [up, rest, down] });
+    expect(waitsIn(unfinished(true), down, new Set())).toEqual([
+      { kind: "upstream", by: "bob", subtaskId: "rest", halted: false },
+    ]);
+    expect(waitsIn(unfinished(false), down, new Set())).toEqual([]);
   });
 
   it("holds what is pending or yet to merge while its goal is paused", () => {

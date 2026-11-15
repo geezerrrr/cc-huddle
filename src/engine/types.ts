@@ -40,16 +40,21 @@ export interface Goal {
   archivedAt?: number;
 }
 
-/** A group of subtasks that is accepted as a whole. */
+/** One result for you: a group of subtasks, done once they all are. */
 export interface Task {
   id: string;
   goalId: string;
   title: string;
-  /** What it delivers when accepted. */
+  /** What it delivers. */
   outcome: string;
   createdAt: number;
   /** The meeting whose approved plan it came from; none when assigned directly. */
   meetingId?: string;
+  /**
+   * Done, it waits for you to accept it, and work in other tasks that builds
+   * on it waits for that; else it is done as its last subtask merges (§7.1).
+   */
+  ownerAccepts: boolean;
 }
 
 export type SubtaskStatus =
@@ -130,6 +135,8 @@ export interface PlanSubtask {
 export interface PlanTask {
   title: string;
   outcome: string;
+  /** Whether you accept it once done (Task.ownerAccepts): off unless you tick it in review. */
+  ownerAccepts: boolean;
   subtasks: PlanSubtask[];
 }
 
@@ -287,7 +294,7 @@ export type Wait =
   | { kind: "busy"; by: string }
   | { kind: "teammate"; by: string; questionId: string }
   | { kind: "you"; questionId: string; decision?: DecisionKind }
-  /** Upstream work in another task, done, whose task waits for your acceptance. */
+  /** Upstream work in another task you accept, done, whose task waits for your acceptance. */
   | { kind: "acceptance"; questionId: string };
 
 export const SUBTASK_ACTIONS = ["stop", "continue", "retry", "redo"] as const;

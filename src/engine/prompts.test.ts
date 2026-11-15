@@ -55,7 +55,14 @@ describe("taskBrief", () => {
   it("gives the work, where to do it, its plan, what it builds on, and your words for it", () => {
     const brief = taskBrief({
       goal: { id: "g1", name: "Dice game", slug: "dice-game", status: "active", createdAt: 0 },
-      task: { id: "t1", goalId: "g1", title: "Board", outcome: "A board to roll on", createdAt: 0 },
+      task: {
+        id: "t1",
+        goalId: "g1",
+        title: "Board",
+        outcome: "A board to roll on",
+        createdAt: 0,
+        ownerAccepts: true,
+      },
       subtask: subtask("Scoreboard", { acceptance: "Shows both scores" }),
       cwd: "/desks/s2",
       branch: "openplan/dice-game/s2",

@@ -145,6 +145,7 @@ describe("Engine", () => {
       title: "Game",
       outcome: "",
       createdAt: 0,
+      ownerAccepts: true,
     });
     const subtask = {
       id: "s1",

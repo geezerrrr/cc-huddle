@@ -144,7 +144,14 @@ describe("Goals", () => {
     await mkdir(path.dirname(record));
     await writeFile(record, "");
     const { state } = core;
-    state.tasks.push({ id: "t1", goalId: goal.id, title: "", outcome: "", createdAt: 0 });
+    state.tasks.push({
+      id: "t1",
+      goalId: goal.id,
+      title: "",
+      outcome: "",
+      createdAt: 0,
+      ownerAccepts: true,
+    });
     state.subtasks.push({
       id: "s1",
       taskId: "t1",
@@ -192,7 +199,12 @@ describe("Goals", () => {
     );
     goals.assign(goal.id, work);
     expect(scheduler.assign).toHaveBeenCalledWith(goal.id, [
-      { title: "Scoreboard", outcome: "", subtasks: [{ ...work, key: "", dependsOn: [] }] },
+      {
+        title: "Scoreboard",
+        outcome: "",
+        ownerAccepts: false,
+        subtasks: [{ ...work, key: "", dependsOn: [] }],
+      },
     ]);
     await goals.archive(goal.id);
     expect(() => goals.assign(goal.id, work)).toThrow("archived: resume it first");

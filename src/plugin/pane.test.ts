@@ -55,7 +55,17 @@ const question = (
 const work = (): Work => ({
   members: ["glm", "sonnet"],
   goals: [{ id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 }],
-  tasks: [{ id: "t1", goalId: "g1", title: "Game", outcome: "", createdAt: 0, meetingId: "m1" }],
+  tasks: [
+    {
+      id: "t1",
+      goalId: "g1",
+      title: "Game",
+      outcome: "",
+      createdAt: 0,
+      meetingId: "m1",
+      ownerAccepts: true,
+    },
+  ],
   meetings: [meeting],
   subtasks: [
     subtask("rules", {
@@ -171,6 +181,12 @@ describe("paneTeam", () => {
       { key: "back:board:1", text: '"board" went back to sonnet: Bigger' },
       { key: "done:board", text: '"board" by sonnet is merged' },
     ]);
+    const finished = work();
+    finished.subtasks = finished.subtasks.map((s) => ({ ...s, status: "done" as const }));
+    expect(paneTeam(finished, members).milestones).toContainEqual({
+      key: "task:t1",
+      text: 'The task "Game" is done',
+    });
     expect(team.prompts).toEqual([
       {
         key: "accept:q3",
@@ -200,7 +216,7 @@ Tell the user what was done, and ask whether to accept it or send it back with w
     expect(review.prompts).toEqual([
       {
         key: "review:m1",
-        text: 'The meeting [m1] on "Dice" has a plan: A dice game. Show it to the user with show_plan, and ask whether to approve it, change it, or cancel it.',
+        text: 'The meeting [m1] on "Dice" has a plan: A dice game. Show it to the user with show_plan, and ask whether to approve it, change it, or cancel it, and which tasks, if any, they want to accept themselves once done: none is unless they say, since reviews and checks confirm the work; it is worth it for a result only looking at it or trying it can judge.',
       },
     ]);
   });

@@ -325,8 +325,15 @@ describe("A plan under review", () => {
     expect(() => {
       meetings.change(meeting.id, changed("ann"));
     }).toThrow();
+    expect(meeting.plan?.tasks[0]?.ownerAccepts).toBe(false);
     meetings.change(meeting.id, changed("sonnet"));
     expect(meeting.plan?.tasks[0]?.subtasks.map((s) => s.assignee)).toEqual(["sonnet", "sonnet"]);
+    expect(meeting.plan?.tasks[0]?.ownerAccepts).toBe(false);
+    meetings.change(meeting.id, {
+      ...changed("sonnet"),
+      tasks: [{ ...changed("sonnet").tasks[0], owner_accepts: true }],
+    });
+    expect(meeting.plan?.tasks[0]?.ownerAccepts).toBe(true);
 
     await meetings.approve(meeting.id);
     expect(meeting).toMatchObject({

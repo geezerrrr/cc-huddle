@@ -124,8 +124,9 @@ export function waitsIn(state: Work, subtask: Subtask, busy: Set<string>): Wait[
         if (!d) return [];
         if (d.status !== "done") return [unmerged(d)];
         if (d.taskId === subtask.taskId) return [];
-        // Done in another task: that whole task is yours to accept first, so
-        // the rest of it is waited for, then your acceptance.
+        // Done in another task you accept: that whole task is yours to accept
+        // first, so the rest of it is waited for, then your acceptance.
+        if (!state.tasks.find((t) => t.id === d.taskId)?.ownerAccepts) return [];
         const rest = state.subtasks.find((s) => s.taskId === d.taskId && s.status !== "done");
         if (rest) return [unmerged(rest)];
         const acceptance = acceptanceOf(state, d.taskId);

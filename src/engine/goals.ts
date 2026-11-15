@@ -141,7 +141,13 @@ export class Goals {
     if (!this.core.team.members.some((m) => m.name === work.assignee))
       throw new Error(`There is no member called "${work.assignee}"`);
     return this.scheduler.assign(goal.id, [
-      { title: work.title, outcome: "", subtasks: [{ ...work, key: "", dependsOn: [] }] },
+      // Work you assign is done once merged: it isn't yours to accept (§7.1).
+      {
+        title: work.title,
+        outcome: "",
+        ownerAccepts: false,
+        subtasks: [{ ...work, key: "", dependsOn: [] }],
+      },
     ]);
   }
 

@@ -55,6 +55,7 @@ const writtenPlan = (plan: Plan) => ({
   tasks: plan.tasks.map((task) => ({
     title: task.title,
     outcome: task.outcome,
+    owner_accepts: task.ownerAccepts,
     subtasks: task.subtasks.map(({ dependsOn, ...subtask }) => ({
       ...subtask,
       depends_on: dependsOn,
@@ -169,7 +170,7 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
     "change_plan",
     {
       description:
-        "Replace a plan under review with the user's changes: the whole plan, as show_plan gives it, changed. Any member can be given work.",
+        "Replace a plan under review with the user's changes: the whole plan, as show_plan gives it, changed. Any member can be given work. owner_accepts marks a task the user accepts themselves once done; none is, unless they say.",
       inputSchema: changePlanInput(memberName()),
     },
     async ({ meeting: id, plan }) => {

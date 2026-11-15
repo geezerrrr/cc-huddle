@@ -60,7 +60,9 @@ beforeEach(async () => {
   core = {
     state: {
       goals: [{ id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 }],
-      tasks: [{ id: "t1", goalId: "g1", title: "Board", outcome: "", createdAt: 0 }],
+      tasks: [
+        { id: "t1", goalId: "g1", title: "Board", outcome: "", createdAt: 0, ownerAccepts: true },
+      ],
       subtasks: [],
       meetings: [],
       questions: [],
@@ -153,6 +155,17 @@ describe("Scheduler", () => {
     ]);
   });
 
+  it("hands over a task you don't accept as its last subtask merges, asking nothing", async () => {
+    const [task] = core.state.tasks;
+    if (task) task.ownerAccepts = false;
+    const s1 = subtask("s1");
+    core.state.subtasks.push(s1);
+    vi.mocked(runSubtask).mockImplementation(delivering({ "score.txt": "0:0\n" }));
+    scheduler.pump();
+    await settled(s1, "done");
+    expect(core.state.questions).toEqual([]);
+  });
+
   it("starts work once what it builds on is merged, and tells it what that was", async () => {
     const s1 = subtask("s1");
     const s2 = subtask("s2", { assignee: "sonnet", dependsOn: ["s1"] });
@@ -189,9 +202,15 @@ describe("Scheduler", () => {
         {
           title: "Game",
           outcome: "Playable",
+          ownerAccepts: true,
           subtasks: [planned("a", "glm"), planned("b", "sonnet", ["a"])],
         },
-        { title: "Score", outcome: "", subtasks: [planned("c", "sonnet", ["b"])] },
+        {
+          title: "Score",
+          outcome: "",
+          ownerAccepts: true,
+          subtasks: [planned("c", "sonnet", ["b"])],
+        },
       ],
       "m1",
     );
@@ -225,7 +244,15 @@ describe("Scheduler", () => {
       createdAt: 0,
     });
     core.state.tasks = [
-      { id: "t1", goalId: "g1", title: "Board", outcome: "", createdAt: 0, meetingId: "m1" },
+      {
+        id: "t1",
+        goalId: "g1",
+        title: "Board",
+        outcome: "",
+        createdAt: 0,
+        meetingId: "m1",
+        ownerAccepts: true,
+      },
     ];
     const s1 = subtask("s1");
     core.state.subtasks.push(s1);

@@ -21,7 +21,7 @@ import { errorText, workOf, type Core } from "./core.ts";
 import { busyMembers, meetingResumes } from "./derive.ts";
 import { openGoal } from "./git.ts";
 import { can, MEETING_MACHINE, step } from "./machines.ts";
-import { hostPlanSchema, parsePlan } from "./plan.ts";
+import { hostPlanSchema, hostWritten, planSchema, soundPlan } from "./plan.ts";
 import {
   MEETING_TOOLS,
   meetingAnswer,
@@ -222,15 +222,16 @@ export class Meetings {
   }
 
   /**
-   * Your changes to a plan under review: `raw` is the whole plan as the host
-   * hands one in (hostPlanSchema), and may give work to any member.
+   * Your changes to a plan under review: `raw` is the whole plan, which may
+   * give work to any member and names the tasks you accept (planSchema).
+   * Dependencies that loop are refused.
    */
   change(id: string, raw: unknown) {
     const { core } = this;
     const { meeting } = this.underReview(id, "change");
     // A plan under review came out of a meeting, so the team has members.
     const names = core.team.members.map((m) => m.name) as [string, ...string[]];
-    meeting.plan = parsePlan(raw, names);
+    meeting.plan = soundPlan(planSchema(z.enum(names)).parse(raw), "refuse");
     core.changed();
   }
 
@@ -485,12 +486,11 @@ export class Meetings {
       }
       meeting.hands = undefined;
       const names = ctx.attendees.map((m) => m.name) as [string, ...string[]];
-      const closing = await speak(host, meetingClosing(ctx), {
-        schema: hostPlanSchema(names),
-      });
+      const schema = hostPlanSchema(names);
+      const closing = await speak(host, meetingClosing(ctx), { schema });
       // Stopped as the plan came in: there is no plan, and it ends as any stop does.
       signal.throwIfAborted();
-      meeting.plan = parsePlan(closing.structured, names);
+      meeting.plan = soundPlan(hostWritten(schema.parse(closing.structured)), "drop");
       said(host, { text: meeting.plan.summary, tokens: closing.tokens }, "summary");
       meeting.status = step(MEETING_MACHINE, meeting.status, "plan");
       // With its plan out a meeting can't go on: the sessions it kept have served.

@@ -94,7 +94,9 @@ export function statusText(work: Work): string {
         `  Meeting [${meeting.id}], hosted by ${meeting.host}: ${MEETING_STATUS[meeting.status]}${meeting.error ? ` (${meeting.error})` : ""}${derived.resumable.includes(meeting.id) ? "; it can go on" : ""}`,
       );
     for (const task of work.tasks.filter((t) => t.goalId === goal.id)) {
-      lines.push(`  Task "${task.title}" [${task.id}]`);
+      lines.push(
+        `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", the user accepts it" : ""}`,
+      );
       for (const subtask of work.subtasks.filter((s) => s.taskId === task.id))
         lines.push(subtaskLine(subtask, derived.subtasks[subtask.id]?.waits ?? [], work));
     }

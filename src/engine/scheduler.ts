@@ -128,12 +128,13 @@ export class Scheduler {
     const { state } = this.core;
     const now = Date.now();
     const ids = new Map<string, string>();
-    const added = tasks.flatMap(({ title, outcome, subtasks }) => {
+    const added = tasks.flatMap(({ title, outcome, ownerAccepts, subtasks }) => {
       const task: Task = {
         id: randomUUID(),
         goalId,
         title,
         outcome,
+        ownerAccepts,
         createdAt: now,
         ...(meetingId !== undefined && { meetingId }),
       };
@@ -752,12 +753,16 @@ export class Scheduler {
     }
   }
 
-  /** A subtask merged: done. The last of its task, the task's delivery waits for your acceptance. */
+  /**
+   * A subtask merged: done. The last of its task, the task is done: one you
+   * accept waits for your acceptance.
+   */
   private finished(subtask: Subtask) {
     subtask.finishedAt = Date.now();
     subtask.progress = { done: subtask.progress.total, total: subtask.progress.total };
     if (this.core.state.subtasks.some((s) => s.taskId === subtask.taskId && s.status !== "done"))
       return;
+    if (!this.taskOf(subtask).ownerAccepts) return;
     this.questions.openDecision(
       subtask,
       { kind: "delivery", options: DELIVERY_CALLS },

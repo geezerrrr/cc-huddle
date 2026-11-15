@@ -164,7 +164,7 @@ describe("tools", () => {
       plan: {
         summary: "Dice",
         markdown: "# Dice",
-        tasks: [{ title: "Game", outcome: "", subtasks: [subtask] }],
+        tasks: [{ title: "Game", outcome: "", ownerAccepts: true, subtasks: [subtask] }],
       },
       tokens: 0,
       createdAt: 0,

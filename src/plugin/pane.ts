@@ -192,6 +192,10 @@ function milestones(work: Work): OpenplanTeam["milestones"] {
         text: `"${s.title}" by ${s.assignee} failed${s.error ? `: ${s.error}` : ""}`,
       });
   }
+  // A task is done once its last subtask merges, whether or not you accept it (§7.1).
+  for (const task of work.tasks)
+    if (work.subtasks.every((s) => s.taskId !== task.id || s.status === "done"))
+      said.push({ key: `task:${task.id}`, text: `The task "${task.title}" is done` });
   return said;
 }
 
@@ -205,7 +209,7 @@ function prompts(work: Work): OpenplanTeam["prompts"] {
     if (meeting.status === "review" && meeting.plan)
       asked.push({
         key: `review:${meeting.id}`,
-        text: `The meeting [${meeting.id}] on "${aboutOf(work, meeting)}" has a plan: ${meeting.plan.summary}. Show it to the user with show_plan, and ask whether to approve it, change it, or cancel it.`,
+        text: `The meeting [${meeting.id}] on "${aboutOf(work, meeting)}" has a plan: ${meeting.plan.summary}. Show it to the user with show_plan, and ask whether to approve it, change it, or cancel it, and which tasks, if any, they want to accept themselves once done: none is unless they say, since reviews and checks confirm the work; it is worth it for a result only looking at it or trying it can judge.`,
       });
   for (const question of work.questions) {
     if (question.kind !== "decision" || question.decision.kind !== "delivery") continue;
