@@ -27465,14 +27465,8 @@ function derive(state) {
   };
 }
 
-// src/plugin/status.ts
-var MEETING_STATUS = {
-  running: "under way",
-  review: "its plan waits for you: approve it, change it, or cancel it",
-  approved: "plan approved",
-  cancelled: "cancelled",
-  failed: "failed"
-};
+// src/plugin/words.ts
+var PLAN_TO_REVIEW = "plan to review";
 function waitText(wait, work) {
   switch (wait.kind) {
     case "goal":
@@ -27496,6 +27490,67 @@ function stepText({ done, total, current }) {
   const step = `step ${String(Math.min(done + 1, total))} of ${String(total)}`;
   return current ? `${step}: ${current}` : step;
 }
+function meetingStatus(meeting) {
+  switch (meeting.status) {
+    case "running":
+      return meeting.planning ? `${meeting.host} writes the plan` : meeting.speaking ? `${meeting.speaking} speaks` : meeting.drafting ? "the members form their first judgments" : meeting.weighing ? "deciding who speaks next" : "under way";
+    case "review":
+      return "its plan waits for you";
+    case "approved":
+      return "plan approved";
+    case "cancelled":
+      return "cancelled";
+    case "failed":
+      return `failed${meeting.error ? `: ${meeting.error}` : ""}`;
+  }
+}
+var MAIN_ARGUMENTS = ["command", "file_path", "path", "pattern", "url", "description"];
+function mainArgument(input3) {
+  const fields = input3 ?? {};
+  return MAIN_ARGUMENTS.map((key) => fields[key]).find(
+    (value) => typeof value === "string"
+  );
+}
+function callText(permission) {
+  const main = mainArgument(permission.input);
+  return main ? `${permission.tool}: ${main}` : permission.tool;
+}
+function needWords(question, work) {
+  const title = work.subtasks.find((s) => s.id === question.subtaskId)?.title;
+  const about = title ? ` for "${title}"` : "";
+  switch (question.kind) {
+    case "permission":
+      return {
+        headline: `${question.from} asks to use ${callText(question.permission)}${about}. Allow it?`,
+        ...question.text && { detail: question.text }
+      };
+    case "choices":
+      return { headline: `${question.from} asks${about}:` };
+    case "decision":
+      switch (question.decision.kind) {
+        case "review":
+          return {
+            headline: `The review of "${title ?? ""}" is stuck. What now?`,
+            detail: question.text
+          };
+        case "merge":
+          return {
+            headline: `Merging "${title ?? ""}" needs you. What now?`,
+            detail: question.text.split("\n").join(", ")
+          };
+        case "delivery":
+          return { headline: `The task "${question.text}" is done. Accept it?` };
+      }
+  }
+}
+var whereOf = (entry) => entry.holder ? "in another session" : entry.state.goal.status === "archived" ? "archived" : "paused";
+function progressOf({ subtasks, meetings }) {
+  const done = subtasks.filter((s) => s.status === "done").length;
+  return subtasks.length ? `${String(done)}/${String(subtasks.length)} subtasks done` : meetings.some((m) => m.status === "review") ? PLAN_TO_REVIEW : "no plan yet";
+}
+var goalLabel = (state, where) => `${state.goal.name} \xB7 ${progressOf(state)} \xB7 ${where}`;
+
+// src/plugin/status.ts
 function subtaskLine(subtask, waits, work) {
   const parts = [subtask.status];
   const step = subtask.status === "running" && stepText(subtask.progress);
@@ -27505,21 +27560,10 @@ function subtaskLine(subtask, waits, work) {
   return `    - ${subtask.title} [${subtask.id}], ${subtask.assignee}: ${parts.join(", ")}`;
 }
 function questionLine(question, work) {
-  const about = work.subtasks.find((s) => s.id === question.subtaskId);
-  const head = `  - [${question.id}] `;
-  if (question.kind === "permission")
-    return `${head}${question.from} asks to use ${question.permission.tool}${question.permission.title ? `: ${question.permission.title}` : ""}. Answer it in /openplan.`;
-  if (question.kind === "choices")
-    return `${head}${question.from} asks: ${question.choices.map((c) => c.question).join(" ")} Answer it in /openplan.`;
-  const options = question.decision.options.join(", ");
-  switch (question.decision.kind) {
-    case "delivery":
-      return `${head}The task "${question.text}" is done: ${options}.`;
-    case "review":
-      return `${head}The review of "${about?.title ?? ""}" is stuck (${question.text}): ${options}.`;
-    case "merge":
-      return `${head}Merging "${about?.title ?? ""}" needs you (${question.text.split("\n").join(", ")}): ${options}.`;
-  }
+  const { headline, detail } = needWords(question, work);
+  const asks = question.kind === "choices" ? ` ${question.choices.map((c) => c.question).join(" ")}` : "";
+  const then = question.kind === "decision" ? ` Options: ${question.decision.options.join(", ")}.` : " The user answers it in /openplan.";
+  return `  - [${question.id}] ${headline}${asks}${detail ? ` (${detail})` : ""}${then}`;
 }
 function statusText(work) {
   const derived2 = derive(work);
@@ -27531,7 +27575,7 @@ function statusText(work) {
   ];
   for (const meeting of work.meetings.filter((m) => m.status !== "approved"))
     lines.push(
-      `  Meeting [${meeting.id}], hosted by ${meeting.host}${meeting.hostOnly ? ", who only runs it" : ""}: ${MEETING_STATUS[meeting.status]}${meeting.error ? ` (${meeting.error})` : ""}${derived2.resumable.includes(meeting.id) ? "; it can go on" : ""}`
+      `  Meeting [${meeting.id}], hosted by ${meeting.host}${meeting.hostOnly ? ", who only runs it" : ""}: ${meetingStatus(meeting)}${meeting.status === "review" ? ": approve it, change it, or cancel it" : ""}${derived2.resumable.includes(meeting.id) ? "; it can go on" : ""}`
     );
   for (const task of work.tasks) {
     lines.push(
@@ -27544,14 +27588,9 @@ function statusText(work) {
   if (open2.length) lines.push("", "Waiting on you:", ...open2.map((q) => questionLine(q, work)));
   return lines.join("\n");
 }
-var whereOf = (entry) => entry.holder ? "in another session" : entry.state.goal.status === "archived" ? "archived" : "paused";
-function progressOf({ subtasks, meetings }) {
-  const done = subtasks.filter((s) => s.status === "done").length;
-  return subtasks.length ? `${String(done)}/${String(subtasks.length)} subtasks done` : meetings.some((m) => m.status === "review") ? "plan to review" : "no plan yet";
-}
 var othersOf = (others) => others.map((entry) => ({
   slug: entry.slug,
-  label: `${entry.state.goal.name} \xB7 ${progressOf(entry.state)} \xB7 ${whereOf(entry)}`
+  label: goalLabel(entry.state, whereOf(entry))
 }));
 function othersText(others) {
   if (!others.length) return void 0;

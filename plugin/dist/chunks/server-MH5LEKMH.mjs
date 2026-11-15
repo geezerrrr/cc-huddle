@@ -7744,7 +7744,17 @@ var DECISION_OPTIONS = [
   "accept",
   "revise"
 ];
+var DECISIONS = {
+  review: { options: ["rereview", "skip", "sendBack"], note: { option: "sendBack" } },
+  merge: { options: ["ours", "theirs", "retry"] },
+  delivery: { options: ["accept", "revise"], note: { option: "revise", needed: true } }
+};
+function noteNeeded(kind, option) {
+  const { note } = DECISIONS[kind];
+  return note?.option === option && note.needed === true;
+}
 var PERMISSION_OPTIONS = ["once", "always", "deny"];
+var PERMISSION_NOTE = "deny";
 var toYou = (question) => question.kind !== "teammate";
 var SUBTASK_ACTIONS = ["stop", "continue", "retry", "redo"];
 var GOAL_ACTIONS = ["pause", "resume", "archive", "delete"];
@@ -8120,14 +8130,10 @@ function derive(state) {
   };
 }
 
-// src/plugin/status.ts
-var MEETING_STATUS = {
-  running: "under way",
-  review: "its plan waits for you: approve it, change it, or cancel it",
-  approved: "plan approved",
-  cancelled: "cancelled",
-  failed: "failed"
-};
+// src/plugin/words.ts
+var plural = (n, one, many) => `${String(n)} ${n === 1 ? one : many}`;
+var PLAN_TO_REVIEW = "plan to review";
+var rosterOf = (members) => members.map((m) => `${m.name} (${m.role.title})`).join(", ");
 function waitText(wait, work) {
   switch (wait.kind) {
     case "goal":
@@ -8151,76 +8157,19 @@ function stepText({ done, total, current }) {
   const step2 = `step ${String(Math.min(done + 1, total))} of ${String(total)}`;
   return current ? `${step2}: ${current}` : step2;
 }
-function subtaskLine(subtask2, waits, work) {
-  const parts = [subtask2.status];
-  const step2 = subtask2.status === "running" && stepText(subtask2.progress);
-  if (step2) parts.push(step2);
-  parts.push(...waits.map((w) => waitText(w, work)));
-  if (subtask2.error) parts.push(`error: ${subtask2.error}`);
-  return `    - ${subtask2.title} [${subtask2.id}], ${subtask2.assignee}: ${parts.join(", ")}`;
-}
-function questionLine(question, work) {
-  const about = work.subtasks.find((s) => s.id === question.subtaskId);
-  const head = `  - [${question.id}] `;
-  if (question.kind === "permission")
-    return `${head}${question.from} asks to use ${question.permission.tool}${question.permission.title ? `: ${question.permission.title}` : ""}. Answer it in /openplan.`;
-  if (question.kind === "choices")
-    return `${head}${question.from} asks: ${question.choices.map((c) => c.question).join(" ")} Answer it in /openplan.`;
-  const options = question.decision.options.join(", ");
-  switch (question.decision.kind) {
-    case "delivery":
-      return `${head}The task "${question.text}" is done: ${options}.`;
-    case "review":
-      return `${head}The review of "${about?.title ?? ""}" is stuck (${question.text}): ${options}.`;
-    case "merge":
-      return `${head}Merging "${about?.title ?? ""}" needs you (${question.text.split("\n").join(", ")}): ${options}.`;
+function underWay(subtask2) {
+  switch (subtask2.status) {
+    case "running": {
+      const step2 = stepText(subtask2.progress);
+      return `works on "${subtask2.title}"${step2 ? `, ${step2}` : ""}`;
+    }
+    case "reviewing":
+      return `"${subtask2.title}" in review`;
+    case "merging":
+      return `"${subtask2.title}" being merged`;
+    default:
+      return void 0;
   }
-}
-function statusText(work) {
-  const derived = derive(work);
-  const busy = new Set(derived.busy);
-  const { goal } = work;
-  const lines = [
-    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)}`,
-    `Team: ${work.members.map((m) => busy.has(m) ? `${m} (busy)` : m).join(", ")}`
-  ];
-  for (const meeting2 of work.meetings.filter((m) => m.status !== "approved"))
-    lines.push(
-      `  Meeting [${meeting2.id}], hosted by ${meeting2.host}${meeting2.hostOnly ? ", who only runs it" : ""}: ${MEETING_STATUS[meeting2.status]}${meeting2.error ? ` (${meeting2.error})` : ""}${derived.resumable.includes(meeting2.id) ? "; it can go on" : ""}`
-    );
-  for (const task of work.tasks) {
-    lines.push(
-      `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", the user accepts it" : ""}`
-    );
-    for (const subtask2 of work.subtasks.filter((s) => s.taskId === task.id))
-      lines.push(subtaskLine(subtask2, derived.subtasks[subtask2.id]?.waits ?? [], work));
-  }
-  const open2 = work.questions.filter(toYou).filter((q) => q.status === "open");
-  if (open2.length) lines.push("", "Waiting on you:", ...open2.map((q) => questionLine(q, work)));
-  return lines.join("\n");
-}
-var whereOf = (entry) => entry.holder ? "in another session" : entry.state.goal.status === "archived" ? "archived" : "paused";
-function progressOf({ subtasks, meetings }) {
-  const done = subtasks.filter((s) => s.status === "done").length;
-  return subtasks.length ? `${String(done)}/${String(subtasks.length)} subtasks done` : meetings.some((m) => m.status === "review") ? "plan to review" : "no plan yet";
-}
-var othersOf = (others) => others.map((entry) => ({
-  slug: entry.slug,
-  label: `${entry.state.goal.name} \xB7 ${progressOf(entry.state)} \xB7 ${whereOf(entry)}`
-}));
-function othersText(others) {
-  if (!others.length) return void 0;
-  return [
-    "The repository's other goals, which the user takes up here with /openplan resume:",
-    ...othersOf(others).map((o) => `  - ${o.label}`)
-  ].join("\n");
-}
-
-// src/plugin/pane.ts
-var plural = (n, one, many) => `${String(n)} ${n === 1 ? one : many}`;
-function shownMeeting(work) {
-  const latest = (status) => work.meetings.filter((m) => !status || m.status === status).at(-1);
-  return latest("running") ?? latest("review") ?? latest();
 }
 function meetingStatus(meeting2) {
   switch (meeting2.status) {
@@ -8236,12 +8185,143 @@ function meetingStatus(meeting2) {
       return `failed${meeting2.error ? `: ${meeting2.error}` : ""}`;
   }
 }
+var MAIN_ARGUMENTS = ["command", "file_path", "path", "pattern", "url", "description"];
+function mainArgument(input) {
+  const fields = input ?? {};
+  return MAIN_ARGUMENTS.map((key) => fields[key]).find(
+    (value) => typeof value === "string"
+  );
+}
+function callText(permission) {
+  const main = mainArgument(permission.input);
+  return main ? `${permission.tool}: ${main}` : permission.tool;
+}
+var OPTION_LABELS = {
+  once: "Allow once",
+  always: "Always allow",
+  deny: "Deny",
+  rereview: "Review again",
+  skip: "Skip the review",
+  sendBack: "Send back",
+  ours: "Keep ours",
+  theirs: "Take theirs",
+  retry: "Retry",
+  accept: "Accept",
+  revise: "Send back"
+};
+var NOTE_PROMPTS = {
+  deny: "Or deny it, saying why",
+  sendBack: "Or send it back, saying what to change",
+  revise: "What to change"
+};
+function needWords(question, work) {
+  const title = work.subtasks.find((s) => s.id === question.subtaskId)?.title;
+  const about = title ? ` for "${title}"` : "";
+  switch (question.kind) {
+    case "permission":
+      return {
+        headline: `${question.from} asks to use ${callText(question.permission)}${about}. Allow it?`,
+        ...question.text && { detail: question.text }
+      };
+    case "choices":
+      return { headline: `${question.from} asks${about}:` };
+    case "decision":
+      switch (question.decision.kind) {
+        case "review":
+          return {
+            headline: `The review of "${title ?? ""}" is stuck. What now?`,
+            detail: question.text
+          };
+        case "merge":
+          return {
+            headline: `Merging "${title ?? ""}" needs you. What now?`,
+            detail: question.text.split("\n").join(", ")
+          };
+        case "delivery":
+          return { headline: `The task "${question.text}" is done. Accept it?` };
+      }
+  }
+}
+var whereOf = (entry) => entry.holder ? "in another session" : entry.state.goal.status === "archived" ? "archived" : "paused";
+function progressOf({ subtasks, meetings }) {
+  const done = subtasks.filter((s) => s.status === "done").length;
+  return subtasks.length ? `${String(done)}/${String(subtasks.length)} subtasks done` : meetings.some((m) => m.status === "review") ? PLAN_TO_REVIEW : "no plan yet";
+}
+var goalLabel = (state, where) => `${state.goal.name} \xB7 ${progressOf(state)} \xB7 ${where}`;
+var noGoalText = (moved) => moved ? `"${moved}" moved to another Claude Code session. Bring it back here with /openplan resume.` : "This session runs no goal. Hand the team a task with /openplan <task>, or take a goal up with /openplan resume.";
+function handOffText(task, mine) {
+  const goal = mine ? `This session runs the goal "${mine.goal.name}", ${mine.goal.status === "active" ? "under way" : mine.goal.status}. The team: ${rosterOf(mine.members)}.` : "This session runs no goal yet.";
+  return [
+    "The user hands this to openplan's team: take it on as openplan's team skill says, and don't do any of it yourself.",
+    "",
+    task,
+    "",
+    goal
+  ].join("\n");
+}
+var resumeRefusal = (name) => `"${name}" is under way in this session, which runs one goal: /openplan pause it first, or take the other up in another session.`;
+
+// src/plugin/status.ts
+function subtaskLine(subtask2, waits, work) {
+  const parts = [subtask2.status];
+  const step2 = subtask2.status === "running" && stepText(subtask2.progress);
+  if (step2) parts.push(step2);
+  parts.push(...waits.map((w) => waitText(w, work)));
+  if (subtask2.error) parts.push(`error: ${subtask2.error}`);
+  return `    - ${subtask2.title} [${subtask2.id}], ${subtask2.assignee}: ${parts.join(", ")}`;
+}
+function questionLine(question, work) {
+  const { headline, detail } = needWords(question, work);
+  const asks = question.kind === "choices" ? ` ${question.choices.map((c) => c.question).join(" ")}` : "";
+  const then = question.kind === "decision" ? ` Options: ${question.decision.options.join(", ")}.` : " The user answers it in /openplan.";
+  return `  - [${question.id}] ${headline}${asks}${detail ? ` (${detail})` : ""}${then}`;
+}
+function statusText(work) {
+  const derived = derive(work);
+  const busy = new Set(derived.busy);
+  const { goal } = work;
+  const lines = [
+    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)}`,
+    `Team: ${work.members.map((m) => busy.has(m) ? `${m} (busy)` : m).join(", ")}`
+  ];
+  for (const meeting2 of work.meetings.filter((m) => m.status !== "approved"))
+    lines.push(
+      `  Meeting [${meeting2.id}], hosted by ${meeting2.host}${meeting2.hostOnly ? ", who only runs it" : ""}: ${meetingStatus(meeting2)}${meeting2.status === "review" ? ": approve it, change it, or cancel it" : ""}${derived.resumable.includes(meeting2.id) ? "; it can go on" : ""}`
+    );
+  for (const task of work.tasks) {
+    lines.push(
+      `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", the user accepts it" : ""}`
+    );
+    for (const subtask2 of work.subtasks.filter((s) => s.taskId === task.id))
+      lines.push(subtaskLine(subtask2, derived.subtasks[subtask2.id]?.waits ?? [], work));
+  }
+  const open2 = work.questions.filter(toYou).filter((q) => q.status === "open");
+  if (open2.length) lines.push("", "Waiting on you:", ...open2.map((q) => questionLine(q, work)));
+  return lines.join("\n");
+}
+var othersOf = (others) => others.map((entry) => ({
+  slug: entry.slug,
+  label: goalLabel(entry.state, whereOf(entry))
+}));
+function othersText(others) {
+  if (!others.length) return void 0;
+  return [
+    "The repository's other goals, which the user takes up here with /openplan resume:",
+    ...othersOf(others).map((o) => `  - ${o.label}`)
+  ].join("\n");
+}
+
+// src/plugin/pane.ts
+function shownMeeting(work) {
+  const latest = (status) => work.meetings.filter((m) => !status || m.status === status).at(-1);
+  return latest("running") ?? latest("review") ?? latest();
+}
 var meetingOf = (meeting2, work) => ({
-  id: meeting2.id,
   // Its agenda is the brief your session wrote for it, too long for a line.
   about: work.goal.name,
   agenda: meeting2.agenda,
   status: meetingStatus(meeting2),
+  host: meeting2.host,
   participants: meeting2.participants,
   turns: meeting2.turns.map((t) => ({
     speaker: t.speaker,
@@ -8262,14 +8342,12 @@ function memberOf(member, work, derived) {
   );
   const next = at("pending");
   const running3 = at("running");
+  const handedOver = at("reviewing") ?? at("merging");
   let doing;
-  if (running3) {
-    const step2 = stepText(running3.progress);
-    doing = `works on "${running3.title}"${step2 ? `, ${step2}` : ""}`;
-  } else if (meeting2) doing = `at the meeting on "${work.goal.name}"`;
+  if (running3) doing = underWay(running3);
+  else if (meeting2) doing = `at the meeting on "${work.goal.name}"`;
   else if (reviewing) doing = `reviews "${reviewing.title}" by ${reviewing.assignee}`;
-  else if (at("reviewing")) doing = `"${at("reviewing")?.title ?? ""}" is in review`;
-  else if (at("merging")) doing = `"${at("merging")?.title ?? ""}" is being merged`;
+  else if (handedOver) doing = underWay(handedOver);
   else if (next) {
     const waits = derived.subtasks[next.id]?.waits ?? [];
     doing = `next: "${next.title}"${waits.length ? `, ${waits.map((w) => waitText(w, work)).join(", ")}` : ""}`;
@@ -8280,33 +8358,46 @@ function memberOf(member, work, derived) {
     name: member.name,
     role: member.role.title,
     ...member.model && { model: member.model },
-    doing,
+    doing: doing ?? "free",
     ...followed && { subtask: followed.id },
     tokens: own.reduce((sum, s) => sum + s.tokens, 0) + spoken
   };
 }
-function callText(permission) {
-  if (permission.title) return permission.title;
-  const { input } = permission;
-  const main = ["command", "file_path", "path", "pattern", "url", "description"].map((key) => input[key]).find((value) => typeof value === "string");
-  return main ? `${permission.tool}: ${main}` : permission.tool;
+var optionOf = (value) => ({
+  value,
+  label: OPTION_LABELS[value]
+});
+function noteOf(options, note) {
+  if (!note || !options.includes(note.option)) return void 0;
+  return {
+    option: note.option,
+    prompt: NOTE_PROMPTS[note.option] ?? OPTION_LABELS[note.option],
+    needed: note.needed === true
+  };
 }
 function needOf(question, work) {
-  const subtask2 = work.subtasks.find((s) => s.id === question.subtaskId);
+  const { headline, detail } = needWords(question, work);
   const head = {
     id: question.id,
     from: question.from,
-    about: subtask2?.title ?? "",
-    text: question.text
+    headline,
+    ...detail && { detail },
+    ask: question.kind !== "decision" || question.decision.kind !== "delivery"
   };
   switch (question.kind) {
-    case "permission":
+    case "permission": {
+      const { options } = question.permission;
+      const note = noteOf(options, { option: PERMISSION_NOTE });
       return {
         ...head,
-        kind: "permission",
-        call: callText(question.permission),
-        options: question.permission.options
+        kind: "options",
+        options: options.map((o) => ({
+          ...optionOf(o),
+          ...o === "once" && { primary: true }
+        })),
+        ...note && { note }
       };
+    }
     case "choices":
       return {
         ...head,
@@ -8319,13 +8410,16 @@ function needOf(question, work) {
         }))
       };
     case "decision": {
+      const { kind, options } = question.decision;
+      const note = noteOf(options, DECISIONS[kind].note);
+      const subtask2 = work.subtasks.find((s) => s.id === question.subtaskId);
       const done = work.subtasks.filter((s) => s.taskId === subtask2?.taskId && s.status === "done");
       return {
         ...head,
-        kind: "decision",
-        of: question.decision.kind,
-        options: question.decision.options,
-        ...question.decision.kind === "delivery" && {
+        kind: "options",
+        options: options.map(optionOf),
+        ...note && { note },
+        ...kind === "delivery" && {
           sendBack: done.map((s) => ({ id: s.id, title: s.title }))
         }
       };
@@ -8387,11 +8481,10 @@ function taskWhere(work, derived, subtasks) {
   if (!at) return void 0;
   switch (at.status) {
     case "running":
-      return `${at.assignee} works on "${at.title}"`;
+      return `${at.assignee} ${underWay(at) ?? ""}`;
     case "reviewing":
-      return `"${at.title}" in review`;
     case "merging":
-      return `"${at.title}" merging`;
+      return underWay(at);
     case "pending": {
       const [wait] = derived.subtasks[at.id]?.waits ?? [];
       return `"${at.title}" ${wait ? waitText(wait, work) : "starts next"}`;
@@ -8419,7 +8512,7 @@ function taskLines(work, derived) {
 function bandText(work, needs) {
   const parts = [];
   if (work.meetings.some((m) => m.status === "running")) parts.push("meeting");
-  if (work.meetings.some((m) => m.status === "review")) parts.push("plan to review");
+  if (work.meetings.some((m) => m.status === "review")) parts.push(PLAN_TO_REVIEW);
   const working = work.subtasks.filter((s) => s.status === "running").length;
   if (working) parts.push(`${String(working)} working`);
   if (needs) parts.push(`${plural(needs, "needs", "need")} you`);
@@ -8436,10 +8529,11 @@ function othersBand(others) {
   ];
   return parts.length ? parts.join(" \xB7 ") : void 0;
 }
-function paneTeam(mine, others) {
+function paneTeam(mine, others, moved) {
   if (!mine) {
     const band = othersBand(others);
     return {
+      noGoal: noGoalText(moved),
       ...band && { band },
       tasks: [],
       members: [],
@@ -8454,14 +8548,9 @@ function paneTeam(mine, others) {
   const needs = work.questions.filter(toYou).filter((q) => q.status === "open").map((q) => needOf(q, work));
   const meeting2 = shownMeeting(work);
   const { goal } = work;
-  const here = goal.status === "active" ? [] : [
-    {
-      slug: goal.slug,
-      label: `${goal.name} \xB7 ${progressOf(work)} \xB7 ${goal.status}, in this session`
-    }
-  ];
+  const here = goal.status === "active" ? [] : [{ slug: goal.slug, label: goalLabel(work, `${goal.status}, in this session`) }];
   return {
-    goal: { name: goal.name, slug: goal.slug, active: goal.status === "active" },
+    goal: { name: goal.name, slug: goal.slug },
     band: bandText(work, needs.length),
     tasks: taskLines(work, derived),
     ...meeting2 && { meeting: meetingOf(meeting2, work) },
@@ -8469,9 +8558,24 @@ function paneTeam(mine, others) {
     needs,
     milestones: milestones(work),
     prompts: prompts(work),
-    resumable: [...here, ...othersOf(others)]
+    resumable: [...here, ...othersOf(others)],
+    ...goal.status === "active" && { resumeRefused: resumeRefusal(goal.name) }
   };
 }
+var callOf = (name, input) => {
+  const argument = mainArgument(input);
+  return { name, ...argument !== void 0 && { argument } };
+};
+var viewEntries = (entries) => entries.map((entry) => {
+  if (entry.kind !== "tool") return entry;
+  const { input, name, ...rest } = entry;
+  return { ...rest, ...callOf(name, input) };
+});
+var viewLive = (live) => ({
+  ...live.streaming && { streaming: live.streaming },
+  ...live.starting && { starting: live.starting },
+  running: live.running.map((call) => callOf(call.name, call.input))
+});
 
 // src/plugin/pane-server.ts
 var viewSchema = z2.object({
@@ -8496,7 +8600,7 @@ function viewer(session2) {
     const entries = session2().othersOf(all);
     const engine = session2().current;
     const mine = engine && { work: workOf(engine), members: engine.team.members };
-    const team = paneTeam(mine, entries);
+    const team = paneTeam(mine, entries, session2().moved);
     const text2 = JSON.stringify(team);
     if (text2 !== shown) {
       shown = text2;
@@ -8505,14 +8609,23 @@ function viewer(session2) {
     const meeting2 = mine && shownMeeting(mine.work);
     const spoken = meeting2 && engine.records.speaking(meeting2);
     const { record: record2 } = asked2;
+    const read = record2 && engine && await engine.records.read(record2.subtask, record2.from);
     return {
       revision,
       ...asked2.revision !== revision && { team },
-      ...spoken && { speaking: spoken },
-      ...record2 && engine && {
+      ...spoken && {
+        speaking: {
+          speaker: spoken.speaker,
+          entries: viewEntries(spoken.entries),
+          live: viewLive(spoken.live)
+        }
+      },
+      ...read && {
         record: {
           subtask: record2.subtask,
-          ...await engine.records.read(record2.subtask, record2.from)
+          entries: viewEntries(read.entries),
+          next: read.next,
+          ...read.live && { live: viewLive(read.live) }
         }
       }
     };
@@ -9198,8 +9311,7 @@ var subtask = z5.string().describe("The subtask's id");
 function memberName(members) {
   if (!members) return z5.string().describe("A member's name");
   const names = members.map((m) => m.name);
-  const roster = members.map((m) => `${m.name} (${m.role.title})`).join(", ");
-  return z5.enum(names).describe(`One of the team: ${roster}`);
+  return z5.enum(names).describe(`One of the team: ${rosterOf(members)}`);
 }
 var meetingInput = (member) => ({
   agenda: z5.string().trim().min(1).describe("What to plan, with everything the user said about it"),
@@ -9402,6 +9514,7 @@ function addTools(server2, session2) {
 }
 
 // src/plugin/pane-tools.ts
+var isPermission = (option) => PERMISSION_OPTIONS.includes(option);
 var PANE_ONLY = "For openplan's pane only: your session never calls it.";
 function addPaneTools(server2, session2, pane2) {
   server2.registerTool(
@@ -9418,32 +9531,32 @@ function addPaneTools(server2, session2, pane2) {
       description: `${PANE_ONLY} Answers what waits on the user, as they pressed it.`,
       inputSchema: {
         question: z6.string(),
-        option: z6.enum(PERMISSION_OPTIONS).optional().describe("A permission's answer"),
+        option: z6.enum([...PERMISSION_OPTIONS, ...DECISION_OPTIONS]).optional().describe("A permission's or a decision's answer"),
         picks: z6.array(z6.string()).optional().describe("One pick per question with choices"),
-        decision: z6.enum(DECISION_OPTIONS).optional(),
         note: z6.string().trim().optional().describe("Why it is denied, or what to change"),
         sent_back: z6.string().optional().describe("The subtask a revised task goes back to")
       }
     },
-    async ({ question, option, picks, decision, note, sent_back }) => {
-      const answer = option ? { option, ...note && { note } } : decision ? decisionOf(decision, note, sent_back) : { picks: picks ?? [] };
-      await session2.goal.answer(question, answer);
+    async ({ question, option, picks, note, sent_back }) => {
+      await session2.goal.answer(
+        question,
+        option === void 0 ? { picks: picks ?? [] } : isPermission(option) ? { option, ...note && { note } } : decisionOf(option, note, sent_back)
+      );
       return toolText(`Answered ${question}.`);
     }
   );
   server2.registerTool(
-    "pause_goal",
+    "hand_off",
     {
-      description: `${PANE_ONLY} Pauses the session's goal, as /openplan pause.`,
-      inputSchema: {}
+      description: `${PANE_ONLY} The prompt /openplan <task> gives the session: the task, for the team.`,
+      inputSchema: { task: z6.string().trim().min(1) },
+      annotations: { readOnlyHint: true }
     },
-    async () => {
+    ({ task }) => {
       const engine = session2.current;
-      if (!engine) return toolText(session2.none);
-      const { goal } = engine.state;
-      if (goal.status !== "active") return toolText(`"${goal.name}" is ${goal.status} already.`);
-      await engine.goals.pause();
-      return toolText(`Paused "${goal.name}".`);
+      return toolText(
+        handOffText(task, engine && { goal: engine.state.goal, members: engine.team.members })
+      );
     }
   );
   server2.registerTool(
@@ -10362,7 +10475,6 @@ var Questions = class {
       permission: {
         tool: tool3,
         input,
-        ...request2.title !== void 0 && { title: request2.title },
         options: rules.length ? ["once", "always", "deny"] : ["once", "deny"]
       }
     });
@@ -10415,14 +10527,13 @@ var Questions = class {
       case "choices":
         return "picks" in answer && answer.picks.length === question.choices.length;
       case "decision":
-        return "decision" in answer && question.decision.options.includes(answer.decision) && (answer.decision !== "revise" || this.revisable(question, answer));
+        return "decision" in answer && question.decision.options.includes(answer.decision) && (answer.note !== void 0 || !noteNeeded(question.decision.kind, answer.decision)) && (answer.decision !== "revise" || this.revisable(question, answer));
       case "teammate":
         return false;
     }
   }
-  /** Sending a task back says what to change, and sends back only one of its subtasks that is done. */
+  /** Sending a task back sends back only one of its subtasks that is done. */
   revisable(question, answer) {
-    if (!answer.note) return false;
     if (answer.sentBack === void 0) return true;
     const { subtasks } = this.inbox.state;
     const taskId = subtasks.find((s) => s.id === question.subtaskId)?.taskId;
@@ -10709,9 +10820,6 @@ async function runSubtask(params) {
 // src/engine/scheduler.ts
 var verdictSchema = z9.object({ pass: z9.boolean(), notes: z9.string().trim() });
 var REVIEW_ROUNDS = 3;
-var REVIEW_CALLS = ["rereview", "skip", "sendBack"];
-var SIDE_CALLS = ["ours", "theirs", "retry"];
-var DELIVERY_CALLS = ["accept", "revise"];
 function goOnWith(subtask2, reason) {
   subtask2.goOn = [...subtask2.goOn ?? [], reason];
 }
@@ -11259,7 +11367,7 @@ ${outcome.handover.summary}`
       else if (rounds >= REVIEW_ROUNDS)
         this.questions.openDecision(
           subtask2,
-          { kind: "review", options: REVIEW_CALLS },
+          { kind: "review", options: [...DECISIONS.review.options] },
           verdict.notes
         );
       else {
@@ -11270,7 +11378,7 @@ ${outcome.handover.summary}`
       if (abort.signal.aborted || subtask2.status !== "reviewing") return;
       this.questions.openDecision(
         subtask2,
-        { kind: "review", options: REVIEW_CALLS },
+        { kind: "review", options: [...DECISIONS.review.options] },
         errorText(error)
       );
     } finally {
@@ -11305,7 +11413,7 @@ ${outcome.handover.summary}`
       } else if (merged.other.length) {
         this.questions.openDecision(
           subtask2,
-          { kind: "merge", options: SIDE_CALLS, files: merged.other },
+          { kind: "merge", options: [...DECISIONS.merge.options], files: merged.other },
           merged.other.join("\n")
         );
       } else {
@@ -11335,7 +11443,7 @@ ${outcome.handover.summary}`
     if (!this.taskOf(subtask2).ownerAccepts) return;
     this.questions.openDecision(
       subtask2,
-      { kind: "delivery", options: DELIVERY_CALLS },
+      { kind: "delivery", options: [...DECISIONS.delivery.options] },
       this.taskOf(subtask2).title
     );
   }
@@ -11592,7 +11700,7 @@ var Session = class {
   /** The folder of the session's repository in the data folder, once found. */
   repo;
   /** The goal that moved to another session, by name, until this one runs another. */
-  moved;
+  movedAway;
   turn = serialBy();
   /** The session's goal, while it runs one. */
   get current() {
@@ -11603,9 +11711,13 @@ var Session = class {
     if (this.engine) return this.engine;
     throw new Error(this.none);
   }
+  /** The goal that moved to another session, by name, until this one runs another. */
+  get moved() {
+    return this.movedAway;
+  }
   /** Why the session runs no goal, and what to do. */
   get none() {
-    return this.moved ? `The goal "${this.moved}" moved to another Claude Code session. The user brings it back with /openplan resume.` : "This session runs no goal: start one (start_goal), or the user takes one up with /openplan resume.";
+    return this.movedAway ? `The goal "${this.movedAway}" moved to another Claude Code session. The user brings it back with /openplan resume.` : "This session runs no goal: start one (start_goal), or the user takes one up with /openplan resume.";
   }
   /** Starts a goal here: refused while this session's goal is active; a paused or archived one is let go. */
   start(name) {
@@ -11634,7 +11746,7 @@ var Session = class {
       const was = this.engine;
       if (was?.state.goal.slug !== slug) return { meetings: [] };
       this.engine = void 0;
-      this.moved = was.state.goal.name;
+      this.movedAway = was.state.goal.name;
       this.changed(void 0);
       return was.close();
     });
@@ -11692,7 +11804,7 @@ var Session = class {
   }
   run(engine) {
     this.engine = engine;
-    this.moved = void 0;
+    this.movedAway = void 0;
     this.changed(engine);
     return engine;
   }
