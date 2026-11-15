@@ -99,15 +99,29 @@ const branches = async () =>
 
 describe("Goals", () => {
   it("start on a branch and worktree of their own, a name taken getting the next slug", async () => {
-    const [first, second] = await Promise.all([goals.start("Dice game"), goals.start("Dice game")]);
+    const first = await goals.start("Dice game");
+    await goals.pause(first.id);
+    const second = await goals.start("Dice game");
     expect([first.slug, second.slug]).toEqual(["dice-game", "dice-game-2"]);
-    expect(first).toMatchObject({ name: "Dice game", status: "active" });
+    expect(second).toMatchObject({ name: "Dice game", status: "active" });
     expect(new Set(await branches())).toEqual(
       new Set(["main", goalBranch("dice-game"), goalBranch("dice-game-2")]),
     );
     expect(
       await readFile(path.join(goalFolder(core.places, "dice-game"), "README.md"), "utf8"),
     ).toBe("hello\n");
+  });
+
+  it("run one at a time: a start or a resume while another is under way is refused", async () => {
+    const dice = await goals.start("Dice");
+    await expect(goals.start("Chess")).rejects.toThrow(`"Dice" [${dice.id}] is under way`);
+    await goals.pause(dice.id);
+    const chess = await goals.start("Chess");
+    await expect(goals.resume(dice.id)).rejects.toThrow(`"Chess" [${chess.id}] is under way`);
+    expect(dice.status).toBe("paused");
+    await goals.archive(chess.id);
+    await goals.resume(dice.id);
+    expect([dice.status, chess.status]).toEqual(["active", "archived"]);
   });
 
   it("pause and archive, holding their work and cancelling their meetings, and resume", async () => {

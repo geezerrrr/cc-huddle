@@ -193,7 +193,7 @@ describe("tools", () => {
       text: 'There is no goal "dice"',
       error: true,
     });
-    await engine.goals.start("Dice");
+    await engine.goals.pause((await engine.goals.start("Dice")).id);
     await engine.goals.start("Dice");
     expect((await call("goal_action", { goal: "Dice", action: "pause" })).text).toBe(
       'More than one goal is called "Dice": give its id',

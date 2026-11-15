@@ -16,8 +16,11 @@ import type { Scheduler } from "./scheduler.ts";
 import { serialBy } from "./serial.ts";
 import type { Goal, Subtask } from "./types.ts";
 
-/** Starts take turns too: each picks a slug no other goal has. */
-const STARTING = "start";
+/**
+ * Starts and resumes take turns: each start picks a slug no other goal has,
+ * and each finds no other goal active (§4.1).
+ */
+const ACTIVATING = "activate";
 
 /** A subtask you give a member directly, without a meeting. */
 export interface DirectWork {
@@ -38,8 +41,9 @@ export class Goals {
 
   /** Starts a goal: its branch cut from your HEAD, checked out in its own worktree. */
   start(name: string): Promise<Goal> {
-    return this.life(STARTING, async () => {
+    return this.life(ACTIVATING, async () => {
       const { core } = this;
+      this.onlyOne();
       const taken = await takenSlugs(core.places.repo);
       for (const goal of core.state.goals) taken.add(goal.slug);
       const goal: Goal = {
@@ -85,11 +89,13 @@ export class Goals {
 
   /** Puts a paused or archived goal back to work, from where it was. */
   resume(id: string): Promise<void> {
-    return this.life(id, () => {
-      if (!this.wake(this.goal(id))) return;
-      this.core.changed();
-      this.scheduler.pump();
-    });
+    return this.life(id, () =>
+      this.life(ACTIVATING, () => {
+        if (!this.wake(this.goal(id))) return;
+        this.core.changed();
+        this.scheduler.pump();
+      }),
+    );
   }
 
   /**
@@ -98,7 +104,8 @@ export class Goals {
    * members go back to it before anything else takes them.
    */
   async carryOn({ goals, meetings }: HandedOver) {
-    for (const id of goals) await this.life(id, () => this.wake(this.goal(id)));
+    for (const id of goals)
+      await this.life(id, () => this.life(ACTIVATING, () => this.wake(this.goal(id))));
     for (const id of meetings) this.meetings.resume(id);
     this.core.changed();
     this.scheduler.pump();
@@ -164,9 +171,19 @@ export class Goals {
   /** Makes a goal active again; false when it was already. */
   private wake(goal: Goal): boolean {
     if (goal.status === "active") return false;
+    this.onlyOne();
     goal.status = step(GOAL_MACHINE, goal.status, "resume");
     goal.archivedAt = undefined;
     return true;
+  }
+
+  /** One goal is active at a time (§4.1): one under way refuses another. */
+  private onlyOne() {
+    const active = this.core.state.goals.find((g) => g.status === "active");
+    if (active)
+      throw new Error(
+        `The goal "${active.name}" [${active.id}] is under way, and one goal runs at a time: pause it first if the user wants`,
+      );
   }
 
   private goal(id: string): Goal {
