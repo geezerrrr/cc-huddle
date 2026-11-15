@@ -10,27 +10,18 @@ import { z } from "zod";
 import type { Team } from "../engine/core.ts";
 import { goalBranch } from "../engine/git.ts";
 import { planSchema } from "../engine/plan.ts";
-import type { Answer } from "../engine/questions.ts";
 import { toolText } from "../engine/turns.ts";
 import {
   DECISION_OPTIONS,
   GOAL_ACTIONS,
   MEETING_SIZES,
   SUBTASK_ACTIONS,
-  type DecisionOption,
   type Member,
   type Plan,
 } from "../engine/types.ts";
 import type { Session } from "./session.ts";
 import { othersText, statusText } from "./status.ts";
 import { attendanceText, plural, rosterOf } from "./words.ts";
-
-/** A decision as the tools take it: `sentBack`, the subtask a revised task goes back to. */
-export const decisionOf = (decision: DecisionOption, note?: string, sentBack?: string): Answer => ({
-  decision,
-  ...(note && { note }),
-  ...(sentBack !== undefined && { sentBack }),
-});
 
 /** A plan in the shape change_plan takes. */
 const writtenPlan = (plan: Plan) => ({
@@ -280,7 +271,12 @@ export function addTools(server: McpServer, session: Session) {
       },
     },
     async ({ question, decision, note, sent_back }) => {
-      await session.goal.answer(question, decisionOf(decision, note, sent_back));
+      await session.goal.answer(question, {
+        kind: "decision",
+        option: decision,
+        note,
+        sentBack: sent_back,
+      });
       return toolText("Done.");
     },
   );

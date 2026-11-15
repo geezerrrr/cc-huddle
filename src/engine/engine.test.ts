@@ -349,10 +349,14 @@ describe("Engine", () => {
     engine.state.subtasks.push(subtask);
     engine.questions.openDecision(subtask, DECISIONS.delivery(), "Game");
     const [question] = engine.state.questions;
-    await expect(engine.answer(question?.id ?? "", { decision: "revise" })).rejects.toThrow(
-      "doesn't fit",
-    );
-    await engine.answer(question?.id ?? "", { decision: "revise", note: "Bigger dice" });
+    await expect(
+      engine.answer(question?.id ?? "", { kind: "decision", option: "revise" }),
+    ).rejects.toThrow("doesn't fit");
+    await engine.answer(question?.id ?? "", {
+      kind: "decision",
+      option: "revise",
+      note: "Bigger dice",
+    });
     expect(engine.state.questions).toEqual([]);
     expect(engine.state.subtasks[0]).toMatchObject({
       status: "pending",

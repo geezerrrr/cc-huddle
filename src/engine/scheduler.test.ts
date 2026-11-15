@@ -4,11 +4,11 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Core } from "./core.ts";
 import { git, goalBranch, openRepository } from "./git.ts";
-import { Questions, type Answer } from "./questions.ts";
+import { Questions, type DecisionAnswer } from "./questions.ts";
 import { runSubtask, type RunOutcome } from "./run.ts";
 import { Scheduler } from "./scheduler.ts";
 import { askOnce } from "./turns.ts";
-import type { DecisionOption, Member, Subtask } from "./types.ts";
+import type { Member, Subtask } from "./types.ts";
 import { goalFiles } from "../shared/layout.ts";
 
 vi.mock("./run.ts", () => ({ runSubtask: vi.fn() }));
@@ -116,7 +116,8 @@ const settled = (s: Subtask, status: Subtask["status"]) =>
   });
 
 /** Answers a decision as Engine.answer does: the question closes, and the scheduler acts on it. */
-async function decide(id: string, answer: Extract<Answer, { decision: DecisionOption }>) {
+async function decide(id: string, decided: Omit<DecisionAnswer, "kind">) {
+  const answer = { kind: "decision" as const, ...decided };
   const question = questions.answer(id, answer);
   if (question.kind !== "decision") throw new Error(`${id} is not a decision`);
   await scheduler.decide(question, answer);
@@ -384,7 +385,7 @@ describe("Scheduler", () => {
         decision: { kind: "review", options: ["rereview", "skip", "sendBack"] },
       });
       await decide(core.state.questions[0]?.id ?? "", {
-        decision: "sendBack",
+        option: "sendBack",
         note: "Keep the board",
       });
       await eventually(() => {
@@ -409,7 +410,7 @@ describe("Scheduler", () => {
           },
         ]);
       });
-      await decide(core.state.questions[0]?.id ?? "", { decision: "sendBack", note: "Bigger" });
+      await decide(core.state.questions[0]?.id ?? "", { option: "sendBack", note: "Bigger" });
       await eventually(() => {
         expect(vi.mocked(runSubtask).mock.calls.length).toBe(2);
       });
@@ -528,7 +529,7 @@ describe("Scheduler", () => {
         expect(core.state.questions).toHaveLength(1);
       });
       const [stuck] = core.state.questions;
-      await decide(stuck?.id ?? "", { decision: "skip" });
+      await decide(stuck?.id ?? "", { option: "skip" });
       await settled(s1, "done");
     });
 
@@ -541,7 +542,7 @@ describe("Scheduler", () => {
         expect(core.state.questions).toHaveLength(1);
       });
       await decide(core.state.questions[0]?.id ?? "", {
-        decision: "revise",
+        option: "revise",
         note: "Bigger numbers",
       });
       await eventually(() => {
@@ -574,7 +575,7 @@ describe("Scheduler", () => {
           },
         ]);
       });
-      await decide(core.state.questions[0]?.id ?? "", { decision: "ours" });
+      await decide(core.state.questions[0]?.id ?? "", { option: "ours" });
       await settled(s2, "done");
       expect(await onGoal("logo.bin")).toBe("sonnet\0\n");
     });

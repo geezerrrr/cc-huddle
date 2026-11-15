@@ -13,7 +13,6 @@ import { DECISION_OPTIONS, PERMISSION_OPTIONS, type PermissionOption } from "../
 import { toolText } from "../engine/turns.ts";
 import type { PaneServer } from "./pane-server.ts";
 import type { Session } from "./session.ts";
-import { decisionOf } from "./tools.ts";
 import { handOffText } from "./words.ts";
 
 const isPermission = (option: string): option is PermissionOption =>
@@ -51,10 +50,10 @@ export function addPaneTools(server: McpServer, session: Session, pane: PaneServ
       await session.goal.answer(
         question,
         option === undefined
-          ? { picks: picks ?? [] }
+          ? { kind: "choices", picks: picks ?? [] }
           : isPermission(option)
-            ? { option, ...(note && { note }) }
-            : decisionOf(option, note, sent_back),
+            ? { kind: "permission", option, note }
+            : { kind: "decision", option, note, sentBack: sent_back },
       );
       return toolText(`Answered ${question}.`);
     },

@@ -1,6 +1,6 @@
 import type { CanUseTool, PermissionUpdate } from "@anthropic-ai/claude-agent-sdk";
 import { describe, expect, it, vi } from "vitest";
-import { Questions, type Inbox } from "./questions.ts";
+import { Questions, type Answer, type Inbox } from "./questions.ts";
 import { DECISIONS, type Question, type Subtask } from "./types.ts";
 
 /** An inbox over an empty state, recording the rules allowed always. */
@@ -59,7 +59,7 @@ describe("a call outside the rules", () => {
       kind: "permission",
       permission: { tool: "Bash", input: command, options: ["once", "deny"] },
     });
-    questions.answer(question.id, { option: "once" });
+    questions.answer(question.id, { kind: "permission", option: "once" });
     expect(await result).toEqual({ behavior: "allow", updatedInput: command });
     expect(box.state.questions).toEqual([]);
   });
@@ -70,7 +70,7 @@ describe("a call outside the rules", () => {
     const result = gate("Bash", command, request({ suggestions: [ruleFor] }));
     const question = await opened(box);
     expect(question).toMatchObject({ permission: { options: ["once", "always", "deny"] } });
-    questions.answer(question.id, { option: "always" });
+    questions.answer(question.id, { kind: "permission", option: "always" });
     expect(await result).toEqual({
       behavior: "allow",
       updatedInput: command,
@@ -102,7 +102,11 @@ describe("a call outside the rules", () => {
     const { box, questions } = inbox();
     const gate = questions.gate({ from: "glm", signal: new AbortController().signal });
     const result = gate("Bash", command, request());
-    questions.answer((await opened(box)).id, { option: "deny", note: "use vitest directly" });
+    questions.answer((await opened(box)).id, {
+      kind: "permission",
+      option: "deny",
+      note: "use vitest directly",
+    });
     expect(await result).toEqual({
       behavior: "deny",
       message: "The user denied this and said: use vitest directly",
@@ -151,7 +155,7 @@ describe("questions with choices", () => {
     const question = await opened(box);
     expect(question.text).toBe("Where does the score go?\nWhich sounds?");
     expect(question).toMatchObject({ choices: input.questions });
-    questions.answer(question.id, { picks: ["Center", "Roll, Win"] });
+    questions.answer(question.id, { kind: "choices", picks: ["Center", "Roll, Win"] });
     expect(await result).toEqual({
       behavior: "allow",
       updatedInput: {
@@ -170,10 +174,10 @@ describe("questions with choices", () => {
     );
     const question = await opened(box);
     expect(() => {
-      questions.answer(question.id, { picks: ["Center"] });
+      questions.answer(question.id, { kind: "choices", picks: ["Center"] });
     }).toThrow("doesn't fit");
     expect(() => {
-      questions.answer(question.id, { option: "once" });
+      questions.answer(question.id, { kind: "permission", option: "once" });
     }).toThrow("doesn't fit");
   });
 });
@@ -182,7 +186,7 @@ describe("answer", () => {
   it("refuses a question that is no longer open", () => {
     const { questions } = inbox();
     expect(() => {
-      questions.answer("gone", { option: "once" });
+      questions.answer("gone", { kind: "permission", option: "once" });
     }).toThrow("no longer open");
   });
 
@@ -195,7 +199,7 @@ describe("answer", () => {
     );
     const question = await opened(box);
     expect(() => {
-      questions.answer(question.id, { option: "always" });
+      questions.answer(question.id, { kind: "permission", option: "always" });
     }).toThrow("doesn't fit");
   });
 });
@@ -223,8 +227,10 @@ describe("decisions", () => {
     );
     const question = await opened(box);
     expect(question).toMatchObject({ from: "glm", subtaskId: "s1", kind: "decision" });
-    expect(() => questions.answer(question.id, { option: "once" })).toThrow("doesn't fit");
-    expect(questions.answer(question.id, { decision: "skip" })).toBe(question);
+    expect(() => questions.answer(question.id, { kind: "permission", option: "once" })).toThrow(
+      "doesn't fit",
+    );
+    expect(questions.answer(question.id, { kind: "decision", option: "skip" })).toBe(question);
     expect(box.state.questions).toEqual([]);
   });
 
@@ -238,13 +244,18 @@ describe("decisions", () => {
     );
     questions.openDecision(subtask("s1"), DECISIONS.delivery(), "Dice game");
     const { id } = await opened(box);
-    for (const answer of [
-      { decision: "revise" as const },
-      { decision: "revise" as const, note: "Bigger dice", sentBack: "s3" },
-      { decision: "revise" as const, note: "Bigger dice", sentBack: "x" },
-    ])
-      expect(() => questions.answer(id, answer)).toThrow("doesn't fit");
-    questions.answer(id, { decision: "revise", note: "Bigger dice", sentBack: "s2" });
+    const answers: Answer[] = [
+      { kind: "decision", option: "revise" },
+      { kind: "decision", option: "revise", note: "Bigger dice", sentBack: "s3" },
+      { kind: "decision", option: "revise", note: "Bigger dice", sentBack: "x" },
+    ];
+    for (const answer of answers) expect(() => questions.answer(id, answer)).toThrow("doesn't fit");
+    questions.answer(id, {
+      kind: "decision",
+      option: "revise",
+      note: "Bigger dice",
+      sentBack: "s2",
+    });
   });
 });
 

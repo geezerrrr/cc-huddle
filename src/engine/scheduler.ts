@@ -32,12 +32,11 @@ import {
   teammateQuestion,
   type Upstream,
 } from "./prompts.ts";
-import type { Answer, Questions } from "./questions.ts";
+import type { DecisionAnswer, Questions } from "./questions.ts";
 import { runSubtask, type RunOutcome } from "./run.ts";
 import { askOnce, type Step } from "./turns.ts";
 import {
   DECISIONS,
-  type DecisionOption,
   type Goal,
   type GoOn,
   type Member,
@@ -316,13 +315,10 @@ export class Scheduler {
    * start; or send one of its subtasks, `sentBack` or else the last one done,
    * back with what to change).
    */
-  async decide(
-    question: Extract<Question, { kind: "decision" }>,
-    answer: Extract<Answer, { decision: DecisionOption }>,
-  ) {
+  async decide(question: Extract<Question, { kind: "decision" }>, answer: DecisionAnswer) {
     const subtask = this.subtask(question.subtaskId);
     if (!subtask) return;
-    const { decision: pick, note = "" } = answer;
+    const { option: pick, note = "" } = answer;
     if (question.decision.kind === "delivery") {
       const sentBack = this.subtask(answer.sentBack ?? subtask.id);
       if (pick === "revise" && sentBack) {

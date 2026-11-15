@@ -40,15 +40,18 @@ interface Asker {
 }
 
 /**
- * Your answer: one of a permission request's options (denying, with a
- * note), one pick per question with choices, or one of a decision's options
- * (sending a task back, what to change in `note`, and which of its done
- * subtasks goes back in `sentBack`).
+ * Your answer, of the question's kind: one of a permission request's options
+ * (denying, with a note), one pick per question with choices, or one of a
+ * decision's options (sending a task back, what to change in `note`, and
+ * which of its done subtasks goes back in `sentBack`). An empty note is none.
  */
 export type Answer =
-  | { option: PermissionOption; note?: string }
-  | { picks: string[] }
-  | { decision: DecisionOption; note?: string; sentBack?: string };
+  | { kind: "permission"; option: PermissionOption; note?: string }
+  | { kind: "choices"; picks: string[] }
+  | { kind: "decision"; option: DecisionOption; note?: string; sentBack?: string };
+
+/** Your answer to a decision, which the scheduler carries out. */
+export type DecisionAnswer = Extract<Answer, { kind: "decision" }>;
 
 /** What questions need from the engine. */
 export interface Inbox {
@@ -175,7 +178,7 @@ export class Questions {
     request: Request,
   ): Promise<PermissionResult> {
     const rules = alwaysRules(request);
-    const answer = await this.wait<Extract<Answer, { option: PermissionOption }>>(asker, {
+    const answer = await this.wait<Extract<Answer, { kind: "permission" }>>(asker, {
       // A command comes with the member's own words for what it does.
       text: request.description ?? "",
       kind: "permission",
@@ -221,7 +224,7 @@ export class Questions {
       })),
       multiSelect: q.multiSelect,
     }));
-    const answer = await this.wait<Extract<Answer, { picks: string[] }>>(asker, {
+    const answer = await this.wait<Extract<Answer, { kind: "choices" }>>(asker, {
       text: choices.map((c) => c.question).join("\n"),
       kind: "choices",
       choices,
@@ -235,15 +238,15 @@ export class Questions {
   private fits(question: Question, answer: Answer): boolean {
     switch (question.kind) {
       case "permission":
-        return "option" in answer && question.permission.options.includes(answer.option);
+        return answer.kind === "permission" && question.permission.options.includes(answer.option);
       case "choices":
-        return "picks" in answer && answer.picks.length === question.choices.length;
+        return answer.kind === "choices" && answer.picks.length === question.choices.length;
       case "decision":
         return (
-          "decision" in answer &&
-          question.decision.options.includes(answer.decision) &&
-          (answer.note !== undefined || !noteNeeded(question.decision, answer.decision)) &&
-          (answer.decision !== "revise" || this.revisable(question, answer))
+          answer.kind === "decision" &&
+          question.decision.options.includes(answer.option) &&
+          (Boolean(answer.note) || !noteNeeded(question.decision, answer.option)) &&
+          (answer.option !== "revise" || this.revisable(question, answer))
         );
       case "teammate":
         return false;
@@ -251,7 +254,7 @@ export class Questions {
   }
 
   /** Sending a task back sends back only one of its subtasks that is done. */
-  private revisable(question: Question, answer: Extract<Answer, { decision: DecisionOption }>) {
+  private revisable(question: Question, answer: DecisionAnswer) {
     if (answer.sentBack === undefined) return true;
     const { subtasks } = this.inbox.state;
     const taskId = subtasks.find((s) => s.id === question.subtaskId)?.taskId;
