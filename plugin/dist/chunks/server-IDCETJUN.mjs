@@ -84,17 +84,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path12) {
-      const ctrl = callVisitor(key, node, visitor, path12);
+    function visit_(key, node, visitor, path13) {
+      const ctrl = callVisitor(key, node, visitor, path13);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path12, ctrl);
-        return visit_(key, ctrl, visitor, path12);
+        replaceNode(key, path13, ctrl);
+        return visit_(key, ctrl, visitor, path13);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path12 = Object.freeze(path12.concat(node));
+          path13 = Object.freeze(path13.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path12);
+            const ci = visit_(i, node.items[i], visitor, path13);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -105,13 +105,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path12 = Object.freeze(path12.concat(node));
-          const ck = visit_("key", node.key, visitor, path12);
+          path13 = Object.freeze(path13.concat(node));
+          const ck = visit_("key", node.key, visitor, path13);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path12);
+          const cv = visit_("value", node.value, visitor, path13);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -132,17 +132,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path12) {
-      const ctrl = await callVisitor(key, node, visitor, path12);
+    async function visitAsync_(key, node, visitor, path13) {
+      const ctrl = await callVisitor(key, node, visitor, path13);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path12, ctrl);
-        return visitAsync_(key, ctrl, visitor, path12);
+        replaceNode(key, path13, ctrl);
+        return visitAsync_(key, ctrl, visitor, path13);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path12 = Object.freeze(path12.concat(node));
+          path13 = Object.freeze(path13.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path12);
+            const ci = await visitAsync_(i, node.items[i], visitor, path13);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -153,13 +153,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path12 = Object.freeze(path12.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path12);
+          path13 = Object.freeze(path13.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path13);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path12);
+          const cv = await visitAsync_("value", node.value, visitor, path13);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -186,23 +186,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path12) {
+    function callVisitor(key, node, visitor, path13) {
       if (typeof visitor === "function")
-        return visitor(key, node, path12);
+        return visitor(key, node, path13);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path12);
+        return visitor.Map?.(key, node, path13);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path12);
+        return visitor.Seq?.(key, node, path13);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path12);
+        return visitor.Pair?.(key, node, path13);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path12);
+        return visitor.Scalar?.(key, node, path13);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path12);
+        return visitor.Alias?.(key, node, path13);
       return void 0;
     }
-    function replaceNode(key, path12, node) {
-      const parent = path12[path12.length - 1];
+    function replaceNode(key, path13, node) {
+      const parent = path13[path13.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -814,10 +814,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path12, value) {
+    function collectionFromPath(schema, path13, value) {
       let v = value;
-      for (let i = path12.length - 1; i >= 0; --i) {
-        const k = path12[i];
+      for (let i = path13.length - 1; i >= 0; --i) {
+        const k = path13[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -836,7 +836,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path12) => path12 == null || typeof path12 === "object" && !!path12[Symbol.iterator]().next().done;
+    var isEmptyPath = (path13) => path13 == null || typeof path13 === "object" && !!path13[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -866,11 +866,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path12, value) {
-        if (isEmptyPath(path12))
+      addIn(path13, value) {
+        if (isEmptyPath(path13))
           this.add(value);
         else {
-          const [key, ...rest] = path12;
+          const [key, ...rest] = path13;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -884,8 +884,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path12) {
-        const [key, ...rest] = path12;
+      deleteIn(path13) {
+        const [key, ...rest] = path13;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -899,8 +899,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path12, keepScalar) {
-        const [key, ...rest] = path12;
+      getIn(path13, keepScalar) {
+        const [key, ...rest] = path13;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -918,8 +918,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path12) {
-        const [key, ...rest] = path12;
+      hasIn(path13) {
+        const [key, ...rest] = path13;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -929,8 +929,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path12, value) {
-        const [key, ...rest] = path12;
+      setIn(path13, value) {
+        const [key, ...rest] = path13;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -3445,9 +3445,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path12, value) {
+      addIn(path13, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path12, value);
+          this.contents.addIn(path13, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3522,14 +3522,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path12) {
-        if (Collection.isEmptyPath(path12)) {
+      deleteIn(path13) {
+        if (Collection.isEmptyPath(path13)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path12) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path13) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3544,10 +3544,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path12, keepScalar) {
-        if (Collection.isEmptyPath(path12))
+      getIn(path13, keepScalar) {
+        if (Collection.isEmptyPath(path13))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path12, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path13, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3558,10 +3558,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path12) {
-        if (Collection.isEmptyPath(path12))
+      hasIn(path13) {
+        if (Collection.isEmptyPath(path13))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path12) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path13) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3578,13 +3578,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path12, value) {
-        if (Collection.isEmptyPath(path12)) {
+      setIn(path13, value) {
+        if (Collection.isEmptyPath(path13)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path12), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path13), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path12, value);
+          this.contents.setIn(path13, value);
         }
       }
       /**
@@ -5545,9 +5545,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path12) => {
+    visit.itemAtPath = (cst, path13) => {
       let item = cst;
-      for (const [field, index] of path12) {
+      for (const [field, index] of path13) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5556,23 +5556,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path12) => {
-      const parent = visit.itemAtPath(cst, path12.slice(0, -1));
-      const field = path12[path12.length - 1][0];
+    visit.parentCollection = (cst, path13) => {
+      const parent = visit.itemAtPath(cst, path13.slice(0, -1));
+      const field = path13[path13.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path12, item, visitor) {
-      let ctrl = visitor(item, path12);
+    function _visit(path13, item, visitor) {
+      let ctrl = visitor(item, path13);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path12.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path13.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -5583,10 +5583,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path12);
+            ctrl = ctrl(item, path13);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path12) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path13) : ctrl;
     }
     exports.visit = visit;
   }
@@ -7358,14 +7358,35 @@ var plugin_default = {
 // src/engine/core.ts
 var workOf = (core) => ({
   ...core.state,
-  members: core.team.members.map((m) => m.name)
+  members: core.team.members.map((m) => m.name),
+  underWay: core.underWay()
 });
 var errorText = (error) => error instanceof Error ? error.message : String(error);
 
 // src/engine/git.ts
 import { spawn } from "node:child_process";
 import { readdir, readFile, realpath, rm, stat } from "node:fs/promises";
+import path2 from "node:path";
+
+// src/engine/goal-files.ts
 import path from "node:path";
+var goalFiles = (folder) => ({
+  state: path.join(folder, "state.json"),
+  lock: path.join(folder, "lock"),
+  members: path.join(folder, "members.json"),
+  /** The goal's copy of the team (team.ts copyTeam). */
+  team: path.join(folder, "team.json"),
+  /** A member's settings file (policy.ts writeSettings). */
+  settings: (member) => path.join(folder, "settings", `${member}.json`),
+  /** The worktree the goal's branch is checked out in. */
+  checkout: path.join(folder, "checkout"),
+  /** The worktree a subtask works in. */
+  desk: (subtaskId) => path.join(folder, "desks", subtaskId),
+  /** What a subtask's runs did (records.ts). */
+  record: (subtaskId) => path.join(folder, "records", `${subtaskId}.jsonl`),
+  /** An approved plan's document. */
+  plan: (meetingId) => path.join(folder, "plans", `${meetingId}.md`)
+});
 
 // src/engine/serial.ts
 function serialBy() {
@@ -7446,10 +7467,10 @@ async function openRepository(folder) {
   const head = await git(at, ["rev-parse", "--verify", "-q", "HEAD"], { allow: [1] });
   if (head.code !== 0)
     throw new GitError(["rev-parse"], head.code, `${top} has no commit to start from yet`);
-  return { top: await realpath(top), common: await realpath(path.resolve(folder, common)) };
+  return { top: await realpath(top), common: await realpath(path2.resolve(folder, common)) };
 }
 var goalBranch = (slug) => `openplan/${slug}/main`;
-var goalFolder = (places) => path.join(places.root, "checkout");
+var goalFolder = (places) => goalFiles(places.root).checkout;
 async function takenSlugs(repo) {
   const refs = await git({ cwd: repo.top }, [
     "for-each-ref",
@@ -7493,7 +7514,7 @@ async function openGoal(places, slug) {
   return folder;
 }
 var subtaskBranch = (slug, subtaskId) => `openplan/${slug}/${subtaskId}`;
-var deskFolder = (places, subtaskId) => path.join(places.root, "desks", subtaskId);
+var deskFolder = (places, subtaskId) => goalFiles(places.root).desk(subtaskId);
 var serial = serialBy();
 var perGoal = (places, task) => serial(goalFolder(places), task);
 function openDesk(places, slug, subtaskId) {
@@ -7501,7 +7522,7 @@ function openDesk(places, slug, subtaskId) {
     const { repo } = places;
     const desk = deskFolder(places, subtaskId);
     await openGoal(places, slug);
-    if (await exists(path.join(desk, ".git"))) return desk;
+    if (await exists(path2.join(desk, ".git"))) return desk;
     await rm(desk, { recursive: true, force: true });
     const branch = subtaskBranch(slug, subtaskId);
     await checkOut(
@@ -7514,14 +7535,14 @@ function openDesk(places, slug, subtaskId) {
   });
 }
 async function worktreeAt(repo, tree) {
-  const real = (file) => realpath(file).catch(() => path.resolve(file));
+  const real = (file) => realpath(file).catch(() => path2.resolve(file));
   const here = await real(tree);
-  const entries = path.join(repo.common, "worktrees");
+  const entries = path2.join(repo.common, "worktrees");
   const find = async () => {
     for (const name of await readdir(entries).catch(() => [])) {
-      const gitdir = await readFile(path.join(entries, name, "gitdir"), "utf8").catch(() => "");
-      if (gitdir && await real(path.dirname(gitdir.trim())) === here)
-        return path.join(entries, name);
+      const gitdir = await readFile(path2.join(entries, name, "gitdir"), "utf8").catch(() => "");
+      if (gitdir && await real(path2.dirname(gitdir.trim())) === here)
+        return path2.join(entries, name);
     }
   };
   const entry = await find() ?? await git({ cwd: repo.top }, ["worktree", "repair", tree], { allow: [128] }).then(find);
@@ -7544,7 +7565,7 @@ async function unresolved(places, subtaskId, files) {
   const desk = deskFolder(places, subtaskId);
   const marked = await Promise.all(
     files.map(
-      (file) => readFile(path.join(desk, file), "utf8").then(
+      (file) => readFile(path2.join(desk, file), "utf8").then(
         (text2) => MARKERS.test(text2),
         () => false
       )
@@ -7651,10 +7672,10 @@ import { readFile as readFile2 } from "node:fs/promises";
 // src/engine/files.ts
 import { renameSync, writeFileSync } from "node:fs";
 import { mkdir, rename, writeFile } from "node:fs/promises";
-import path2 from "node:path";
+import path3 from "node:path";
 var fresh = (file) => `${file}.${String(process.pid)}.new`;
 async function writeWhole(file, text2, mode) {
-  await mkdir(path2.dirname(file), { recursive: true });
+  await mkdir(path3.dirname(file), { recursive: true });
   await writeFile(fresh(file), text2, { mode });
   await rename(fresh(file), file);
 }
@@ -7728,7 +7749,7 @@ function stopRecording() {
 var import_yaml = __toESM(require_dist(), 1);
 import { readdir as readdir2, readFile as readFile3 } from "node:fs/promises";
 import { homedir } from "node:os";
-import path3 from "node:path";
+import path4 from "node:path";
 import { z } from "zod";
 
 // src/engine/types.ts
@@ -7760,8 +7781,8 @@ var SUBTASK_ACTIONS = ["stop", "continue", "retry", "redo"];
 var GOAL_ACTIONS = ["pause", "resume", "archive", "delete"];
 
 // src/engine/team.ts
-var teamFolder = (top) => path3.join(top, ".claude", "openplan");
-var userTeamFolder = (env) => path3.join(env.CLAUDE_CONFIG_DIR ?? path3.join(homedir(), ".claude"), "openplan");
+var teamFolder = (top) => path4.join(top, ".claude", "openplan");
+var userTeamFolder = (env) => path4.join(env.CLAUDE_CONFIG_DIR ?? path4.join(homedir(), ".claude"), "openplan");
 var EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 var roleSchema = z.object({ title: z.string().trim().min(1) });
 var memberSchema = z.object({
@@ -7807,7 +7828,7 @@ async function markdownFiles(folder) {
   }
   return Promise.all(
     names.map(async (name) => {
-      const file = path3.join(folder, name);
+      const file = path4.join(folder, name);
       const text2 = await readFile3(file, "utf8");
       const front = /^---\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(text2);
       let data;
@@ -7840,17 +7861,17 @@ async function loadTeam(folders) {
   let own = {};
   let settings = {};
   for (const folder of folders) {
-    for (const { name, file, data, body } of await markdownFiles(path3.join(folder, "roles")))
+    for (const { name, file, data, body } of await markdownFiles(path4.join(folder, "roles")))
       roles.set(name, {
         id: name,
         title: parsed(roleSchema, data, file).title,
         duties: body.trim()
       });
-    for (const { name, file, data } of await markdownFiles(path3.join(folder, "members")))
+    for (const { name, file, data } of await markdownFiles(path4.join(folder, "members")))
       written2.set(name, { file, data });
-    const teamFile = path3.join(folder, "team.json");
+    const teamFile = path4.join(folder, "team.json");
     own = { ...own, ...parsed(teamSchema, await jsonFile(teamFile) ?? {}, teamFile) };
-    const settingsFile = path3.join(folder, "settings.json");
+    const settingsFile = path4.join(folder, "settings.json");
     settings = mergeSettings(
       settings,
       parsed(settingsSchema, await jsonFile(settingsFile) ?? {}, settingsFile)
@@ -7871,7 +7892,7 @@ async function loadTeam(folders) {
   });
   if (!members.length)
     throw new Error(
-      `The team has no members: add them in ${folders.map((f) => path3.join(f, "members")).join(" or ")}`
+      `The team has no members: add them in ${folders.map((f) => path4.join(f, "members")).join(" or ")}`
     );
   return {
     team: { members, review: own.review ?? true },
@@ -7890,7 +7911,7 @@ function allowing(settings, rules, file) {
   return { ...settings, permissions: { ...permissions, allow } };
 }
 function allowInTeam(top, rules) {
-  const file = path3.join(teamFolder(top), "settings.json");
+  const file = path4.join(teamFolder(top), "settings.json");
   return writing(file, async () => {
     const settings = parsed(settingsSchema, await jsonFile(file) ?? {}, file);
     await writeWhole(file, `${JSON.stringify(allowing(settings, rules, file), null, 2)}
@@ -7938,10 +7959,10 @@ async function executableOf(pid) {
 }
 
 // src/plugin/plugin-id.ts
-import path4 from "node:path";
+import path5 from "node:path";
 var PLUGIN = "openplan";
 function pluginId(dataFolder2) {
-  return `${PLUGIN}@${path4.basename(dataFolder2).slice(PLUGIN.length + 1)}`;
+  return `${PLUGIN}@${path5.basename(dataFolder2).slice(PLUGIN.length + 1)}`;
 }
 
 // src/plugin/pane-server.ts
@@ -7949,7 +7970,7 @@ import { randomBytes } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { createServer, request } from "node:http";
 import { tmpdir } from "node:os";
-import path5 from "node:path";
+import path6 from "node:path";
 import { text } from "node:stream/consumers";
 import { z as z2 } from "zod";
 
@@ -8033,21 +8054,29 @@ function busyMembers(state) {
     if (m.status === "running") for (const id of m.participants) busy.add(id);
   return busy;
 }
-function reviewerAway(state, subtask2) {
-  const reviewer = reviewerOf(state, subtask2);
+function ahead(state, subtask2, alike) {
   const at = subtask2.delivery?.at ?? 0;
   const index = state.subtasks.indexOf(subtask2);
+  const others = state.subtasks.filter((s) => s !== subtask2 && alike(s));
+  return others.find((s) => state.underWay.includes(s.id)) ?? others.find((s) => {
+    const sAt = s.delivery?.at ?? 0;
+    return sAt < at || sAt === at && state.subtasks.indexOf(s) < index;
+  });
+}
+function reviewerAway(state, subtask2) {
+  const reviewer = reviewerOf(state, subtask2);
   const working = state.subtasks.some((s) => s.status === "running" && s.assignee === reviewer);
   const meeting2 = state.meetings.some(
     (m) => m.status === "running" && m.participants.includes(reviewer)
   );
-  const earlier = state.subtasks.some((s, i) => {
-    if (s === subtask2 || !underReview(state, s) || reviewerOf(state, s) !== reviewer) return false;
-    const sAt = s.delivery?.at ?? 0;
-    return sAt < at || sAt === at && i < index;
-  });
-  return working || meeting2 || earlier ? reviewer : void 0;
+  const reviewing = ahead(
+    state,
+    subtask2,
+    (s) => underReview(state, s) && reviewerOf(state, s) === reviewer
+  );
+  return working || meeting2 || reviewing ? reviewer : void 0;
 }
+var mergeable = (state, subtask2) => subtask2.status === "merging" && isActive(state) && !openQuestions(state, subtask2.id).some((q) => q.kind === "decision");
 function waitsIn(state, subtask2, busy) {
   const { goal } = state;
   const held = goal.status !== "active" ? [{ kind: "goal", status: goal.status }] : [];
@@ -8082,10 +8111,18 @@ function waitsIn(state, subtask2, busy) {
     case "running":
     case "done":
       return asked2();
-    // A merge under way finishes (§3.2); one yet to start waits for its goal.
-    case "merging":
-      return [...held, ...asked2()];
+    // A merge under way finishes (§3.2); one yet to start waits for its goal, and its turn.
+    case "merging": {
+      if (state.underWay.includes(subtask2.id)) return asked2();
+      const before = mergeable(state, subtask2) ? ahead(state, subtask2, (s) => mergeable(state, s)) : void 0;
+      return [
+        ...held,
+        ...asked2(),
+        ...before ? [{ kind: "merge", subtaskId: before.id }] : []
+      ];
+    }
     case "reviewing": {
+      if (state.underWay.includes(subtask2.id)) return asked2();
       const reviewer = underReview(state, subtask2) ? reviewerAway(state, subtask2) : void 0;
       return [...held, ...asked2(), ...reviewer ? [{ kind: "busy", by: reviewer }] : []];
     }
@@ -8102,11 +8139,12 @@ function redoneUpstream(state, subtask2) {
     return d?.status === "done" && (d.finishedAt ?? 0) > startedAt ? [d] : [];
   });
 }
-function subtaskActions(subtask2, redone, deciding) {
+function actionsOf(state, subtask2) {
+  const deciding = openQuestions(state, subtask2.id).length > 0;
   const moves = ["stop", "continue", "retry"].filter(
     (event) => can(SUBTASK_MACHINE, subtask2.status, event) && (event !== "stop" || subtask2.status !== "merging" || deciding)
   );
-  return redone && can(SUBTASK_MACHINE, subtask2.status, "redo") ? [...moves, "redo"] : moves;
+  return redoneUpstream(state, subtask2).length && can(SUBTASK_MACHINE, subtask2.status, "redo") ? [...moves, "redo"] : moves;
 }
 function goalActions(goal) {
   return GOAL_ACTIONS.filter((event) => can(GOAL_MACHINE, goal.status, event));
@@ -8120,8 +8158,7 @@ function derive(state) {
     subtasks: Object.fromEntries(
       state.subtasks.map((s) => {
         const redone = redoneUpstream(state, s).map((d) => d.id);
-        const actions = subtaskActions(s, redone.length > 0, openQuestions(state, s.id).length > 0);
-        return [s.id, { waits: waitsIn(state, s, busy), actions, redone }];
+        return [s.id, { waits: waitsIn(state, s, busy), actions: actionsOf(state, s), redone }];
       })
     ),
     goal: goalActions(state.goal),
@@ -8144,6 +8181,10 @@ function waitText(wait, work) {
     }
     case "busy":
       return `waits until ${wait.by} is free`;
+    case "merge": {
+      const ahead2 = work.subtasks.find((s) => s.id === wait.subtaskId);
+      return `waits until "${ahead2?.title ?? ""}" is merged`;
+    }
     case "teammate":
       return `asked ${wait.by}`;
     case "you":
@@ -8599,7 +8640,7 @@ function viewer(session2) {
     });
     const entries = session2().othersOf(all);
     const engine = session2().current;
-    const mine = engine && { work: workOf(engine), members: engine.team.members };
+    const mine = engine && { work: engine.work, members: engine.team.members };
     const team = paneTeam(mine, entries, session2().moved);
     const text2 = JSON.stringify(team);
     if (text2 !== shown) {
@@ -8634,8 +8675,8 @@ function viewer(session2) {
 function socketAddress() {
   if (process.platform === "win32")
     return { address: `\\\\.\\pipe\\openplan-${randomBytes(12).toString("hex")}` };
-  const folder = mkdtempSync(path5.join(tmpdir(), "openplan-"));
-  return { address: path5.join(folder, "pane.sock"), folder };
+  const folder = mkdtempSync(path6.join(tmpdir(), "openplan-"));
+  return { address: path6.join(folder, "pane.sock"), folder };
 }
 var asked = async (schema, request2) => schema.parse(JSON.parse(await text(request2) || "{}"));
 async function servePane(session2) {
@@ -8685,9 +8726,9 @@ function askToLetGo(address, slug) {
 
 // src/plugin/session-mode.ts
 import { readFileSync } from "node:fs";
-import path6 from "node:path";
-var folderOf = (dataFolder2) => path6.join(dataFolder2, "sessions");
-var fileOf = (dataFolder2, session2) => path6.join(folderOf(dataFolder2), `${String(session2)}.mode`);
+import path7 from "node:path";
+var folderOf = (dataFolder2) => path7.join(dataFolder2, "sessions");
+var fileOf = (dataFolder2, session2) => path7.join(folderOf(dataFolder2), `${String(session2)}.mode`);
 function modeOf(dataFolder2, session2) {
   try {
     return readFileSync(fileOf(dataFolder2, session2), "utf8");
@@ -9082,7 +9123,7 @@ ${others.length ? `Your teammates: ${others.join(", ")}.` : "You are the only me
 
 # Your duties
 ${member.role.duties.trim()}`;
-  return kind === "task" ? `${who}
+  return kind === "work" ? `${who}
 
 ${TASK_WAYS}` : who;
 }
@@ -9339,9 +9380,7 @@ function addTools(server2, session2) {
       const engine = session2.current;
       const others = othersText(await session2.others());
       return toolText(
-        [engine ? statusText(workOf(engine)) : session2.none, ...others ? [others] : []].join(
-          "\n\n"
-        )
+        [engine ? statusText(engine.work) : session2.none, ...others ? [others] : []].join("\n\n")
       );
     }
   );
@@ -9468,12 +9507,9 @@ function addTools(server2, session2) {
     },
     async ({ subtask: id, action }) => {
       const engine = session2.goal;
-      const found = engine.state.subtasks.find((s) => s.id === id);
-      if (!found) throw new Error("There is no such subtask");
-      if (!derive(workOf(engine)).subtasks[id]?.actions.includes(action))
-        throw new Error(`"${found.title}" can't ${action} while ${found.status}`);
-      await engine.scheduler[action](id);
-      return toolText(`"${found.title}" is ${found.status} now.`);
+      await engine.scheduler.act(id, action);
+      const acted = engine.state.subtasks.find((s) => s.id === id);
+      return toolText(`"${acted?.title ?? ""}" is ${acted?.status ?? "gone"} now.`);
     }
   );
   server2.registerTool(
@@ -9580,22 +9616,13 @@ import { createHash } from "node:crypto";
 import { link, mkdir as mkdir2, readdir as readdir3, readFile as readFile4, rename as rename2, rm as rm2, writeFile as writeFile2 } from "node:fs/promises";
 import { readFileSync as readFileSync2, unlinkSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
-import path7 from "node:path";
+import path8 from "node:path";
 function repoFolder(dataFolder2, repo) {
-  const name = path7.basename(repo.top).replace(/[^\w.-]+/g, "-");
+  const name = path8.basename(repo.top).replace(/[^\w.-]+/g, "-");
   const hash = createHash("sha256").update(repo.common).digest("hex").slice(0, 12);
-  return path7.join(dataFolder2, "repos", `${name}-${hash}`);
+  return path8.join(dataFolder2, "repos", `${name}-${hash}`);
 }
-var goalsFolder = (repoFolder2) => path7.join(repoFolder2, "goals");
-var goalFiles = (folder) => ({
-  state: path7.join(folder, "state.json"),
-  lock: path7.join(folder, "lock"),
-  members: path7.join(folder, "members.json"),
-  /** The goal's copy of the team (team.ts copyTeam). */
-  team: path7.join(folder, "team.json"),
-  /** A member's settings file (policy.ts writeSettings). */
-  settings: (member) => path7.join(folder, "settings", `${member}.json`)
-});
+var goalsFolder = (repoFolder2) => path8.join(repoFolder2, "goals");
 var STATE_VERSION = 1;
 var SAVE_DELAY_MS = 200;
 async function readState(file) {
@@ -9659,7 +9686,7 @@ function holderOf(lock) {
   return holder && running(holder.pid) ? holder : void 0;
 }
 async function holding(lock, me, open2) {
-  await mkdir2(path7.dirname(lock), { recursive: true });
+  await mkdir2(path8.dirname(lock), { recursive: true });
   const file = `${lock}.${String(process.pid)}`;
   const holder = { pid: process.pid, ...me, open: open2 };
   await writeFile2(file, JSON.stringify(holder));
@@ -9729,7 +9756,7 @@ async function newGoalFolder(repoFolder2, name, taken) {
   for (const slug of await readdir3(goals)) taken.add(slug);
   for (; ; ) {
     const slug = slugFor(name, taken);
-    const folder = path7.join(goals, slug);
+    const folder = path8.join(goals, slug);
     try {
       await mkdir2(folder);
       return { slug, folder };
@@ -9750,7 +9777,7 @@ async function listGoals(repoFolder2) {
   }
   const found = await Promise.all(
     slugs.map(async (slug) => {
-      const files = goalFiles(path7.join(folder, slug));
+      const files = goalFiles(path8.join(folder, slug));
       let state;
       try {
         state = await readState(files.state);
@@ -9769,7 +9796,7 @@ async function listGoals(repoFolder2) {
 import { randomUUID as randomUUID4 } from "node:crypto";
 import { existsSync } from "node:fs";
 import { rm as rm3 } from "node:fs/promises";
-import path11 from "node:path";
+import path12 from "node:path";
 
 // src/engine/goals.ts
 var LIFE = "life";
@@ -9881,7 +9908,7 @@ var Goals = class {
 // src/engine/meetings.ts
 import { randomUUID } from "node:crypto";
 import { mkdir as mkdir3, writeFile as writeFile3 } from "node:fs/promises";
-import path8 from "node:path";
+import path9 from "node:path";
 import {
   createSdkMcpServer,
   tool
@@ -10033,14 +10060,13 @@ var Meetings = class {
     const { core } = this;
     const { meeting: meeting2, plan } = this.underReview(id, "approve");
     this.activeGoal();
-    const file = path8.join(core.places.root, "plans", `${meeting2.id}.md`);
-    await mkdir3(path8.dirname(file), { recursive: true });
+    const file = goalFiles(core.places.root).plan(meeting2.id);
+    await mkdir3(path9.dirname(file), { recursive: true });
     await writeFile3(file, plan.markdown);
     if (meeting2.plan !== plan || !can(MEETING_MACHINE, meeting2.status, "approve"))
       throw new Error("The plan changed while it was being approved");
     this.activeGoal();
     meeting2.status = step(MEETING_MACHINE, meeting2.status, "approve");
-    meeting2.planFile = file;
     return this.scheduler.assign(plan.tasks, meeting2.id);
   }
   /** Settles once no meeting is under way: one being cancelled has ended. */
@@ -10118,7 +10144,7 @@ var Meetings = class {
     };
     const ask = async (member2, prompt, turn = {}) => {
       const heard = turn.heard ?? meeting2.turns.length;
-      const options = core.options(member2, "meeting", ctx.cwd);
+      const options = core.options(member2, "readOnly", ctx.cwd);
       const seat = meeting2.seats?.[member2.name];
       const reply = await askOnce({
         prompt,
@@ -10347,7 +10373,11 @@ async function writeSettings(file, settings) {
   await writeWhole(file, JSON.stringify(settings), 384);
   return file;
 }
+var sessionOptions = (seat, kind, from) => kind === "work" ? workOptions(seat, from) : readOnlyOptions(seat, from);
 function workOptions(seat, from) {
+  return memberOptions(seat, from, seat.teamMode ? void 0 : seat.sessionMode);
+}
+function memberOptions(seat, from, mode) {
   const { member } = seat;
   const env = Object.fromEntries(
     Object.entries(from).filter(([name]) => !SESSION_VARS.includes(name))
@@ -10357,10 +10387,10 @@ function workOptions(seat, from) {
     model: member.model,
     effort: member.effort,
     settings: seat.settings,
-    ...seat.mode && {
-      permissionMode: seat.mode,
+    ...mode && {
+      permissionMode: mode,
       // The SDK takes bypassPermissions only so: your session runs in it, as you chose.
-      ...seat.mode === "bypassPermissions" && { allowDangerouslySkipPermissions: true }
+      ...mode === "bypassPermissions" && { allowDangerouslySkipPermissions: true }
     },
     env: { ...env, ...authorEnv(memberSigner(member.name)) },
     systemPrompt: { type: "preset", preset: "claude_code", append: seat.system },
@@ -10372,9 +10402,8 @@ function workOptions(seat, from) {
 }
 function readOnlyOptions(seat, from) {
   return {
-    ...workOptions(seat, from),
+    ...memberOptions(seat, from, "dontAsk"),
     tools: READ_ONLY_TOOLS,
-    permissionMode: "dontAsk",
     strictMcpConfig: true
   };
 }
@@ -10589,7 +10618,7 @@ var Questions = class {
 
 // src/engine/records.ts
 import { appendFile, mkdir as mkdir4, open } from "node:fs/promises";
-import path9 from "node:path";
+import path10 from "node:path";
 var OUTPUT_MAX = 4e3;
 var liveOf = (now) => ({
   ...now.streaming && { streaming: now.streaming },
@@ -10638,7 +10667,7 @@ function tracking(now, keep) {
     }
   };
 }
-var recordFile = (places, subtaskId) => path9.join(places.root, "records", `${subtaskId}.jsonl`);
+var recordFile = (places, subtaskId) => goalFiles(places.root).record(subtaskId);
 var Records = class {
   constructor(places, failed) {
     this.places = places;
@@ -10658,7 +10687,7 @@ var Records = class {
     const file = recordFile(this.places, subtaskId);
     const write = (entry) => {
       this.writing = this.writing.then(async () => {
-        await mkdir4(path9.dirname(file), { recursive: true });
+        await mkdir4(path10.dirname(file), { recursive: true });
         await appendFile(file, `${JSON.stringify(entry)}
 `);
       }).catch(this.failed);
@@ -10722,7 +10751,7 @@ var Records = class {
 // src/engine/scheduler.ts
 import { randomUUID as randomUUID3 } from "node:crypto";
 import { stat as stat2 } from "node:fs/promises";
-import path10 from "node:path";
+import path11 from "node:path";
 import { z as z9 } from "zod";
 
 // src/engine/run.ts
@@ -10832,6 +10861,7 @@ var progressOf2 = (steps) => {
   };
 };
 var handedAt = (subtask2) => subtask2.status === "reviewing" || subtask2.status === "merging" ? subtask2.delivery?.at ?? 0 : 0;
+var TAKEN_UP = ["pending", "reviewing", "merging"];
 var Scheduler = class {
   constructor(core, questions) {
     this.core = core;
@@ -10945,6 +10975,22 @@ var Scheduler = class {
     this.pump();
     return "goes";
   }
+  /** The subtasks whose review or merge is under way now. */
+  underWay() {
+    return [...this.live].filter(([, live]) => live.kind !== "run").map(([id]) => id);
+  }
+  /**
+   * Does what you asked to a subtask (§4.3): stop it, have it go on, retry it,
+   * or redo it. Throws when there is no such subtask, or when it can't be
+   * done where the subtask stands (derive.ts actionsOf).
+   */
+  async act(subtaskId, action) {
+    const subtask2 = this.subtask(subtaskId);
+    if (!subtask2) throw new Error("There is no such subtask");
+    if (!actionsOf(workOf(this.core), subtask2).includes(action))
+      throw new Error(`"${subtask2.title}" can't ${action} while ${subtask2.status}`);
+    await this[action](subtask2);
+  }
   /**
    * Lets go of work about to be deleted: what waits to start won't, what runs
    * or is reviewed stops, not to go on, and this settles once all of it under
@@ -10955,7 +11001,8 @@ var Scheduler = class {
       subtaskIds.flatMap((id) => {
         this.held.delete(id);
         const live = this.live.get(id);
-        const stopping = this.stop(id);
+        const subtask2 = this.subtask(id);
+        const stopping = subtask2 ? this.stop(subtask2) : Promise.resolve();
         return live ? [live.ended, stopping] : [stopping];
       })
     );
@@ -10965,15 +11012,14 @@ var Scheduler = class {
    * review, a merge waiting on your decision (its half-done merge undone). One
    * handed over keeps its delivery and the stage it stopped in, to go on from.
    */
-  async stop(subtaskId) {
-    const subtask2 = this.subtask(subtaskId);
-    const live = this.live.get(subtaskId);
+  async stop(subtask2) {
+    const live = this.live.get(subtask2.id);
     if (live?.kind === "run") {
-      this.held.delete(subtaskId);
+      this.held.delete(subtask2.id);
       live.abort.abort();
       return;
     }
-    if (!subtask2 || !can(SUBTASK_MACHINE, subtask2.status, "stop")) return;
+    if (!can(SUBTASK_MACHINE, subtask2.status, "stop")) return;
     if (subtask2.status === "merging") {
       if (live) return;
       await abortMerge(this.core.places, this.goal.slug, subtask2.id);
@@ -10988,9 +11034,7 @@ var Scheduler = class {
     this.pump();
   }
   /** You retry a failed or stopped subtask from the start: its session, delivery, review and worktree go. */
-  async retry(subtaskId) {
-    const subtask2 = this.subtask(subtaskId);
-    if (!subtask2 || !can(SUBTASK_MACHINE, subtask2.status, "retry")) return;
+  async retry(subtask2) {
     await dropDesk(this.core.places, this.goal.slug, subtask2.id);
     if (!can(SUBTASK_MACHINE, subtask2.status, "retry")) return;
     this.move(subtask2, "retry");
@@ -11011,9 +11055,7 @@ var Scheduler = class {
    * session and worktree, or, stopped once handed over, its review or merge,
    * its delivery standing.
    */
-  continue(subtaskId) {
-    const subtask2 = this.subtask(subtaskId);
-    if (!subtask2 || !can(SUBTASK_MACHINE, subtask2.status, "continue")) return;
+  continue(subtask2) {
     const stage = subtask2.stoppedIn;
     this.move(
       subtask2,
@@ -11025,9 +11067,7 @@ var Scheduler = class {
     this.pump();
   }
   /** You redo a done subtask whose upstream was redone since: in its session, from the goal's branch. */
-  redo(subtaskId) {
-    const subtask2 = this.subtask(subtaskId);
-    if (!subtask2 || !can(SUBTASK_MACHINE, subtask2.status, "redo")) return;
+  redo(subtask2) {
     const redone = redoneUpstream(this.core.state, subtask2).map((s) => s.title);
     this.move(subtask2, "redo");
     if (subtask2.session) goOnWith(subtask2, { why: "redo", note: redone.join(", ") });
@@ -11072,41 +11112,26 @@ var Scheduler = class {
     this.pump();
   }
   /**
-   * Takes up whatever can go on: what goes on in its session first, then new
-   * work, and delivered work reviewed and merged in the order it was
-   * delivered. A pending subtask starts, and one in review is reviewed, when
-   * nothing holds it up (waitsIn: its goal active, you not deciding about it,
-   * its member or reviewer free); one being merged is merged unless you are
-   * deciding about it, one at a time.
+   * Takes up whatever can go on, as the rules say (derive.ts waitsIn): what
+   * goes on in its session first, then new work, and delivered work reviewed
+   * and merged in the order it was delivered. Each start is seen by the next:
+   * its member is busy, its review or merge under way.
    */
   pump() {
     if (this.closed) return;
-    const { state } = this.core;
-    const work = workOf(this.core);
-    const busy = busyMembers(work);
-    const reviews = new Set(
-      state.subtasks.filter((s) => this.live.get(s.id)?.kind === "review").map((s) => reviewerOf(work, s))
-    );
-    let merging2 = state.subtasks.some((s) => this.live.get(s.id)?.kind === "merge");
-    const order = [...state.subtasks].sort(
+    const order = [...this.core.state.subtasks].sort(
       (a, b) => Number(Boolean(b.goOn)) - Number(Boolean(a.goOn)) || handedAt(a) - handedAt(b)
     );
-    for (const subtask2 of order) {
-      if (this.live.has(subtask2.id)) continue;
-      if (subtask2.status === "pending") {
-        if (waitsIn(work, subtask2, busy).length) continue;
-        busy.add(subtask2.assignee);
-        void this.startRun(subtask2);
-      } else if (subtask2.status === "reviewing") {
-        const reviewer = reviewerOf(work, subtask2);
-        if (reviews.has(reviewer) || waitsIn(work, subtask2, busy).length) continue;
-        reviews.add(reviewer);
-        void this.startReview(subtask2);
-      } else if (subtask2.status === "merging") {
-        if (waitsIn(work, subtask2, busy).length || merging2) continue;
-        merging2 = true;
-        void this.startMerge(subtask2);
-      }
+    for (; ; ) {
+      const work = workOf(this.core);
+      const busy = busyMembers(work);
+      const next = order.find(
+        (s) => !this.live.has(s.id) && TAKEN_UP.includes(s.status) && !waitsIn(work, s, busy).length
+      );
+      if (!next) return;
+      if (next.status === "pending") void this.startRun(next);
+      else if (next.status === "reviewing") void this.startReview(next);
+      else void this.startMerge(next);
     }
   }
   /**
@@ -11202,7 +11227,7 @@ var Scheduler = class {
       const desk = await openDesk(core.places, goal.slug, subtask2.id);
       const recorder = core.recorder(subtask2);
       outcome = await runSubtask({
-        options: core.options(member, "task", desk),
+        options: core.options(member, "work", desk),
         opening: goOn ? goOnMessage(goOn, subtask2) : taskBrief({
           goal,
           task,
@@ -11294,7 +11319,7 @@ ${outcome.handover.summary}`
             question,
             own: core.state.subtasks.filter((s) => s.assignee === target.name)
           }),
-          options: core.options(target, "answer", await openGoal(core.places, this.goal.slug)),
+          options: core.options(target, "readOnly", await openGoal(core.places, this.goal.slug)),
           signal
         })
       );
@@ -11313,13 +11338,13 @@ ${outcome.handover.summary}`
     const kept = [];
     const missing2 = [];
     for (const file of files) {
-      const relative = path10.relative(desk, path10.resolve(desk, file));
-      const inside = relative !== "" && !relative.startsWith("..") && !path10.isAbsolute(relative);
-      const there = inside && await stat2(path10.join(desk, relative)).then(
+      const relative = path11.relative(desk, path11.resolve(desk, file));
+      const inside = relative !== "" && !relative.startsWith("..") && !path11.isAbsolute(relative);
+      const there = inside && await stat2(path11.join(desk, relative)).then(
         (found) => found.isFile(),
         () => false
       );
-      if (there) kept.push(relative.split(path10.sep).join("/"));
+      if (there) kept.push(relative.split(path11.sep).join("/"));
       else missing2.push(file);
     }
     if (missing2.length)
@@ -11354,7 +11379,7 @@ ${outcome.handover.summary}`
           delivery,
           cwd: desk
         }),
-        options: core.options(reviewer, "review", desk),
+        options: core.options(reviewer, "readOnly", desk),
         schema: verdictSchema,
         signal: abort.signal
       });
@@ -11531,7 +11556,7 @@ var Engine = class _Engine {
    */
   static async takeUp(options, slug) {
     const repo = await openRepository(options.cwd);
-    const folder = path11.join(goalsFolder(repoFolder(options.dataFolder, repo)), slug);
+    const folder = path12.join(goalsFolder(repoFolder(options.dataFolder, repo)), slug);
     const files = goalFiles(folder);
     if (!existsSync(files.state)) throw new Error(`There is no goal "${slug}" in this repository`);
     const me = { session: options.session, address: options.address };
@@ -11570,7 +11595,8 @@ var Engine = class _Engine {
       allowAlways: (rules) => engine.allow(rules),
       options: (member, kind, cwd2) => engine.turnOptions(member, kind, cwd2),
       recorder: (subtask2) => records.recorder(subtask2.id),
-      speech: (meeting2, speaker) => records.speech(meeting2, speaker)
+      speech: (meeting2, speaker) => records.speech(meeting2, speaker),
+      underWay: () => engine.scheduler.underWay()
     };
     const engine = new _Engine(core, records, files, writer, options, copy);
     await engine.writeMemberSettings(copy);
@@ -11581,6 +11607,10 @@ var Engine = class _Engine {
   }
   get state() {
     return this.core.state;
+  }
+  /** The goal as the rules read it (derive.ts). */
+  get work() {
+    return workOf(this.core);
   }
   /** The goal's copy of the team. */
   get team() {
@@ -11667,16 +11697,17 @@ var Engine = class _Engine {
     this.teamMode = copy.settings.permissions?.defaultMode !== void 0;
   }
   turnOptions(...[member, kind, cwd2]) {
+    const sessionMode = this.options.sessionMode();
     const seat = {
       member,
       claude: this.options.claude,
       cwd: cwd2,
       settings: this.files.settings(member.name),
-      system: systemPrompt(kind, member, this.core.team.members)
+      system: systemPrompt(kind, member, this.core.team.members),
+      ...sessionMode && { sessionMode },
+      teamMode: this.teamMode
     };
-    if (kind !== "task") return readOnlyOptions(seat, this.options.env);
-    const mode = this.teamMode ? void 0 : this.options.sessionMode();
-    return workOptions({ ...seat, ...mode && { mode } }, this.options.env);
+    return sessionOptions(seat, kind, this.options.env);
   }
 };
 
