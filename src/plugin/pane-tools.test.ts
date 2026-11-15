@@ -104,14 +104,13 @@ describe("the pane's socket and tools", () => {
     expect(engine.state.goals[0]?.status).toBe("paused");
   });
 
-  it("pause every active goal, and resume every paused one", async () => {
-    await engine.goals.start("Dice");
-    const chess = await engine.goals.start("Chess");
-    await engine.goals.pause(chess.id);
-    expect((await call("every_goal", { action: "pause" })).text).toBe('Paused "Dice".');
-    expect((await call("every_goal", { action: "pause" })).text).toBe("No goal is active.");
-    expect((await call("every_goal", { action: "resume" })).text).toBe('Resumed "Dice", "Chess".');
-    expect(engine.state.goals.map((g) => g.status)).toEqual(["active", "active"]);
+  it("pause the goal under way, and resume the one picked", async () => {
+    const dice = await engine.goals.start("Dice");
+    expect((await call("pause_goal")).text).toBe('Paused "Dice".');
+    expect((await view()).team?.paused).toEqual([{ id: dice.id, label: "Dice · no plan yet" }]);
+    expect((await call("pause_goal")).text).toBe("No goal is active.");
+    expect((await call("resume_goal", { goal: dice.id })).text).toBe("Resumed.");
+    expect(dice.status).toBe("active");
   });
 
   it("serve only the view and the release, and say why an ask doesn't fit", async () => {
@@ -130,6 +129,7 @@ describe("the pane's socket and tools", () => {
       needs: [],
       milestones: [],
       prompts: [],
+      paused: [],
     });
     expect(await view({ revision: first.revision })).toEqual({ revision: first.revision });
     await engine.goals.start("Dice");

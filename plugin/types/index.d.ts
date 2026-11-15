@@ -16,6 +16,8 @@ export type OpenplanTeam = {
   milestones: { key: string; text: string }[];
   /** What needs a conversation with you, by a key that names it: your session is prompted with each new one. */
   prompts: { key: string; text: string }[];
+  /** The paused goals, oldest first, each named with how far it got: what `/openplan resume` picks from. */
+  paused: { id: string; label: string }[];
 };
 
 export type OpenplanMeeting = {

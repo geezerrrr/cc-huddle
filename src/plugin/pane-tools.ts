@@ -2,7 +2,7 @@
  * The tools of openplan's mod (docs/design.md §7.2, §7.3): where the pane
  * reads the team (`pane`, its socket), how it answers what waits on you
  * (`answer`), and what `/openplan pause` and `/openplan resume` do
- * (`every_goal`). They are the mod's, not your session's: the mod keeps the
+ * (`pause_goal`, `resume_goal`). They are the mod's, not your session's: the mod keeps the
  * model from calling them, so a permission is granted only by you, pressing
  * its button, and your session has `goal_action` for a goal of its own.
  */
@@ -53,22 +53,29 @@ export function addPaneTools(server: McpServer, team: () => Promise<Engine>, pan
   );
 
   server.registerTool(
-    "every_goal",
+    "pause_goal",
     {
-      description: `${PANE_ONLY} Pauses every active goal, or resumes every paused one, as /openplan pause or resume.`,
-      inputSchema: { action: z.enum(["pause", "resume"]) },
+      description: `${PANE_ONLY} Pauses the active goal, as /openplan pause.`,
+      inputSchema: {},
     },
-    async ({ action }) => {
+    async () => {
       const engine = await team();
-      const from = action === "pause" ? "active" : "paused";
-      const goals = engine.state.goals.filter((g) => g.status === from);
-      for (const goal of goals) await engine.goals[action](goal.id);
-      const done = action === "pause" ? "Paused" : "Resumed";
-      return toolText(
-        goals.length
-          ? `${done} ${goals.map((g) => `"${g.name}"`).join(", ")}.`
-          : `No goal is ${from}.`,
-      );
+      const goal = engine.state.goals.find((g) => g.status === "active");
+      if (!goal) return toolText("No goal is active.");
+      await engine.goals.pause(goal.id);
+      return toolText(`Paused "${goal.name}".`);
+    },
+  );
+
+  server.registerTool(
+    "resume_goal",
+    {
+      description: `${PANE_ONLY} Resumes the paused goal you picked, as /openplan resume.`,
+      inputSchema: { goal: z.string().describe("The goal's id") },
+    },
+    async ({ goal }) => {
+      await (await team()).goals.resume(goal);
+      return toolText("Resumed.");
     },
   );
 }

@@ -1,5 +1,5 @@
 import type { On } from "claude-code";
-import { expect, mock, test } from "claude-code/testing";
+import { expect, mock, test, type Engine } from "claude-code/testing";
 
 import type { OpenplanNeed, OpenplanTeam, OpenplanView } from "../types";
 
@@ -59,6 +59,7 @@ const TEAM: OpenplanTeam = {
   needs: [NEED],
   milestones: [],
   prompts: [],
+  paused: [],
 };
 
 const SOCKET = "/tmp/openplan-test/pane.sock";
@@ -386,19 +387,71 @@ test("/openplan status prints where the team stands", async ($, on) => {
   expect(text).toBe("Team: glm");
 });
 
-test("/openplan pause and resume pause or resume every goal, with no model turn", async ($, on) => {
-  const calls = serve(on, [{ revision: 1, team: TEAM }]);
+/** Runs `/openplan <args>` from the prompt, giving what it printed. */
+async function openplan($: Engine, args: string) {
+  const { text } = await $.command.run({
+    command: "openplan",
+    args,
+    origin: { kind: "composer" },
+    presentation: { isFullscreen: true, columns: 120 },
+  });
+  return text;
+}
+
+const paused = (count: number) =>
+  Array.from({ length: count }, (_, i) => ({
+    id: `g${String(i + 1)}`,
+    label: "Dice · no plan yet",
+  }));
+
+test("/openplan pause pauses the goal under way, and resume resumes the only one paused, with no model turn", async ($, on) => {
+  const calls = serve(on, [{ revision: 1, team: { ...TEAM, paused: paused(1) } }]);
   await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
-  for (const action of ["pause", "resume"])
-    await $.command.run({
-      command: "openplan",
-      args: action,
-      origin: { kind: "composer" },
-      presentation: { isFullscreen: true, columns: 120 },
-    });
-  expect(calls.filter((c) => c.tool === "every_goal")).toEqual([
-    { tool: "every_goal", args: { action: "pause" } },
-    { tool: "every_goal", args: { action: "resume" } },
+  await openplan($, "pause");
+  expect(await openplan($, "resume")).toBe("Resumed Dice · no plan yet.");
+  expect(calls.filter((c) => c.tool.endsWith("_goal"))).toEqual([
+    { tool: "pause_goal", args: {} },
+    { tool: "resume_goal", args: { goal: "g1" } },
+  ]);
+});
+
+test("/openplan resume asks which goal when several are paused, each numbered", async ($, on) => {
+  const asked: string[][] = [];
+  const said = ["2. Dice · no plan yet"];
+  on("tool.call", { tool: "AskUserQuestion" }, (_, e) => {
+    const [question] = e.questions as { question: string; options: { label: string }[] }[];
+    asked.push(question?.options.map((o) => o.label) ?? []);
+    const answer = said.shift();
+    return answer
+      ? { result: { answers: { [question?.question ?? ""]: answer } } }
+      : { deny: "dismissed" };
+  });
+  const calls = serve(on, [{ revision: 1, team: { ...TEAM, paused: paused(2) } }]);
+  await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
+  expect(await openplan($, "resume")).toBe("Resumed Dice · no plan yet.");
+  expect(await openplan($, "resume")).toBe("Nothing resumed.");
+  expect(asked).toEqual([
+    ["1. Dice · no plan yet", "2. Dice · no plan yet"],
+    ["1. Dice · no plan yet", "2. Dice · no plan yet"],
+  ]);
+  expect(calls.filter((c) => c.tool === "resume_goal")).toEqual([
+    { tool: "resume_goal", args: { goal: "g2" } },
+  ]);
+});
+
+test("/openplan resume lists more paused goals than the dialog holds, to pick by number", async ($, on) => {
+  const calls = serve(on, [{ revision: 1, team: { ...TEAM, paused: paused(5) } }]);
+  await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
+  expect(await openplan($, "resume")).toBe(
+    [
+      "Paused goals; resume one with /openplan resume <number>:",
+      ...paused(5).map((g, i) => `${String(i + 1)}. ${g.label}`),
+    ].join("\n"),
+  );
+  expect(await openplan($, "resume 6")).toBe("No paused goal is numbered 6.");
+  expect(await openplan($, "resume 5")).toBe("Resumed Dice · no plan yet.");
+  expect(calls.filter((c) => c.tool === "resume_goal")).toEqual([
+    { tool: "resume_goal", args: { goal: "g5" } },
   ]);
 });
 

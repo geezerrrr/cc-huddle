@@ -303,6 +303,22 @@ function bandText(work: Work, needs: number): string | undefined {
   return parts.join(" · ");
 }
 
+/** The paused goals, each named with how far it got, for `/openplan resume` to pick from. */
+function pausedGoals(work: Work): OpenplanTeam["paused"] {
+  return work.goals
+    .filter((g) => g.status === "paused")
+    .map((goal) => {
+      const subtasks = work.subtasks.filter((s) => s.goalId === goal.id);
+      const done = subtasks.filter((s) => s.status === "done").length;
+      const where = subtasks.length
+        ? `${String(done)}/${String(subtasks.length)} subtasks done`
+        : work.meetings.some((m) => m.goalId === goal.id && m.status === "review")
+          ? "plan to review"
+          : "no plan yet";
+      return { id: goal.id, label: `${goal.name} · ${where}` };
+    });
+}
+
 /** The team as the pane shows it. */
 export function paneTeam(work: Work, members: readonly Member[]): OpenplanTeam {
   const derived = derive(work);
@@ -320,5 +336,6 @@ export function paneTeam(work: Work, members: readonly Member[]): OpenplanTeam {
     needs,
     milestones: milestones(work),
     prompts: prompts(work),
+    paused: pausedGoals(work),
   };
 }

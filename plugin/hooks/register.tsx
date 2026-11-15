@@ -28,7 +28,7 @@ const PLUGIN = "openplan";
 /** The server's tools, as the model names them. */
 const TOOLS = /^mcp__plugin_openplan_openplan__/;
 /** The tools only the mod calls, as the model would name them. */
-const PANE_ONLY = /^mcp__plugin_openplan_openplan__(pane|answer|every_goal)$/;
+const PANE_ONLY = /^mcp__plugin_openplan_openplan__(pane|answer|pause_goal|resume_goal)$/;
 const PANE_ONLY_REASON = "This tool is the user's, in /openplan.";
 /** How often the pane asks the team how it stands. */
 const POLL_MS = 500;
@@ -215,6 +215,54 @@ async function view($: $, args: Record<string, unknown>): Promise<OpenplanView> 
 /** Polls the team, unless it does already. */
 function watch($: $) {
   ticking ??= $.clock.every(POLL_MS, () => void poll($));
+}
+
+/** Claude Code's question dialog offers at most this many options. */
+const ASK_OPTIONS = 4;
+
+/**
+ * Resumes a paused goal (§7.3): the only one; with several, the one you pick
+ * in the question dialog, or the one numbered `number` when there are more
+ * than it holds, as listed.
+ */
+async function resumeGoal($: $, number?: number): Promise<string> {
+  const paused = (await view($, {})).team?.paused ?? [];
+  if (!paused.length) return "No goal is paused.";
+  const listed = paused.map((goal, i) => ({
+    id: goal.id,
+    name: goal.label,
+    label: `${String(i + 1)}. ${goal.label}`,
+  }));
+  if (number === undefined && listed.length > ASK_OPTIONS)
+    return [
+      "Paused goals; resume one with /openplan resume <number>:",
+      ...listed.map((g) => g.label),
+    ].join("\n");
+  const goal =
+    number !== undefined
+      ? listed[number - 1]
+      : listed.length === 1
+        ? listed[0]
+        : await picked($, listed);
+  if (!goal)
+    return number === undefined
+      ? "Nothing resumed."
+      : `No paused goal is numbered ${String(number)}.`;
+  await call($, "resume_goal", { goal: goal.id });
+  return `Resumed ${goal.name}.`;
+}
+
+/** The goal you pick in the question dialog; none when you dismiss it or type something else. */
+async function picked<T extends { label: string }>($: $, listed: T[]): Promise<T | undefined> {
+  try {
+    const said = await $.ui.ask("Which goal should go on?", {
+      options: listed.map((g) => g.label),
+      header: "Resume",
+    });
+    return listed.find((g) => g.label === said);
+  } catch {
+    return undefined;
+  }
 }
 
 /** Opens the pane with the keyboard: only ever on the person's command or press. */
@@ -595,8 +643,8 @@ export const register: Register = (on) => {
     await $.command.register({
       name: "openplan",
       description:
-        "Hand openplan's team a task; with none, show the team in a pane; `/openplan status` prints where it stands, `pause` and `resume` every goal",
-      argumentHint: "[task | status | pause | resume]",
+        "Hand openplan's team a task; with none, show the team in a pane; `/openplan status` prints where it stands, `pause` pauses the goal under way and `resume` resumes one",
+      argumentHint: "[task | status | pause | resume [number]]",
     });
     watch($);
     return next(e);
@@ -609,10 +657,11 @@ export const register: Register = (on) => {
     // Certain, so said without a model turn.
     const certain: Record<string, () => Promise<string>> = {
       status: () => call($, "status"),
-      pause: () => call($, "every_goal", { action: "pause" }),
-      resume: () => call($, "every_goal", { action: "resume" }),
+      pause: () => call($, "pause_goal"),
+      resume: () => resumeGoal($),
     };
-    const run = certain[task];
+    const numbered = /^resume\s+(\d+)$/.exec(task);
+    const run = numbered ? () => resumeGoal($, Number(numbered[1])) : certain[task];
     if (run) {
       try {
         return { text: await run() };
