@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { hostPlanSchema, hostWritten, loopingDependencies, planSchema, soundPlan } from "./plan.ts";
+import {
+  hostPlanSchema,
+  hostWritten,
+  loopingDependencies,
+  planSchema,
+  soundPlan,
+  writtenPlan,
+} from "./plan.ts";
 
 const sub = (key: string, depends_on: string[] = [], assignee = "glm") => ({
   key,
@@ -134,5 +141,18 @@ describe("soundPlan", () => {
 
   it("refuses a plan with nothing in it", () => {
     expect(() => soundPlan(yours(raw({ subtasks: [] })), "drop")).toThrow("no tasks");
+  });
+
+  it("reads back a plan written out whole (writtenPlan)", () => {
+    const plan = soundPlan(
+      yours(
+        raw(
+          { owner_accepts: true, subtasks: [sub("a"), sub("b", ["a"])] },
+          { subtasks: [sub("c", ["b"])] },
+        ),
+      ),
+      "refuse",
+    );
+    expect(soundPlan(yours(writtenPlan(plan)), "refuse")).toEqual(plan);
   });
 });

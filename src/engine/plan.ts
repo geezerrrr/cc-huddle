@@ -56,6 +56,21 @@ export const hostWritten = (plan: z.output<ReturnType<typeof hostPlanSchema>>): 
   tasks: plan.tasks.map((task) => ({ ...task, owner_accepts: false })),
 });
 
+/** A plan written back in the shape it is written in (planSchema), as change_plan takes it. */
+export const writtenPlan = (plan: Plan): WrittenPlan => ({
+  summary: plan.summary,
+  plan_markdown: plan.markdown,
+  tasks: plan.tasks.map((task) => ({
+    title: task.title,
+    outcome: task.outcome,
+    owner_accepts: task.ownerAccepts,
+    subtasks: task.subtasks.map(({ dependsOn, ...subtask }) => ({
+      ...subtask,
+      depends_on: dependsOn,
+    })),
+  })),
+});
+
 /**
  * The dependencies that close a loop, as [subtask, dependency] pairs. A
  * subtask that waits on one in another task you accept waits on that whole

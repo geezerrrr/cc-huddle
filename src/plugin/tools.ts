@@ -9,7 +9,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { Team } from "../engine/core.ts";
 import { goalBranch } from "../engine/git.ts";
-import { planSchema } from "../engine/plan.ts";
+import { planSchema, writtenPlan } from "../engine/plan.ts";
 import { toolText } from "../engine/turns.ts";
 import {
   DECISION_OPTIONS,
@@ -17,26 +17,10 @@ import {
   MEETING_SIZES,
   SUBTASK_ACTIONS,
   type Member,
-  type Plan,
 } from "../engine/types.ts";
 import type { Session } from "./session.ts";
 import { othersText, statusText } from "./status.ts";
 import { attendanceText, plural, rosterOf } from "./words.ts";
-
-/** A plan in the shape change_plan takes. */
-const writtenPlan = (plan: Plan) => ({
-  summary: plan.summary,
-  plan_markdown: plan.markdown,
-  tasks: plan.tasks.map((task) => ({
-    title: task.title,
-    outcome: task.outcome,
-    owner_accepts: task.ownerAccepts,
-    subtasks: task.subtasks.map(({ dependsOn, ...subtask }) => ({
-      ...subtask,
-      depends_on: dependsOn,
-    })),
-  })),
-});
 
 const meeting = z.string().describe("The meeting's id");
 const subtask = z.string().describe("The subtask's id");
