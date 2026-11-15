@@ -24,10 +24,35 @@ export const goalFolder = (repoFolder: string, slug: string) =>
   path.join(goalsFolder(repoFolder), slug);
 
 /** Where each session's permission mode is kept, by its pid (session-mode.ts). */
-export const sessionsFolder = (dataFolder: string) => path.join(dataFolder, "sessions");
+export function sessionModes(dataFolder: string) {
+  const folder = path.join(dataFolder, "sessions");
+  return {
+    folder,
+    file: (pid: number) => path.join(folder, `${String(pid)}.mode`),
+    /** The session a file in the folder is kept for; undefined for a file that isn't a mode. */
+    pidOf: (name: string) => {
+      const { name: pid, ext } = path.parse(name);
+      return ext === ".mode" ? Number(pid) : undefined;
+    },
+  };
+}
 
 /** Where the MCP server's npm dependencies are installed, by version (bootstrap.ts). */
-export const depsFolder = (dataFolder: string) => path.join(dataFolder, "deps");
+export function depsFolders(dataFolder: string) {
+  const folder = path.join(dataFolder, "deps");
+  return {
+    folder,
+    /** A version's dependencies, by the hash of what it locks. */
+    version: (hash: string) => path.join(folder, hash.slice(0, 12)),
+    /** Where process `pid` installs a version, beside it, before it moves in whole. */
+    draft: (version: string, pid: number) => `${version}.${String(pid)}`,
+    /** The process installing in a folder there; undefined for a version's own folder. */
+    pidOf: (name: string) => {
+      const [, pid] = name.split(".");
+      return pid === undefined ? undefined : Number(pid);
+    },
+  };
+}
 
 /** The files a lock is taken through, beside it (lock.ts): a taker's own, by its pid, and the claim on an ended holder's. */
 export const lockFiles = (lock: string) => ({

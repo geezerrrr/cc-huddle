@@ -128,11 +128,7 @@ export async function loadTeam(userTeam: string, top: string): Promise<TeamFiles
   const folders = [userTeam, teamFolder(top)];
   for (const folder of folders) {
     for (const { name, file, data, body } of await markdownFiles(path.join(folder, "roles")))
-      roles.set(name, {
-        id: name,
-        title: parsed(roleSchema, data, file).title,
-        duties: body.trim(),
-      });
+      roles.set(name, { title: parsed(roleSchema, data, file).title, duties: body.trim() });
     for (const { name, file, data } of await markdownFiles(path.join(folder, "members")))
       written.set(name, { file, data });
     const teamFile = path.join(folder, "team.json");

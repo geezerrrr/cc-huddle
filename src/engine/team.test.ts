@@ -48,14 +48,14 @@ describe("loadTeam", () => {
       members: [
         {
           name: "glm",
-          role: { id: "ui-designer", title: "UI designer", duties: "Design the screens." },
+          role: { title: "UI designer", duties: "Design the screens." },
           model: "glm-5.3-flashx",
           effort: "max",
           env: { ANTHROPIC_AUTH_TOKEN: "${GLM_API_KEY}", API_TIMEOUT_MS: "3000000" },
         },
         {
           name: "sonnet",
-          role: { id: "programmer", title: "Programmer", duties: "Write the code." },
+          role: { title: "Programmer", duties: "Write the code." },
           model: "claude-sonnet-5-5",
           env: {},
         },

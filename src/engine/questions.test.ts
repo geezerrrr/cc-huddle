@@ -150,7 +150,7 @@ describe("questions with choices", () => {
         header: "Score",
         options: [
           { label: "Top right", description: "Out of the way" },
-          { label: "Center", description: "Big", preview: "```\n  12  \n```" },
+          { label: "Center", description: "Big" },
         ],
         multiSelect: false,
       },

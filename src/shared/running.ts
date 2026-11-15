@@ -7,8 +7,10 @@ export function running(pid: number): boolean {
     process.kill(pid, 0);
     return true;
   } catch (error) {
+    if (errorCode(error) === "ESRCH") return false;
     // There, but not ours to signal.
-    return errorCode(error) === "EPERM";
+    if (errorCode(error) === "EPERM") return true;
+    throw error;
   }
 }
 

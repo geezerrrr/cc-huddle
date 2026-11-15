@@ -98,8 +98,10 @@ describe("waitsIn", () => {
 
   it("has new work wait for its member's work going on in its session, while that can start", () => {
     const fresh = subtask("fresh");
-    const held = subtask("held", { goOn: [{ why: "held" }] });
-    const state = work({ subtasks: [fresh, held] });
+    // Your words for work not started yet don't put it first.
+    const told = subtask("told", { goOn: [{ why: "carried", note: "Bigger" }] });
+    const held = subtask("held", { session: "glm-1", goOn: [{ why: "held" }] });
+    const state = work({ subtasks: [fresh, told, held] });
     expect(waitsIn(state, fresh, busyMembers(state))).toEqual([
       { kind: "after", subtaskId: "held" },
     ]);

@@ -54,7 +54,7 @@ describe("Records", () => {
 
     const { entries, next, live } = await records.read("s1");
     expect(entries).toMatchObject([
-      { kind: "run", session: "sess-1", model: "glm-5" },
+      { kind: "run", model: "glm-5" },
       { kind: "thinking", text: "Where is the readme?" },
       {
         kind: "tool",
@@ -96,7 +96,6 @@ describe("Records", () => {
       status: "running",
       turns: [] as Meeting["turns"],
     } as Meeting;
-    vi.useFakeTimers({ now: 5 });
     const speech = records.speech(meeting);
     const read = {
       kind: "tool",
@@ -118,9 +117,8 @@ describe("Records", () => {
       speech: spoken?.speech,
       next: 2,
       entries: [
-        { at: 5, kind: "text", text: "Let me look." },
+        { kind: "text", text: "Let me look." },
         {
-          at: 5,
           kind: "tool",
           name: "Read",
           input: { file_path: "rules.md" },
@@ -135,8 +133,7 @@ describe("Records", () => {
       next: 2,
     });
     expect(records.speaking(meeting, { speech: "another", next: 2 })?.entries).toHaveLength(2);
-    meeting.turns.push({ speaker: "glm", text: "", at: 0, phase: "opening" });
+    meeting.turns.push({ speaker: "glm", text: "", phase: "opening" });
     expect(records.speaking(meeting)).toBeUndefined();
-    vi.useRealTimers();
   });
 });

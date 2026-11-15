@@ -167,7 +167,6 @@ function memberOptions(seat: Seat, from: Env, mode: PermissionMode | undefined):
     env: { ...env, ...authorEnv(memberSigner(member.name)) },
     systemPrompt: { type: "preset", preset: "claude_code", append: seat.system },
     includePartialMessages: true,
-    toolConfig: { askUserQuestion: { previewFormat: "markdown" } },
     extraArgs: { name: `openplan-${member.name}` },
     pathToClaudeCodeExecutable: seat.claude,
   };

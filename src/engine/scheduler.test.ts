@@ -26,7 +26,7 @@ const ME = {
 
 const member = (name: string): Member => ({
   name,
-  role: { id: "dev", title: "Developer", duties: "Build it." },
+  role: { title: "Developer", duties: "Build it." },
   env: {},
 });
 
@@ -393,9 +393,12 @@ describe("Scheduler", () => {
       expect(runs).toHaveLength(3);
       expect(runs[1]?.opening).toContain("The review sent your delivery back");
       expect(runs[1]?.opening).toContain("Scores overlap");
-      expect(s1).toMatchObject({ status: "waitingInReview", review: { rounds: 3 } });
+      expect(s1).toMatchObject({
+        status: "waitingInReview",
+        review: { rounds: 3, notes: "Scores overlap" },
+      });
       expect(core.state.questions[0]).toMatchObject({
-        text: "Scores overlap",
+        text: "",
         decision: { kind: "review", options: ["rereview", "skip", "sendBack"] },
       });
       await decide(core.state.questions[0]?.id ?? "", {

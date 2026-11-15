@@ -135,7 +135,7 @@ export class Questions {
   /**
    * A member asks a teammate: the question is open while `answering` runs
    * (the teammate's read-only turn), so the asker shows as waiting on them,
-   * and leaves the state when it settles. Its subtask's run stopping calls it
+   * and is closed when it settles. Its subtask's run stopping calls it
    * off (cancelFor) and should stop `answering` too.
    */
   async toTeammate<T>(
@@ -226,11 +226,7 @@ export class Questions {
     const choices: Choice[] = input.questions.map((q) => ({
       question: q.question,
       header: q.header,
-      options: q.options.map((o) => ({
-        label: o.label,
-        description: o.description,
-        ...(o.preview !== undefined && { preview: o.preview }),
-      })),
+      options: q.options.map((o) => ({ label: o.label, description: o.description })),
       multiSelect: q.multiSelect,
     }));
     const answer = await this.wait<Extract<Answer, { kind: "choices" }>>(asker, {

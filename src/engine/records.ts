@@ -19,13 +19,12 @@ import type { Meeting } from "./types.ts";
 const OUTPUT_MAX = 4000;
 
 /** One whole thing a run did, as its record keeps it. */
-export type RecordEntry = { at: number } & (
-  | { kind: "run"; session: string; model: string }
+export type RecordEntry =
+  | { kind: "run"; model: string }
   | { kind: "thinking" | "text"; text: string }
   | { kind: "tool"; name: string; input: unknown; state: "done" | "error"; output: string }
   | { kind: "steps"; steps: Step[] }
-  | { kind: "notice"; notice: Notice }
-);
+  | { kind: "notice"; notice: Notice };
 
 /** What a run is doing right now, not in its record yet. */
 export interface LiveRun {
@@ -68,8 +67,8 @@ const liveOf = (now: Now): LiveRun => ({
  */
 function tracking(now: Now, keep: (entry: RecordEntry) => void): TurnListener {
   return {
-    session: (session, model) => {
-      keep({ at: Date.now(), kind: "run", session, model });
+    session: (_session, model) => {
+      keep({ kind: "run", model });
     },
     thinking: (delta) => {
       now.streaming =
@@ -93,12 +92,11 @@ function tracking(now: Now, keep: (entry: RecordEntry) => void): TurnListener {
         return;
       }
       if (now.streaming?.kind === block.kind) now.streaming = undefined;
-      keep({ at: Date.now(), kind: block.kind, text: block.text });
+      keep({ kind: block.kind, text: block.text });
     },
     toolDone: (call) => {
       now.running.delete(call.id);
       keep({
-        at: Date.now(),
         kind: "tool",
         name: call.name,
         input: call.input,
@@ -107,10 +105,10 @@ function tracking(now: Now, keep: (entry: RecordEntry) => void): TurnListener {
       });
     },
     steps: (steps) => {
-      keep({ at: Date.now(), kind: "steps", steps });
+      keep({ kind: "steps", steps });
     },
     notice: (notice) => {
-      keep({ at: Date.now(), kind: "notice", notice });
+      keep({ kind: "notice", notice });
     },
   };
 }

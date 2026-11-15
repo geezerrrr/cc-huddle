@@ -4,7 +4,7 @@
  * meetings, its branch and worktrees. One change to its life at a time, and
  * asking twice is the same as asking once.
  */
-import type { Core } from "./core.ts";
+import { REFUSED, type Core } from "./core.ts";
 import { removeGoal } from "./git.ts";
 import { can, GOAL_MACHINE, step } from "./machines.ts";
 import type { Meetings } from "./meetings.ts";
@@ -33,8 +33,7 @@ export class Goals {
     return this.life(LIFE, () => {
       const { goal } = this;
       if (goal.status === "paused") return;
-      if (goal.status === "archived")
-        throw new Error(`The goal "${goal.name}" is archived: resume it first`);
+      if (goal.status === "archived") throw new Error(REFUSED.archived(goal));
       goal.status = step(GOAL_MACHINE, goal.status, "pause");
       this.hold(false);
     });

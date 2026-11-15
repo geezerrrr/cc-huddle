@@ -17,7 +17,7 @@ import {
   waitsIn,
   upstreamOf,
 } from "./derive.ts";
-import { spend, workOf, type Core } from "./core.ts";
+import { REFUSED, spend, workOf, type Core } from "./core.ts";
 import { errorText } from "../shared/errors.ts";
 import {
   abortMerge,
@@ -162,10 +162,9 @@ export class Scheduler {
    */
   assignOne(work: DirectWork): Subtask {
     const { goal } = this;
-    if (goal.status === "archived")
-      throw new Error(`The goal "${goal.name}" is archived: resume it first`);
+    if (goal.status === "archived") throw new Error(REFUSED.archived(goal));
     if (!this.core.team.members.some((m) => m.name === work.assignee))
-      throw new Error(`There is no member called "${work.assignee}"`);
+      throw new Error(REFUSED.noMember(work.assignee));
     const [added] = this.assign([
       {
         title: work.title,
@@ -226,10 +225,11 @@ export class Scheduler {
 
   /**
    * Does what you asked to a subtask (§4.3): stop it, have it go on, retry it,
-   * or redo it. Throws when there is no such subtask, or when it can't be
-   * done where the subtask stands (derive.ts actionsOf).
+   * or redo it: the subtask, where that left it. Throws when there is no
+   * such subtask, or when it can't be done where the subtask stands
+   * (derive.ts actionsOf).
    */
-  async act(subtaskId: string, action: SubtaskAction) {
+  async act(subtaskId: string, action: SubtaskAction): Promise<Subtask> {
     const subtask = this.subtask(subtaskId);
     if (!subtask) throw new Error("There is no such subtask");
     const event = actionEvent(subtask.status, action);
@@ -237,6 +237,7 @@ export class Scheduler {
       throw new Error(`"${subtask.title}" can't ${action} while ${subtask.status}`);
     if (action === "continue") this.continue(subtask, event);
     else await this[action](subtask);
+    return subtask;
   }
 
   /**
@@ -591,7 +592,8 @@ export class Scheduler {
       const rounds = (subtask.review?.rounds ?? 0) + (verdict.pass ? 0 : 1);
       subtask.review = { rounds, notes: verdict.notes };
       if (verdict.pass) this.move(subtask, "merge");
-      else if (rounds >= REVIEW_ROUNDS) this.ask(subtask, DECISIONS.stuckReview(), verdict.notes);
+      // Its notes are in `review`, read from there.
+      else if (rounds >= REVIEW_ROUNDS) this.ask(subtask, DECISIONS.stuckReview(), "");
       else {
         this.move(subtask, "reject");
         if (subtask.session) goOnWith(subtask, { why: "rejected", note: verdict.notes });

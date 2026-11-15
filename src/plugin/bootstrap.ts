@@ -16,7 +16,7 @@ import { promisify } from "node:util";
 import { exists, renameOver } from "../shared/files.ts";
 import { running } from "../shared/running.ts";
 import { dataFolder } from "./data-folder.ts";
-import { depsFolder } from "../shared/layout.ts";
+import { depsFolders } from "../shared/layout.ts";
 
 if (!("registerHooks" in nodeModule))
   throw new Error(`openplan needs Node.js 22.15 or later; this is ${process.version}`);
@@ -32,21 +32,17 @@ const manifests = await Promise.all(
     async (file) => [file, await readFile(path.join(here, file), "utf8")] as const,
   ),
 );
-const deps = depsFolder(dataFolder);
+const deps = depsFolders(dataFolder);
 /** The dependencies of this version, by what it locks. */
-const home = path.join(
-  deps,
-  manifests
-    .reduce((hash, [, text]) => hash.update(text), createHash("sha256"))
-    .digest("hex")
-    .slice(0, 12),
+const home = deps.version(
+  manifests.reduce((hash, [, text]) => hash.update(text), createHash("sha256")).digest("hex"),
 );
 
 const installed = () => exists(path.join(home, "node_modules"));
 
 if (!(await installed())) {
   // Installed beside, then moved in whole: two sessions starting at once don't share a half install.
-  const draft = `${home}.${String(process.pid)}`;
+  const draft = deps.draft(home, process.pid);
   await mkdir(draft, { recursive: true });
   for (const [file, text] of manifests) await writeFile(path.join(draft, file), text);
   try {
@@ -65,10 +61,10 @@ if (!(await installed())) {
       });
   }
   // What earlier versions installed goes, and installs left half done by a process that ended.
-  for (const name of await readdir(deps)) {
-    const [, pid] = name.split(".");
-    if (path.join(deps, name) !== home && !(pid && running(Number(pid))))
-      await rm(path.join(deps, name), { recursive: true, force: true });
+  for (const name of await readdir(deps.folder)) {
+    const pid = deps.pidOf(name);
+    if (path.join(deps.folder, name) !== home && !(pid !== undefined && running(pid)))
+      await rm(path.join(deps.folder, name), { recursive: true, force: true });
   }
 }
 

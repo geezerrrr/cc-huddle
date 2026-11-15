@@ -8,8 +8,6 @@ import type { EffortLevel } from "@anthropic-ai/claude-agent-sdk";
 
 /** A job and its duties, from its file in the team folder (§6). */
 export interface Role {
-  /** The file's name. */
-  id: string;
   title: string;
   /** The file's Markdown. */
   duties: string;
@@ -123,7 +121,7 @@ export interface Subtask {
   error?: string;
   /** The session its last run was in. */
   session?: string;
-  /** Every reason its next run goes on in `session`, in the order they came. */
+  /** Every reason its next run goes on in `session`, in the order they came; with no session yet, your words for its brief. */
   goOn?: GoOn[];
 }
 
@@ -160,7 +158,6 @@ export type MeetingStatus = "running" | "review" | "approved" | "cancelled" | "d
 export interface MeetingTurn {
   speaker: string;
   text: string;
-  at: number;
   /** Which part of the meeting it belongs to: how far the meeting got is read off these. */
   phase: "opening" | "round" | "steer" | "answer" | "summary";
   /** Whom the host gave the floor to (a steer turn). */
@@ -219,7 +216,7 @@ export const hostOf = (meeting: Pick<Meeting, "participants">) => meeting.partic
 export interface Choice {
   question: string;
   header: string;
-  options: { label: string; description: string; preview?: string }[];
+  options: { label: string; description: string }[];
   multiSelect: boolean;
 }
 

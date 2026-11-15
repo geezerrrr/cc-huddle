@@ -23,8 +23,8 @@ import {
 /**
  * What the rules read: the state, the team's members in their order, and
  * what is under way, which the state doesn't keep (after a restart none is):
- * the subtasks whose review or merge is, and what goes on at each running
- * meeting, by its id.
+ * the subtasks whose review or merge is, what goes on at each running
+ * meeting, by its id, and what members' turns wait on.
  */
 export interface Work extends Omit<GoalState, "questions"> {
   /** Your decisions, and what members' turns wait on now. */
@@ -233,7 +233,7 @@ export function waitsIn(state: Work, subtask: Subtask, busy: Set<string>): Wait[
           s.assignee === subtask.assignee &&
           !startWaits(state, s, busy).length,
       );
-      const first = could.find((s) => s.goOn) ?? could[0];
+      const first = could.find((s) => s.session !== undefined) ?? could[0];
       return first && first !== subtask ? [{ kind: "after", subtaskId: first.id }] : [];
     }
     // A done subtask, the last of its task, carries the task's acceptance waiting on you.

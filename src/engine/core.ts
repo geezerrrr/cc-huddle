@@ -9,7 +9,7 @@ import type { MemberOptions } from "./policy.ts";
 import type { SessionKind } from "./prompts.ts";
 import type { Inbox } from "./questions.ts";
 import type { TurnListener } from "./turns.ts";
-import type { GoalState, Meeting, MeetingNow, Member, Question, Subtask } from "./types.ts";
+import type { Goal, GoalState, Meeting, MeetingNow, Member, Question, Subtask } from "./types.ts";
 
 /** The team as configured (§6): its members in order, and openplan's own settings. */
 export interface Team {
@@ -46,6 +46,12 @@ export const workOf = (
   underWay: core.underWay(),
   meetingsNow: core.meetingsNow(),
 });
+
+/** Why what you asked can't be done, as more than one part refuses it. */
+export const REFUSED = {
+  archived: (goal: Goal) => `The goal "${goal.name}" is archived: resume it first`,
+  noMember: (name: string) => `There is no member called "${name}"`,
+};
 
 /** Counts `tokens` to the member whose session used them. */
 export function spend(state: GoalState, member: string, tokens: number) {

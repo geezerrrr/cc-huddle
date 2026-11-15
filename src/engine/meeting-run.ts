@@ -280,7 +280,6 @@ export class MeetingRun {
     this.meeting.turns.push({
       speaker: speaker.name,
       text,
-      at: Date.now(),
       phase,
       ...(calls !== undefined && { calls }),
     });

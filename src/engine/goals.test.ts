@@ -19,7 +19,7 @@ const ME = {
 
 const member = (name: string): Member => ({
   name,
-  role: { id: "dev", title: "Developer", duties: "" },
+  role: { title: "Developer", duties: "" },
   env: {},
 });
 

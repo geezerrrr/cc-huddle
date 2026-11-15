@@ -25,7 +25,7 @@ vi.mock("./turns.ts", async (original) => ({
 
 const member = (name: string, title: string): Member => ({
   name,
-  role: { id: title, title, duties: "" },
+  role: { title, duties: "" },
   env: {},
 });
 
@@ -159,7 +159,6 @@ describe("nextMove", () => {
     phase,
     speaker,
     text: "",
-    at: 0,
     ...(calls && { calls }),
   });
   const at = (turns: MeetingTurn[], hostOnly?: boolean) =>

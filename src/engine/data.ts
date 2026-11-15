@@ -13,7 +13,7 @@ import type { GoalState } from "./types.ts";
 import { holderOf, type Holder } from "./lock.ts";
 
 /** The version of `state.json` this openplan writes. */
-const STATE_VERSION = 4;
+const STATE_VERSION = 5;
 
 /** How long after a change the state is written: a burst of changes is written once. */
 const SAVE_DELAY_MS = 200;

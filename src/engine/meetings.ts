@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import { errorText } from "../shared/errors.ts";
 import { writeWhole } from "../shared/files.ts";
 import { goalFiles } from "../shared/layout.ts";
-import { workOf, type Core } from "./core.ts";
+import { REFUSED, workOf, type Core } from "./core.ts";
 import { busyMembers, meetingResumes } from "./derive.ts";
 import { openGoal } from "./git.ts";
 import { can, MEETING_MACHINE, step } from "./machines.ts";
@@ -49,7 +49,7 @@ export class Meetings {
   /** Calls a meeting, or throws why it can't be held now. */
   start(call: MeetingCall): Meeting {
     const { core } = this;
-    const named = [...new Set(call.attendees.map((name) => name.trim()))];
+    const named = [...new Set(call.attendees)];
     const attendees = named.length
       ? named
       : core.team.members.map((m) => m.name).sort((a, b) => a.localeCompare(b));
@@ -173,7 +173,7 @@ export class Meetings {
     if (host === undefined) throw new Error("The team has no members");
     const names = new Set(core.team.members.map((m) => m.name));
     const stranger = attendees.find((name) => !names.has(name));
-    if (stranger) throw new Error(`There is no member called "${stranger}"`);
+    if (stranger) throw new Error(REFUSED.noMember(stranger));
     const busy = busyMembers(workOf(core));
     const taken = attendees.find((name) => busy.has(name));
     if (taken) throw new Error(`${taken} is busy: working, reviewing, or at another meeting`);

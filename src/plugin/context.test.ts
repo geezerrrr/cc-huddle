@@ -46,7 +46,7 @@ async function writeGoal(slug: string, status = "paused") {
   const files = await filesOf(slug);
   const team: TeamFiles = {
     team: {
-      members: [{ name: "glm", role: { id: "dev", title: "Developer", duties: "" }, env: {} }],
+      members: [{ name: "glm", role: { title: "Developer", duties: "" }, env: {} }],
       review: true,
     },
     settings: {},
@@ -56,7 +56,7 @@ async function writeGoal(slug: string, status = "paused") {
   await writeFile(
     files.state,
     JSON.stringify({
-      version: 4,
+      version: 5,
       state: {
         goal: { name: slug, slug, status, createdAt: slug.length },
         tasks: [],

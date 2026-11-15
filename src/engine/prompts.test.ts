@@ -16,7 +16,7 @@ import type { Meeting, MeetingTurn, Member, Subtask } from "./types.ts";
 
 const member = (name: string, title: string): Member => ({
   name,
-  role: { id: title.toLowerCase(), title, duties: `Duties of a ${title}.\n` },
+  role: { title, duties: `Duties of a ${title}.\n` },
   env: {},
 });
 const glm = member("glm", "UI designer");
@@ -160,7 +160,6 @@ describe("meeting prompts", () => {
   const turn = (speaker: string, text: string, phase: MeetingTurn["phase"]): MeetingTurn => ({
     speaker,
     text,
-    at: 0,
     phase,
   });
 
