@@ -8,15 +8,15 @@ A team of Claude Code sessions on your repository. Each member has a role and an
 
 Agent Teams asks a lead model to run the process: how many teammates, how to split the work, when it's done. openplan keeps the process in code and leaves the models the work.
 
-|                      | Agent Teams                                                 | openplan                                                             |
-| -------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------- |
-| Who runs the process | The lead model, from its prompt                             | State machines in code                                               |
-| Models               | Claude models, one provider                                 | Any model per member, any Anthropic-compatible provider              |
-| Planning             | A teammate drafts a plan; approved automatically by default | A meeting of the members; you approve the plan                       |
-| Isolation            | Shared working tree                                         | A git worktree per subtask, merged one at a time                     |
-| Done means           | A teammate marks the task complete                          | Delivered, reviewed, merged; sent back with notes when review fails  |
-| Errors               | The teammate stops; spawn a replacement                     | Go on in the same session and worktree                               |
-| Closing the terminal | The team is gone                                            | Goals pause; resume the session and a goal to go on where it stopped |
+|                      | Agent Teams                                                 | openplan                                                                            |
+| -------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Who runs the process | The lead model, from its prompt                             | State machines in code                                                              |
+| Models               | Claude models, one provider                                 | Any model per member, any Anthropic-compatible provider                             |
+| Planning             | A teammate drafts a plan; approved automatically by default | A meeting of the members; you approve the plan                                      |
+| Isolation            | Shared working tree                                         | A git worktree per subtask, merged one at a time                                    |
+| Done means           | A teammate marks the task complete                          | Delivered, reviewed, merged; sent back with notes when review fails                 |
+| Errors               | The teammate stops; spawn a replacement                     | Go on in the same session and worktree                                              |
+| Closing the terminal | The team is gone                                            | Its goal pauses; take it up again with `/openplan resume` to go on where it stopped |
 
 For one focused job, a subagent is cheaper and quicker. openplan is for work with several people, steps and dependencies.
 
@@ -98,12 +98,12 @@ The members meet, and the host writes a plan of tasks with owners, dependencies 
 
 - `@sonnet put the scoreboard top right` passes a member a message, in their session.
 - `/openplan` with no task opens the pane: the meeting as it goes, each member at what they do (select one to follow their record), and what needs you, answered there with a button. What needs you is also asked as it comes, in Claude Code's own question dialog; either way, only you answer it.
-- `/openplan status` prints where the team stands; `/openplan pause` and `/openplan resume` pause or resume every goal at once.
+- `/openplan status` prints where the session's goal stands; `/openplan pause` pauses it, and `/openplan resume` resumes it or takes up another of the repository's goals. A session runs one goal: for more goals at once, run more sessions.
 - The band above the prompt says what goes on: `openplan · meeting · 3 working · 1 needs you`, with a line for each task not yet done.
 
-The team runs while your session does. Closing the session pauses its goals; resume the session and a goal to go on where it stopped.
+The team runs while your session does. Closing the session pauses its goal; take it up again with `/openplan resume` to go on where it stopped.
 
-openplan works only on `openplan/*` branches: each goal has `openplan/<goal>/main`, yours to review and merge. It never pushes and never checks anything out in your working tree. Its state, records and worktrees are in the plugin's data folder, outside the repository.
+openplan works only on `openplan/*` branches: each goal has `openplan/<goal>/main`, yours to review and merge. It never pushes and never checks anything out in your working tree. Each goal's state, its copy of the team, its records and its worktrees are in the plugin's data folder, outside the repository.
 
 ## What runs, and what it may do
 
