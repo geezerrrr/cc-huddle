@@ -12,7 +12,7 @@ import { git } from "../engine/git.ts";
 import { teamFolder } from "../engine/team.ts";
 import type { Question } from "../engine/types.ts";
 import type { OpenplanView } from "../../plugin/types/index.d.ts";
-import { servePane, type PaneServer } from "./pane-server.ts";
+import { askToLetGo, servePane, type PaneServer } from "./pane-server.ts";
 import { addPaneTools } from "./pane-tools.ts";
 
 let dir: string;
@@ -46,6 +46,7 @@ beforeEach(async () => {
     dataFolder: path.join(dir, "openplan-inline"),
     claude: "claude",
     session: 41,
+    address: "here",
     plugin: "openplan@inline",
     userTeam: path.join(dir, "user-team"),
     env: {},
@@ -53,7 +54,10 @@ beforeEach(async () => {
     failed: vi.fn(),
   });
   const server = new McpServer({ name: "openplan", version: "0.0.0" });
-  pane = await servePane(() => Promise.resolve(engine));
+  pane = await servePane(
+    () => Promise.resolve(engine),
+    () => engine.close(),
+  );
   addPaneTools(server, () => Promise.resolve(engine), pane);
   const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
   await server.connect(serverSide);
@@ -93,7 +97,13 @@ const view = async (args: Record<string, unknown> = {}) =>
   JSON.parse((await ask("/view", JSON.stringify(args))).text) as OpenplanView;
 
 describe("the pane's socket and tools", () => {
-  it("serve only the view, and say why an ask doesn't fit", async () => {
+  it("let the team go to a session taking it over, and say what that stopped", async () => {
+    const goal = await engine.goals.start("Dice");
+    expect(await askToLetGo(pane.address)).toEqual({ goals: [goal.id], meetings: [] });
+    expect(engine.state.goals[0]?.status).toBe("paused");
+  });
+
+  it("serve only the view and the release, and say why an ask doesn't fit", async () => {
     expect((await ask("/answer", "{}")).status).toBe(404);
     expect(await ask("/view", '{ "revision": "one" }')).toMatchObject({ status: 409 });
     const { address } = pane;

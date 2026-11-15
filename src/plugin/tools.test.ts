@@ -48,6 +48,7 @@ beforeEach(async () => {
     dataFolder: path.join(dir, "openplan-inline"),
     claude: "claude",
     session: 41,
+    address: "here",
     plugin: "openplan@inline",
     userTeam: path.join(dir, "user-team"),
     env: {},

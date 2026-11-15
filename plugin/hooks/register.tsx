@@ -80,6 +80,8 @@ let docks = false;
  * your session turn to openplan.
  */
 let ticking: Timer | undefined;
+/** You turned to openplan here (`/openplan`): the next look takes the team over from another session. */
+let taking = false;
 
 /** What the server answered with an error: the team can't be opened, or refused what was asked. */
 class Refused extends Error {}
@@ -226,10 +228,13 @@ async function poll($: $) {
   polling = true;
   try {
     const following = await read($, record);
+    const take = taking;
     const now = await view($, {
       ...(revision !== undefined && { revision }),
       ...(following && { record: { subtask: following.subtask, from: following.next } }),
+      ...(take && { take }),
     });
+    if (take) taking = false;
     revision = now.revision;
     await update($, problem, () => null);
     if (now.team) {
@@ -240,10 +245,12 @@ async function poll($: $) {
     await update($, speaking, (was) => (JSON.stringify(was) === JSON.stringify(said) ? was : said));
     await update($, record, (was) => followed(was, now));
   } catch (error) {
-    // A server still starting is asked again; a team it can't open waits for you.
+    // A server still starting is asked again; a team it can't open, or that moved, waits for you.
     if (error instanceof Refused) {
       ticking?.cancel();
       ticking = undefined;
+      taking = false;
+      await update($, team, () => null);
     }
     const why = words(error);
     revision = undefined;
@@ -544,6 +551,7 @@ export const register: Register = (on) => {
   });
 
   on("command.run", { command: "openplan" }, async ($, e) => {
+    taking = true;
     watch($);
     const task = e.args.trim();
     if (task === "status") {

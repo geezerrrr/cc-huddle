@@ -30,7 +30,7 @@ export async function sessionContext(
   const status = statusText({ ...state, members: team.members.map((m) => m.name) });
   const holder = holderOf(files.lock);
   if (holder && holder.session !== session)
-    return `openplan's team on this repository runs in another Claude Code session (pid ${String(holder.session)}); this one can't run it while that one does. As it stands:\n\n${status}`;
+    return `openplan's team on this repository runs in another Claude Code session (pid ${String(holder.session)}); it moves to this one when the user uses openplan here, or this session does. As it stands:\n\n${status}`;
   const context = `openplan's team on this repository, as it stands:\n\n${status}`;
   // Active goals the team isn't open on yet: a session ended without closing it (§3.2).
   return !holder?.open && state.goals.some((g) => g.status === "active")

@@ -266,6 +266,49 @@ test("the pane stops asking a team that can't be opened, until you or your sessi
   expect(views).toBe(3);
 });
 
+test("a team that moved to another session leaves the band, and /openplan takes it back", async ($, on) => {
+  const clock = mock.clock(on);
+  const asked: Record<string, unknown>[] = [];
+  let moved = false;
+  on("mcp.connect", () => ({ value: { isConnected: true, server: SERVER } }));
+  on("mcp.call", () => ({ value: { content: [{ type: "text", text: SOCKET }], isError: false } }));
+  on("http.fetch", (_, e) => {
+    const body = e.init?.body;
+    const args = JSON.parse(typeof body === "string" ? body : "{}") as Record<string, unknown>;
+    asked.push(args);
+    return moved && !args.take
+      ? served(409, "Another Claude Code session runs this repository's team (pid 7).")
+      : served(200, JSON.stringify({ revision: asked.length, team: TEAM }));
+  });
+  on("command.register", (_, e) => ({ value: { command: e.name } }));
+  on("ui.open", () => ({ value: { isPlaced: true } }));
+  on("session.start", (_, e) => ({ cwd: e.cwd }));
+  await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
+  await clock.advance(500);
+  const band = async () => {
+    const mounted = await $.ui.mount({ ...BAND, surface: "terminal" });
+    const text = (await mounted.find({ type: "Text", text: /openplan/ }))?.text;
+    await mounted.unmount();
+    return text;
+  };
+  expect(await band()).toBe("openplan · 1 working · 1 needs you");
+
+  moved = true;
+  await clock.advance(500);
+  expect(await band()).toBeUndefined();
+  expect(asked.every((args) => !args.take)).toBe(true);
+
+  await $.command.run({
+    command: "openplan",
+    args: "",
+    origin: { kind: "composer" },
+    presentation: { isFullscreen: true, columns: 120 },
+  });
+  await clock.advance(500);
+  expect(asked.at(-1)).toMatchObject({ take: true });
+  expect(await band()).toBe("openplan · 1 working · 1 needs you");
+});
+
 test("the model can't call the pane's tools", async ($) => {
   const { decision } = await $.tool.check({
     tool: "mcp__plugin_openplan_openplan__answer",

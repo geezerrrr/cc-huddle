@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { dataFiles, repoFolder } from "../engine/data.ts";
+import { dataFiles, holderOf, repoFolder } from "../engine/data.ts";
 import { git, openRepository } from "../engine/git.ts";
 import { teamFolder } from "../engine/team.ts";
 
@@ -75,6 +75,29 @@ describe("the MCP server", () => {
     await writeTeam();
     expect(await call("status")).toBe("Team: glm");
     await client.close();
+  });
+
+  it("goes to the session that uses it, which goes on with what the other one had going", async () => {
+    await writeTeam();
+    const files = dataFiles(
+      repoFolder(path.join(dir, "openplan-inline"), await openRepository(repo)),
+    );
+    const goals = async () =>
+      (JSON.parse(await readFile(files.state, "utf8")) as { state: { goals: unknown[] } }).state
+        .goals;
+    const first = await connect();
+    expect(await first.call("start_goal", { name: "Dice" })).toContain("openplan/dice/main");
+    const second = await connect();
+    expect(await second.call("status")).toContain("Dice");
+    expect(await goals()).toMatchObject([{ name: "Dice", status: "active" }]);
+    const taker = holderOf(files.lock)?.pid;
+    expect(await first.call("status")).toContain("Dice");
+    expect(holderOf(files.lock)?.pid).not.toBe(taker);
+    // The one that let go ends without touching the team.
+    await second.client.close();
+    expect(holderOf(files.lock)).toBeDefined();
+    await first.client.close();
+    expect(await goals()).toMatchObject([{ name: "Dice", status: "paused" }]);
   });
 
   it("closes the team as the session ends: its goals paused, its state written, the lock let go", async () => {

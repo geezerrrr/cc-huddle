@@ -90,16 +90,16 @@ Goal "Dice" [g1]: paused, on branch openplan/dice/main`);
     const left = "The session before ended without closing the team.";
     expect(await sessionContext(repo, data, user, SESSION)).toContain(left);
     // This session's server has the team, but hasn't opened it yet.
-    await hold({ pid: process.pid, session: SESSION, open: false });
+    await hold({ pid: process.pid, session: SESSION, address: "here", open: false });
     expect(await sessionContext(repo, data, user, SESSION)).toContain(left);
     // It has: the goal is active in this session (the context after /clear).
-    await hold({ pid: process.pid, session: SESSION, open: true });
+    await hold({ pid: process.pid, session: SESSION, address: "here", open: true });
     expect(await sessionContext(repo, data, user, SESSION)).not.toContain(left);
   });
 
   it("says when another session runs the team", async () => {
     await writeTeamAndGoal("active");
-    await hold({ pid: process.pid, session: 42, open: true });
+    await hold({ pid: process.pid, session: 42, address: "there", open: true });
     expect(await sessionContext(repo, data, user, SESSION)).toMatch(
       /^openplan's team on this repository runs in another Claude Code session \(pid 42\)/,
     );
