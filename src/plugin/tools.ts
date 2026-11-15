@@ -10,7 +10,7 @@ import { z } from "zod";
 import type { Team } from "../engine/core.ts";
 import { goalBranch } from "../engine/git.ts";
 import { planSchema, writtenPlan } from "../engine/plan.ts";
-import { toolText } from "../engine/turns.ts";
+
 import {
   DECISION_OPTIONS,
   GOAL_ACTIONS,
@@ -21,6 +21,7 @@ import {
 import type { Session } from "./session.ts";
 import { othersText, statusText } from "./status.ts";
 import { attendanceText, plural, rosterOf, STATUS_WORDS } from "./words.ts";
+import { toolText } from "../shared/text.ts";
 
 const meeting = z.string().describe("The meeting's id");
 const subtask = z.string().describe("The subtask's id");

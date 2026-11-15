@@ -36,7 +36,6 @@ import {
 import type { Scheduler } from "./scheduler.ts";
 import {
   askOnce,
-  toolText,
   turnServer,
   turnToolName,
   type Reply,
@@ -53,6 +52,7 @@ import type {
   Plan,
   Subtask,
 } from "./types.ts";
+import { toolText } from "../shared/text.ts";
 
 /** How many times each attendee but the host may have the floor in the discussion. */
 const MEETING_TURNS_EACH: Record<MeetingSize, number> = {

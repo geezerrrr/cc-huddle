@@ -4,11 +4,8 @@
  * can take up, read from their folders, as context. A repository with no
  * goals adds nothing.
  */
-import { workOf } from "../engine/core.ts";
-import { listGoals } from "../engine/data.ts";
-import { goalFiles, repoFolder, goalFolder } from "../shared/layout.ts";
-import { GitError, openRepository } from "../engine/git.ts";
-import { readCopy } from "../engine/team.ts";
+import { GitError } from "../engine/git.ts";
+import { RepositoryGoals } from "../engine/repository.ts";
 import { othersText, statusText } from "./status.ts";
 
 /** The context for session `session` (its pid) in `cwd`. */
@@ -17,25 +14,21 @@ export async function sessionContext(
   dataFolder: string,
   session: number,
 ): Promise<string | undefined> {
-  let repo;
+  let repository;
   try {
-    repo = await openRepository(cwd);
+    repository = await RepositoryGoals.of(dataFolder, cwd);
   } catch (error) {
     // No repository: openplan has nothing to say here.
     if (error instanceof GitError) return undefined;
     throw error;
   }
-  const root = repoFolder(dataFolder, repo);
-  const goals = await listGoals(root);
+  const goals = await repository.list();
   const mine = goals.find((g) => g.holder?.session === session);
   const parts: string[] = [];
   // A goal this session runs was read as it was taken up.
   if (mine && "state" in mine) {
-    const { team } = await readCopy(goalFiles(goalFolder(root, mine.slug)).team);
-    // Read from the goal's file: what is under way is the server's, not known here.
-    const status = statusText(
-      workOf({ state: mine.state, team, underWay: () => [], meetingsNow: () => ({}) }),
-    );
+    // Read from the goal's files: what is under way is the server's, not known here.
+    const status = statusText(await repository.stored(mine.slug, mine.state));
     parts.push(
       `This session runs openplan's goal "${mine.state.goal.name}", as it stands:\n\n${status}`,
     );

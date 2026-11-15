@@ -10,11 +10,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { DECISION_OPTIONS, PERMISSION_OPTIONS, type PermissionOption } from "../engine/types.ts";
-import { toolText } from "../engine/turns.ts";
+
 import type { PaneServer } from "./pane-server.ts";
 import type { Session } from "./session.ts";
 import { handOffText } from "./words.ts";
 import { SLUG } from "../engine/git.ts";
+import { toolText } from "../shared/text.ts";
 
 const isPermission = (option: string): option is PermissionOption =>
   (PERMISSION_OPTIONS as readonly string[]).includes(option);

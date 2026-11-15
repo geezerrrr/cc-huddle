@@ -9,8 +9,8 @@ import type { PermissionMode } from "@anthropic-ai/claude-agent-sdk";
 import { workOf, type Core, type Team } from "./core.ts";
 import type { Work } from "./derive.ts";
 import { newGoalFolder, readState, stateWriter, type StateWriter } from "./data.ts";
-import { goalFiles, repoFolder, goalFolder } from "../shared/layout.ts";
-import { openGoal, openRepository, takenSlugs, type Places } from "./git.ts";
+import { goalFiles } from "../shared/layout.ts";
+import { openGoal, takenSlugs, type Places } from "./git.ts";
 import { Goals } from "./goals.ts";
 import { Meetings } from "./meetings.ts";
 import { sessionOptions, teamSettings, writeSettings } from "./policy.ts";
@@ -23,6 +23,7 @@ import { serialBy } from "../shared/serial.ts";
 import { allowInCopy, allowInTeam, copyTeam, loadTeam, readCopy, type TeamFiles } from "./team.ts";
 import type { GoalState, MeetingSize } from "./types.ts";
 import { releaseLock, takeLock, type Holder, type Runner } from "./lock.ts";
+import { RepositoryGoals } from "./repository.ts";
 
 /** What a session stopped as it let its goal go, for the session taking it up to resume: its meetings under way. */
 export interface HandedOver {
@@ -83,15 +84,12 @@ export class Engine {
    * HEAD, checked out in its own worktree.
    */
   static async start(options: EngineOptions, name: string): Promise<Engine> {
-    const repo = await openRepository(options.cwd);
+    const goals = await RepositoryGoals.of(options.dataFolder, options.cwd);
+    const { repo } = goals;
     const copy = await loadTeam(options.userTeam, repo.top);
     // What a member's environment lacks is said before anything is made.
     teamSettings(copy.settings, copy.team.members, options.env, options.plugins);
-    const { slug, folder } = await newGoalFolder(
-      repoFolder(options.dataFolder, repo),
-      name,
-      await takenSlugs(repo),
-    );
+    const { slug, folder } = await newGoalFolder(goals.folder, name, await takenSlugs(repo));
     const files = goalFiles(folder);
     const me: Runner = { session: options.session, address: options.address };
     let engine: Engine | undefined;
@@ -127,9 +125,8 @@ export class Engine {
    * left running is stopped first.
    */
   static async takeUp(options: EngineOptions, slug: string): Promise<Engine> {
-    const repo = await openRepository(options.cwd);
-    const folder = goalFolder(repoFolder(options.dataFolder, repo), slug);
-    const files = goalFiles(folder);
+    const goals = await RepositoryGoals.of(options.dataFolder, options.cwd);
+    const { folder, files } = goals.goal(slug);
     if (!existsSync(files.state)) throw new Error(`There is no goal "${slug}" in this repository`);
     // What this openplan can't read, or a member's environment lacks, is said before the goal is taken from where it runs.
     await readState(files.state);
@@ -143,7 +140,8 @@ export class Engine {
       // Both again, as the session that let it go left them: it may have allowed a rule since.
       const state = await readState(files.state);
       const copy = await readCopy(files.team);
-      engine = await Engine.ready(options, { repo, slug, root: folder }, files, copy, state);
+      const places = { repo: goals.repo, slug, root: folder };
+      engine = await Engine.ready(options, places, files, copy, state);
       // A session killed outright couldn't pause it: it is paused first, as if it had.
       if (state.goal.status === "active") await engine.goals.pause();
       await engine.goals.resume(stopped);

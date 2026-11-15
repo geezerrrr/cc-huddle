@@ -12,13 +12,13 @@ import type { Handover } from "./types.ts";
 import {
   keepingSession,
   runTurn,
-  toolText,
   turnDecoder,
   turnServer,
   turnToolName,
   type TurnListener,
   withTurn,
 } from "./turns.ts";
+import { toolText } from "../shared/text.ts";
 
 const OWN_TOOLS = new Set([turnToolName("ask_teammate"), turnToolName("deliver")]);
 

@@ -5,20 +5,18 @@
  * Each change to which goal it runs waits for the one before.
  */
 import type { GoalEntry } from "../engine/data.ts";
-import { listGoals } from "../engine/data.ts";
 import { Engine, type EngineOptions, type HandedOver } from "../engine/engine.ts";
-import { openRepository } from "../engine/git.ts";
+import { RepositoryGoals } from "../engine/repository.ts";
 import { serialBy } from "../shared/serial.ts";
 import { noGoalForModel } from "./words.ts";
-import { repoFolder } from "../shared/layout.ts";
 
 /** The key the session's changes of goal take turns on. */
 const TURN = "goal";
 
 export class Session {
   private engine: Engine | undefined;
-  /** The folder of the session's repository in the data folder, once found. */
-  private repo: Promise<string> | undefined;
+  /** The session's repository's goals, once found. */
+  private repo: Promise<RepositoryGoals> | undefined;
   /** The goal that moved to another session, by name, until this one runs another. */
   private movedAway: string | undefined;
   private readonly turn = serialBy();
@@ -109,15 +107,14 @@ export class Session {
 
   /** The repository's goals, oldest first. */
   async goals(): Promise<GoalEntry[]> {
-    this.repo ??= openRepository(this.options.cwd).then(
-      (repo) => repoFolder(this.options.dataFolder, repo),
+    this.repo ??= RepositoryGoals.of(this.options.dataFolder, this.options.cwd).catch(
       (error: unknown) => {
         // Looked for again next time: the folder may be a repository by then.
         this.repo = undefined;
         throw error;
       },
     );
-    return listGoals(await this.repo);
+    return (await this.repo).list();
   }
 
   /** Of the repository's goals (`goals`), those this session doesn't run. */

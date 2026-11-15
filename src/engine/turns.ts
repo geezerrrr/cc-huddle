@@ -25,9 +25,6 @@ const TURN_SERVER = "openplan";
 /** One of openplan's tools as a turn's rules name it: `mcp__openplan__<name>`. */
 export const turnToolName = (name: string) => `mcp__${TURN_SERVER}__${name}`;
 
-/** What one of openplan's tools answers a member, in words. */
-export const toolText = (text: string) => ({ content: [{ type: "text" as const, text }] });
-
 /** The server that gives a turn these of openplan's tools. */
 export const turnServer = (tools: NonNullable<Parameters<typeof createSdkMcpServer>[0]["tools"]>) =>
   createSdkMcpServer({ name: TURN_SERVER, tools });
