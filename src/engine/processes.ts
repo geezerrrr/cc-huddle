@@ -1,6 +1,6 @@
 /**
  * The Claude Code processes started for members (docs/design.md §3.2). One
- * MCP server runs one team at a time, so these are this process's own: those running
+ * MCP server runs one goal at a time, so these are this process's own: those running
  * are kept, to be stopped at once when it exits, and written down with the
  * settings file each runs under, so that a start after a server that was
  * killed outright stops what it left.

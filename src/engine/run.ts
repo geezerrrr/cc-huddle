@@ -3,16 +3,18 @@
  * until it delivers. A turn that ends without delivering is reminded once in
  * the same session; a second fails the run.
  */
-import { createSdkMcpServer, tool, type CanUseTool } from "@anthropic-ai/claude-agent-sdk";
+import { tool, type CanUseTool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { errorText } from "./core.ts";
 import type { MemberOptions } from "./policy.ts";
 import { DELIVER_REMINDER, SESSION_ONLY } from "./prompts.ts";
 import {
+  keepingSession,
   runTurn,
   toolText,
   TURN_SERVER,
   turnDecoder,
+  turnServer,
   turnToolName,
   type TurnListener,
 } from "./turns.ts";
@@ -40,43 +42,40 @@ export type RunOutcome =
   | { status: "stopped"; tokens: number };
 
 function teamServer(collaboration: Collaboration, delivered: (handover: Handover) => void) {
-  return createSdkMcpServer({
-    name: TURN_SERVER,
-    tools: [
-      tool(
-        "ask_teammate",
-        "Asks a teammate a question and waits for the answer. Use it only when you need their information or decision.",
-        {
-          teammate: z.string().describe("The teammate's name"),
-          question: z.string().describe("The question, with the context they need"),
-        },
-        async ({ teammate, question }) =>
-          toolText(await collaboration.askTeammate(teammate, question)),
-      ),
-      tool(
-        "deliver",
-        "Hands over your finished work: your subtask is done only once you call it. Then end your turn. If you deliver again, the last delivery counts.",
-        {
-          summary: z
-            .string()
-            .trim()
-            .min(1)
-            .describe("A few sentences: what you did, and anything to watch out for"),
-          files: z
-            .array(z.string())
-            .describe(
-              "The files that are the result, as paths in your worktree (not scratch files); empty when the result is the summary itself",
-            ),
-        },
-        async ({ summary, files }) => {
-          const checked = await collaboration.checkDelivery(files);
-          if ("refused" in checked) return toolText(checked.refused);
-          delivered({ summary, files: checked.files });
-          return toolText("Delivered. End your turn now.");
-        },
-      ),
-    ],
-  });
+  return turnServer([
+    tool(
+      "ask_teammate",
+      "Asks a teammate a question and waits for the answer. Use it only when you need their information or decision.",
+      {
+        teammate: z.string().describe("The teammate's name"),
+        question: z.string().describe("The question, with the context they need"),
+      },
+      async ({ teammate, question }) =>
+        toolText(await collaboration.askTeammate(teammate, question)),
+    ),
+    tool(
+      "deliver",
+      "Hands over your finished work: your subtask is done only once you call it. Then end your turn. If you deliver again, the last delivery counts.",
+      {
+        summary: z
+          .string()
+          .trim()
+          .min(1)
+          .describe("A few sentences: what you did, and anything to watch out for"),
+        files: z
+          .array(z.string())
+          .describe(
+            "The files that are the result, as paths in your worktree (not scratch files); empty when the result is the summary itself",
+          ),
+      },
+      async ({ summary, files }) => {
+        const checked = await collaboration.checkDelivery(files);
+        if ("refused" in checked) return toolText(checked.refused);
+        delivered({ summary, files: checked.files });
+        return toolText("Delivered. End your turn now.");
+      },
+    ),
+  ]);
 }
 
 /**
@@ -97,13 +96,7 @@ export async function runSubtask(params: {
   const { options, gate, signal } = params;
   let handover: Handover | undefined;
   let session = params.resume;
-  const decode = turnDecoder({
-    ...params.listener,
-    session: (id, model) => {
-      session = id;
-      params.listener.session?.(id, model);
-    },
-  });
+  const decode = turnDecoder(keepingSession(params.listener, (id) => (session = id)));
   const canUseTool: CanUseTool = (name, input, request) => {
     if (!OWN_TOOLS.has(name)) return gate(name, input, request);
     return Promise.resolve(

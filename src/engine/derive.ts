@@ -7,6 +7,7 @@
 import { can, MEETING_MACHINE, GOAL_MACHINE, SUBTASK_MACHINE } from "./machines.ts";
 import {
   GOAL_ACTIONS,
+  SUBTASK_ACTIONS,
   isHalted,
   type Derived,
   type Meeting,
@@ -32,6 +33,10 @@ const openQuestions = (state: Pick<GoalState, "questions">, subtaskId: string) =
   state.questions.filter((q) => q.subtaskId === subtaskId);
 
 const isActive = (state: Pick<GoalState, "goal">) => state.goal.status === "active";
+
+/** Whether a task is done: every subtask of it merged, whether or not you accept it yet (§7.1). */
+export const taskDone = (state: Pick<GoalState, "subtasks">, taskId: string) =>
+  state.subtasks.every((s) => s.taskId !== taskId || s.status === "done");
 
 /**
  * Who reviews a subtask's delivery (§4.5): its meeting's host, else the first
@@ -204,14 +209,12 @@ export function redoneUpstream(state: Pick<GoalState, "subtasks">, subtask: Subt
  */
 export function actionsOf(state: Work, subtask: Subtask): SubtaskAction[] {
   const deciding = openQuestions(state, subtask.id).length > 0;
-  const moves = (["stop", "continue", "retry"] as const).filter(
-    (event) =>
-      can(SUBTASK_MACHINE, subtask.status, event) &&
-      (event !== "stop" || subtask.status !== "merging" || deciding),
+  return SUBTASK_ACTIONS.filter(
+    (action) =>
+      can(SUBTASK_MACHINE, subtask.status, action) &&
+      (action !== "stop" || subtask.status !== "merging" || deciding) &&
+      (action !== "redo" || redoneUpstream(state, subtask).length > 0),
   );
-  return redoneUpstream(state, subtask).length && can(SUBTASK_MACHINE, subtask.status, "redo")
-    ? [...moves, "redo"]
-    : moves;
 }
 
 /** What can be done to a goal where it stands. */
@@ -240,7 +243,16 @@ export function derive(state: Work): Derived {
     subtasks: Object.fromEntries(
       state.subtasks.map((s) => {
         const redone = redoneUpstream(state, s).map((d) => d.id);
-        return [s.id, { waits: waitsIn(state, s, busy), actions: actionsOf(state, s), redone }];
+        const reviewed = s.status === "reviewing" && state.underWay.includes(s.id);
+        return [
+          s.id,
+          {
+            waits: waitsIn(state, s, busy),
+            actions: actionsOf(state, s),
+            redone,
+            ...(reviewed && { reviewedBy: reviewerOf(state, s) }),
+          },
+        ];
       }),
     ),
     goal: goalActions(state.goal),

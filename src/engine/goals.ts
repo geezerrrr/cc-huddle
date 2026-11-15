@@ -10,18 +10,13 @@ import { can, GOAL_MACHINE, step } from "./machines.ts";
 import type { Meetings } from "./meetings.ts";
 import type { Scheduler } from "./scheduler.ts";
 import { serialBy } from "./serial.ts";
-import type { Goal, Subtask } from "./types.ts";
+import type { Goal, PlanSubtask, Subtask } from "./types.ts";
 
 /** The key the goal's changes take turns on. */
 const LIFE = "life";
 
 /** A subtask you give a member directly, without a meeting. */
-interface DirectWork {
-  title: string;
-  description: string;
-  acceptance: string;
-  assignee: string;
-}
+type DirectWork = Omit<PlanSubtask, "key" | "dependsOn">;
 
 export class Goals {
   private readonly life = serialBy();

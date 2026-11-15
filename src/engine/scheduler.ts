@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { actionsOf, busyMembers, redoneUpstream, reviewerOf, waitsIn } from "./derive.ts";
+import { actionsOf, busyMembers, redoneUpstream, reviewerOf, taskDone, waitsIn } from "./derive.ts";
 import { errorText, workOf, type Core } from "./core.ts";
 import {
   abortMerge,
@@ -744,9 +744,7 @@ export class Scheduler {
   private finished(subtask: Subtask) {
     subtask.finishedAt = Date.now();
     subtask.progress = { done: subtask.progress.total, total: subtask.progress.total };
-    if (this.core.state.subtasks.some((s) => s.taskId === subtask.taskId && s.status !== "done"))
-      return;
-    if (!this.taskOf(subtask).ownerAccepts) return;
+    if (!taskDone(this.core.state, subtask.taskId) || !this.taskOf(subtask).ownerAccepts) return;
     this.questions.openDecision(
       subtask,
       { kind: "delivery", options: [...DECISIONS.delivery.options] },

@@ -10,7 +10,7 @@ import path from "node:path";
 import type { EffortLevel, Settings } from "@anthropic-ai/claude-agent-sdk";
 import { parse } from "yaml";
 import { z } from "zod";
-import { errorText, type Team } from "./core.ts";
+import { errorCode, errorText, type Team } from "./core.ts";
 import { writeWhole } from "./files.ts";
 import { serialBy } from "./serial.ts";
 import { MEETING_SIZES, type MeetingSize, type Member, type Role } from "./types.ts";
@@ -57,15 +57,13 @@ function parsed<T>(schema: z.ZodType<T>, data: unknown, file: string): T {
   return result.data;
 }
 
-const missing = (error: unknown) => (error as NodeJS.ErrnoException).code === "ENOENT";
-
 /** A JSON file's contents; undefined when there is no such file. */
 async function jsonFile(file: string): Promise<unknown> {
   let text: string;
   try {
     text = await readFile(file, "utf8");
   } catch (error) {
-    if (missing(error)) return undefined;
+    if (errorCode(error) === "ENOENT") return undefined;
     throw error;
   }
   try {
@@ -81,7 +79,7 @@ async function markdownFiles(folder: string) {
   try {
     names = (await readdir(folder)).filter((name) => name.endsWith(".md")).sort();
   } catch (error) {
-    if (missing(error)) return [];
+    if (errorCode(error) === "ENOENT") return [];
     throw error;
   }
   return Promise.all(
@@ -130,16 +128,18 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
 /**
- * Reads the team from its `folders`, yours first, then the repository's: a
+ * Reads the team from your folder (`userTeam`), then the repository's (at
+ * `top`): a
  * role or member the repository has by the same name replaces yours, its
  * `team.json` fields replace yours, and settings merge as Claude Code's do.
  * Throws what is wrong with a file, naming it.
  */
-export async function loadTeam(folders: readonly string[]): Promise<TeamFiles> {
+export async function loadTeam(userTeam: string, top: string): Promise<TeamFiles> {
   const roles = new Map<string, Role>();
   const written = new Map<string, { file: string; data: unknown }>();
   let own: z.infer<typeof teamSchema> = {};
   let settings: Record<string, unknown> = {};
+  const folders = [userTeam, teamFolder(top)];
   for (const folder of folders) {
     for (const { name, file, data, body } of await markdownFiles(path.join(folder, "roles")))
       roles.set(name, {

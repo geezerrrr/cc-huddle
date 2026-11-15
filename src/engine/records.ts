@@ -1,14 +1,16 @@
 /**
  * Records (docs/design.md §7.2): what each subtask's runs did, kept as a file
  * of whole entries in the data folder, and what is being said or done right
- * now, kept in memory for the pane: the words still streaming, the tool calls
+ * now, kept in memory for whoever follows it: the words still streaming, the tool calls
  * not back yet. A meeting turn being spoken is followed the same way, its
  * entries kept in memory until it is the meeting's.
  */
 import { appendFile, mkdir, open } from "node:fs/promises";
 import path from "node:path";
+import { errorCode } from "./core.ts";
 import type { Places } from "./git.ts";
 import { goalFiles } from "./goal-files.ts";
+import { inOrder } from "./serial.ts";
 import type { Notice, Step, ToolCall, TurnListener } from "./turns.ts";
 import type { Meeting } from "./types.ts";
 
@@ -48,7 +50,7 @@ interface Now {
   running: Map<string, ToolCall>;
 }
 
-/** What a run does now, as the pane reads it. */
+/** What a run does now, as whoever follows it reads it. */
 const liveOf = (now: Now): LiveRun => ({
   ...(now.streaming && { streaming: now.streaming }),
   ...(now.starting && { starting: now.starting }),
@@ -125,13 +127,15 @@ export class Records {
   private readonly live = new Map<string, Now>();
   private readonly spoken = new Map<string, Speaking>();
   /** Entries are appended one at a time, in the order they came. */
-  private writing = Promise.resolve();
+  private readonly writing: ReturnType<typeof inOrder>;
 
   constructor(
     private readonly places: Places,
     /** An entry couldn't be written. */
-    private readonly failed: (error: unknown) => void,
-  ) {}
+    failed: (error: unknown) => void,
+  ) {
+    this.writing = inOrder(failed);
+  }
 
   /** Where a run of `subtaskId` tells what it does: its record, and what goes on now. */
   recorder(subtaskId: string): TurnListener {
@@ -139,12 +143,10 @@ export class Records {
     this.live.set(subtaskId, now);
     const file = recordFile(this.places, subtaskId);
     const write = (entry: RecordEntry) => {
-      this.writing = this.writing
-        .then(async () => {
-          await mkdir(path.dirname(file), { recursive: true });
-          await appendFile(file, `${JSON.stringify(entry)}\n`);
-        })
-        .catch(this.failed);
+      this.writing.run(async () => {
+        await mkdir(path.dirname(file), { recursive: true });
+        await appendFile(file, `${JSON.stringify(entry)}\n`);
+      });
     };
     return tracking(now, write);
   }
@@ -163,7 +165,7 @@ export class Records {
     try {
       handle = await open(recordFile(this.places, subtaskId));
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      if (errorCode(error) !== "ENOENT") throw error;
       return { entries: [], next: 0, ...(live && { live }) };
     }
     try {
@@ -211,6 +213,6 @@ export class Records {
 
   /** Every entry written so far is in its file. */
   flush(): Promise<void> {
-    return this.writing;
+    return this.writing.idle();
   }
 }

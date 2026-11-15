@@ -33,15 +33,7 @@ import { systemPrompt } from "./prompts.ts";
 import { Questions, type Answer } from "./questions.ts";
 import { Records } from "./records.ts";
 import { Scheduler } from "./scheduler.ts";
-import {
-  allowInCopy,
-  allowInTeam,
-  copyTeam,
-  loadTeam,
-  readCopy,
-  teamFolder,
-  type TeamFiles,
-} from "./team.ts";
+import { allowInCopy, allowInTeam, copyTeam, loadTeam, readCopy, type TeamFiles } from "./team.ts";
 import type { GoalState, MeetingSize, Question } from "./types.ts";
 
 export interface EngineOptions {
@@ -116,7 +108,7 @@ export class Engine {
    */
   static async start(options: EngineOptions, name: string): Promise<Engine> {
     const repo = await openRepository(options.cwd);
-    const copy = await loadTeam([options.userTeam, teamFolder(repo.top)]);
+    const copy = await loadTeam(options.userTeam, repo.top);
     // What a member's environment lacks is said before anything is made.
     filledSettings(copy, options);
     const { slug, folder } = await newGoalFolder(

@@ -43,10 +43,7 @@ describe("loadTeam", () => {
         "Notes for me.",
       ].join("\n"),
     });
-    const { team, settings, meetingSize } = await loadTeam([
-      path.join(top, "user"),
-      teamFolder(top),
-    ]);
+    const { team, settings, meetingSize } = await loadTeam(path.join(top, "user"), top);
     expect(team).toEqual({
       members: [
         {
@@ -75,10 +72,7 @@ describe("loadTeam", () => {
       "settings.json": '{ "permissions": { "allow": ["Bash(pnpm test)"] } }',
       "team.json": '{ "review": false, "meetingSize": "large" }',
     });
-    const { team, settings, meetingSize } = await loadTeam([
-      path.join(top, "user"),
-      teamFolder(top),
-    ]);
+    const { team, settings, meetingSize } = await loadTeam(path.join(top, "user"), top);
     expect([team.review, settings, meetingSize]).toEqual([
       false,
       { permissions: { allow: ["Bash(pnpm test)"] } },
@@ -109,7 +103,7 @@ describe("loadTeam", () => {
       "settings.json": JSON.stringify({ permissions: { allow: ["Read", "Bash(pnpm test)"] } }),
       "team.json": '{ "meetingSize": "small" }',
     });
-    const { team, settings, meetingSize } = await loadTeam([user, teamFolder(top)]);
+    const { team, settings, meetingSize } = await loadTeam(user, top);
     expect(team.members.map((m) => [m.name, m.role.title, m.model])).toEqual([
       ["ann", "UI designer", undefined],
       ["glm", "Game programmer", undefined],
@@ -126,29 +120,23 @@ describe("loadTeam", () => {
   });
 
   it("says which file is wrong, and how", async () => {
-    await expect(loadTeam([path.join(top, "user"), teamFolder(top)])).rejects.toThrow(
-      "The team has no members",
-    );
+    await expect(loadTeam(path.join(top, "user"), top)).rejects.toThrow("The team has no members");
     await write({ "members/glm.md": "---\nrole: ui-designer\n---\n" });
-    await expect(loadTeam([path.join(top, "user"), teamFolder(top)])).rejects.toThrow(
+    await expect(loadTeam(path.join(top, "user"), top)).rejects.toThrow(
       /glm\.md: there is no role "ui-designer"/,
     );
     await write({
       "roles/ui-designer.md": UI,
       "members/glm.md": "---\nrole: ui-designer\neffort: huge\n---\n",
     });
-    await expect(loadTeam([path.join(top, "user"), teamFolder(top)])).rejects.toThrow(
-      /glm\.md:\n.*effort/s,
-    );
+    await expect(loadTeam(path.join(top, "user"), top)).rejects.toThrow(/glm\.md:\n.*effort/s);
     await write({ "members/glm.md": "---\nrole: [ui-designer\n---\n" });
-    await expect(loadTeam([path.join(top, "user"), teamFolder(top)])).rejects.toThrow(/glm\.md: /);
+    await expect(loadTeam(path.join(top, "user"), top)).rejects.toThrow(/glm\.md: /);
     await write({
       "members/glm.md": "---\nrole: ui-designer\n---\n",
       "team.json": "{ review: false }",
     });
-    await expect(loadTeam([path.join(top, "user"), teamFolder(top)])).rejects.toThrow(
-      /team\.json: /,
-    );
+    await expect(loadTeam(path.join(top, "user"), top)).rejects.toThrow(/team\.json: /);
   });
 });
 

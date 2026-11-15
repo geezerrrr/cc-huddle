@@ -16,3 +16,17 @@ export function serialBy() {
     return next;
   };
 }
+
+/**
+ * Runs tasks one after another, in the order they come, each failure told to
+ * `failed` and the next run all the same; `idle` settles once all so far have run.
+ */
+export function inOrder(failed: (error: unknown) => void) {
+  let tail = Promise.resolve();
+  return {
+    run(task: () => Promise<void>) {
+      tail = tail.then(task).catch(failed);
+    },
+    idle: () => tail,
+  };
+}

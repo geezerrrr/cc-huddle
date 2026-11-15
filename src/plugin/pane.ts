@@ -15,7 +15,7 @@ import type {
   OpenplanTeam,
 } from "../../plugin/types/index.d.ts";
 import type { GoalEntry } from "../engine/data.ts";
-import { derive, reviewerOf, type Work } from "../engine/derive.ts";
+import { derive, taskDone, type Work } from "../engine/derive.ts";
 import type { LiveRun, RecordEntry } from "../engine/records.ts";
 import {
   DECISIONS,
@@ -29,7 +29,7 @@ import {
   type QuestionToYou,
   type Subtask,
 } from "../engine/types.ts";
-import { othersOf } from "./status.ts";
+import { resumableOf } from "./status.ts";
 import {
   goalLabel,
   mainArgument,
@@ -73,11 +73,7 @@ function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>
   const own = work.subtasks.filter((s) => s.assignee === member.name);
   const at = (status: Subtask["status"]) => own.find((s) => s.status === status);
   const reviewing = work.subtasks.find(
-    (s) =>
-      s.status === "reviewing" &&
-      s.assignee !== member.name &&
-      reviewerOf(work, s) === member.name &&
-      derived.busy.includes(member.name),
+    (s) => s.assignee !== member.name && derived.subtasks[s.id]?.reviewedBy === member.name,
   );
   const meeting = work.meetings.find(
     (m) => m.status === "running" && m.participants.includes(member.name),
@@ -202,9 +198,8 @@ function milestones(work: Work): OpenplanTeam["milestones"] {
         text: `"${s.title}" by ${s.assignee} failed${s.error ? `: ${s.error}` : ""}`,
       });
   }
-  // A task is done once its last subtask merges, whether or not you accept it (§7.1).
   for (const task of work.tasks)
-    if (work.subtasks.every((s) => s.taskId !== task.id || s.status === "done"))
+    if (taskDone(work, task.id))
       said.push({ key: `task:${task.id}`, text: `The task "${task.title}" is done` });
   return said;
 }
@@ -333,7 +328,7 @@ export function paneTeam(
       needs: [],
       milestones: [],
       prompts: [],
-      resumable: othersOf(others),
+      resumable: resumableOf(others),
     };
   }
   const { work, members } = mine;
@@ -354,7 +349,7 @@ export function paneTeam(
     needs,
     milestones: milestones(work),
     prompts: prompts(work),
-    resumable: [...here, ...othersOf(others)],
+    resumable: [...here, ...resumableOf(others)],
     ...(goal.status === "active" && { resumeRefused: resumeRefusal(goal.name) }),
   };
 }

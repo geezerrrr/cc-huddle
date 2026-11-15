@@ -57,7 +57,7 @@ export function statusText(work: Work): string {
 }
 
 /** The repository's goals not running here, each named with how far it got and where it is, for `/openplan resume`. */
-export const othersOf = (others: readonly GoalEntry[]): { slug: string; label: string }[] =>
+export const resumableOf = (others: readonly GoalEntry[]): { slug: string; label: string }[] =>
   others.map((entry) => ({
     slug: entry.slug,
     label: goalLabel(entry.state, whereOf(entry)),
@@ -68,6 +68,6 @@ export function othersText(others: readonly GoalEntry[]): string | undefined {
   if (!others.length) return undefined;
   return [
     "The repository's other goals, which the user takes up here with /openplan resume:",
-    ...othersOf(others).map((o) => `  - ${o.label}`),
+    ...resumableOf(others).map((o) => `  - ${o.label}`),
   ].join("\n");
 }

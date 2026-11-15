@@ -24,9 +24,10 @@ import type {
 type $ = EngineInterface;
 type Ui = Pick<Elements["terminal"], "Box" | "Button" | "Input" | "Markdown" | "Select" | "Text">;
 
-const PANE = "openplan";
-/** This plugin, as `next.origin` names the caller of a `$` call. */
+/** This plugin: as `next.origin` names the caller of a `$` call, and its server (its atoms spell it out: the state scan reads literals). */
 const PLUGIN = "openplan";
+/** The pane, which has the plugin's name. */
+const PANE = PLUGIN;
 /** The server's tools, as the model names them. */
 const TOOLS = /^mcp__plugin_openplan_openplan__/;
 /** The tools only the mod calls, as the model would name them. */
@@ -147,7 +148,7 @@ async function askNeed($: $, need: OpenplanNeed) {
 /** Calls one of openplan's server's tools: its text, or its error thrown. */
 async function call($: $, tool: string, args: Record<string, unknown> = {}): Promise<string> {
   if (!server) {
-    const connected = await $.mcp.connect("openplan");
+    const connected = await $.mcp.connect(PLUGIN);
     if (!connected.isConnected) throw new Error(connected.message);
     server = connected.server;
   }
@@ -243,7 +244,7 @@ async function openPane($: $) {
 
 /** The pane's title: whose record it shows, when it shows one. */
 const paneTitle = (shown: OpenplanRecord | null) =>
-  shown ? `openplan · ${shown.member}` : "openplan";
+  shown ? `${PLUGIN} · ${shown.member}` : PLUGIN;
 
 /**
  * Whether the pane shows what keeps coming, the meeting or a member's

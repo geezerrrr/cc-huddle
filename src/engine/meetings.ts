@@ -10,7 +10,6 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
-  createSdkMcpServer,
   tool,
   type AnyZodRawShape,
   type McpServerConfig,
@@ -38,6 +37,7 @@ import {
   askOnce,
   toolText,
   TURN_SERVER,
+  turnServer,
   turnToolName,
   type Reply,
   type TurnListener,
@@ -66,7 +66,7 @@ interface TurnTool {
 }
 
 const turnTool = <S extends AnyZodRawShape>(meetingTool: SdkMcpToolDefinition<S>): TurnTool => ({
-  server: createSdkMcpServer({ name: TURN_SERVER, tools: [meetingTool] }),
+  server: turnServer([meetingTool]),
   name: turnToolName(meetingTool.name),
 });
 
@@ -459,64 +459,61 @@ export class Meetings {
         meeting.hands = undefined;
         said(member, await speak(member, meetingAnswer(ctx, member, point)), "answer");
       };
-      /** Those who may speak next each decide whether to, all at once; one failing stops the others. */
-      const weigh = async (who: Member[]) => {
-        meeting.weighing = true;
-        meeting.hands = [];
+      /**
+       * Each of `who` at once, with `flag` up meanwhile: one failing stops
+       * the others, and fails the lot.
+       */
+      const allAtOnce = async (
+        who: Member[],
+        flag: "weighing" | "drafting",
+        each: (member: Member, signal: AbortSignal) => Promise<unknown>,
+      ) => {
+        meeting[flag] = true;
         core.changed();
         const stop = new AbortController();
-        const weighing = AbortSignal.any([signal, stop.signal]);
-        const asked = await Promise.allSettled(
+        const together = AbortSignal.any([signal, stop.signal]);
+        const settled = await Promise.allSettled(
           who.map((member) =>
-            ask(member, meetingHand(ctx, member), {
-              signal: weighing,
-              tool: handTool((hand) => {
-                meeting.hands = [
-                  ...(meeting.hands ?? []).filter((h) => h.member !== member.name),
-                  { member: member.name, ...hand },
-                ];
-                core.changed();
-              }),
-            }).catch((error: unknown) => {
+            each(member, together).catch((error: unknown) => {
               stop.abort();
               throw error;
             }),
           ),
         );
-        meeting.weighing = undefined;
+        meeting[flag] = undefined;
         core.changed();
-        const failed = asked.find((r) => r.status === "rejected");
+        const failed = settled.find((r) => r.status === "rejected");
         if (failed) throw failed.reason;
+      };
+      /** Those who may speak next each decide whether to. */
+      const weigh = (who: Member[]) => {
+        meeting.hands = [];
+        return allAtOnce(who, "weighing", (member, weighing) =>
+          ask(member, meetingHand(ctx, member), {
+            signal: weighing,
+            tool: handTool((hand) => {
+              meeting.hands = [
+                ...(meeting.hands ?? []).filter((h) => h.member !== member.name),
+                { member: member.name, ...hand },
+              ];
+              core.changed();
+            }),
+          }),
+        );
       };
       /**
-       * The first judgments, all at once: none hears the others, so none
-       * waits for them. Each becomes a turn once given; one failing stops the
-       * others.
+       * The first judgments: none hears the others, so none waits for them.
+       * Each becomes a turn once given.
        */
-      const round = async (who: Member[]) => {
-        meeting.drafting = true;
-        core.changed();
-        const stop = new AbortController();
-        const drafting = AbortSignal.any([signal, stop.signal]);
-        const judged = await Promise.allSettled(
-          who.map((member) =>
-            // What they heard is the opening alone: the others' first judgments reach them after.
-            ask(member, meetingRound(ctx, member), { heard: 1, signal: drafting }).then(
-              (reply) => {
-                said(member, reply, "round");
-              },
-              (error: unknown) => {
-                stop.abort();
-                throw error;
-              },
-            ),
-          ),
-        );
-        meeting.drafting = undefined;
-        core.changed();
-        const failed = judged.find((r) => r.status === "rejected");
-        if (failed) throw failed.reason;
-      };
+      const round = (who: Member[]) =>
+        allAtOnce(who, "drafting", async (member, drafting) => {
+          // What they heard is the opening alone: the others' first judgments reach them after.
+          said(
+            member,
+            await ask(member, meetingRound(ctx, member), { heard: 1, signal: drafting }),
+            "round",
+          );
+        });
       /** A step of the discussion: hands go up, the host gives the floor or ends it. False once it is over. */
       const discuss = async (left: number) => {
         const last = meeting.turns.at(-1);

@@ -10,7 +10,7 @@ import plugin from "../../plugin/.claude-plugin/plugin.json" with { type: "json"
 import { errorText } from "../engine/core.ts";
 import { openRepository } from "../engine/git.ts";
 import { stopMembers } from "../engine/processes.ts";
-import { loadTeam, teamFolder, userTeamFolder } from "../engine/team.ts";
+import { loadTeam, userTeamFolder } from "../engine/team.ts";
 import { executableOf } from "./claude.ts";
 import { dataFolder } from "./data-folder.ts";
 import { pluginId } from "./plugin-id.ts";
@@ -108,9 +108,9 @@ addPaneTools(server, session, pane);
 async function listTeamFiles() {
   try {
     const repo = await openRepository(cwd);
-    listMembers((await loadTeam([userTeam, teamFolder(repo.top)])).team);
+    listMembers((await loadTeam(userTeam, repo.top)).team);
   } catch {
-    // No repository, or no team in it yet: any name, as the tools say.
+    // No repository, or its team doesn't read yet (starting a goal says what is wrong): any name.
   }
 }
 

@@ -320,7 +320,16 @@ export type GoalAction = (typeof GOAL_ACTIONS)[number];
 
 /** The rules applied to the state, worked out once for whoever shows it. */
 export interface Derived {
-  subtasks: Record<string, { waits: Wait[]; actions: SubtaskAction[]; redone: string[] }>;
+  subtasks: Record<
+    string,
+    {
+      waits: Wait[];
+      actions: SubtaskAction[];
+      redone: string[];
+      /** Who reviews it, while its review is under way. */
+      reviewedBy?: string;
+    }
+  >;
   /** What can be done to the goal. */
   goal: GoalAction[];
   busy: string[];

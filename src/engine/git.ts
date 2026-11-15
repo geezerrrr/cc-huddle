@@ -126,8 +126,12 @@ export interface Places {
   root: string;
 }
 
+/** Where openplan's branches are: each goal's under `openplan/<slug>/`, which no other branch shares. */
+const BRANCHES = "openplan/";
+const goalBranches = (slug: string) => `${BRANCHES}${slug}/`;
+
 /** The branch a goal's work is merged into. */
-export const goalBranch = (slug: string) => `openplan/${slug}/main`;
+export const goalBranch = (slug: string) => `${goalBranches(slug)}main`;
 
 /** The worktree a goal's branch is checked out in. */
 export const goalFolder = (places: Places) => goalFiles(places.root).checkout;
@@ -137,7 +141,7 @@ export async function takenSlugs(repo: Repository): Promise<Set<string>> {
   const refs = await git({ cwd: repo.top }, [
     "for-each-ref",
     "--format=%(refname:lstrip=3)",
-    "refs/heads/openplan/",
+    `refs/heads/${BRANCHES}`,
   ]);
   return new Set(refs.stdout.split("\n").flatMap((ref) => (ref ? [ref.split("/")[0] ?? ""] : [])));
 }
@@ -206,7 +210,8 @@ export async function openGoal(places: Places, slug: string): Promise<string> {
 }
 
 /** The branch a subtask works on. */
-export const subtaskBranch = (slug: string, subtaskId: string) => `openplan/${slug}/${subtaskId}`;
+export const subtaskBranch = (slug: string, subtaskId: string) =>
+  `${goalBranches(slug)}${subtaskId}`;
 
 /** The worktree a subtask works in. */
 export const deskFolder = (places: Places, subtaskId: string) =>
@@ -448,7 +453,7 @@ export function removeGoal(places: Places, slug: string): Promise<void> {
     const refs = await git({ cwd: repo.top }, [
       "for-each-ref",
       "--format=%(refname:lstrip=4)",
-      `refs/heads/openplan/${slug}/`,
+      `refs/heads/${goalBranches(slug)}`,
     ]);
     for (const id of refs.stdout.split("\n")) {
       if (id && id !== "main") await removeDesk(places, slug, id);

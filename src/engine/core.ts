@@ -24,9 +24,9 @@ export interface Core extends Inbox {
   places: Places;
   /** The Agent SDK options of a member's turn of `kind` in `cwd`: their settings and system prompt. */
   options(member: Member, kind: SessionKind, cwd: string): MemberOptions;
-  /** Where what a subtask's runs do is told: its record and the pane. */
+  /** Where what a subtask's runs do is told: its record, and whoever follows it live. */
   recorder(subtask: Subtask): TurnListener;
-  /** Where what is said at a meeting is told as it is said: the pane. */
+  /** Where what is said at a meeting is told as it is said, to whoever follows it. */
   speech(meeting: Meeting, speaker: string): TurnListener;
   /** The subtasks whose review or merge is under way now (Scheduler.underWay). */
   underWay(): readonly string[];
@@ -42,3 +42,6 @@ export const workOf = (core: Pick<Core, "state" | "team" | "underWay">): Work =>
 /** An error in words. */
 export const errorText = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
+
+/** A system error's code: `ENOENT`, `EEXIST`…; undefined for any other error. */
+export const errorCode = (error: unknown) => (error as NodeJS.ErrnoException).code;

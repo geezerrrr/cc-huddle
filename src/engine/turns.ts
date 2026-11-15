@@ -4,6 +4,7 @@
  */
 import { spawn } from "node:child_process";
 import {
+  createSdkMcpServer,
   query,
   type SDKMessage,
   type SDKResultMessage,
@@ -24,6 +25,10 @@ export const turnToolName = (name: string) => `mcp__${TURN_SERVER}__${name}`;
 
 /** What one of openplan's tools answers a member, in words. */
 export const toolText = (text: string) => ({ content: [{ type: "text" as const, text }] });
+
+/** The server that gives a turn these of openplan's tools. */
+export const turnServer = (tools: NonNullable<Parameters<typeof createSdkMcpServer>[0]["tools"]>) =>
+  createSdkMcpServer({ name: TURN_SERVER, tools });
 
 /** How a turn ended: its final text, or why it failed, and the tokens it used. */
 type TurnOutcome = (
@@ -115,6 +120,18 @@ export interface TurnListener {
   steps?(steps: Step[]): void;
   notice?(notice: Notice): void;
 }
+
+/** `listener`, also handing `keep` the id of each session the turns start or pick up. */
+export const keepingSession = (
+  listener: TurnListener,
+  keep: (id: string) => void,
+): TurnListener => ({
+  ...listener,
+  session: (id, model) => {
+    keep(id);
+    listener.session?.(id, model);
+  },
+});
 
 /** A tool result's content as text: its words, and a mark for anything else in it (an image). */
 function outputText(content: unknown): string {
@@ -425,13 +442,7 @@ export async function askOnce(params: {
       }),
     },
     signal,
-    turnDecoder({
-      ...listener,
-      session: (id, model) => {
-        session = id;
-        listener.session?.(id, model);
-      },
-    }),
+    turnDecoder(keepingSession(listener, (id) => (session = id))),
   );
   if (!outcome.ok) throw new Error(outcome.error);
   if (schema && outcome.structured === undefined)

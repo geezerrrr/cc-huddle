@@ -8,9 +8,10 @@ import { link, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/p
 import { readFileSync, unlinkSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 import path from "node:path";
-import { errorText } from "./core.ts";
+import { errorCode, errorText } from "./core.ts";
 import { writeWhole } from "./files.ts";
 import { goalFiles } from "./goal-files.ts";
+import { inOrder } from "./serial.ts";
 import { slugFor, type Repository } from "./git.ts";
 import { running } from "./running.ts";
 import type { GoalState } from "./types.ts";
@@ -70,13 +71,11 @@ export function stateWriter(
   failed: (error: unknown) => void,
 ): StateWriter {
   let timer: NodeJS.Timeout | undefined;
-  let writing = Promise.resolve();
+  const writing = inOrder(failed);
   let closed = false;
   const write = () => {
     timer = undefined;
-    writing = writing
-      .then(() => writeWhole(file, JSON.stringify({ version: STATE_VERSION, state: state() })))
-      .catch(failed);
+    writing.run(() => writeWhole(file, JSON.stringify({ version: STATE_VERSION, state: state() })));
   };
   return {
     changed() {
@@ -87,13 +86,13 @@ export function stateWriter(
         clearTimeout(timer);
         write();
       }
-      await writing;
+      await writing.idle();
     },
     async close() {
       clearTimeout(timer);
       write();
       closed = true;
-      await writing;
+      await writing.idle();
     },
   };
 }
@@ -153,8 +152,6 @@ async function holding(lock: string, me: Runner, open: boolean): Promise<string>
   return file;
 }
 
-const code = (error: unknown) => (error as NodeJS.ErrnoException).code;
-
 /** How long a taker waits for another that is replacing an ended holder's lock. */
 const REPLACING_WAIT_MS = 10;
 
@@ -180,7 +177,7 @@ export async function takeGoal(
         await link(mine, lock);
         return handed;
       } catch (error) {
-        if (code(error) !== "EEXIST") throw error;
+        if (errorCode(error) !== "EEXIST") throw error;
       }
       const ended = lockText(lock);
       // Let go of meanwhile: try again.
@@ -199,7 +196,7 @@ export async function takeGoal(
       try {
         await link(mine, claim);
       } catch (error) {
-        if (code(error) !== "EEXIST") throw error;
+        if (errorCode(error) !== "EEXIST") throw error;
         // Done with meanwhile: try again. Still there, its taker either replaces the lock or ended partway.
         if (lockText(claim) === undefined) continue;
         const replacing = readHolder(claim);
@@ -254,7 +251,7 @@ export async function newGoalFolder(
       await mkdir(folder);
       return { slug, folder };
     } catch (error) {
-      if (code(error) !== "EEXIST") throw error;
+      if (errorCode(error) !== "EEXIST") throw error;
       taken.add(slug);
     }
   }
@@ -277,7 +274,7 @@ export async function listGoals(repoFolder: string): Promise<GoalEntry[]> {
   try {
     slugs = await readdir(folder);
   } catch (error) {
-    if (code(error) === "ENOENT") return [];
+    if (errorCode(error) === "ENOENT") return [];
     throw error;
   }
   const found = await Promise.all(
@@ -287,7 +284,7 @@ export async function listGoals(repoFolder: string): Promise<GoalEntry[]> {
       try {
         state = await readState(files.state);
       } catch (error) {
-        if (code(error) === "ENOENT" || code(error) === "ENOTDIR") return undefined;
+        if (errorCode(error) === "ENOENT" || errorCode(error) === "ENOTDIR") return undefined;
         throw error;
       }
       const holder = holderOf(files.lock);
