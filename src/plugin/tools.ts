@@ -186,8 +186,8 @@ export function addTools(server: McpServer, session: Session) {
       inputSchema: assignInput(memberName()),
     },
     (work) => {
-      const [added] = session.goal.goals.assign(work);
-      return toolText(`Assigned "${work.title}" [${added?.id ?? ""}] to ${work.assignee}.`);
+      const added = session.goal.scheduler.assignOne(work);
+      return toolText(`Assigned "${work.title}" [${added.id}] to ${work.assignee}.`);
     },
   );
 

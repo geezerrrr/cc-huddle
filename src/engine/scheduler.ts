@@ -32,7 +32,12 @@ import {
   teammateQuestion,
   type Upstream,
 } from "./prompts.ts";
-import type { DecisionAnswer, Questions } from "./questions.ts";
+import {
+  DOESNT_FIT,
+  type DecisionAnswer,
+  type DecisionQuestion,
+  type Questions,
+} from "./questions.ts";
 import { runSubtask, type RunOutcome } from "./run.ts";
 import { askOnce, type Step } from "./turns.ts";
 import {
@@ -40,9 +45,9 @@ import {
   type Goal,
   type GoOn,
   type Member,
+  type PlanSubtask,
   type PlanTask,
   type Progress,
-  type Question,
   type Subtask,
   type SubtaskAction,
   type Task,
@@ -53,6 +58,9 @@ const verdictSchema = z.object({ pass: z.boolean(), notes: z.string().trim() });
 
 /** Sent back this many times, a delivery is yours to decide on. */
 const REVIEW_ROUNDS = 3;
+
+/** A subtask you give a member directly, without a meeting. */
+type DirectWork = Omit<PlanSubtask, "key" | "dependsOn">;
 
 /** One more reason for a subtask to go on in its session, after those it has. */
 function goOnWith(subtask: Subtask, reason: GoOn) {
@@ -158,6 +166,29 @@ export class Scheduler {
     state.subtasks.push(...added);
     this.core.changed();
     this.pump();
+    return added;
+  }
+
+  /**
+   * Gives a member one subtask directly, as a task of its own: done once
+   * merged, not yours to accept (§7.1). Throws when the goal is archived or
+   * there is no such member.
+   */
+  assignOne(work: DirectWork): Subtask {
+    const { goal } = this;
+    if (goal.status === "archived")
+      throw new Error(`The goal "${goal.name}" is archived: resume it first`);
+    if (!this.core.team.members.some((m) => m.name === work.assignee))
+      throw new Error(`There is no member called "${work.assignee}"`);
+    const [added] = this.assign([
+      {
+        title: work.title,
+        outcome: "",
+        ownerAccepts: false,
+        subtasks: [{ ...work, key: "", dependsOn: [] }],
+      },
+    ]);
+    if (!added) throw new Error("No subtask was made");
     return added;
   }
 
@@ -313,14 +344,19 @@ export class Scheduler {
   }
 
   /**
-   * Carries out your decision, answered already (Questions.answer): on a
+   * Answers a decision put to you (Questions.answer) and carries it out: on a
    * stuck review (review again, skip it, send it back), on a merge (keep one
    * side of the files that can't be merged line by line, or try again), on a
    * task done (accept it, which is all it takes for work built on it to
    * start; or send one of its subtasks, `sentBack` or else the last one done,
-   * back with what to change).
+   * back with what to change). Throws as answering does, and when the
+   * subtask sent back isn't one done in the task.
    */
-  async decide(question: Extract<Question, { kind: "decision" }>, answer: DecisionAnswer) {
+  async decide(id: string, answer: DecisionAnswer) {
+    const question = this.questions.find(id);
+    if (question.kind !== "decision" || !this.revisable(question, answer))
+      throw new Error(DOESNT_FIT);
+    this.questions.answer(id, answer);
     const subtask = this.subtask(question.subtaskId);
     if (!subtask) return;
     const { option: pick, note = "" } = answer;
@@ -384,7 +420,18 @@ export class Scheduler {
     subtask.status = step(SUBTASK_MACHINE, from, event);
     if ((from === "reviewing" || from === "merging") && subtask.status !== from)
       this.questions.cancelFor(subtask.id, true);
-    if (from === "done") this.questions.cancelDelivery(subtask.taskId);
+    if (from === "done")
+      this.questions.cancelDelivery(
+        this.core.state.subtasks.filter((s) => s.taskId === subtask.taskId).map((s) => s.id),
+      );
+  }
+
+  /** Sending a task back sends back only one of its subtasks that is done. */
+  private revisable(question: DecisionQuestion, { sentBack }: DecisionAnswer) {
+    if (sentBack === undefined) return true;
+    const taskId = this.subtask(question.subtaskId)?.taskId;
+    const target = this.subtask(sentBack);
+    return target !== undefined && target.taskId === taskId && target.status === "done";
   }
 
   /** A run about to be stopped goes on in its session, with `reason` too. */

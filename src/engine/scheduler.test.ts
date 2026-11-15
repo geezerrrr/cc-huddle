@@ -116,13 +116,9 @@ const settled = (s: Subtask, status: Subtask["status"]) =>
     expect(s.status).toBe(status);
   });
 
-/** Answers a decision as Engine.answer does: the question closes, and the scheduler acts on it. */
-async function decide(id: string, decided: Omit<DecisionAnswer, "kind">) {
-  const answer = { kind: "decision" as const, ...decided };
-  const question = questions.answer(id, answer);
-  if (question.kind !== "decision") throw new Error(`${id} is not a decision`);
-  await scheduler.decide(question, answer);
-}
+/** Answers a decision as Engine.answer does. */
+const decide = (id: string, decided: Omit<DecisionAnswer, "kind">) =>
+  scheduler.decide(id, { kind: "decision", ...decided });
 
 const onGoal = (file: string) =>
   readFile(path.join(goalFiles(core.places.root).checkout, file), "utf8");
@@ -228,6 +224,23 @@ describe("Scheduler", () => {
       "pending",
       "pending",
     ]);
+  });
+
+  it("takes a subtask given directly as a task of its own, for a member on the team", () => {
+    vi.mocked(runSubtask).mockImplementation(working);
+    const work = { title: "Scoreboard", description: "Top right", acceptance: "", assignee: "glm" };
+    expect(() => scheduler.assignOne({ ...work, assignee: "ann" })).toThrow(
+      'There is no member called "ann"',
+    );
+    const added = scheduler.assignOne(work);
+    expect(added).toMatchObject({ ...work, dependsOn: [] });
+    expect(core.state.tasks.at(-1)).toMatchObject({
+      id: added.taskId,
+      title: "Scoreboard",
+      ownerAccepts: false,
+    });
+    core.state.goal.status = "archived";
+    expect(() => scheduler.assignOne(work)).toThrow("archived: resume it first");
   });
 
   it("gives a subtask from a plan the plan's document in its brief", async () => {
@@ -541,10 +554,13 @@ describe("Scheduler", () => {
       await eventually(() => {
         expect(core.state.questions).toHaveLength(1);
       });
-      await decide(core.state.questions[0]?.id ?? "", {
-        option: "revise",
-        note: "Bigger numbers",
-      });
+      const id = core.state.questions[0]?.id ?? "";
+      core.state.subtasks.push(subtask("x", { taskId: "t2", status: "done" }));
+      for (const sentBack of ["x", "ghost"])
+        await expect(decide(id, { option: "revise", note: "Bigger", sentBack })).rejects.toThrow(
+          "doesn't fit",
+        );
+      await decide(id, { option: "revise", note: "Bigger numbers" });
       await eventually(() => {
         expect(runs()).toHaveLength(2);
       });

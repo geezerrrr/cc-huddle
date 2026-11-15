@@ -153,22 +153,4 @@ describe("Goals", () => {
     expect(await exists(goalFiles(core.places.root).desk("s1"))).toBe(false);
     expect(await exists(goalFiles(core.places.root).checkout)).toBe(false);
   });
-
-  it("take a subtask directly, as a task of its own, for a member on the team", async () => {
-    const work = { title: "Scoreboard", description: "Top right", acceptance: "", assignee: "glm" };
-    expect(() => goals.assign({ ...work, assignee: "ann" })).toThrow(
-      'There is no member called "ann"',
-    );
-    goals.assign(work);
-    expect(scheduler.assign).toHaveBeenCalledWith([
-      {
-        title: "Scoreboard",
-        outcome: "",
-        ownerAccepts: false,
-        subtasks: [{ ...work, key: "", dependsOn: [] }],
-      },
-    ]);
-    await goals.archive();
-    expect(() => goals.assign(work)).toThrow("archived: resume it first");
-  });
 });

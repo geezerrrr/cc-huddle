@@ -21,7 +21,7 @@ import { Records } from "./records.ts";
 import { Scheduler } from "./scheduler.ts";
 import { serialBy } from "../shared/serial.ts";
 import { allowInCopy, allowInTeam, copyTeam, loadTeam, readCopy, type TeamFiles } from "./team.ts";
-import type { GoalState, MeetingSize, Question } from "./types.ts";
+import type { GoalState, MeetingSize } from "./types.ts";
 import { releaseLock, takeLock, type Holder, type Runner } from "./lock.ts";
 
 /** What a session stopped as it let its goal go, for the session taking it up to resume: its meetings under way. */
@@ -222,11 +222,9 @@ export class Engine {
    * review, a merge, a task done). Throws when it is no longer open or the
    * answer doesn't fit it.
    */
-  async answer(id: string, answer: Answer): Promise<Question> {
-    const question = this.questions.answer(id, answer);
-    if (question.kind === "decision" && answer.kind === "decision")
-      await this.scheduler.decide(question, answer);
-    return question;
+  async answer(id: string, answer: Answer) {
+    if (answer.kind === "decision") await this.scheduler.decide(id, answer);
+    else this.questions.answer(id, answer);
   }
 
   /**

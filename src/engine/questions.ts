@@ -21,7 +21,9 @@ import {
   type Decision,
   type DecisionOption,
   type PermissionOption,
+  toYou,
   type Question,
+  type QuestionToYou,
   type Subtask,
   type GoalState,
 } from "./types.ts";
@@ -53,9 +55,15 @@ export type Answer =
 /** Your answer to a decision, which the scheduler carries out. */
 export type DecisionAnswer = Extract<Answer, { kind: "decision" }>;
 
+/** What a decision put to you is. */
+export type DecisionQuestion = Extract<Question, { kind: "decision" }>;
+
+/** Why an answer is refused: it isn't one the question can take. */
+export const DOESNT_FIT = "That answer doesn't fit the question.";
+
 /** What questions need from the engine. */
 export interface Inbox {
-  state: Pick<GoalState, "questions" | "subtasks">;
+  state: Pick<GoalState, "questions">;
   /** The state changed. */
   changed(): void;
   /** Adds allow rules to the team's `settings.json` (§6), for every member's next turns. */
@@ -100,18 +108,25 @@ export class Questions {
     };
   }
 
-  /**
-   * Answers a question put to you, and gives it back: a decision is the
-   * scheduler's to act on. Throws when it is no longer open, or the answer
-   * doesn't fit it: not one of its options, not one pick per question, a
-   * task sent back without what to change, or with a subtask not done in it.
-   */
-  answer(id: string, answer: Answer): Question {
-    const question = this.inbox.state.questions.find((q) => q.id === id && q.kind !== "teammate");
+  /** A question put to you, open still; throws when it is no longer open. */
+  find(id: string): QuestionToYou {
+    const question = this.inbox.state.questions.find(
+      (q): q is QuestionToYou => q.id === id && toYou(q),
+    );
     if (!question) throw new Error("That question is no longer open.");
-    if (!this.fits(question, answer)) throw new Error("That answer doesn't fit the question.");
-    this.close(question, answer);
     return question;
+  }
+
+  /**
+   * Answers a question put to you: a decision is the scheduler's to act on
+   * (Scheduler.decide). Throws when it is no longer open, or the answer
+   * doesn't fit it: not one of its options, not one pick per question, a
+   * task sent back without what to change.
+   */
+  answer(id: string, answer: Answer) {
+    const question = this.find(id);
+    if (!this.fits(question, answer)) throw new Error(DOESNT_FIT);
+    this.close(question, answer);
   }
 
   /**
@@ -160,13 +175,11 @@ export class Questions {
     this.cancelAll((q) => q.kind !== "decision");
   }
 
-  /** Calls off a task's delivery waiting on you: work in it is being done again. */
-  cancelDelivery(taskId: string) {
-    const inTask = new Set(
-      this.inbox.state.subtasks.filter((s) => s.taskId === taskId).map((s) => s.id),
-    );
+  /** Calls off a task's delivery waiting on you, on one of `subtaskIds`, its subtasks: work in it is being done again. */
+  cancelDelivery(subtaskIds: readonly string[]) {
     this.cancelAll(
-      (q) => q.kind === "decision" && q.decision.kind === "delivery" && inTask.has(q.subtaskId),
+      (q) =>
+        q.kind === "decision" && q.decision.kind === "delivery" && subtaskIds.includes(q.subtaskId),
     );
   }
 
@@ -235,7 +248,7 @@ export class Questions {
   }
 
   /** Whether `answer` is one `question` can take. */
-  private fits(question: Question, answer: Answer): boolean {
+  private fits(question: QuestionToYou, answer: Answer): boolean {
     switch (question.kind) {
       case "permission":
         return answer.kind === "permission" && question.permission.options.includes(answer.option);
@@ -245,21 +258,9 @@ export class Questions {
         return (
           answer.kind === "decision" &&
           question.decision.options.includes(answer.option) &&
-          (Boolean(answer.note) || !noteNeeded(question.decision, answer.option)) &&
-          (answer.option !== "revise" || this.revisable(question, answer))
+          (Boolean(answer.note) || !noteNeeded(question.decision, answer.option))
         );
-      case "teammate":
-        return false;
     }
-  }
-
-  /** Sending a task back sends back only one of its subtasks that is done. */
-  private revisable(question: Question, answer: DecisionAnswer) {
-    if (answer.sentBack === undefined) return true;
-    const { subtasks } = this.inbox.state;
-    const taskId = subtasks.find((s) => s.id === question.subtaskId)?.taskId;
-    const target = subtasks.find((s) => s.id === answer.sentBack);
-    return target !== undefined && target.taskId === taskId && target.status === "done";
   }
 
   /**

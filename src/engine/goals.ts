@@ -10,13 +10,10 @@ import { can, GOAL_MACHINE, step } from "./machines.ts";
 import type { Meetings } from "./meetings.ts";
 import type { Scheduler } from "./scheduler.ts";
 import { serialBy } from "../shared/serial.ts";
-import type { Goal, PlanSubtask, Subtask } from "./types.ts";
+import type { Goal } from "./types.ts";
 
 /** The key the goal's changes take turns on. */
 const LIFE = "life";
-
-/** A subtask you give a member directly, without a meeting. */
-type DirectWork = Omit<PlanSubtask, "key" | "dependsOn">;
 
 export class Goals {
   private readonly life = serialBy();
@@ -83,27 +80,6 @@ export class Goals {
       await this.meetings.settled();
       await removeGoal(core.places);
     });
-  }
-
-  /**
-   * Gives a member a subtask directly, as a task of its own. It starts once
-   * they are free; a paused goal's waits for the goal to go on.
-   */
-  assign(work: DirectWork): Subtask[] {
-    const { goal } = this;
-    if (goal.status === "archived")
-      throw new Error(`The goal "${goal.name}" is archived: resume it first`);
-    if (!this.core.team.members.some((m) => m.name === work.assignee))
-      throw new Error(`There is no member called "${work.assignee}"`);
-    return this.scheduler.assign([
-      // Work you assign is done once merged: it isn't yours to accept (§7.1).
-      {
-        title: work.title,
-        outcome: "",
-        ownerAccepts: false,
-        subtasks: [{ ...work, key: "", dependsOn: [] }],
-      },
-    ]);
   }
 
   /** Makes the goal active again; false when it was already. */

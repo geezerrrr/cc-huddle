@@ -1,13 +1,13 @@
 import type { CanUseTool, PermissionUpdate } from "@anthropic-ai/claude-agent-sdk";
 import { describe, expect, it, vi } from "vitest";
-import { Questions, type Answer, type Inbox } from "./questions.ts";
+import { Questions, type Inbox } from "./questions.ts";
 import { DECISIONS, type Question, type Subtask } from "./types.ts";
 
 /** An inbox over an empty state, recording the rules allowed always. */
 function inbox() {
   const allowed: string[][] = [];
   const box: Inbox = {
-    state: { questions: [], subtasks: [] as Subtask[] },
+    state: { questions: [] },
     changed: vi.fn(),
     allowAlways: (rules) => {
       allowed.push(rules);
@@ -247,35 +247,22 @@ describe("decisions", () => {
     );
     const question = await opened(box);
     expect(question).toMatchObject({ from: "glm", subtaskId: "s1", kind: "decision" });
-    expect(() => questions.answer(question.id, { kind: "permission", option: "once" })).toThrow(
-      "doesn't fit",
-    );
-    expect(questions.answer(question.id, { kind: "decision", option: "skip" })).toBe(question);
+    expect(() => {
+      questions.answer(question.id, { kind: "permission", option: "once" });
+    }).toThrow("doesn't fit");
+    questions.answer(question.id, { kind: "decision", option: "skip" });
     expect(box.state.questions).toEqual([]);
   });
 
-  it("send a task back only with what to change, and only a subtask done in it", async () => {
+  it("send a task back only with what to change", async () => {
     const { box, questions } = inbox();
-    box.state.subtasks.push(
-      subtask("s1"),
-      subtask("s2"),
-      subtask("s3", { status: "pending" }),
-      subtask("x", { taskId: "t2" }),
-    );
     questions.openDecision(subtask("s1"), DECISIONS.delivery(), "Dice game");
     const { id } = await opened(box);
-    const answers: Answer[] = [
-      { kind: "decision", option: "revise" },
-      { kind: "decision", option: "revise", note: "Bigger dice", sentBack: "s3" },
-      { kind: "decision", option: "revise", note: "Bigger dice", sentBack: "x" },
-    ];
-    for (const answer of answers) expect(() => questions.answer(id, answer)).toThrow("doesn't fit");
-    questions.answer(id, {
-      kind: "decision",
-      option: "revise",
-      note: "Bigger dice",
-      sentBack: "s2",
-    });
+    expect(() => {
+      questions.answer(id, { kind: "decision", option: "revise" });
+    }).toThrow("doesn't fit");
+    questions.answer(id, { kind: "decision", option: "revise", note: "Bigger dice" });
+    expect(box.state.questions).toEqual([]);
   });
 });
 
@@ -325,10 +312,9 @@ describe("calling off", () => {
 
   it("a task's delivery leaves its other decisions", () => {
     const { box, questions } = inbox();
-    box.state.subtasks.push(subtask("s1"), subtask("x", { taskId: "t2" }));
     questions.openDecision(subtask("s1"), DECISIONS.delivery(), "");
     questions.openDecision(subtask("x", { taskId: "t2" }), DECISIONS.delivery(), "");
-    questions.cancelDelivery("t1");
+    questions.cancelDelivery(["s1", "s2"]);
     expect(box.state.questions.map((q) => q.subtaskId)).toEqual(["x"]);
   });
 });
