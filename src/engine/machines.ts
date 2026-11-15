@@ -30,30 +30,35 @@ export const MEETING_MACHINE = {
   resume: { from: ["failed", "cancelled"], to: "running" },
 } as const satisfies Machine<MeetingStatus>;
 
-/**
- * A subtask's moves. Waiting on you in review or merging is a question to
- * you, not a move.
- */
+/** A subtask's moves. */
 export const SUBTASK_MACHINE = {
   /** The scheduler starts it: upstream merged, its assignee free, its goal active. */
   start: { from: ["pending"], to: "running" },
   stop: { from: ["pending", "running"], to: "stopped" },
   /** Stopped once handed over, its delivery stands, to go on from the stage it stopped in. */
-  stopReview: { from: ["reviewing"], to: "stoppedInReview" },
+  stopReview: { from: ["reviewing", "waitingInReview"], to: "stoppedInReview" },
   /** Only while it waits on your call; a merge under way finishes first. */
-  stopMerge: { from: ["merging"], to: "stoppedInMerge" },
+  stopMerge: { from: ["waitingInMerge"], to: "stoppedInMerge" },
   /** Delivered with review on. */
   review: { from: ["running"], to: "reviewing" },
-  /** Delivered with review off, or the review passed or was skipped. */
-  merge: { from: ["running", "reviewing"], to: "merging" },
+  /** A review sent it back too often, or failed: it waits on your decision. */
+  askReview: { from: ["reviewing"], to: "waitingInReview" },
+  /** You had it reviewed again. */
+  rereview: { from: ["waitingInReview"], to: "reviewing" },
+  /** Delivered with review off, or the review passed or you skipped it. */
+  merge: { from: ["running", "reviewing", "waitingInReview"], to: "merging" },
   fail: { from: ["running"], to: "failed" },
   /** Its goal paused, or you added to it: it goes on in its session. */
   hold: { from: ["running"], to: "pending" },
   /** The reviewer, or you, sent it back. */
-  reject: { from: ["reviewing"], to: "pending" },
+  reject: { from: ["reviewing", "waitingInReview"], to: "pending" },
   merged: { from: ["merging"], to: "done" },
   /** Merging it left text conflicts for its assignee to resolve. */
   conflict: { from: ["merging"], to: "pending" },
+  /** Files it can't merge line by line, or git failing: it waits on your decision. */
+  askMerge: { from: ["merging"], to: "waitingInMerge" },
+  /** You kept a side, or had it merged again. */
+  remerge: { from: ["waitingInMerge"], to: "merging" },
   /** From the start: no session, delivery or worktree. */
   retry: { from: ["failed", "stopped", "stoppedInReview", "stoppedInMerge"], to: "pending" },
   /** Where it stopped: its session and worktree. */

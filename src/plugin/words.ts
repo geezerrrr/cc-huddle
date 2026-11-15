@@ -70,7 +70,9 @@ export const STATUS_WORDS: Record<SubtaskStatus, string> = {
   pending: "pending",
   running: "running",
   reviewing: "in review",
+  waitingInReview: "in review, waits for a decision",
   merging: "being merged",
+  waitingInMerge: "being merged, waits for a decision",
   done: "done",
   failed: "failed",
   stopped: "stopped",
@@ -156,10 +158,15 @@ export function needWords(
             headline: `The review of "${title ?? ""}" is stuck. What now?`,
             detail: question.text,
           };
+        case "conflict":
+          return {
+            headline: `Merging "${title ?? ""}" is stuck. What now?`,
+            detail: question.decision.files.join(", "),
+          };
         case "merge":
           return {
             headline: `Merging "${title ?? ""}" is stuck. What now?`,
-            detail: question.text.split("\n").join(", "),
+            detail: question.text,
           };
         case "delivery":
           return { headline: `The task "${question.text}" is done. Accept it?` };

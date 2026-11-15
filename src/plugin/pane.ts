@@ -99,7 +99,7 @@ function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>
   );
   const next = own.find((s) => s.status === "pending");
   const running = at("running");
-  const handedOver = at("reviewing") ?? at("merging");
+  const handedOver = at("reviewing", "waitingInReview") ?? at("merging", "waitingInMerge");
   let doing: string;
   if (running) doing = inProgressText(running);
   else if (meeting) doing = `at the meeting on "${work.goal.name}"`;
@@ -446,17 +446,15 @@ function noticeText(notice: Notice): string {
   }
 }
 
-/** A subtask in progress, in words: worked on and how far, in review, or being merged. */
+/** A subtask in progress, in words: worked on and how far, or where it was handed over to. */
 function inProgressText(subtask: InProgress): string {
   switch (subtask.status) {
     case "running": {
       const step = stepText(subtask.progress);
       return `works on "${subtask.title}"${step ? `, ${step}` : ""}`;
     }
-    case "reviewing":
-      return `"${subtask.title}" in review`;
-    case "merging":
-      return `"${subtask.title}" being merged`;
+    default:
+      return `"${subtask.title}" ${STATUS_WORDS[subtask.status]}`;
   }
 }
 

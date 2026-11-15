@@ -190,17 +190,7 @@ describe("waitsIn", () => {
     const merging = work({ subtasks: [first, next], underWay: ["next"] });
     expect(waitsIn(merging, first, new Set())).toEqual([{ kind: "merge", subtaskId: "next" }]);
     // One that waits on your decision holds no merge up.
-    const deciding = work({
-      subtasks: [first, next],
-      questions: [
-        question({
-          id: "q1",
-          subtaskId: "first",
-          kind: "decision",
-          decision: DECISIONS.failedMerge(),
-        }),
-      ],
-    });
+    const deciding = work({ subtasks: [{ ...first, status: "waitingInMerge" }, next] });
     expect(waitsIn(deciding, next, new Set())).toEqual([]);
   });
 
@@ -233,18 +223,8 @@ describe("derive", () => {
   it("offers stopping a merge only while it waits on your call", () => {
     const merging = subtask("s1", { status: "merging" });
     expect(actionsOf(work({ subtasks: [merging] }), merging)).toEqual([]);
-    const deciding = work({
-      subtasks: [merging],
-      questions: [
-        question({
-          id: "q1",
-          subtaskId: "s1",
-          kind: "decision",
-          decision: DECISIONS.failedMerge(),
-        }),
-      ],
-    });
-    expect(actionsOf(deciding, merging)).toEqual(["stop"]);
+    const waiting = subtask("s1", { status: "waitingInMerge" });
+    expect(actionsOf(work({ subtasks: [waiting] }), waiting)).toEqual(["stop"]);
   });
 
   it("counts everyone in a running meeting as busy", () => {

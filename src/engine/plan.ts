@@ -37,10 +37,7 @@ export const planSchema = (assignee: z.ZodType<string>) =>
   planShape(
     z.object({
       ...taskShape(assignee),
-      owner_accepts: z
-        .boolean()
-        .default(false)
-        .describe(PLAN_FIELDS.ownerAccepts),
+      owner_accepts: z.boolean().default(false).describe(PLAN_FIELDS.ownerAccepts),
     }),
   );
 

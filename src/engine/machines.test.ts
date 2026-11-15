@@ -14,7 +14,8 @@ describe("state machines", () => {
   });
 
   it("answers what may happen where", () => {
-    expect(can(SUBTASK_MACHINE, "merging", "stopMerge")).toBe(true);
+    expect(can(SUBTASK_MACHINE, "merging", "stopMerge")).toBe(false);
+    expect(can(SUBTASK_MACHINE, "waitingInMerge", "stopMerge")).toBe(true);
     expect(can(SUBTASK_MACHINE, "done", "stop")).toBe(false);
     expect(can(SUBTASK_MACHINE, "done", "redo")).toBe(true);
   });

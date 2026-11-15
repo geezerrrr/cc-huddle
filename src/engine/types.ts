@@ -57,7 +57,9 @@ export type SubtaskStatus =
   | "pending"
   | "running"
   | "reviewing"
+  | "waitingInReview"
   | "merging"
+  | "waitingInMerge"
   | "done"
   | "failed"
   | "stopped"
@@ -238,13 +240,16 @@ export type DecisionOption = (typeof DECISION_OPTIONS)[number];
 /**
  * A decision on a subtask: what it offers, and the option a note typed
  * instead of a pick goes with, `needed` where that option is no answer
- * without one. `files`: a merge's files that can't be merged line by line.
+ * without one. A review stuck or failed, a merge with files it can't merge
+ * line by line (`conflict`, its `files`) or one git failed, a task done.
  */
-export interface Decision {
-  kind: "review" | "merge" | "delivery";
+export type Decision =
+  DecisionOf<"review" | "merge" | "delivery"> | (DecisionOf<"conflict"> & { files: string[] });
+
+interface DecisionOf<K extends string> {
+  kind: K;
   options: DecisionOption[];
   note?: { option: Extract<NoteOption, DecisionOption>; needed?: true };
-  files?: string[];
 }
 
 /** The decisions there are, each as it is put to you. */
@@ -263,7 +268,7 @@ export const DECISIONS = {
   }),
   /** Files a merge can't take line by line: keep one side, or merge again. */
   mergeFiles: (files: string[]): Decision => ({
-    kind: "merge",
+    kind: "conflict",
     options: ["ours", "theirs", "retry"],
     files,
   }),

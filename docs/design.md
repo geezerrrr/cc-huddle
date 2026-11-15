@@ -151,16 +151,22 @@ Each attendee keeps one session for the whole meeting, in the goal's worktree. A
 | —                                                    | plan approved, or assigned directly                             | pending                                                 |
 | pending                                              | upstream merged, owner free, goal active                        | running                                                 |
 | pending, running                                     | you stop it                                                     | stopped                                                 |
-| reviewing                                            | you stop it                                                     | stopped in review                                       |
-| merging (waiting on you)                             | you stop it                                                     | stopped in merge                                        |
+| reviewing, review waiting on you                     | you stop it                                                     | stopped in review                                       |
+| merge waiting on you                                 | you stop it                                                     | stopped in merge                                        |
 | running                                              | delivered, review on                                            | reviewing                                               |
 | running                                              | delivered, review off                                           | merging                                                 |
 | running                                              | error, or no delivery after one reminder                        | failed                                                  |
 | running                                              | goal paused, you add to it                                      | pending, same session                                   |
-| reviewing                                            | passed, or you skip the review                                  | merging                                                 |
+| reviewing                                            | passed                                                          | merging                                                 |
+| reviewing                                            | sent back the third time, or the review errors                  | review waiting on you                                   |
 | reviewing                                            | sent back (first two times)                                     | pending, same session, with the notes                   |
+| review waiting on you                                | you review it again                                             | reviewing                                               |
+| review waiting on you                                | you skip the review                                             | merging                                                 |
+| review waiting on you                                | you send it back                                                | pending, same session, with the notes                   |
 | merging                                              | merged                                                          | done                                                    |
 | merging                                              | text conflicts                                                  | pending, same session, to resolve them                  |
+| merging                                              | files it can't merge line by line, or a git error               | merge waiting on you                                    |
+| merge waiting on you                                 | you keep a side, or merge it again                              | merging                                                 |
 | failed, stopped, stopped in review, stopped in merge | retry                                                           | pending, fresh session and worktree                     |
 | failed, stopped                                      | go on                                                           | pending, same session and worktree                      |
 | stopped in review                                    | go on                                                           | reviewing, its delivery standing                        |
@@ -169,7 +175,7 @@ Each attendee keeps one session for the whole meeting, in the goal's worktree. A
 
 Your actions (stop, go on, retry, redo) are each one or more events: an action is offered where one of its events can happen, and does that one.
 
-A third failed review, a review that errors, a binary conflict and a git error each become a decision for you (§4.4) rather than a move.
+Waiting on you in review or in a merge is a status of its own: its decision (§4.4) is open while the subtask is there, and leaving it, by your answer or your stop, closes it.
 
 A running subtask's member has two tools beyond Claude Code's own, from an in-process MCP server given to its turn: `ask_teammate`, a question a teammate answers in a read-only session, and `deliver`, a summary and the files that are the result. A run is done only once it delivers. The Team tab follows its steps from its own `TodoWrite` calls.
 

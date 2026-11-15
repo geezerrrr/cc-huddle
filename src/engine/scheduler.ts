@@ -36,6 +36,7 @@ import { runSubtask, type RunOutcome } from "./run.ts";
 import { type Step } from "./turns.ts";
 import {
   DECISIONS,
+  type Decision,
   type Goal,
   type GoOn,
   type Member,
@@ -272,11 +273,8 @@ export class Scheduler {
     }
     // Deleted work, stopped already: nothing to stop.
     if (!actionEvent(subtask.status, "stop")) return;
-    if (subtask.status === "merging") {
-      // A merge under way finishes; one waiting on you is undone, its worktree back as delivered.
-      if (live) return;
-      await abortMerge(this.core.places, subtask.id);
-    }
+    // A merge under way finishes (stopMerge is only while it waits on you); that one is undone, its worktree back as delivered.
+    if (subtask.status === "waitingInMerge") await abortMerge(this.core.places, subtask.id);
     // Stopped meanwhile: that stop did it.
     const event = actionEvent(subtask.status, "stop");
     if (!event) return;
@@ -351,10 +349,11 @@ export class Scheduler {
         this.move(sentBack, "redo");
         goOnWith(sentBack, { why: "revised", note });
       }
-    } else if (subtask.status === "reviewing") {
+    } else if (subtask.status === "waitingInReview") {
       // You decided: the count of times sent back starts over.
       subtask.review = { ...subtask.review, rounds: 0 };
-      if (pick === "skip") this.move(subtask, "merge");
+      if (pick === "rereview") this.move(subtask, "rereview");
+      else if (pick === "skip") this.move(subtask, "merge");
       else if (pick === "sendBack") {
         this.move(subtask, "reject");
         if (subtask.session) {
@@ -363,11 +362,15 @@ export class Scheduler {
           if (note) goOnWith(subtask, { why: "carried", note });
         }
       }
-    } else if (subtask.status === "merging") {
-      if (pick === "retry") await abortMerge(this.core.places, subtask.id);
-      else if (pick === "stop") await this.stop(subtask);
-      else if (pick === "ours" || pick === "theirs")
-        await pickSide(this.core.places, subtask.id, question.decision.files ?? [], pick);
+    } else if (subtask.status === "waitingInMerge") {
+      if (pick === "stop") await this.stop(subtask);
+      else {
+        if (pick === "retry") await abortMerge(this.core.places, subtask.id);
+        else if (question.decision.kind === "conflict" && (pick === "ours" || pick === "theirs"))
+          await pickSide(this.core.places, subtask.id, question.decision.files, pick);
+        // Stopped meanwhile: that stop stands.
+        if (can(SUBTASK_MACHINE, subtask.status, "remerge")) this.move(subtask, "remerge");
+      }
     }
     this.core.changed();
     this.pump();
@@ -395,15 +398,21 @@ export class Scheduler {
     }
   }
 
+  /** A review or merge waits on your decision: `text`, what it came to, if it says more. */
+  private ask(subtask: Subtask, decision: Decision, text: string) {
+    this.move(subtask, decision.kind === "review" ? "askReview" : "askMerge");
+    this.questions.openDecision(subtask, decision, text);
+  }
+
   /**
-   * Moves a subtask by its machine. Leaving review or a merge calls off your
-   * decision on it; done again, its task's delivery waits until it is done
-   * again; leaving where it stopped, where it was handed over stands no more.
+   * Moves a subtask by its machine. Leaving where it waits on you calls off
+   * your decision on it; done again, its task's delivery waits until it is
+   * done again.
    */
   private move(subtask: Subtask, event: SubtaskEvent) {
     const from = subtask.status;
     subtask.status = step(SUBTASK_MACHINE, from, event);
-    if ((from === "reviewing" || from === "merging") && subtask.status !== from)
+    if (from === "waitingInReview" || from === "waitingInMerge")
       this.questions.cancelFor(subtask.id, true);
     if (from === "done")
       this.questions.cancelDelivery(
@@ -582,8 +591,7 @@ export class Scheduler {
       const rounds = (subtask.review?.rounds ?? 0) + (verdict.pass ? 0 : 1);
       subtask.review = { rounds, notes: verdict.notes };
       if (verdict.pass) this.move(subtask, "merge");
-      else if (rounds >= REVIEW_ROUNDS)
-        this.questions.openDecision(subtask, DECISIONS.stuckReview(), verdict.notes);
+      else if (rounds >= REVIEW_ROUNDS) this.ask(subtask, DECISIONS.stuckReview(), verdict.notes);
       else {
         this.move(subtask, "reject");
         if (subtask.session) goOnWith(subtask, { why: "rejected", note: verdict.notes });
@@ -592,7 +600,7 @@ export class Scheduler {
       if (abort.signal.aborted || subtask.status !== "reviewing") return;
       // The last review gave no word: earlier notes are no longer what it says.
       subtask.review = { rounds: subtask.review?.rounds ?? 0 };
-      this.questions.openDecision(subtask, DECISIONS.failedReview(), errorText(error));
+      this.ask(subtask, DECISIONS.failedReview(), errorText(error));
     } finally {
       end();
       core.changed();
@@ -616,18 +624,14 @@ export class Scheduler {
         subtask.conflict = undefined;
         this.finished(subtask);
       } else if (merged.other.length) {
-        this.questions.openDecision(
-          subtask,
-          DECISIONS.mergeFiles(merged.other),
-          merged.other.join("\n"),
-        );
+        this.ask(subtask, DECISIONS.mergeFiles(merged.other), "");
       } else {
         this.move(subtask, "conflict");
         subtask.conflict = { files: merged.text };
         if (subtask.session) goOnWith(subtask, { why: "conflict" });
       }
     } catch (error) {
-      this.questions.openDecision(subtask, DECISIONS.failedMerge(), errorText(error));
+      this.ask(subtask, DECISIONS.failedMerge(), errorText(error));
     } finally {
       end();
       core.changed();

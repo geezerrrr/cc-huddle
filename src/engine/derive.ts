@@ -37,16 +37,26 @@ const openQuestions = (state: Pick<GoalState, "questions">, subtaskId: string) =
 
 const isActive = (state: Pick<GoalState, "goal">) => state.goal.status === "active";
 
-/** A subtask in progress: worked on, in review, or being merged. */
-export type InProgress = Subtask & { status: "running" | "reviewing" | "merging" };
+const IN_PROGRESS = [
+  "running",
+  "reviewing",
+  "waitingInReview",
+  "merging",
+  "waitingInMerge",
+] as const satisfies readonly Subtask["status"][];
+
+/** A subtask in progress: worked on, in review or being merged, or waiting on you there. */
+export type InProgress = Subtask & { status: (typeof IN_PROGRESS)[number] };
 
 export const inProgress = (subtask: Subtask): subtask is InProgress =>
-  subtask.status === "running" || subtask.status === "reviewing" || subtask.status === "merging";
+  (IN_PROGRESS as readonly Subtask["status"][]).includes(subtask.status);
 
-/** Handed over: in review or being merged, or stopped there, its delivery standing. */
+/** Handed over: in review or being merged, waiting on you there or stopped there, its delivery standing. */
 const HANDED_OVER: readonly Subtask["status"][] = [
   "reviewing",
+  "waitingInReview",
   "merging",
+  "waitingInMerge",
   "stoppedInReview",
   "stoppedInMerge",
 ];
@@ -105,18 +115,12 @@ export function acceptanceOf(state: Pick<GoalState, "questions" | "subtasks">, t
 export const accepted = (state: Pick<GoalState, "questions" | "subtasks">, taskId: string) =>
   taskDone(state, taskId) && !acceptanceOf(state, taskId);
 
-/**
- * Whether a subtask handed over is taken up in `stage`: it is there, its
- * goal is active and you aren't deciding on it.
- */
+/** Whether a subtask handed over is taken up in `stage`: it is there and its goal is active. */
 const takenUpIn = (
-  state: Pick<GoalState, "goal" | "questions">,
+  state: Pick<GoalState, "goal">,
   subtask: Subtask,
   stage: "reviewing" | "merging",
-) =>
-  subtask.status === stage &&
-  isActive(state) &&
-  !openQuestions(state, subtask.id).some((q) => q.kind === "decision");
+) => subtask.status === stage && isActive(state);
 
 /**
  * Who is busy, and so starts nothing new and can't join a meeting: whoever
@@ -253,6 +257,9 @@ export function waitsIn(state: Work, subtask: Subtask, busy: Set<string>): Wait[
         : undefined;
       return [...held, ...asked(), ...(reviewer ? [{ kind: "busy" as const, by: reviewer }] : [])];
     }
+    case "waitingInReview":
+    case "waitingInMerge":
+      return [...held, ...asked()];
     case "failed":
     case "stopped":
     case "stoppedInReview":
@@ -296,19 +303,11 @@ export function redoneUpstream(state: Pick<GoalState, "subtasks">, subtask: Subt
   });
 }
 
-/**
- * What you can do to a subtask where it stands: redo it only once its
- * upstream was redone; stop a merge only while it waits on your call.
- */
+/** What you can do to a subtask where it stands: redo it only once its upstream was redone. */
 export function actionsOf(state: Work, subtask: Subtask): SubtaskAction[] {
-  const deciding = openQuestions(state, subtask.id).length > 0;
   return SUBTASK_ACTIONS.filter((action) => {
     const event = actionEvent(subtask.status, action);
-    return (
-      event !== undefined &&
-      (event !== "stopMerge" || deciding) &&
-      (event !== "redo" || redoneUpstream(state, subtask).length > 0)
-    );
+    return event !== undefined && (event !== "redo" || redoneUpstream(state, subtask).length > 0);
   });
 }
 

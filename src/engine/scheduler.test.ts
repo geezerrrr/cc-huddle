@@ -392,7 +392,7 @@ describe("Scheduler", () => {
       expect(runs).toHaveLength(3);
       expect(runs[1]?.opening).toContain("The review sent your delivery back");
       expect(runs[1]?.opening).toContain("Scores overlap");
-      expect(s1).toMatchObject({ status: "reviewing", review: { rounds: 3 } });
+      expect(s1).toMatchObject({ status: "waitingInReview", review: { rounds: 3 } });
       expect(core.state.questions[0]).toMatchObject({
         text: "Scores overlap",
         decision: { kind: "review", options: ["rereview", "skip", "sendBack"] },
@@ -587,7 +587,11 @@ describe("Scheduler", () => {
         expect(core.state.questions).toMatchObject([
           {
             kind: "decision",
-            decision: { kind: "merge", options: ["ours", "theirs", "retry"], files: ["logo.bin"] },
+            decision: {
+              kind: "conflict",
+              options: ["ours", "theirs", "retry"],
+              files: ["logo.bin"],
+            },
           },
         ]);
       });
