@@ -254,8 +254,11 @@ export class Engine {
     const stopped: HandedOver = {
       meetings: meetings.filter((m) => m.status === "running").map((m) => m.id),
     };
-    if (goal.status === "active") await this.goals.pause();
-    await this.shut();
+    try {
+      if (goal.status === "active") await this.goals.pause();
+    } finally {
+      await this.shut();
+    }
     return stopped;
   }
 
@@ -279,12 +282,19 @@ export class Engine {
     releaseGoal(this.files.lock);
   }
 
-  /** Stops what runs, writes the state for the last time, and lets the goal go. */
+  /**
+   * Stops what runs, writes the state for the last time, and lets the goal
+   * go, however that went: a goal still held by a session that let it go
+   * would have the session taking it up ask again and again.
+   */
   private async shut() {
-    await Promise.all([this.scheduler.close(), this.meetings.close()]);
-    await Promise.all([this.writer.close(), this.records.flush()]);
-    stopRecording();
-    releaseGoal(this.files.lock);
+    try {
+      await Promise.all([this.scheduler.close(), this.meetings.close()]);
+      await Promise.all([this.writer.close(), this.records.flush()]);
+    } finally {
+      stopRecording();
+      releaseGoal(this.files.lock);
+    }
   }
 
   /**
