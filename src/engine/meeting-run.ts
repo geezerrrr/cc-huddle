@@ -216,6 +216,8 @@ export class MeetingRun {
     this.signal.throwIfAborted();
     const plan = soundPlan(hostWritten(schema.parse(closing.structured)), "drop");
     this.said(this.host, plan.summary, "summary");
+    // With its plan out a meeting can't go on: the sessions it kept have served.
+    this.meeting.seats = undefined;
     return plan;
   }
 

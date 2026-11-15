@@ -211,8 +211,6 @@ export class Meetings {
       const talk = new MeetingRun(core, meeting, now, signal, cwd, core.state.goal);
       meeting.plan = await talk.toPlan();
       meeting.status = step(MEETING_MACHINE, meeting.status, "plan");
-      // With its plan out a meeting can't go on: the sessions it kept have served.
-      meeting.seats = undefined;
     } catch (error) {
       if (meeting.status === "running") {
         meeting.status = step(MEETING_MACHINE, meeting.status, signal.aborted ? "cancel" : "fail");
