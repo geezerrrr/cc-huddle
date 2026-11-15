@@ -35,6 +35,46 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
+// src/engine/core.ts
+var workOf = (core) => ({
+  ...core.state,
+  members: core.team.members.map((m) => m.name),
+  underWay: core.underWay()
+});
+var errorText = (error) => error instanceof Error ? error.message : String(error);
+var errorCode = (error) => error.code;
+
+// src/engine/files.ts
+import { renameSync, writeFileSync } from "node:fs";
+import { mkdir, rename, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
+var HELD = /* @__PURE__ */ new Set(["EPERM", "EACCES", "EBUSY"]);
+var HELD_WAIT_MS = 5e3;
+async function renameOver(from, to) {
+  const until = Date.now() + HELD_WAIT_MS;
+  for (let wait = 10; ; wait = Math.min(wait * 2, 500)) {
+    try {
+      await rename(from, to);
+      return;
+    } catch (error) {
+      const held = process.platform === "win32" && HELD.has(errorCode(error) ?? "");
+      if (!held || Date.now() > until) throw error;
+      await delay(wait);
+    }
+  }
+}
+var fresh = (file) => `${file}.${String(process.pid)}.new`;
+async function writeWhole(file, text, mode) {
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(fresh(file), text, { mode });
+  await renameOver(fresh(file), file);
+}
+function writeWholeSync(file, text) {
+  writeFileSync(fresh(file), text);
+  renameSync(fresh(file), file);
+}
+
 // src/engine/running.ts
 function running(pid) {
   try {
@@ -54,6 +94,12 @@ export {
   __require,
   __commonJS,
   __toESM,
+  workOf,
+  errorText,
+  errorCode,
+  renameOver,
+  writeWhole,
+  writeWholeSync,
   running,
   dataFolder
 };

@@ -7386,7 +7386,7 @@ var errorCode = (error62) => error62.code;
 
 // src/engine/data.ts
 import { createHash } from "node:crypto";
-import { link, mkdir, readdir as readdir2, readFile as readFile2, rename, rm as rm2, writeFile } from "node:fs/promises";
+import { link, mkdir, readdir as readdir2, readFile as readFile2, rm as rm2, writeFile } from "node:fs/promises";
 import { readFileSync, unlinkSync } from "node:fs";
 import path3 from "node:path";
 

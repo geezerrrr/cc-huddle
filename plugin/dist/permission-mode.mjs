@@ -15,11 +15,32 @@ import path2 from "node:path";
 // src/engine/files.ts
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
+
+// src/engine/core.ts
+var errorCode = (error) => error.code;
+
+// src/engine/files.ts
+var HELD = /* @__PURE__ */ new Set(["EPERM", "EACCES", "EBUSY"]);
+var HELD_WAIT_MS = 5e3;
+async function renameOver(from, to) {
+  const until = Date.now() + HELD_WAIT_MS;
+  for (let wait = 10; ; wait = Math.min(wait * 2, 500)) {
+    try {
+      await rename(from, to);
+      return;
+    } catch (error) {
+      const held = process.platform === "win32" && HELD.has(errorCode(error) ?? "");
+      if (!held || Date.now() > until) throw error;
+      await delay(wait);
+    }
+  }
+}
 var fresh = (file) => `${file}.${String(process.pid)}.new`;
 async function writeWhole(file, text2, mode) {
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(fresh(file), text2, { mode });
-  await rename(fresh(file), file);
+  await renameOver(fresh(file), file);
 }
 
 // src/engine/running.ts

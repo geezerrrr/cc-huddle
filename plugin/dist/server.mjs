@@ -1,13 +1,14 @@
 import { createRequire } from "node:module"; const require = createRequire(import.meta.url);
 import {
   dataFolder,
+  renameOver,
   running
-} from "./chunks/chunk-P5QDYH7F.mjs";
+} from "./chunks/chunk-GCIRGWII.mjs";
 
 // src/plugin/bootstrap.ts
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import * as nodeModule from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -42,7 +43,7 @@ if (!await installed()) {
       ["ci", "--omit=optional", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund"],
       { cwd: draft, shell: process.platform === "win32", timeout: INSTALL_TIMEOUT_MS }
     );
-    await rename(draft, home);
+    await renameOver(draft, home);
   } catch (error) {
     await rm(draft, { recursive: true, force: true });
     if (!await installed())
@@ -64,4 +65,4 @@ registerHooks({
     return bare && context.parentURL?.startsWith(ours) ? next(specifier, { ...context, parentURL: from }) : next(specifier, context);
   }
 });
-await import("./chunks/server-J63DVS63.mjs");
+await import("./chunks/server-FSXPRZJE.mjs");
