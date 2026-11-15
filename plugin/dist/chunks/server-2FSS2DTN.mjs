@@ -8095,7 +8095,13 @@ var Goals = class {
     if (!this.core.team.members.some((m) => m.name === work.assignee))
       throw new Error(`There is no member called "${work.assignee}"`);
     return this.scheduler.assign(goal2.id, [
-      { title: work.title, outcome: "", subtasks: [{ ...work, key: "", dependsOn: [] }] }
+      // Work you assign is done once merged: it isn't yours to accept (§7.1).
+      {
+        title: work.title,
+        outcome: "",
+        ownerAccepts: false,
+        subtasks: [{ ...work, key: "", dependsOn: [] }]
+      }
     ]);
   }
   goal(id) {
@@ -8203,6 +8209,7 @@ function waitsIn(state, subtask2, busy2) {
         if (!d) return [];
         if (d.status !== "done") return [unmerged(d)];
         if (d.taskId === subtask2.taskId) return [];
+        if (!state.tasks.find((t) => t.id === d.taskId)?.ownerAccepts) return [];
         const rest = state.subtasks.find((s) => s.taskId === d.taskId && s.status !== "done");
         if (rest) return [unmerged(rest)];
         const acceptance = acceptanceOf(state, d.taskId);
@@ -8266,27 +8273,36 @@ function derive(state) {
 
 // src/engine/plan.ts
 import { z } from "zod";
-var planSchema = (assignee) => z.object({
-  summary: z.string().trim().describe("The outcome in one sentence"),
-  plan_markdown: z.string().trim().describe("The plan document"),
-  tasks: z.array(
+var taskShape = (assignee) => ({
+  title: z.string().trim(),
+  outcome: z.string().trim().describe("What the task delivers"),
+  subtasks: z.array(
     z.object({
+      key: z.string().trim().describe("A short id, unique within this plan, such as api-1"),
       title: z.string().trim(),
-      outcome: z.string().trim().describe("What the task delivers when accepted"),
-      subtasks: z.array(
-        z.object({
-          key: z.string().trim().describe("A short id, unique within this plan, such as api-1"),
-          title: z.string().trim(),
-          description: z.string().trim(),
-          assignee,
-          depends_on: z.array(z.string()).describe("The keys of the subtasks it waits for"),
-          acceptance: z.string().trim()
-        })
-      )
+      description: z.string().trim(),
+      assignee,
+      depends_on: z.array(z.string()).describe("The keys of the subtasks it waits for"),
+      acceptance: z.string().trim()
     })
   )
 });
-var hostPlanSchema = (attendees) => planSchema(z.enum(attendees).describe("The name of the attendee it goes to"));
+var planShape = (task) => z.object({
+  summary: z.string().trim().describe("The outcome in one sentence"),
+  plan_markdown: z.string().trim().describe("The plan document"),
+  tasks: z.array(task)
+});
+var planSchema = (assignee) => planShape(
+  z.object({
+    ...taskShape(assignee),
+    owner_accepts: z.boolean().default(false).describe("Whether the user accepts this task themselves once it is done")
+  })
+);
+var hostPlanSchema = (members) => planShape(z.object(taskShape(z.enum(members).describe("The name of the member it goes to"))));
+var hostWritten = (plan) => ({
+  ...plan,
+  tasks: plan.tasks.map((task) => ({ ...task, owner_accepts: false }))
+});
 function loopingDependencies(tasks) {
   const taskOf = new Map(tasks.flatMap((t) => t.subtasks.map((s) => [s.key, t])));
   const waitsOn = new Map(tasks.flatMap((t) => t.subtasks.map((s) => [s.key, s.dependsOn])));
@@ -8297,7 +8313,7 @@ function loopingDependencies(tasks) {
     for (const dependency of waitsOn.get(key) ?? []) {
       const task = taskOf.get(dependency);
       if (!task) continue;
-      const awaited = task === taskOf.get(key) ? [dependency] : task.subtasks.map((s) => s.key);
+      const awaited = task.ownerAccepts && task !== taskOf.get(key) ? task.subtasks.map((s) => s.key) : [dependency];
       if (awaited.some((k) => state.get(k) === "open")) loops.push([key, dependency]);
       else for (const k of awaited) if (!state.has(k)) follow(k);
     }
@@ -8306,12 +8322,12 @@ function loopingDependencies(tasks) {
   for (const key of waitsOn.keys()) if (!state.has(key)) follow(key);
   return loops;
 }
-function parsePlan(raw, attendees) {
-  const plan = hostPlanSchema(attendees).parse(raw);
+function soundPlan(plan, loops) {
   const used = /* @__PURE__ */ new Set();
   const tasks = plan.tasks.filter((task) => task.subtasks.length).map((task, n) => ({
     title: task.title || `Task ${String(n + 1)}`,
     outcome: task.outcome,
+    ownerAccepts: task.owner_accepts,
     subtasks: task.subtasks.map((sub, i) => {
       let key = sub.key || `t${String(n + 1)}-${String(i + 1)}`;
       while (used.has(key)) key = `${key}'`;
@@ -8326,13 +8342,18 @@ function parsePlan(raw, attendees) {
       };
     })
   }));
-  if (!tasks.length) throw new Error("The host's plan has no tasks");
+  if (!tasks.length) throw new Error("The plan has no tasks");
   const subtasks = tasks.flatMap((task) => task.subtasks);
   for (const subtask2 of subtasks)
     subtask2.dependsOn = [...new Set(subtask2.dependsOn)].filter(
       (key) => key !== subtask2.key && used.has(key)
     );
-  for (const [key, dependency] of loopingDependencies(tasks)) {
+  const looping = loopingDependencies(tasks);
+  if (looping.length && loops === "refuse")
+    throw new Error(
+      `These dependencies go round in a loop, counting a task you accept as waited on whole: ${looping.map(([key, dependency]) => `${key} on ${dependency}`).join(", ")}. Drop them, or accept fewer tasks.`
+    );
+  for (const [key, dependency] of looping) {
     const subtask2 = subtasks.find((s) => s.key === key);
     if (subtask2) subtask2.dependsOn = subtask2.dependsOn.filter((k) => k !== dependency);
   }
@@ -8448,7 +8469,8 @@ function news({ meeting: meeting2 }, member) {
   const fresh2 = meeting2.turns.slice(heard).filter((t) => t.speaker !== member.name);
   return fresh2.map((t) => `[${t.speaker}] ${t.text}`).join("\n\n") || "(nothing new)";
 }
-var SPOKEN = "Say it as you would out loud in a meeting: a few sentences, no headings or lists.";
+var SPOKEN = "Say it as you would out loud in a meeting: a few sentences, no headings or lists. Say only what hasn't been said yet, your conclusion and its reason; don't repeat others or tell how you got there.";
+var MEETING_SCOPE = "A meeting is for lining up, not for working out details. It settles the direction (what to make and the few choices that shape it), who does which piece, and which interfaces there are between the pieces (names, conventions or formats one piece defines and another uses) and who defines each. What an interface holds, and how anyone builds their piece, is worked out afterwards by whoever does it; whoever needs it asks them then. Don't tie pieces together that needn't be: every tie is one more interface to define and to get wrong.";
 var MEETING_KINDS = {
   small: {
     how: "This is a short meeting: everyone gives their judgment once, then only the real conflicts between those judgments get talked through.",
@@ -8483,12 +8505,14 @@ var MEETING_TOOLS = {
 function briefing(ctx, member) {
   const { meeting: meeting2 } = ctx;
   if (meeting2.seats?.[member.name]) return "";
-  return `You're ${member.name === meeting2.host ? "hosting" : "taking part in"} a planning meeting.
+  const part = member.name !== meeting2.host ? "taking part in a" : meeting2.hostOnly ? "only running this; you're not one of its members and take no work in the" : "hosting this, and you also take part in it from your role, as one of its members; as the host you run the";
+  return `You're ${part} planning meeting.
 Goal: ${ctx.goal.name}
 To plan: ${meeting2.agenda}
 The goal's worktree: ${ctx.cwd} (look at what is there; this meeting is read-only)
 Attending: ${listOf(ctx.attendees.map(called))}
 ${MEETING_KINDS[meeting2.size].how}
+${MEETING_SCOPE}
 
 `;
 }
@@ -8496,22 +8520,23 @@ function meetingOpening(ctx) {
   return `${briefing(ctx, ctx.attendees[0])}Open the meeting: restate the goal and the scope, then list the things this meeting has to decide. Put them to everyone as open questions: don't answer them or suggest answers yet, and don't hand topics out by role. You'll give your own view later. Don't write the plan. ${SPOKEN}`;
 }
 function meetingRound(ctx, member) {
-  return `${briefing(ctx, member)}The host opened with:
+  const opened = member.name === ctx.meeting.host ? "You opened with" : "The host opened with";
+  return `${briefing(ctx, member)}${opened}:
 ${ctx.meeting.turns[0]?.text ?? ""}
 
-Everyone now gives a first judgment without hearing each other, so you haven't heard what the others think. Give your own: what you would do about the things to decide and why, and what could go wrong. Your role is the angle you see it from, not the limit of what you may speak to, so if you have a view on something outside it, say it. Don't say who takes which work; that comes when the plan is written. ${SPOKEN}`;
+Everyone now gives a first judgment without hearing each other, so you haven't heard what the others think. Give your own: what you would do about each of the things to decide, not only those nearest your role, and why, which interfaces the pieces of work will need between them (which ones and between whom, not what they hold), and what could go wrong. Your role is the angle you see it from, not the limit of what you may speak to, so if you have a view on something outside it, say it. Don't say who takes which work; that comes when the plan is written. ${SPOKEN}`;
 }
 function meetingHand(ctx, member) {
   return `${briefing(ctx, member)}Said since you last took it in:
 ${news(ctx, member)}
 
-Would you speak next? Raise your hand only if ${MEETING_KINDS[ctx.meeting.size].raise}. Agreeing with what was said is no reason to. If you would, call raise_hand. If not, don't call it. Either way this isn't your turn to speak: nothing you write besides the call is heard.`;
+Would you speak next? Raise your hand only if ${MEETING_KINDS[ctx.meeting.size].raise}. Agreeing with what was said is no reason to, and neither is what an interface holds or how a piece is built: that is for after the meeting, with whoever defines it. If you would, call raise_hand. If not, don't call it. Either way this isn't your turn to speak: nothing you write besides the call is heard.`;
 }
 function meetingAnswer(ctx, member, point) {
   return `${briefing(ctx, member)}Said since you last took it in:
 ${news(ctx, member)}
 
-You have the floor${point ? `, for what you raised your hand about: ${point}` : ": the host has called on you"}. Say it to the person it's for and take up what they actually said. Agree only where you have a reason of your own; if you disagree, say so and why; don't make up a disagreement. ${SPOKEN}`;
+You have the floor${point ? `, for what you raised your hand about: ${point}` : ": the host has called on you"}. Say it to the person it's for and take up what they actually said. Agree only where you have a reason of your own; if you disagree, say so and why; don't make up a disagreement. Keep to what the meeting settles: don't add what an interface should hold or how you'll build your piece. ${SPOKEN}`;
 }
 function meetingSteer(ctx, left) {
   const { meeting: meeting2, attendees } = ctx;
@@ -8531,25 +8556,28 @@ ${hands.join("\n")}` : "Nobody has a hand up."}
 Times each has had the floor in the discussion: ${listOf(had)}.
 You can give the floor ${String(left)} more time${left === 1 ? "" : "s"} at most.
 
-${first ? "You have now heard everyone's first judgment. Say how they differ and what you think yourself." : "Say something yourself only if you have something to add."}
-With hands up, give the floor to one of them: whoever has been challenged first, otherwise whoever has spoken least. You may also give it to someone without a hand up who should answer.
-With no hands up, go back over what you set out to decide: is it true that ${MEETING_KINDS[meeting2.size].settled}? If not, give the floor to the one who should take up what's missing. If so, don't give the floor: close the talk in a sentence, and you'll write the plan after.
-Call give_floor first, then what you say to the room is your last message. ${SPOKEN}`;
+${first ? `You have now heard everyone's first judgment. ${meeting2.hostOnly ? "Say how they differ, without taking a side: you only run this meeting." : "Say how they differ, yours among them: weigh your own against the others by what was said, like anyone's, not as the host's choice."}` : "Say something yourself only if you have something to add."}
+${meeting2.hostOnly ? "" : "You're also a member: when someone questions or asks about your own piece, answer it yourself here, as a member, not by ruling on it.\n"}A hand is worth the floor only if it is about the direction, who does which piece, or which interfaces there are and who defines each. A hand about what an interface holds or how a piece is built isn't: don't give it the floor, and don't take it up or settle it yourself; at most say in a sentence whose it is to settle after the meeting. Among the hands worth it, give the floor to whoever has been challenged first, otherwise whoever has spoken least. You may also give it to someone without a hand up who should answer. When you give someone the floor, say what you need from them: a decision on the direction or on who does what, never what an interface holds or how they will build their piece.
+With no hand worth the floor, go back over what you set out to decide: is it true that ${MEETING_KINDS[meeting2.size].settled}? Check it one thing at a time against what was actually said, not by whether anyone objects: nobody objecting isn't it, and a thing only one way was put forward for hasn't had its options compared. If not, give the floor to the one who should take up what's missing. If so and you haven't yet put the split to the room, put it now: the pieces of work, who takes each, and which interfaces there are and who defines each; give the floor to whoever relies most on others, to say whether that works for them. Anyone whose piece or needs are wrong will raise a hand. Once that is settled too, don't give the floor, whatever hands are up: close the talk in a sentence, and you'll write the plan after.
+Not calling give_floor closes the talk. What you write before and after the call is said to the room. ${SPOKEN}`;
 }
 function meetingClosing(ctx) {
-  const { attendees } = ctx;
+  const { attendees, members } = ctx;
   return `${briefing(ctx, attendees[0])}Said since you last took it in:
 ${news(ctx, attendees[0])}
 
 You're the host: turn the discussion into the final plan.
-Attending (subtasks can only go to them): ${listOf(attendees.map(called))}
+Members (subtasks can only go to them): ${listOf(members.map(called))}${ctx.meeting.hostOnly ? "\nYou only ran the meeting: you take no work in it." : ""}
 
 Requirements:
-- Break the work into 1\u20134 tasks with 1\u20134 subtasks each; every subtask goes to exactly one attendee, whose name goes in assignee: ${listOf(attendees.map((m) => `"${m.name}"`))}. You decide who takes what, from their roles.
-- Spell out the dependencies between subtasks in depends_on (the keys of other subtasks); don't make sequential what can run in parallel.
+- Break the work into 1\u20134 tasks with 1\u20134 subtasks each; every subtask goes to exactly one member, whose name goes in assignee: ${listOf(members.map((m) => `"${m.name}"`))}. Who takes what is the split put to the room; where it wasn't, you decide, from their roles.
+- Split by what each piece of work needs from another. In depends_on (the keys of other subtasks) a subtask names only the subtasks whose results it actually uses; it starts as soon as they are merged. Don't make sequential what can run in parallel.
+- When others wait only on something small and quick to make, such as an interface, types, a config or a skeleton, make it a subtask of its own, so they can start soon; its assignee defines that interface.
+- Every interface the meeting said someone defines and others use is defined in such a quick subtask at the start, by whoever defines it. A subtask that only needs to know an interface depends on the subtask defining it, not on the work behind it. Putting the real pieces together and checking the whole is a subtask of its own at the end.
+- Beyond that, don't split finer: one person's piece is one subtask, and one person's pieces that nobody waits on separately are one subtask. Every subtask carries a fixed cost (a new session getting to know the repository, a review, a merge).
 - Dependencies must not loop: no subtask may wait, directly or through others, on itself or on a subtask that waits on it.
-- A subtask that depends on one in another task starts only when that whole task is finished and the user has accepted it. So tasks can only wait on each other one way: work that needs every other task's result, such as a final integration, is a task of its own.
 - Give every subtask a clear description and acceptance criteria: its member reads them, and the plan document, before starting.
+- In the description of every subtask that defines or uses an interface, name the interface and who defines it.
 - plan_markdown is the plan document for the user and the team: the goal and scope; what was decided, why, and what was turned down; where people didn't agree and how you ruled; what the meeting didn't get to; then who does what, dependencies and risks.
 - summary states the outcome in one sentence.`;
 }
@@ -8931,19 +8959,24 @@ var floorTool = (others, give) => turnTool(
 var quiet = (meeting2) => Object.assign(meeting2, {
   speaking: void 0,
   planning: void 0,
+  drafting: void 0,
   weighing: void 0,
   hands: void 0
 });
-function nextMove({
-  turns,
+var meetingMembers = ({
   participants,
-  size
-}) {
+  hostOnly
+}) => hostOnly ? participants.slice(1) : participants;
+function nextMove(meeting2) {
+  const { turns, participants, size } = meeting2;
   const last = turns.at(-1);
   if (!last) return { kind: "open" };
   const others = participants.slice(1);
-  const waiting = others.find((m) => !turns.some((t) => t.phase === "round" && t.speaker === m));
-  if (waiting) return { kind: "round", member: waiting };
+  const talking = turns.some((t) => t.phase === "steer" || t.phase === "answer");
+  const waiting = meetingMembers(meeting2).filter(
+    (m) => !turns.some((t) => t.phase === "round" && t.speaker === m)
+  );
+  if (!talking && waiting.length) return { kind: "round", members: waiting };
   if (last.phase === "steer")
     return last.calls ? { kind: "answer", member: last.calls } : { kind: "close" };
   const left = others.length * MEETING_TURNS_EACH[size] - turns.filter((t) => t.phase === "answer").length;
@@ -8966,6 +8999,8 @@ var Meetings = class {
     const named = [...new Set(call.attendees.map((name) => name.trim()))];
     const attendees = named.length ? named : core.team.members.map((m) => m.name).sort((a, b) => a.localeCompare(b));
     const host = this.admit(call.goalId, attendees);
+    if (call.hostOnly && attendees.length < 2)
+      throw new Error(`${host} can't only run a meeting with nobody else at it`);
     const meeting2 = {
       id: randomUUID2(),
       goalId: call.goalId,
@@ -8973,6 +9008,7 @@ var Meetings = class {
       size: call.size,
       participants: attendees,
       host,
+      ...call.hostOnly && { hostOnly: true },
       status: "running",
       turns: [],
       tokens: 0,
@@ -9010,14 +9046,15 @@ var Meetings = class {
     return this.ongoing.get(id);
   }
   /**
-   * Your changes to a plan under review: `raw` is the whole plan as the host
-   * hands one in (hostPlanSchema), and may give work to any member.
+   * Your changes to a plan under review: `raw` is the whole plan, which may
+   * give work to any member and names the tasks you accept (planSchema).
+   * Dependencies that loop are refused.
    */
   change(id, raw) {
     const { core } = this;
     const { meeting: meeting2 } = this.underReview(id, "change");
     const names = core.team.members.map((m) => m.name);
-    meeting2.plan = parsePlan(raw, names);
+    meeting2.plan = soundPlan(planSchema(z3.enum(names)).parse(raw), "refuse");
     core.changed();
   }
   /**
@@ -9103,16 +9140,22 @@ var Meetings = class {
   }
   async run(meeting2, signal) {
     const { core } = this;
-    const [host, ...others] = meeting2.participants.flatMap(
-      (name) => core.team.members.filter((m) => m.name === name)
-    );
+    const named = (names) => names.flatMap((name) => core.team.members.filter((m) => m.name === name));
+    const [host, ...others] = named(meeting2.participants);
+    const [member, ...more] = named(meetingMembers(meeting2));
     const goal2 = core.state.goals.find((g) => g.id === meeting2.goalId);
-    if (!host || !goal2) return;
-    let ctx = { meeting: meeting2, goal: goal2, attendees: [host, ...others], cwd: "" };
-    const ask = async (member, prompt, turn = {}) => {
+    if (!host || !member || !goal2) return;
+    let ctx = {
+      meeting: meeting2,
+      goal: goal2,
+      attendees: [host, ...others],
+      members: [member, ...more],
+      cwd: ""
+    };
+    const ask = async (member2, prompt, turn = {}) => {
       const heard = turn.heard ?? meeting2.turns.length;
-      const options = core.options(member, "meeting", ctx.cwd);
-      const seat = meeting2.seats?.[member.name];
+      const options = core.options(member2, "meeting", ctx.cwd);
+      const seat = meeting2.seats?.[member2.name];
       const reply = await askOnce({
         prompt,
         options: {
@@ -9127,15 +9170,33 @@ var Meetings = class {
         signal: turn.signal ?? signal,
         ...turn.listener && { listener: turn.listener }
       });
-      meeting2.seats = { ...meeting2.seats, [member.name]: { session: reply.session, heard } };
+      meeting2.seats = { ...meeting2.seats, [member2.name]: { session: reply.session, heard } };
       meeting2.tokens += reply.tokens;
       return reply;
     };
-    const speak = (member, prompt, turn = {}) => {
-      meeting2.speaking = member.name;
+    const speak = async (member2, prompt, turn = {}) => {
+      const { saying, ...asked } = turn;
+      meeting2.speaking = member2.name;
       meeting2.planning = turn.schema !== void 0;
       core.changed();
-      return ask(member, prompt, { ...turn, listener: core.speech(meeting2, member.name) });
+      const speech = core.speech(meeting2, member2.name);
+      let words = "";
+      try {
+        return await ask(member2, prompt, {
+          ...asked,
+          listener: {
+            ...speech,
+            text: (delta, fresh2) => {
+              speech.text?.(delta, fresh2);
+              words = fresh2 ? delta : words + delta;
+              saying?.(words);
+            }
+          }
+        });
+      } finally {
+        meeting2.speaking = void 0;
+        meeting2.planning = void 0;
+      }
     };
     const said = (speaker, { text: text2, tokens }, phase, calls) => {
       meeting2.turns.push({
@@ -9149,17 +9210,17 @@ var Meetings = class {
       core.changed();
     };
     const attendee = (name) => {
-      const found = others.find((m) => m.name === name);
+      const found = ctx.attendees.find((m) => m.name === name);
       if (!found) throw new Error(`${name} isn't at this meeting`);
       return found;
     };
     try {
       ctx = { ...ctx, cwd: await openGoal(core.places, goal2.slug) };
       const answer = async (name) => {
-        const member = attendee(name);
+        const member2 = attendee(name);
         const point = meeting2.hands?.find((hand) => hand.member === name)?.point;
         meeting2.hands = void 0;
-        said(member, await speak(member, meetingAnswer(ctx, member, point)), "answer");
+        said(member2, await speak(member2, meetingAnswer(ctx, member2, point)), "answer");
       };
       const weigh = async (who) => {
         meeting2.weighing = true;
@@ -9169,12 +9230,12 @@ var Meetings = class {
         const weighing = AbortSignal.any([signal, stop.signal]);
         const asked = await Promise.allSettled(
           who.map(
-            (member) => ask(member, meetingHand(ctx, member), {
+            (member2) => ask(member2, meetingHand(ctx, member2), {
               signal: weighing,
               tool: handTool((hand) => {
                 meeting2.hands = [
-                  ...(meeting2.hands ?? []).filter((h) => h.member !== member.name),
-                  { member: member.name, ...hand }
+                  ...(meeting2.hands ?? []).filter((h) => h.member !== member2.name),
+                  { member: member2.name, ...hand }
                 ];
                 core.changed();
               })
@@ -9189,15 +9250,48 @@ var Meetings = class {
         const failed = asked.find((r) => r.status === "rejected");
         if (failed) throw failed.reason;
       };
+      const round = async (who) => {
+        meeting2.drafting = true;
+        core.changed();
+        const stop = new AbortController();
+        const drafting = AbortSignal.any([signal, stop.signal]);
+        const judged = await Promise.allSettled(
+          who.map(
+            (member2) => (
+              // What they heard is the opening alone: the others' first judgments reach them after.
+              ask(member2, meetingRound(ctx, member2), { heard: 1, signal: drafting }).then(
+                (reply) => {
+                  said(member2, reply, "round");
+                },
+                (error) => {
+                  stop.abort();
+                  throw error;
+                }
+              )
+            )
+          )
+        );
+        meeting2.drafting = void 0;
+        core.changed();
+        const failed = judged.find((r) => r.status === "rejected");
+        if (failed) throw failed.reason;
+      };
       const discuss = async (left) => {
         const last = meeting2.turns.at(-1);
         await weigh(others.filter((m) => last?.phase === "round" || m.name !== last?.speaker));
         let floor;
+        let saying = "";
+        let before = "";
         const steer = await speak(host, meetingSteer(ctx, left), {
-          tool: floorTool(others, (given) => floor = given)
+          tool: floorTool(others, (given) => {
+            floor = given;
+            before = saying.trim();
+          }),
+          saying: (words) => saying = words
         });
-        const called2 = floor?.member ?? meeting2.hands?.[0]?.member;
-        const text2 = steer.text.trim();
+        const called2 = floor?.member;
+        const after = steer.text.trim();
+        const text2 = before && before !== after ? [before, after].filter(Boolean).join("\n\n") : after;
         if (text2 && !floor?.quiet) said(host, { text: text2, tokens: steer.tokens }, "steer", called2);
         else if (called2) await answer(called2);
         else return false;
@@ -9209,11 +9303,9 @@ var Meetings = class {
           case "open":
             said(host, await speak(host, meetingOpening(ctx)), "opening");
             break;
-          case "round": {
-            const member = attendee(move.member);
-            said(member, await speak(member, meetingRound(ctx, member), { heard: 1 }), "round");
+          case "round":
+            await round(move.members.map(attendee));
             break;
-          }
           case "answer":
             await answer(move.member);
             break;
@@ -9222,12 +9314,11 @@ var Meetings = class {
         }
       }
       meeting2.hands = void 0;
-      const names = ctx.attendees.map((m) => m.name);
-      const closing = await speak(host, meetingClosing(ctx), {
-        schema: hostPlanSchema(names)
-      });
+      const names = ctx.members.map((m) => m.name);
+      const schema = hostPlanSchema(names);
+      const closing = await speak(host, meetingClosing(ctx), { schema });
       signal.throwIfAborted();
-      meeting2.plan = parsePlan(closing.structured, names);
+      meeting2.plan = soundPlan(hostWritten(schema.parse(closing.structured)), "drop");
       said(host, { text: meeting2.plan.summary, tokens: closing.tokens }, "summary");
       meeting2.status = step(MEETING_MACHINE, meeting2.status, "plan");
       meeting2.seats = void 0;
@@ -9690,12 +9781,13 @@ var Scheduler = class {
     const { state } = this.core;
     const now = Date.now();
     const ids = /* @__PURE__ */ new Map();
-    const added = tasks.flatMap(({ title, outcome, subtasks }) => {
+    const added = tasks.flatMap(({ title, outcome, ownerAccepts, subtasks }) => {
       const task = {
         id: randomUUID4(),
         goalId,
         title,
         outcome,
+        ownerAccepts,
         createdAt: now,
         ...meetingId !== void 0 && { meetingId }
       };
@@ -10257,12 +10349,16 @@ ${outcome.handover.summary}`
       }
     }
   }
-  /** A subtask merged: done. The last of its task, the task's delivery waits for your acceptance. */
+  /**
+   * A subtask merged: done. The last of its task, the task is done: one you
+   * accept waits for your acceptance.
+   */
   finished(subtask2) {
     subtask2.finishedAt = Date.now();
     subtask2.progress = { done: subtask2.progress.total, total: subtask2.progress.total };
     if (this.core.state.subtasks.some((s) => s.taskId === subtask2.taskId && s.status !== "done"))
       return;
+    if (!this.taskOf(subtask2).ownerAccepts) return;
     this.questions.openDecision(
       subtask2,
       { kind: "delivery", options: DELIVERY_CALLS },
@@ -10696,10 +10792,12 @@ function statusText(work) {
       (m) => m.goalId === goal2.id && m.status !== "approved"
     ))
       lines.push(
-        `  Meeting [${meeting2.id}], hosted by ${meeting2.host}: ${MEETING_STATUS[meeting2.status]}${meeting2.error ? ` (${meeting2.error})` : ""}${derived.resumable.includes(meeting2.id) ? "; it can go on" : ""}`
+        `  Meeting [${meeting2.id}], hosted by ${meeting2.host}${meeting2.hostOnly ? ", who only runs it" : ""}: ${MEETING_STATUS[meeting2.status]}${meeting2.error ? ` (${meeting2.error})` : ""}${derived.resumable.includes(meeting2.id) ? "; it can go on" : ""}`
       );
     for (const task of work.tasks.filter((t) => t.goalId === goal2.id)) {
-      lines.push(`  Task "${task.title}" [${task.id}]`);
+      lines.push(
+        `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", the user accepts it" : ""}`
+      );
       for (const subtask2 of work.subtasks.filter((s) => s.taskId === task.id))
         lines.push(subtaskLine(subtask2, derived.subtasks[subtask2.id]?.waits ?? [], work));
     }
@@ -10723,7 +10821,7 @@ function shownMeeting(work) {
 function meetingStatus(meeting2) {
   switch (meeting2.status) {
     case "running":
-      return meeting2.planning ? `${meeting2.host} writes the plan` : meeting2.speaking ? `${meeting2.speaking} speaks` : meeting2.weighing ? "deciding who speaks next" : "under way";
+      return meeting2.planning ? `${meeting2.host} writes the plan` : meeting2.speaking ? `${meeting2.speaking} speaks` : meeting2.drafting ? "the members form their first judgments" : meeting2.weighing ? "deciding who speaks next" : "under way";
     case "review":
       return "its plan waits for you";
     case "approved":
@@ -10847,6 +10945,9 @@ function milestones(work) {
         text: `"${s.title}" by ${s.assignee} failed${s.error ? `: ${s.error}` : ""}`
       });
   }
+  for (const task of work.tasks)
+    if (work.subtasks.every((s) => s.taskId !== task.id || s.status === "done"))
+      said.push({ key: `task:${task.id}`, text: `The task "${task.title}" is done` });
   return said;
 }
 function prompts(work) {
@@ -10855,7 +10956,7 @@ function prompts(work) {
     if (meeting2.status === "review" && meeting2.plan)
       asked.push({
         key: `review:${meeting2.id}`,
-        text: `The meeting [${meeting2.id}] on "${aboutOf(work, meeting2)}" has a plan: ${meeting2.plan.summary}. Show it to the user with show_plan, and ask whether to approve it, change it, or cancel it.`
+        text: `The meeting [${meeting2.id}] on "${aboutOf(work, meeting2)}" has a plan: ${meeting2.plan.summary}. Show it to the user with show_plan, and ask whether to approve it, change it, or cancel it, and which tasks, if any, they want to accept themselves once done: none is unless they say, since reviews and checks confirm the work; it is worth it for a result only looking at it or trying it can judge.`
       });
   for (const question of work.questions) {
     if (question.kind !== "decision" || question.decision.kind !== "delivery") continue;
@@ -10988,6 +11089,7 @@ var writtenPlan = (plan) => ({
   tasks: plan.tasks.map((task) => ({
     title: task.title,
     outcome: task.outcome,
+    owner_accepts: task.ownerAccepts,
     subtasks: task.subtasks.map(({ dependsOn, ...subtask2 }) => ({
       ...subtask2,
       depends_on: dependsOn
@@ -11007,7 +11109,10 @@ var meetingInput = (member) => ({
   goal,
   agenda: z8.string().trim().min(1).describe("What to plan, with everything the user said about it"),
   size: z8.enum(MEETING_SIZES).optional().describe("How long the discussion runs; the team's default when left out"),
-  attendees: z8.array(member).default([]).describe("The host first; everyone when empty")
+  attendees: z8.array(member).default([]).describe("The host first; everyone when empty"),
+  host_only: z8.boolean().default(false).describe(
+    "True when the host only runs the meeting: no view of their own and no work in the plan. Leave it out for a host who also takes part from their role, the usual"
+  )
 });
 var changePlanInput = (member) => ({ meeting, plan: planSchema(member) });
 var assignInput = (member) => ({
@@ -11048,16 +11153,17 @@ function addTools(server2, team2) {
       description: "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and the session is told when its plan waits for the user. Hold one only once the user has agreed who attends.",
       inputSchema: meetingInput(memberName())
     },
-    async ({ goal: ref, agenda, size, attendees }) => {
+    async ({ goal: ref, agenda, size, attendees, host_only }) => {
       const engine2 = await team2();
       const held = engine2.meetings.start({
         goalId: goalOf(engine2, ref).id,
         agenda,
         size: size ?? engine2.meetingSize,
-        attendees
+        attendees,
+        hostOnly: host_only
       });
       return toolText(
-        `The meeting [${held.id}] has begun: ${listOf(held.participants)}, hosted by ${held.host}.`
+        `The meeting [${held.id}] has begun: ${listOf(held.participants)}, hosted by ${held.host}${held.hostOnly ? ", who only runs it" : ""}.`
       );
     }
   );
@@ -11077,7 +11183,7 @@ function addTools(server2, team2) {
   const changePlanTool = server2.registerTool(
     "change_plan",
     {
-      description: "Replace a plan under review with the user's changes: the whole plan, as show_plan gives it, changed. Any member can be given work.",
+      description: "Replace a plan under review with the user's changes: the whole plan, as show_plan gives it, changed. Any member can be given work. owner_accepts marks a task the user accepts themselves once done; none is, unless they say.",
       inputSchema: changePlanInput(memberName())
     },
     async ({ meeting: id, plan }) => {

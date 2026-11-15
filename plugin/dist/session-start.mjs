@@ -27481,6 +27481,7 @@ function waitsIn(state, subtask, busy) {
         if (!d) return [];
         if (d.status !== "done") return [unmerged(d)];
         if (d.taskId === subtask.taskId) return [];
+        if (!state.tasks.find((t) => t.id === d.taskId)?.ownerAccepts) return [];
         const rest = state.subtasks.find((s) => s.taskId === d.taskId && s.status !== "done");
         if (rest) return [unmerged(rest)];
         const acceptance = acceptanceOf(state, d.taskId);
@@ -27611,10 +27612,12 @@ function statusText(work) {
       (m) => m.goalId === goal.id && m.status !== "approved"
     ))
       lines.push(
-        `  Meeting [${meeting.id}], hosted by ${meeting.host}: ${MEETING_STATUS[meeting.status]}${meeting.error ? ` (${meeting.error})` : ""}${derived2.resumable.includes(meeting.id) ? "; it can go on" : ""}`
+        `  Meeting [${meeting.id}], hosted by ${meeting.host}${meeting.hostOnly ? ", who only runs it" : ""}: ${MEETING_STATUS[meeting.status]}${meeting.error ? ` (${meeting.error})` : ""}${derived2.resumable.includes(meeting.id) ? "; it can go on" : ""}`
       );
     for (const task of work.tasks.filter((t) => t.goalId === goal.id)) {
-      lines.push(`  Task "${task.title}" [${task.id}]`);
+      lines.push(
+        `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", the user accepts it" : ""}`
+      );
       for (const subtask of work.subtasks.filter((s) => s.taskId === task.id))
         lines.push(subtaskLine(subtask, derived2.subtasks[subtask.id]?.waits ?? [], work));
     }
