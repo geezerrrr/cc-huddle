@@ -33,6 +33,7 @@ describe("statusText", () => {
   it("tells the goal with its team, meetings and work, and what waits on you", () => {
     const text = statusText({
       members: ["glm", "sonnet"],
+      underWay: [],
       goal: { id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 },
       meetings: [
         {

@@ -7,6 +7,7 @@
 import { spawn } from "node:child_process";
 import { readdir, readFile, realpath, rm, stat } from "node:fs/promises";
 import path from "node:path";
+import { goalFiles } from "./goal-files.ts";
 import { serialBy } from "./serial.ts";
 
 /** Every command: nothing from the repository's config runs, and paths come out as they are. */
@@ -129,7 +130,7 @@ export interface Places {
 export const goalBranch = (slug: string) => `openplan/${slug}/main`;
 
 /** The worktree a goal's branch is checked out in. */
-export const goalFolder = (places: Places) => path.join(places.root, "checkout");
+export const goalFolder = (places: Places) => goalFiles(places.root).checkout;
 
 /** The slugs goals have taken in a repository: every name with a branch under `openplan/<slug>/`. */
 export async function takenSlugs(repo: Repository): Promise<Set<string>> {
@@ -209,7 +210,7 @@ export const subtaskBranch = (slug: string, subtaskId: string) => `openplan/${sl
 
 /** The worktree a subtask works in. */
 export const deskFolder = (places: Places, subtaskId: string) =>
-  path.join(places.root, "desks", subtaskId);
+  goalFiles(places.root).desk(subtaskId);
 
 /** One git operation per goal at a time: its branch and its worktrees are shared. */
 const serial = serialBy();

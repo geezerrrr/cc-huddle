@@ -7,6 +7,7 @@
 import type { Options, PermissionMode, Settings } from "@anthropic-ai/claude-agent-sdk";
 import { writeWhole } from "./files.ts";
 import { authorEnv, memberSigner } from "./git.ts";
+import type { SessionKind } from "./prompts.ts";
 import type { Member } from "./types.ts";
 
 type Env = Record<string, string | undefined>;
@@ -100,17 +101,29 @@ export interface Seat {
   settings: string;
   /** Appended to Claude Code's own system prompt. */
   system: string;
-  /** Your session's permission mode, for a working turn; none when the team sets its own, or none is known yet. */
-  mode?: PermissionMode;
+  /** Your session's permission mode as it is now; undefined before it is known. */
+  sessionMode?: PermissionMode;
+  /** Whether the team's settings set a permission mode of their own, which then wins over yours. */
+  teamMode: boolean;
 }
+
+/** The options of a member's turn of `kind`: working (workOptions) or reading only (readOnlyOptions). */
+export const sessionOptions = (seat: Seat, kind: SessionKind, from: Env): Options =>
+  kind === "work" ? workOptions(seat, from) : readOnlyOptions(seat, from);
 
 /**
  * Agent SDK options for a member's working turn: their model and effort,
- * their settings file, your session's permission mode, Claude Code's system
+ * their settings file, your session's permission mode unless the team sets
+ * its own, Claude Code's system
  * prompt with ours appended, the reply streamed as it is written, their name
  * on the commits they make and in `claude agents`.
  */
-export function workOptions(seat: Seat, from: Env): Options {
+function workOptions(seat: Seat, from: Env): Options {
+  return memberOptions(seat, from, seat.teamMode ? undefined : seat.sessionMode);
+}
+
+/** What every member turn runs with, in permission mode `mode` (Claude Code's default for none). */
+function memberOptions(seat: Seat, from: Env, mode: PermissionMode | undefined): Options {
   const { member } = seat;
   const env = Object.fromEntries(
     Object.entries(from).filter(([name]) => !SESSION_VARS.includes(name)),
@@ -120,10 +133,10 @@ export function workOptions(seat: Seat, from: Env): Options {
     model: member.model,
     effort: member.effort,
     settings: seat.settings,
-    ...(seat.mode && {
-      permissionMode: seat.mode,
+    ...(mode && {
+      permissionMode: mode,
       // The SDK takes bypassPermissions only so: your session runs in it, as you chose.
-      ...(seat.mode === "bypassPermissions" && { allowDangerouslySkipPermissions: true }),
+      ...(mode === "bypassPermissions" && { allowDangerouslySkipPermissions: true }),
     }),
     env: { ...env, ...authorEnv(memberSigner(member.name)) },
     systemPrompt: { type: "preset", preset: "claude_code", append: seat.system },
@@ -146,11 +159,10 @@ export function workOptions(seat: Seat, from: Env): Options {
  * through each turn, its tools change and the conversation's prompt cache is
  * written again whole, turn after turn.
  */
-export function readOnlyOptions(seat: Seat, from: Env): Options {
+function readOnlyOptions(seat: Seat, from: Env): Options {
   return {
-    ...workOptions(seat, from),
+    ...memberOptions(seat, from, "dontAsk"),
     tools: READ_ONLY_TOOLS,
-    permissionMode: "dontAsk",
     strictMcpConfig: true,
   };
 }

@@ -57,6 +57,7 @@ const question = (
 
 const work = (): Work => ({
   members: ["glm", "sonnet"],
+  underWay: [],
   goal: { id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 },
   tasks: [
     {

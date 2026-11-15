@@ -200,8 +200,6 @@ export interface Meeting {
   hands?: MeetingHand[];
   seats?: Record<string, MeetingSeat>;
   plan?: Plan;
-  /** Where the approved plan was written. */
-  planFile?: string;
   tokens: number;
   error?: string;
   createdAt: number;
@@ -316,6 +314,8 @@ export type Wait =
   | { kind: "goal"; status: "paused" | "archived" }
   | { kind: "upstream"; by: string; subtaskId: string; halted: boolean }
   | { kind: "busy"; by: string }
+  /** Merges go one at a time: one under way, or delivered before it. */
+  | { kind: "merge"; subtaskId: string }
   | { kind: "teammate"; by: string; questionId: string }
   | { kind: "you"; questionId: string; decision?: DecisionKind }
   /** Upstream work in another task you accept, done, whose task waits for your acceptance. */

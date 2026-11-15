@@ -10,6 +10,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import path from "node:path";
 import { errorText } from "./core.ts";
 import { writeWhole } from "./files.ts";
+import { goalFiles } from "./goal-files.ts";
 import { slugFor, type Repository } from "./git.ts";
 import { running } from "./running.ts";
 import type { GoalState } from "./types.ts";
@@ -26,17 +27,6 @@ export function repoFolder(dataFolder: string, repo: Repository): string {
 
 /** The folder of a repository's goals, each in a folder named by its slug. */
 export const goalsFolder = (repoFolder: string) => path.join(repoFolder, "goals");
-
-/** The files in a goal's folder. */
-export const goalFiles = (folder: string) => ({
-  state: path.join(folder, "state.json"),
-  lock: path.join(folder, "lock"),
-  members: path.join(folder, "members.json"),
-  /** The goal's copy of the team (team.ts copyTeam). */
-  team: path.join(folder, "team.json"),
-  /** A member's settings file (policy.ts writeSettings). */
-  settings: (member: string) => path.join(folder, "settings", `${member}.json`),
-});
 
 /** The version of `state.json` this openplan writes. */
 const STATE_VERSION = 1;

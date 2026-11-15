@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Core } from "./core.ts";
+import { goalFiles } from "./goal-files.ts";
 import { git, goalFolder, openRepository } from "./git.ts";
 import { Meetings, nextMove } from "./meetings.ts";
 import type { Scheduler } from "./scheduler.ts";
@@ -59,6 +60,7 @@ beforeEach(async () => {
     options: (m, kind, cwd) => ({ cwd, model: `${m.name}/${kind}` }),
     recorder: () => ({}),
     speech: () => ({}),
+    underWay: () => [],
   };
   meetings = new Meetings(core, { pump, assign } as unknown as Scheduler);
   vi.mocked(askOnce).mockReset();
@@ -219,11 +221,11 @@ describe("Meetings", () => {
     const asks = vi.mocked(askOnce).mock.calls.map(([ask]) => ask);
     expect(asks[0]?.options).toEqual({
       cwd: goalFolder(core.places),
-      model: "glm/meeting",
+      model: "glm/readOnly",
     });
     const hand = asks.find((a) => a.prompt.includes("Would you speak next?"));
     expect(hand?.options).toMatchObject({
-      resume: "sonnet/meeting#3",
+      resume: "sonnet/readOnly#3",
       allowedTools: ["mcp__openplan__raise_hand"],
     });
     const answer = asks.find((a) => a.prompt.includes("You have the floor"));
@@ -352,9 +354,9 @@ describe("Meetings", () => {
     const round = vi
       .mocked(askOnce)
       .mock.calls.findLast(
-        ([a]) => a.prompt.includes("Everyone now gives") && a.options.model === "glm/meeting",
+        ([a]) => a.prompt.includes("Everyone now gives") && a.options.model === "glm/readOnly",
       );
-    expect(round?.[0].options.resume).toBe("glm/meeting#1");
+    expect(round?.[0].options.resume).toBe("glm/readOnly#1");
   });
 
   it("are cancelled when stopped, and after a restart", async () => {
@@ -433,11 +435,10 @@ describe("A plan under review", () => {
     expect(meeting.plan?.tasks[0]?.ownerAccepts).toBe(true);
 
     await meetings.approve(meeting.id);
-    expect(meeting).toMatchObject({
-      status: "approved",
-      planFile: path.join(core.places.root, "plans", `${meeting.id}.md`),
-    });
-    expect(await readFile(meeting.planFile ?? "", "utf8")).toBe("# Plan, changed");
+    expect(meeting.status).toBe("approved");
+    expect(await readFile(goalFiles(core.places.root).plan(meeting.id), "utf8")).toBe(
+      "# Plan, changed",
+    );
     expect(assign).toHaveBeenCalledWith(meeting.plan?.tasks, meeting.id);
     await expect(meetings.approve(meeting.id)).rejects.toThrow("no plan under review");
   });

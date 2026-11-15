@@ -20,6 +20,7 @@ import { z } from "zod";
 import { errorText, workOf, type Core } from "./core.ts";
 import { busyMembers, meetingResumes } from "./derive.ts";
 import { openGoal } from "./git.ts";
+import { goalFiles } from "./goal-files.ts";
 import { can, MEETING_MACHINE, step } from "./machines.ts";
 import { hostPlanSchema, hostWritten, planSchema, soundPlan } from "./plan.ts";
 import {
@@ -258,7 +259,7 @@ export class Meetings {
     const { core } = this;
     const { meeting, plan } = this.underReview(id, "approve");
     this.activeGoal();
-    const file = path.join(core.places.root, "plans", `${meeting.id}.md`);
+    const file = goalFiles(core.places.root).plan(meeting.id);
     await mkdir(path.dirname(file), { recursive: true });
     await writeFile(file, plan.markdown);
     // Changed, called off or approved meanwhile, or its goal held: not approved now (the file stays).
@@ -266,7 +267,6 @@ export class Meetings {
       throw new Error("The plan changed while it was being approved");
     this.activeGoal();
     meeting.status = step(MEETING_MACHINE, meeting.status, "approve");
-    meeting.planFile = file;
     return this.scheduler.assign(plan.tasks, meeting.id);
   }
 
@@ -371,7 +371,7 @@ export class Meetings {
       } = {},
     ): Promise<Reply> => {
       const heard = turn.heard ?? meeting.turns.length;
-      const options = core.options(member, "meeting", ctx.cwd);
+      const options = core.options(member, "readOnly", ctx.cwd);
       const seat = meeting.seats?.[member.name];
       const reply = await askOnce({
         prompt,

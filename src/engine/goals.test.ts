@@ -80,6 +80,7 @@ beforeEach(async () => {
     options: () => ({}),
     recorder: () => ({}),
     speech: () => ({}),
+    underWay: () => [],
   };
   goals = new Goals(core, scheduler as unknown as Scheduler, meetings as unknown as Meetings);
   vi.clearAllMocks();

@@ -5,7 +5,8 @@
  * goals adds nothing.
  */
 import path from "node:path";
-import { goalFiles, goalsFolder, listGoals, repoFolder } from "../engine/data.ts";
+import { goalsFolder, listGoals, repoFolder } from "../engine/data.ts";
+import { goalFiles } from "../engine/goal-files.ts";
 import { openRepository } from "../engine/git.ts";
 import { readCopy } from "../engine/team.ts";
 import { othersText, statusText } from "./status.ts";
@@ -29,7 +30,12 @@ export async function sessionContext(
   const parts: string[] = [];
   if (mine) {
     const { team } = await readCopy(goalFiles(path.join(goalsFolder(root), mine.slug)).team);
-    const status = statusText({ ...mine.state, members: team.members.map((m) => m.name) });
+    // Read from the goal's file: what is under way is the server's, not known here.
+    const status = statusText({
+      ...mine.state,
+      members: team.members.map((m) => m.name),
+      underWay: [],
+    });
     parts.push(
       `This session runs openplan's goal "${mine.state.goal.name}", as it stands:\n\n${status}`,
     );

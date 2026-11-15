@@ -28,12 +28,15 @@ export interface Core extends Inbox {
   recorder(subtask: Subtask): TurnListener;
   /** Where what is said at a meeting is told as it is said: the pane. */
   speech(meeting: Meeting, speaker: string): TurnListener;
+  /** The subtasks whose review or merge is under way now (Scheduler.underWay). */
+  underWay(): readonly string[];
 }
 
 /** The state as the rules read it (derive.ts). */
-export const workOf = (core: Pick<Core, "state" | "team">): Work => ({
+export const workOf = (core: Pick<Core, "state" | "team" | "underWay">): Work => ({
   ...core.state,
   members: core.team.members.map((m) => m.name),
+  underWay: core.underWay(),
 });
 
 /** An error in words. */

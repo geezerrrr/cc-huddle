@@ -7,10 +7,9 @@
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { workOf, type Team } from "../engine/core.ts";
+import type { Team } from "../engine/core.ts";
 import { goalBranch } from "../engine/git.ts";
 import { planSchema } from "../engine/plan.ts";
-import { derive } from "../engine/derive.ts";
 import { listOf } from "../engine/prompts.ts";
 import type { Answer } from "../engine/questions.ts";
 import { toolText } from "../engine/turns.ts";
@@ -102,9 +101,7 @@ export function addTools(server: McpServer, session: Session) {
       const engine = session.current;
       const others = othersText(await session.others());
       return toolText(
-        [engine ? statusText(workOf(engine)) : session.none, ...(others ? [others] : [])].join(
-          "\n\n",
-        ),
+        [engine ? statusText(engine.work) : session.none, ...(others ? [others] : [])].join("\n\n"),
       );
     },
   );
@@ -250,12 +247,9 @@ export function addTools(server: McpServer, session: Session) {
     },
     async ({ subtask: id, action }) => {
       const engine = session.goal;
-      const found = engine.state.subtasks.find((s) => s.id === id);
-      if (!found) throw new Error("There is no such subtask");
-      if (!derive(workOf(engine)).subtasks[id]?.actions.includes(action))
-        throw new Error(`"${found.title}" can't ${action} while ${found.status}`);
-      await engine.scheduler[action](id);
-      return toolText(`"${found.title}" is ${found.status} now.`);
+      await engine.scheduler.act(id, action);
+      const acted = engine.state.subtasks.find((s) => s.id === id);
+      return toolText(`"${acted?.title ?? ""}" is ${acted?.status ?? "gone"} now.`);
     },
   );
 

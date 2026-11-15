@@ -15,7 +15,7 @@ import path from "node:path";
 import { text } from "node:stream/consumers";
 import { z } from "zod";
 import type { OpenplanTeam, OpenplanView } from "../../plugin/types/index.d.ts";
-import { errorText, workOf } from "../engine/core.ts";
+import { errorText } from "../engine/core.ts";
 import type { GoalEntry, HandedOver } from "../engine/data.ts";
 import { paneTeam, shownMeeting, viewEntries, viewLive } from "./pane.ts";
 import type { Session } from "./session.ts";
@@ -50,7 +50,7 @@ function viewer(session: () => Session) {
     });
     const entries = session().othersOf(all);
     const engine = session().current;
-    const mine = engine && { work: workOf(engine), members: engine.team.members };
+    const mine = engine && { work: engine.work, members: engine.team.members };
     const team: OpenplanTeam = paneTeam(mine, entries, session().moved);
     const text = JSON.stringify(team);
     if (text !== shown) {

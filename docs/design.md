@@ -177,9 +177,9 @@ Kinds: a teammate's question (answered by that teammate in a read-only session),
 
 ### 4.5 Derived, never stored
 
-- What a subtask waits on: an upstream subtask, a busy owner or reviewer, a paused goal, a teammate's or your answer. Upstream work in a task you accept yourself is waited on as that whole task, done and accepted; in any other task, only the subtasks depended on, merged.
+- What a subtask waits on: an upstream subtask, a busy owner or reviewer, a merge ahead of it, a paused goal, a teammate's or your answer. Upstream work in a task you accept yourself is waited on as that whole task, done and accepted; in any other task, only the subtasks depended on, merged. A reviewer reviews one delivery at a time and the goal merges one at a time: the one under way first, then the rest in delivery order. What is under way isn't in the state (after a restart nothing is); the scheduler says, and the rules read it with the state. The scheduler starts exactly what these rules leave waiting on nothing.
 - Who is busy, who reviews a delivery (the meeting's host, else another member), whose upstream was redone after it started.
-- What you can do to each subtask, meeting and goal: asked of the same tables with `can`.
+- What you can do to each subtask, meeting and goal: asked of the same tables with `can`. The scheduler refuses anything else you ask of a subtask, saying why.
 
 ## 5. Git
 

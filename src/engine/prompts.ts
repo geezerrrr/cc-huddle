@@ -4,8 +4,11 @@
  */
 import type { Delivery, Goal, GoOn, Meeting, MeetingSize, Member, Subtask, Task } from "./types.ts";
 
-/** The kinds of session a member works in. */
-export type SessionKind = "task" | "meeting" | "answer" | "review";
+/**
+ * The kinds of turn a member takes: working on a subtask, or reading only
+ * (a meeting, an answer to a teammate, a review).
+ */
+export type SessionKind = "work" | "readOnly";
 
 /** Names in a sentence: "a, b and c". */
 export const listOf = (items: readonly string[]) =>
@@ -30,7 +33,7 @@ ${others.length ? `Your teammates: ${others.join(", ")}.` : "You are the only me
 
 # Your duties
 ${member.role.duties.trim()}`;
-  return kind === "task" ? `${who}\n\n${TASK_WAYS}` : who;
+  return kind === "work" ? `${who}\n\n${TASK_WAYS}` : who;
 }
 
 /** Work a subtask builds on, with what it delivered: what it depends on directly, or further up. */

@@ -40,6 +40,7 @@ const question = (fields: Pick<Question, "id" | "subtaskId"> & Ask): Question =>
 
 const work = (fields: Partial<Work> = {}): Work => ({
   members: ["host", "ann", "bob"],
+  underWay: [],
   goal: { id: "p1", name: "dice", slug: "dice", status: "active", createdAt: 0 },
   tasks: [
     {
@@ -145,6 +146,38 @@ describe("waitsIn", () => {
     const state = work({ subtasks: [first, second] });
     expect(waitsIn(state, first, busyMembers(state))).toEqual([]);
     expect(waitsIn(state, second, busyMembers(state))).toEqual([{ kind: "busy", by: "host" }]);
+  });
+
+  it("has a review or merge under way go first, then the rest in delivery order, one at a time", () => {
+    const at = (n: number) => ({ summary: "", files: [], at: n });
+    const early = subtask("early", { status: "reviewing", assignee: "bob", delivery: at(1) });
+    const late = subtask("late", { status: "reviewing", delivery: at(2) });
+    const reviewing = work({ subtasks: [early, late], underWay: ["late"] });
+    expect(waitsIn(reviewing, late, busyMembers(reviewing))).toEqual([]);
+    expect(waitsIn(reviewing, early, busyMembers(reviewing))).toEqual([
+      { kind: "busy", by: "host" },
+    ]);
+
+    const first = subtask("first", { status: "merging", delivery: at(1) });
+    const next = subtask("next", { status: "merging", delivery: at(2) });
+    const queued = work({ subtasks: [first, next] });
+    expect(waitsIn(queued, first, new Set())).toEqual([]);
+    expect(waitsIn(queued, next, new Set())).toEqual([{ kind: "merge", subtaskId: "first" }]);
+    const merging = work({ subtasks: [first, next], underWay: ["next"] });
+    expect(waitsIn(merging, first, new Set())).toEqual([{ kind: "merge", subtaskId: "next" }]);
+    // One that waits on your decision holds no merge up.
+    const deciding = work({
+      subtasks: [first, next],
+      questions: [
+        question({
+          id: "q1",
+          subtaskId: "first",
+          kind: "decision",
+          decision: { kind: "merge", options: ["retry"] },
+        }),
+      ],
+    });
+    expect(waitsIn(deciding, next, new Set())).toEqual([]);
   });
 
   it("waits on a teammate's answer and on yours while running", () => {

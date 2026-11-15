@@ -71,6 +71,7 @@ beforeEach(async () => {
     options: (_, kind, cwd) => ({ cwd, model: kind }),
     recorder: () => ({}),
     speech: () => ({}),
+    underWay: () => scheduler.underWay(),
   };
   questions = new Questions(core);
   scheduler = new Scheduler(core, questions);
@@ -133,7 +134,7 @@ describe("Scheduler", () => {
 
     const run = vi.mocked(runSubtask).mock.lastCall?.[0];
     expect(run?.opening).toContain("Your subtask: Make s1");
-    expect(run?.options.model).toBe("task");
+    expect(run?.options.model).toBe("work");
     expect(await onGoal("score.txt")).toBe("0:0\n");
     const log = await git({ cwd: core.places.repo.top }, [
       "log",
@@ -319,7 +320,7 @@ describe("Scheduler", () => {
     ]);
     expect(vi.mocked(askOnce).mock.lastCall?.[0].options).toEqual({
       cwd: goalFolder(core.places),
-      model: "answer",
+      model: "readOnly",
     });
     expect(s1.tokens).toBe(5);
   });
@@ -344,7 +345,7 @@ describe("Scheduler", () => {
       const review = vi.mocked(askOnce).mock.lastCall?.[0];
       expect(review?.options).toEqual({
         cwd: path.join(core.places.root, "desks", "s1"),
-        model: "review",
+        model: "readOnly",
       });
       expect(review?.prompt).toContain("Acceptance criteria: Shows both scores");
       expect(review?.schema?.safeParse({ pass: true, notes: "Fine." }).success).toBe(true);
@@ -413,9 +414,9 @@ describe("Scheduler", () => {
       await eventually(() => {
         expect(runs()).toHaveLength(1);
       });
-      await scheduler.stop("s1");
+      await scheduler.act("s1", "stop");
       await settled(s1, "stopped");
-      scheduler.continue("s1");
+      await scheduler.act("s1", "continue");
       await settled(s1, "done");
       expect(runs()[1]).toMatchObject({
         resume: "glm-1",
@@ -440,7 +441,7 @@ describe("Scheduler", () => {
         });
       scheduler.pump();
       await settled(s1, "failed");
-      scheduler.continue("s1");
+      await scheduler.act("s1", "continue");
       await settled(s1, "done");
       expect(runs()[1]?.resume).toBe("glm-1");
     });
@@ -461,7 +462,7 @@ describe("Scheduler", () => {
       scheduler.pump();
       await settled(s1, "failed");
       expect(s1).toMatchObject({ session: "glm-1", error: "API Error: 529" });
-      await scheduler.retry("s1");
+      await scheduler.act("s1", "retry");
       await settled(s1, "done");
       expect(runs()[1]?.resume).toBeUndefined();
       expect(runs()[1]?.opening).toContain("Your subtask: Make s1");
@@ -491,9 +492,9 @@ describe("Scheduler", () => {
       await eventually(() => {
         expect(askOnce).toHaveBeenCalledTimes(1);
       });
-      await scheduler.stop("s1");
+      await scheduler.act("s1", "stop");
       expect(s1).toMatchObject({ status: "stopped", stoppedIn: "reviewing" });
-      scheduler.continue("s1");
+      await scheduler.act("s1", "continue");
       await settled(s1, "done");
       expect(runSubtask).toHaveBeenCalledTimes(1);
       expect(core.state.questions).toMatchObject([{ decision: { kind: "delivery" } }]);
@@ -571,7 +572,7 @@ describe("Scheduler", () => {
       });
       core.state.subtasks.push(s1, s2);
       vi.mocked(runSubtask).mockImplementation(delivering({ "board.txt": "2\n" }));
-      scheduler.redo("s2");
+      await scheduler.act("s2", "redo");
       await settled(s2, "done");
       expect(runs()[0]).toMatchObject({
         resume: "glm-2",
@@ -580,6 +581,16 @@ describe("Scheduler", () => {
         ) as string,
       });
     });
+  });
+
+  it("refuses what can't be done to a subtask where it stands", async () => {
+    const s1 = subtask("s1", { status: "done", finishedAt: 5 });
+    const s2 = subtask("s2", { status: "done", dependsOn: ["s1"], startedAt: 10 });
+    core.state.subtasks.push(s1, s2);
+    await expect(scheduler.act("s2", "redo")).rejects.toThrow("can't redo while done");
+    await expect(scheduler.act("s1", "retry")).rejects.toThrow("can't retry while done");
+    await expect(scheduler.act("gone", "stop")).rejects.toThrow("There is no such subtask");
+    expect(s2.status).toBe("done");
   });
 
   describe("work on hold", () => {

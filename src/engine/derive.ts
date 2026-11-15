@@ -18,9 +18,14 @@ import {
   type Wait,
 } from "./types.ts";
 
-/** What the rules read: the state, and the team's members in their order. */
+/**
+ * What the rules read: the state, the team's members in their order, and the
+ * subtasks whose review or merge is under way, which the state doesn't keep:
+ * after a restart none is.
+ */
 export interface Work extends GoalState {
   members: readonly string[];
+  underWay: readonly string[];
 }
 
 const openQuestions = (state: Pick<GoalState, "questions">, subtaskId: string) =>
@@ -53,7 +58,7 @@ function acceptanceOf(state: Pick<GoalState, "questions" | "subtasks">, taskId: 
   );
 }
 
-/** Whether a subtask in review is being reviewed now: its goal is active and you aren't deciding on it. */
+/** Whether a subtask in review can be reviewed: its goal is active and you aren't deciding on it. */
 const underReview = (state: Pick<GoalState, "goal" | "questions">, subtask: Subtask) =>
   subtask.status === "reviewing" &&
   isActive(state) &&
@@ -76,25 +81,47 @@ export function busyMembers(state: Work): Set<string> {
 }
 
 /**
+ * Of the subtasks handed over and waiting like `subtask` (`alike`), one that
+ * goes before it: one under way, else one delivered earlier (the earlier in
+ * the list on a tie). Reviews by one reviewer, and merges, go so, one at a time.
+ */
+function ahead(state: Work, subtask: Subtask, alike: (s: Subtask) => boolean): Subtask | undefined {
+  const at = subtask.delivery?.at ?? 0;
+  const index = state.subtasks.indexOf(subtask);
+  const others = state.subtasks.filter((s) => s !== subtask && alike(s));
+  return (
+    others.find((s) => state.underWay.includes(s.id)) ??
+    others.find((s) => {
+      const sAt = s.delivery?.at ?? 0;
+      return sAt < at || (sAt === at && state.subtasks.indexOf(s) < index);
+    })
+  );
+}
+
+/**
  * Whom a review that could go on waits for: its reviewer while they are at
- * something else (their own subtask, a meeting, a review of work delivered
- * earlier), as everyone does one thing at a time.
+ * something else (their own subtask, a meeting, a review under way or of
+ * work delivered earlier), as everyone does one thing at a time.
  */
 function reviewerAway(state: Work, subtask: Subtask): string | undefined {
   const reviewer = reviewerOf(state, subtask);
-  const at = subtask.delivery?.at ?? 0;
-  const index = state.subtasks.indexOf(subtask);
   const working = state.subtasks.some((s) => s.status === "running" && s.assignee === reviewer);
   const meeting = state.meetings.some(
     (m) => m.status === "running" && m.participants.includes(reviewer),
   );
-  const earlier = state.subtasks.some((s, i) => {
-    if (s === subtask || !underReview(state, s) || reviewerOf(state, s) !== reviewer) return false;
-    const sAt = s.delivery?.at ?? 0;
-    return sAt < at || (sAt === at && i < index);
-  });
-  return working || meeting || earlier ? reviewer : undefined;
+  const reviewing = ahead(
+    state,
+    subtask,
+    (s) => underReview(state, s) && reviewerOf(state, s) === reviewer,
+  );
+  return working || meeting || reviewing ? reviewer : undefined;
 }
+
+/** Whether a subtask being merged can be merged: its goal is active and you aren't deciding on it. */
+const mergeable = (state: Pick<GoalState, "goal" | "questions">, subtask: Subtask) =>
+  subtask.status === "merging" &&
+  isActive(state) &&
+  !openQuestions(state, subtask.id).some((q) => q.kind === "decision");
 
 /** What a subtask waits on in its stage; `busy` is busyMembers. */
 export function waitsIn(state: Work, subtask: Subtask, busy: Set<string>): Wait[] {
@@ -139,10 +166,20 @@ export function waitsIn(state: Work, subtask: Subtask, busy: Set<string>): Wait[
     case "running":
     case "done":
       return asked();
-    // A merge under way finishes (§3.2); one yet to start waits for its goal.
-    case "merging":
-      return [...held, ...asked()];
+    // A merge under way finishes (§3.2); one yet to start waits for its goal, and its turn.
+    case "merging": {
+      if (state.underWay.includes(subtask.id)) return asked();
+      const before = mergeable(state, subtask)
+        ? ahead(state, subtask, (s) => mergeable(state, s))
+        : undefined;
+      return [
+        ...held,
+        ...asked(),
+        ...(before ? [{ kind: "merge" as const, subtaskId: before.id }] : []),
+      ];
+    }
     case "reviewing": {
+      if (state.underWay.includes(subtask.id)) return asked();
       const reviewer = underReview(state, subtask) ? reviewerAway(state, subtask) : undefined;
       return [...held, ...asked(), ...(reviewer ? [{ kind: "busy" as const, by: reviewer }] : [])];
     }
@@ -166,13 +203,16 @@ export function redoneUpstream(state: Pick<GoalState, "subtasks">, subtask: Subt
  * What you can do to a subtask where it stands: redo it only once its
  * upstream was redone; stop a merge only while it waits on your call.
  */
-function subtaskActions(subtask: Subtask, redone: boolean, deciding: boolean): SubtaskAction[] {
+export function actionsOf(state: Work, subtask: Subtask): SubtaskAction[] {
+  const deciding = openQuestions(state, subtask.id).length > 0;
   const moves = (["stop", "continue", "retry"] as const).filter(
     (event) =>
       can(SUBTASK_MACHINE, subtask.status, event) &&
       (event !== "stop" || subtask.status !== "merging" || deciding),
   );
-  return redone && can(SUBTASK_MACHINE, subtask.status, "redo") ? [...moves, "redo"] : moves;
+  return redoneUpstream(state, subtask).length && can(SUBTASK_MACHINE, subtask.status, "redo")
+    ? [...moves, "redo"]
+    : moves;
 }
 
 /** What can be done to a goal where it stands. */
@@ -201,8 +241,7 @@ export function derive(state: Work): Derived {
     subtasks: Object.fromEntries(
       state.subtasks.map((s) => {
         const redone = redoneUpstream(state, s).map((d) => d.id);
-        const actions = subtaskActions(s, redone.length > 0, openQuestions(state, s.id).length > 0);
-        return [s.id, { waits: waitsIn(state, s, busy), actions, redone }];
+        return [s.id, { waits: waitsIn(state, s, busy), actions: actionsOf(state, s), redone }];
       }),
     ),
     goal: goalActions(state.goal),

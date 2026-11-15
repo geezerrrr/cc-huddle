@@ -8,6 +8,7 @@
 import { appendFile, mkdir, open } from "node:fs/promises";
 import path from "node:path";
 import type { Places } from "./git.ts";
+import { goalFiles } from "./goal-files.ts";
 import type { Notice, Step, ToolCall, TurnListener } from "./turns.ts";
 import type { Meeting } from "./types.ts";
 
@@ -117,7 +118,7 @@ interface Speaking {
 
 /** A subtask's record file. */
 export const recordFile = (places: Places, subtaskId: string) =>
-  path.join(places.root, "records", `${subtaskId}.jsonl`);
+  goalFiles(places.root).record(subtaskId);
 
 export class Records {
   /** What each subtask's run is doing now, by subtask id: its last run's, once it ends. */

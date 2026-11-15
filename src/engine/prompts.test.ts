@@ -39,7 +39,7 @@ const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
 
 describe("systemPrompt", () => {
   it("says who the member is, their duties and their teammates", () => {
-    const prompt = systemPrompt("answer", glm, [glm, sonnet]);
+    const prompt = systemPrompt("readOnly", glm, [glm, sonnet]);
     expect(prompt).toContain("You are glm, the UI designer");
     expect(prompt).toContain("Your teammates: sonnet (Programmer).");
     expect(prompt).toContain("# Your duties\nDuties of a UI designer.");
@@ -47,7 +47,7 @@ describe("systemPrompt", () => {
   });
 
   it("tells how to work on a subtask only in a working session", () => {
-    expect(systemPrompt("task", glm, [glm])).toContain("call deliver");
+    expect(systemPrompt("work", glm, [glm])).toContain("call deliver");
   });
 });
 

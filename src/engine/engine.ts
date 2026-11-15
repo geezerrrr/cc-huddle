@@ -8,9 +8,9 @@ import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import path from "node:path";
 import type { PermissionMode } from "@anthropic-ai/claude-agent-sdk";
-import { errorText, type Core, type Team } from "./core.ts";
+import { errorText, workOf, type Core, type Team } from "./core.ts";
+import type { Work } from "./derive.ts";
 import {
-  goalFiles,
   goalsFolder,
   newGoalFolder,
   openedGoal,
@@ -24,10 +24,11 @@ import {
   type Runner,
   type StateWriter,
 } from "./data.ts";
+import { goalFiles } from "./goal-files.ts";
 import { openGoal, openRepository, takenSlugs, type Places } from "./git.ts";
 import { Goals } from "./goals.ts";
 import { Meetings } from "./meetings.ts";
-import { memberSettings, readOnlyOptions, workOptions, writeSettings } from "./policy.ts";
+import { memberSettings, sessionOptions, writeSettings } from "./policy.ts";
 import { recordMembersIn, stopMembers, stopRecording } from "./processes.ts";
 import { systemPrompt } from "./prompts.ts";
 import { Questions, type Answer } from "./questions.ts";
@@ -208,6 +209,7 @@ export class Engine {
       options: (member, kind, cwd) => engine.turnOptions(member, kind, cwd),
       recorder: (subtask) => records.recorder(subtask.id),
       speech: (meeting, speaker) => records.speech(meeting, speaker),
+      underWay: () => engine.scheduler.underWay(),
     };
     const engine = new Engine(core, records, files, writer, options, copy);
     await engine.writeMemberSettings(copy);
@@ -219,6 +221,11 @@ export class Engine {
 
   get state(): GoalState {
     return this.core.state;
+  }
+
+  /** The goal as the rules read it (derive.ts). */
+  get work(): Work {
+    return workOf(this.core);
   }
 
   /** The goal's copy of the team. */
@@ -315,15 +322,16 @@ export class Engine {
   }
 
   private turnOptions(...[member, kind, cwd]: Parameters<Core["options"]>) {
+    const sessionMode = this.options.sessionMode();
     const seat = {
       member,
       claude: this.options.claude,
       cwd,
       settings: this.files.settings(member.name),
       system: systemPrompt(kind, member, this.core.team.members),
+      ...(sessionMode && { sessionMode }),
+      teamMode: this.teamMode,
     };
-    if (kind !== "task") return readOnlyOptions(seat, this.options.env);
-    const mode = this.teamMode ? undefined : this.options.sessionMode();
-    return workOptions({ ...seat, ...(mode && { mode }) }, this.options.env);
+    return sessionOptions(seat, kind, this.options.env);
   }
 }

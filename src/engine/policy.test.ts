@@ -2,13 +2,7 @@ import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  expandEnv,
-  memberSettings,
-  readOnlyOptions,
-  workOptions,
-  writeSettings,
-} from "./policy.ts";
+import { expandEnv, memberSettings, sessionOptions, writeSettings, type Seat } from "./policy.ts";
 import type { Member } from "./types.ts";
 
 const glm: Member = {
@@ -100,7 +94,9 @@ describe("session options", () => {
     cwd: "/desk",
     settings: "/data/glm.json",
     system: "Your duties",
+    teamMode: false,
   };
+  const work = (fields: Partial<Seat> = {}) => sessionOptions({ ...seat, ...fields }, "work", from);
   const from = {
     PATH: "/bin",
     CLAUDE_CODE_MESSAGING_SOCKET: "/tmp/cc-socks/1.sock",
@@ -108,7 +104,7 @@ describe("session options", () => {
   };
 
   it("starts a member as a session of its own, under its name", () => {
-    const options = workOptions(seat, from);
+    const options = work();
     expect(options).toMatchObject({
       cwd: "/desk",
       model: "glm-5.3-flashx",
@@ -127,25 +123,28 @@ describe("session options", () => {
     });
   });
 
-  it("works in your session's permission mode, bypassing as the SDK takes it only when that is yours", () => {
-    expect(workOptions(seat, from)).not.toHaveProperty("permissionMode");
-    expect(workOptions({ ...seat, mode: "acceptEdits" }, from)).toMatchObject({
-      permissionMode: "acceptEdits",
-    });
-    expect(workOptions({ ...seat, mode: "acceptEdits" }, from)).not.toHaveProperty(
+  it("works in your session's permission mode unless the team sets its own, bypassing as the SDK takes it only when that is yours", () => {
+    expect(work()).not.toHaveProperty("permissionMode");
+    expect(work({ sessionMode: "acceptEdits" })).toMatchObject({ permissionMode: "acceptEdits" });
+    expect(work({ sessionMode: "acceptEdits" })).not.toHaveProperty(
       "allowDangerouslySkipPermissions",
     );
-    expect(workOptions({ ...seat, mode: "bypassPermissions" }, from)).toMatchObject({
+    expect(work({ sessionMode: "bypassPermissions" })).toMatchObject({
       permissionMode: "bypassPermissions",
       allowDangerouslySkipPermissions: true,
     });
+    expect(work({ sessionMode: "bypassPermissions", teamMode: true })).not.toHaveProperty(
+      "permissionMode",
+    );
   });
 
   it("keeps a read-only turn to the read-only tools and its own MCP server, and asks nobody", () => {
-    expect(readOnlyOptions(seat, from)).toMatchObject({
+    const reading = sessionOptions({ ...seat, sessionMode: "bypassPermissions" }, "readOnly", from);
+    expect(reading).toMatchObject({
       tools: ["Read", "Glob", "Grep", "WebSearch", "WebFetch"],
       permissionMode: "dontAsk",
       strictMcpConfig: true,
     });
+    expect(reading).not.toHaveProperty("allowDangerouslySkipPermissions");
   });
 });

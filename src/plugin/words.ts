@@ -38,6 +38,10 @@ export function waitText(wait: Wait, work: Work): string {
     }
     case "busy":
       return `waits until ${wait.by} is free`;
+    case "merge": {
+      const ahead = work.subtasks.find((s) => s.id === wait.subtaskId);
+      return `waits until "${ahead?.title ?? ""}" is merged`;
+    }
     case "teammate":
       return `asked ${wait.by}`;
     case "you":

@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import { busyMembers, redoneUpstream, reviewerOf, waitsIn } from "./derive.ts";
+import { actionsOf, busyMembers, redoneUpstream, reviewerOf, waitsIn } from "./derive.ts";
 import { errorText, workOf, type Core } from "./core.ts";
 import {
   abortMerge,
@@ -44,6 +44,7 @@ import {
   type Progress,
   type Question,
   type Subtask,
+  type SubtaskAction,
   type Task,
 } from "./types.ts";
 
@@ -71,6 +72,9 @@ const progressOf = (steps: Step[]): Progress => {
 /** When a subtask in review or being merged was delivered; the rest keep their order. */
 const handedAt = (subtask: Subtask) =>
   subtask.status === "reviewing" || subtask.status === "merging" ? (subtask.delivery?.at ?? 0) : 0;
+
+/** The stages a subtask is taken up in: run, reviewed, merged. */
+const TAKEN_UP: readonly Subtask["status"][] = ["pending", "reviewing", "merging"];
 
 /** A subtask's stage under way: how to stop it, and when it has ended. */
 interface Live {
@@ -198,6 +202,24 @@ export class Scheduler {
     return "goes";
   }
 
+  /** The subtasks whose review or merge is under way now. */
+  underWay(): string[] {
+    return [...this.live].filter(([, live]) => live.kind !== "run").map(([id]) => id);
+  }
+
+  /**
+   * Does what you asked to a subtask (§4.3): stop it, have it go on, retry it,
+   * or redo it. Throws when there is no such subtask, or when it can't be
+   * done where the subtask stands (derive.ts actionsOf).
+   */
+  async act(subtaskId: string, action: SubtaskAction) {
+    const subtask = this.subtask(subtaskId);
+    if (!subtask) throw new Error("There is no such subtask");
+    if (!actionsOf(workOf(this.core), subtask).includes(action))
+      throw new Error(`"${subtask.title}" can't ${action} while ${subtask.status}`);
+    await this[action](subtask);
+  }
+
   /**
    * Lets go of work about to be deleted: what waits to start won't, what runs
    * or is reviewed stops, not to go on, and this settles once all of it under
@@ -208,7 +230,8 @@ export class Scheduler {
       subtaskIds.flatMap((id) => {
         this.held.delete(id);
         const live = this.live.get(id);
-        const stopping = this.stop(id);
+        const subtask = this.subtask(id);
+        const stopping = subtask ? this.stop(subtask) : Promise.resolve();
         return live ? [live.ended, stopping] : [stopping];
       }),
     );
@@ -219,16 +242,16 @@ export class Scheduler {
    * review, a merge waiting on your decision (its half-done merge undone). One
    * handed over keeps its delivery and the stage it stopped in, to go on from.
    */
-  async stop(subtaskId: string) {
-    const subtask = this.subtask(subtaskId);
-    const live = this.live.get(subtaskId);
+  private async stop(subtask: Subtask) {
+    const live = this.live.get(subtask.id);
     if (live?.kind === "run") {
       // Your stop wins over going on.
-      this.held.delete(subtaskId);
+      this.held.delete(subtask.id);
       live.abort.abort();
       return;
     }
-    if (!subtask || !can(SUBTASK_MACHINE, subtask.status, "stop")) return;
+    // Deleted work, stopped already: nothing to stop.
+    if (!can(SUBTASK_MACHINE, subtask.status, "stop")) return;
     if (subtask.status === "merging") {
       // A merge under way finishes; one waiting on you is undone, its worktree back as delivered.
       if (live) return;
@@ -246,9 +269,7 @@ export class Scheduler {
   }
 
   /** You retry a failed or stopped subtask from the start: its session, delivery, review and worktree go. */
-  async retry(subtaskId: string) {
-    const subtask = this.subtask(subtaskId);
-    if (!subtask || !can(SUBTASK_MACHINE, subtask.status, "retry")) return;
+  private async retry(subtask: Subtask) {
     await dropDesk(this.core.places, this.goal.slug, subtask.id);
     // Retried meanwhile: that one did it.
     if (!can(SUBTASK_MACHINE, subtask.status, "retry")) return;
@@ -271,9 +292,7 @@ export class Scheduler {
    * session and worktree, or, stopped once handed over, its review or merge,
    * its delivery standing.
    */
-  continue(subtaskId: string) {
-    const subtask = this.subtask(subtaskId);
-    if (!subtask || !can(SUBTASK_MACHINE, subtask.status, "continue")) return;
+  private continue(subtask: Subtask) {
     const stage = subtask.stoppedIn;
     this.move(
       subtask,
@@ -286,9 +305,7 @@ export class Scheduler {
   }
 
   /** You redo a done subtask whose upstream was redone since: in its session, from the goal's branch. */
-  redo(subtaskId: string) {
-    const subtask = this.subtask(subtaskId);
-    if (!subtask || !can(SUBTASK_MACHINE, subtask.status, "redo")) return;
+  private redo(subtask: Subtask) {
     const redone = redoneUpstream(this.core.state, subtask).map((s) => s.title);
     this.move(subtask, "redo");
     if (subtask.session) goOnWith(subtask, { why: "redo", note: redone.join(", ") });
@@ -339,44 +356,28 @@ export class Scheduler {
   }
 
   /**
-   * Takes up whatever can go on: what goes on in its session first, then new
-   * work, and delivered work reviewed and merged in the order it was
-   * delivered. A pending subtask starts, and one in review is reviewed, when
-   * nothing holds it up (waitsIn: its goal active, you not deciding about it,
-   * its member or reviewer free); one being merged is merged unless you are
-   * deciding about it, one at a time.
+   * Takes up whatever can go on, as the rules say (derive.ts waitsIn): what
+   * goes on in its session first, then new work, and delivered work reviewed
+   * and merged in the order it was delivered. Each start is seen by the next:
+   * its member is busy, its review or merge under way.
    */
   pump() {
     if (this.closed) return;
-    const { state } = this.core;
-    const work = workOf(this.core);
-    const busy = busyMembers(work);
-    // One review each: those under way and those this pump starts.
-    const reviews = new Set(
-      state.subtasks
-        .filter((s) => this.live.get(s.id)?.kind === "review")
-        .map((s) => reviewerOf(work, s)),
-    );
-    let merging = state.subtasks.some((s) => this.live.get(s.id)?.kind === "merge");
-    const order = [...state.subtasks].sort(
+    const order = [...this.core.state.subtasks].sort(
       (a, b) => Number(Boolean(b.goOn)) - Number(Boolean(a.goOn)) || handedAt(a) - handedAt(b),
     );
-    for (const subtask of order) {
-      if (this.live.has(subtask.id)) continue;
-      if (subtask.status === "pending") {
-        if (waitsIn(work, subtask, busy).length) continue;
-        busy.add(subtask.assignee);
-        void this.startRun(subtask);
-      } else if (subtask.status === "reviewing") {
-        const reviewer = reviewerOf(work, subtask);
-        if (reviews.has(reviewer) || waitsIn(work, subtask, busy).length) continue;
-        reviews.add(reviewer);
-        void this.startReview(subtask);
-      } else if (subtask.status === "merging") {
-        if (waitsIn(work, subtask, busy).length || merging) continue;
-        merging = true;
-        void this.startMerge(subtask);
-      }
+    for (;;) {
+      const work = workOf(this.core);
+      const busy = busyMembers(work);
+      const next = order.find(
+        (s) =>
+          !this.live.has(s.id) && TAKEN_UP.includes(s.status) && !waitsIn(work, s, busy).length,
+      );
+      if (!next) return;
+      // Under way at once (begin), so the next look sees it.
+      if (next.status === "pending") void this.startRun(next);
+      else if (next.status === "reviewing") void this.startReview(next);
+      else void this.startMerge(next);
     }
   }
 
@@ -484,7 +485,7 @@ export class Scheduler {
       const desk = await openDesk(core.places, goal.slug, subtask.id);
       const recorder = core.recorder(subtask);
       outcome = await runSubtask({
-        options: core.options(member, "task", desk),
+        options: core.options(member, "work", desk),
         opening: goOn
           ? goOnMessage(goOn, subtask)
           : taskBrief({
@@ -592,7 +593,7 @@ export class Scheduler {
               question,
               own: core.state.subtasks.filter((s) => s.assignee === target.name),
             }),
-            options: core.options(target, "answer", await openGoal(core.places, this.goal.slug)),
+            options: core.options(target, "readOnly", await openGoal(core.places, this.goal.slug)),
             signal,
           }),
       );
@@ -658,7 +659,7 @@ export class Scheduler {
           delivery,
           cwd: desk,
         }),
-        options: core.options(reviewer, "review", desk),
+        options: core.options(reviewer, "readOnly", desk),
         schema: verdictSchema,
         signal: abort.signal,
       });
