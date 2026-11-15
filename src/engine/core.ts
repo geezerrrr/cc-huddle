@@ -1,7 +1,7 @@
 /**
  * What the engine's parts share (docs/design.md §3.1): the state, the team,
  * where the work lives, and how a member's turn is set up and followed. The
- * engine makes one per repository.
+ * engine makes one per goal it opens.
  */
 import type { Work } from "./derive.ts";
 import type { Places } from "./git.ts";

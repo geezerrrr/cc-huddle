@@ -8,7 +8,7 @@ import path from "node:path";
 import { workOf } from "../engine/core.ts";
 import { goalsFolder, listGoals, repoFolder } from "../engine/data.ts";
 import { goalFiles } from "../engine/goal-files.ts";
-import { openRepository } from "../engine/git.ts";
+import { GitError, openRepository } from "../engine/git.ts";
 import { readCopy } from "../engine/team.ts";
 import { othersText, statusText } from "./status.ts";
 
@@ -21,9 +21,10 @@ export async function sessionContext(
   let repo;
   try {
     repo = await openRepository(cwd);
-  } catch {
+  } catch (error) {
     // No repository: openplan has nothing to say here.
-    return undefined;
+    if (error instanceof GitError) return undefined;
+    throw error;
   }
   const root = repoFolder(dataFolder, repo);
   const goals = await listGoals(root);

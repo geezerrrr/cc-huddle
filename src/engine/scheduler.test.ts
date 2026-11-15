@@ -3,12 +3,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Core } from "./core.ts";
-import { git, goalBranch, goalFolder, openRepository } from "./git.ts";
+import { git, goalBranch, openRepository } from "./git.ts";
 import { Questions, type Answer } from "./questions.ts";
 import { runSubtask, type RunOutcome } from "./run.ts";
 import { Scheduler } from "./scheduler.ts";
 import { askOnce } from "./turns.ts";
 import type { DecisionOption, Member, Subtask } from "./types.ts";
+import { goalFiles } from "./goal-files.ts";
 
 vi.mock("./run.ts", () => ({ runSubtask: vi.fn() }));
 vi.mock("./turns.ts", async (original) => ({
@@ -121,7 +122,8 @@ async function decide(id: string, answer: Extract<Answer, { decision: DecisionOp
   await scheduler.decide(question, answer);
 }
 
-const onGoal = (file: string) => readFile(path.join(goalFolder(core.places), file), "utf8");
+const onGoal = (file: string) =>
+  readFile(path.join(goalFiles(core.places.root).checkout, file), "utf8");
 
 describe("Scheduler", () => {
   it("runs a subtask in its worktree, merges its delivery, and puts the task to you", async () => {
@@ -319,7 +321,7 @@ describe("Scheduler", () => {
       "That's you; no need to ask.",
     ]);
     expect(vi.mocked(askOnce).mock.lastCall?.[0].options).toEqual({
-      cwd: goalFolder(core.places),
+      cwd: goalFiles(core.places.root).checkout,
       model: "readOnly",
       settings: "sonnet.json",
     });

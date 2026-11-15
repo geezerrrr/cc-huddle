@@ -3,10 +3,32 @@
  * or a crash never finds it half written. Renaming over, as all of openplan
  * does it.
  */
-import { mkdir, rename, writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
+import { mkdir, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { errorCode } from "./core.ts";
+
+/** Whether `file` is there; anything but its absence is thrown. */
+export async function exists(file: string): Promise<boolean> {
+  try {
+    await stat(file);
+    return true;
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return false;
+    throw error;
+  }
+}
+
+/** A file's text; undefined when it isn't there, anything else thrown. */
+export function textIfThere(file: string): string | undefined {
+  try {
+    return readFileSync(file, "utf8");
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return undefined;
+    throw error;
+  }
+}
 
 /** What Windows answers a rename while another program (an antivirus, an indexer) holds the file or folder a moment. */
 const HELD = new Set(["EPERM", "EACCES", "EBUSY"]);

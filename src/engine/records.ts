@@ -118,10 +118,6 @@ interface Speaking {
   now: Now;
 }
 
-/** A subtask's record file. */
-export const recordFile = (places: Places, subtaskId: string) =>
-  goalFiles(places.root).record(subtaskId);
-
 export class Records {
   /** What each subtask's run is doing now, by subtask id: its last run's, once it ends. */
   private readonly live = new Map<string, Now>();
@@ -141,7 +137,7 @@ export class Records {
   recorder(subtaskId: string): TurnListener {
     const now: Now = { running: new Map() };
     this.live.set(subtaskId, now);
-    const file = recordFile(this.places, subtaskId);
+    const file = goalFiles(this.places.root).record(subtaskId);
     const write = (entry: RecordEntry) => {
       this.writing.run(async () => {
         await mkdir(path.dirname(file), { recursive: true });
@@ -163,7 +159,7 @@ export class Records {
     const live = now && liveOf(now);
     let handle;
     try {
-      handle = await open(recordFile(this.places, subtaskId));
+      handle = await open(goalFiles(this.places.root).record(subtaskId));
     } catch (error) {
       if (errorCode(error) !== "ENOENT") throw error;
       return { entries: [], next: 0, ...(live && { live }) };

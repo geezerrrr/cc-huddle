@@ -3,20 +3,12 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Core } from "./core.ts";
-import {
-  deskFolder,
-  git,
-  goalBranch,
-  goalFolder,
-  openDesk,
-  openGoal,
-  openRepository,
-  subtaskBranch,
-} from "./git.ts";
+import { git, goalBranch, openDesk, openGoal, openRepository, subtaskBranch } from "./git.ts";
 import { Goals } from "./goals.ts";
 import type { Meetings } from "./meetings.ts";
 import type { Scheduler } from "./scheduler.ts";
 import type { Meeting, Member } from "./types.ts";
+import { goalFiles } from "./goal-files.ts";
 
 const ME = {
   GIT_AUTHOR_NAME: "you",
@@ -158,8 +150,8 @@ describe("Goals", () => {
     expect(scheduler.release).toHaveBeenCalledWith(["s1"]);
     expect(meetings.settled).toHaveBeenCalled();
     expect(await branches()).toEqual(["main", goalBranch("dice")]);
-    expect(await exists(deskFolder(core.places, "s1"))).toBe(false);
-    expect(await exists(goalFolder(core.places))).toBe(false);
+    expect(await exists(goalFiles(core.places.root).desk("s1"))).toBe(false);
+    expect(await exists(goalFiles(core.places.root).checkout)).toBe(false);
   });
 
   it("take a subtask directly, as a task of its own, for a member on the team", async () => {

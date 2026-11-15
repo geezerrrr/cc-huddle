@@ -10,7 +10,7 @@ import type { Core } from "./core.ts";
 import { goalsFolder, holderOf, repoFolder } from "./data.ts";
 import { goalFiles } from "./goal-files.ts";
 import { Engine, type EngineOptions } from "./engine.ts";
-import { git, goalBranch, goalFolder, openRepository } from "./git.ts";
+import { git, goalBranch, openRepository } from "./git.ts";
 import { Goals } from "./goals.ts";
 import { runSubtask, type RunOutcome } from "./run.ts";
 import { readCopy, teamFolder } from "./team.ts";
@@ -119,10 +119,7 @@ describe("Engine", () => {
     });
     expect(
       await readFile(
-        path.join(
-          goalFolder({ repo: await openRepository(repo), root: path.join(goals, "dice-game") }),
-          "README.md",
-        ),
+        path.join(goalFiles(path.join(goals, "dice-game")).checkout, "README.md"),
         "utf8",
       ),
     ).toBe("hello\n");

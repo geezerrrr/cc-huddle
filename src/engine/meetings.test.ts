@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Core } from "./core.ts";
 import { goalFiles } from "./goal-files.ts";
-import { git, goalFolder, openRepository } from "./git.ts";
+import { git, openRepository } from "./git.ts";
 import { z } from "zod";
 import { Meetings, nextMove } from "./meetings.ts";
 import { planSchema } from "./plan.ts";
@@ -222,7 +222,7 @@ describe("Meetings", () => {
 
     const asks = vi.mocked(askOnce).mock.calls.map(([ask]) => ask);
     expect(asks[0]?.options).toEqual({
-      cwd: goalFolder(core.places),
+      cwd: goalFiles(core.places.root).checkout,
       model: "glm/readOnly",
       settings: "glm.json",
     });

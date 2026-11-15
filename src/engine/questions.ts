@@ -138,8 +138,8 @@ export class Questions {
    */
   openDecision(subtask: Subtask, decision: Decision, text: string) {
     this.open(
-      { from: subtask.assignee, subtaskId: subtask.id },
-      { text, kind: "decision", decision },
+      { from: subtask.assignee },
+      { text, kind: "decision", decision, subtaskId: subtask.id },
     );
   }
 
@@ -163,8 +163,7 @@ export class Questions {
       this.inbox.state.subtasks.filter((s) => s.taskId === taskId).map((s) => s.id),
     );
     this.cancelAll(
-      (q) =>
-        q.kind === "decision" && q.decision.kind === "delivery" && inTask.has(q.subtaskId ?? ""),
+      (q) => q.kind === "decision" && q.decision.kind === "delivery" && inTask.has(q.subtaskId),
     );
   }
 

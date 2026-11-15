@@ -5,8 +5,9 @@
  * signing. Members use git in their worktrees as they would anywhere.
  */
 import { spawn } from "node:child_process";
-import { readdir, readFile, realpath, rm, stat } from "node:fs/promises";
+import { readdir, readFile, realpath, rm } from "node:fs/promises";
 import path from "node:path";
+import { exists } from "./files.ts";
 import { goalFiles } from "./goal-files.ts";
 import { serialBy } from "./serial.ts";
 
@@ -133,9 +134,6 @@ const goalBranches = (slug: string) => `${BRANCHES}${slug}/`;
 /** The branch a goal's work is merged into. */
 export const goalBranch = (slug: string) => `${goalBranches(slug)}main`;
 
-/** The worktree a goal's branch is checked out in. */
-export const goalFolder = (places: Places) => goalFiles(places.root).checkout;
-
 /** The slugs goals have taken in a repository: every name with a branch under `openplan/<slug>/`. */
 export async function takenSlugs(repo: Repository): Promise<Set<string>> {
   const refs = await git({ cwd: repo.top }, [
@@ -161,12 +159,6 @@ export function slugFor(name: string, taken: ReadonlySet<string>): string {
     if (!taken.has(slug)) return slug;
   }
 }
-
-const exists = (file: string) =>
-  stat(file).then(
-    () => true,
-    () => false,
-  );
 
 /**
  * Takes one of openplan's worktrees off the repository's list, there or not.
@@ -199,13 +191,10 @@ async function checkOut(repo: Repository, folder: string, branch: string, from?:
 export const subtaskBranch = (slug: string, subtaskId: string) =>
   `${goalBranches(slug)}${subtaskId}`;
 
-/** The worktree a subtask works in. */
-export const deskFolder = (places: Places, subtaskId: string) =>
-  goalFiles(places.root).desk(subtaskId);
-
 /** One git operation per goal at a time: its branch and its worktrees are shared. */
 const serial = serialBy();
-const perGoal = <T>(places: Places, task: () => Promise<T>) => serial(goalFolder(places), task);
+const perGoal = <T>(places: Places, task: () => Promise<T>) =>
+  serial(goalFiles(places.root).checkout, task);
 
 /**
  * Sets a goal up in git, or again what of it is missing: its branch cut from
@@ -215,7 +204,7 @@ const perGoal = <T>(places: Places, task: () => Promise<T>) => serial(goalFolder
 async function setUpGoal(places: Places, slug: string): Promise<string> {
   const { repo } = places;
   const branch = goalBranch(slug);
-  const folder = goalFolder(places);
+  const folder = goalFiles(places.root).checkout;
   if (!(await hasBranch(repo, branch))) await git({ cwd: repo.top }, ["branch", branch, "HEAD"]);
   if (!(await exists(folder))) await checkOut(repo, folder, branch);
   return folder;
@@ -233,7 +222,7 @@ export const openGoal = (places: Places, slug: string) =>
 export function openDesk(places: Places, slug: string, subtaskId: string): Promise<string> {
   return perGoal(places, async () => {
     const { repo } = places;
-    const desk = deskFolder(places, subtaskId);
+    const desk = goalFiles(places.root).desk(subtaskId);
     await setUpGoal(places, slug);
     if (await exists(path.join(desk, ".git"))) return desk;
     await rm(desk, { recursive: true, force: true });
@@ -291,7 +280,7 @@ export function commitDesk(
   message: string,
 ): Promise<void> {
   return perGoal(places, async () => {
-    const at = await worktreeAt(places.repo, deskFolder(places, subtaskId));
+    const at = await worktreeAt(places.repo, goalFiles(places.root).desk(subtaskId));
     const signed = { ...at, env: { ...at.env, ...authorEnv(by) } };
     await git(signed, ["add", "-A"]);
     const staged = await git(signed, ["diff", "--cached", "--quiet"], { allow: [1] });
@@ -312,7 +301,7 @@ export async function unresolved(
   subtaskId: string,
   files: string[],
 ): Promise<string[]> {
-  const desk = deskFolder(places, subtaskId);
+  const desk = goalFiles(places.root).desk(subtaskId);
   const marked = await Promise.all(
     files.map((file) =>
       readFile(path.join(desk, file), "utf8").then(
@@ -342,7 +331,7 @@ async function conflicts(
 
 /** Takes a subtask's worktree and its branch away. */
 async function removeDesk(places: Places, slug: string, subtaskId: string) {
-  const desk = deskFolder(places, subtaskId);
+  const desk = goalFiles(places.root).desk(subtaskId);
   await unlist(places.repo, desk);
   await rm(desk, { recursive: true, force: true });
   await git({ cwd: places.repo.top }, ["branch", "-q", "-D", subtaskBranch(slug, subtaskId)], {
@@ -365,7 +354,7 @@ export function mergeDesk(
 ): Promise<MergeOutcome> {
   return perGoal(places, async () => {
     const { repo } = places;
-    const folder = deskFolder(places, subtaskId);
+    const folder = goalFiles(places.root).desk(subtaskId);
     if (!(await exists(folder))) {
       const branch = subtaskBranch(slug, subtaskId);
       if (!(await hasBranch(repo, branch))) return { kind: "merged" };
@@ -408,13 +397,12 @@ const literally = (file: string) => `:(literal)${file}`;
  */
 export function pickSide(
   places: Places,
-  slug: string,
   subtaskId: string,
   files: string[],
   side: "ours" | "theirs",
 ): Promise<void> {
   return perGoal(places, async () => {
-    const desk = await worktreeAt(places.repo, deskFolder(places, subtaskId));
+    const desk = await worktreeAt(places.repo, goalFiles(places.root).desk(subtaskId));
     const stages = await git(desk, ["ls-files", "-u", "-z", "--", ...files.map(literally)]);
     const wanted = side === "ours" ? "2" : "3";
     const kept = new Set(
@@ -435,9 +423,9 @@ export function pickSide(
 }
 
 /** Calls off a merge a subtask's worktree is in the middle of, to try it again from scratch. */
-export function abortMerge(places: Places, slug: string, subtaskId: string): Promise<void> {
+export function abortMerge(places: Places, subtaskId: string): Promise<void> {
   return perGoal(places, async () => {
-    const desk = await worktreeAt(places.repo, deskFolder(places, subtaskId));
+    const desk = await worktreeAt(places.repo, goalFiles(places.root).desk(subtaskId));
     if (await merging(desk)) await git(desk, ["merge", "--abort"]);
   });
 }
@@ -462,7 +450,7 @@ export function removeGoal(places: Places, slug: string): Promise<void> {
     for (const id of refs.stdout.split("\n")) {
       if (id && id !== "main") await removeDesk(places, slug, id);
     }
-    const folder = goalFolder(places);
+    const folder = goalFiles(places.root).checkout;
     await unlist(repo, folder);
     await rm(folder, { recursive: true, force: true });
   });

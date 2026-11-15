@@ -51,6 +51,10 @@ export function waitText(wait: Wait, work: Work): string {
   }
 }
 
+/** That a done subtask is built on work redone since, `titles` that work. */
+export const redoneText = (titles: readonly string[]) =>
+  `built on ${titles.map((t) => `"${t}"`).join(", ")}, redone since: redo it to take that in`;
+
 /** Where a running subtask is: "step 2 of 3: Write the reroll"; nothing before its steps are known. */
 export function stepText({ done, total, current }: Subtask["progress"]): string | undefined {
   if (!total) return undefined;

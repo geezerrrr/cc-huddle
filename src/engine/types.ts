@@ -297,7 +297,8 @@ export type Ask =
   | { kind: "teammate"; to: string }
   | { kind: "choices"; choices: Choice[] }
   | { kind: "permission"; permission: Permission }
-  | { kind: "decision"; decision: Decision };
+  /** A decision is always on a subtask: one stuck in review or a merge, or the last one done of a task. */
+  | { kind: "decision"; decision: Decision; subtaskId: string };
 
 /** A question put to you: every kind but a teammate's. */
 export type QuestionToYou = Exclude<Question, { kind: "teammate" }>;
@@ -332,7 +333,6 @@ export const SUBTASK_ACTIONS = ["stop", "continue", "retry", "redo"] as const;
 export type SubtaskAction = (typeof SUBTASK_ACTIONS)[number];
 
 export const GOAL_ACTIONS = ["pause", "resume", "archive", "delete"] as const;
-export type GoalAction = (typeof GOAL_ACTIONS)[number];
 
 /** The rules applied to the state, worked out once for whoever shows it. */
 export interface Derived {
@@ -340,14 +340,12 @@ export interface Derived {
     string,
     {
       waits: Wait[];
-      actions: SubtaskAction[];
+      /** The upstream subtasks done again since it started: it is built on work redone (§7.1). */
       redone: string[];
       /** Who reviews it, while its review is under way. */
       reviewedBy?: string;
     }
   >;
-  /** What can be done to the goal. */
-  goal: GoalAction[];
   busy: string[];
   /** Meetings that stopped before their plan and can go on from there. */
   resumable: string[];

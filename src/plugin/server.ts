@@ -8,7 +8,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import plugin from "../../plugin/.claude-plugin/plugin.json" with { type: "json" };
 import { errorText } from "../engine/core.ts";
-import { openRepository } from "../engine/git.ts";
+import { GitError, openRepository } from "../engine/git.ts";
 import { stopMembers } from "../engine/processes.ts";
 import { claudeFolder, loadTeam, userTeamFolder } from "../engine/team.ts";
 import { executableOf } from "./claude.ts";
@@ -107,12 +107,17 @@ addPaneTools(server, session, pane);
 
 /** Before a goal, the tools that name a member list the team as its files have it (§7.3). */
 async function listTeamFiles() {
+  let repo;
   try {
-    const repo = await openRepository(cwd);
-    listMembers((await loadTeam(userTeam, repo.top)).team);
-  } catch {
-    // No repository, or its team doesn't read yet (starting a goal says what is wrong): any name.
+    repo = await openRepository(cwd);
+  } catch (error) {
+    // No repository: any name.
+    if (error instanceof GitError) return;
+    throw error;
   }
+  // A team that doesn't read yet takes any name: starting a goal says what is wrong with it.
+  const team = await loadTeam(userTeam, repo.top).catch(() => undefined);
+  if (team) listMembers(team.team);
 }
 
 await listTeamFiles();

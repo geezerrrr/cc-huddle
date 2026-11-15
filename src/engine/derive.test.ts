@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { busyMembers, derive, meetingResumes, reviewerOf, waitsIn, type Work } from "./derive.ts";
+import {
+  actionsOf,
+  busyMembers,
+  derive,
+  meetingResumes,
+  reviewerOf,
+  waitsIn,
+  type Work,
+} from "./derive.ts";
 import { DECISIONS, type Ask, type Meeting, type Question, type Subtask } from "./types.ts";
 
 const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
@@ -193,14 +201,15 @@ describe("derive", () => {
   it("offers redo only once an upstream was done again after it started", () => {
     const up = subtask("up", { status: "done", finishedAt: 5 });
     const down = subtask("down", { status: "done", dependsOn: ["up"], startedAt: 3 });
-    const view = derive(work({ subtasks: [up, down] }));
-    expect(view.subtasks.down).toEqual({ waits: [], actions: ["redo"], redone: ["up"] });
-    expect(view.subtasks.up?.actions).toEqual([]);
+    const state = work({ subtasks: [up, down] });
+    expect(derive(state).subtasks.down).toEqual({ waits: [], redone: ["up"] });
+    expect(actionsOf(state, down)).toEqual(["redo"]);
+    expect(actionsOf(state, up)).toEqual([]);
   });
 
   it("offers stopping a merge only while it waits on your call", () => {
     const merging = subtask("s1", { status: "merging" });
-    expect(derive(work({ subtasks: [merging] })).subtasks.s1?.actions).toEqual([]);
+    expect(actionsOf(work({ subtasks: [merging] }), merging)).toEqual([]);
     const deciding = work({
       subtasks: [merging],
       questions: [
@@ -212,14 +221,7 @@ describe("derive", () => {
         }),
       ],
     });
-    expect(derive(deciding).subtasks.s1?.actions).toEqual(["stop"]);
-  });
-
-  it("offers delete only for an archived goal", () => {
-    const state = work({
-      goal: { name: "dice", slug: "dice", status: "archived", createdAt: 0 },
-    });
-    expect(derive(state).goal).toEqual(["resume", "delete"]);
+    expect(actionsOf(deciding, merging)).toEqual(["stop"]);
   });
 
   it("counts everyone in a running meeting as busy", () => {
@@ -236,9 +238,5 @@ describe("meetingResumes", () => {
       plan: { summary: "", markdown: "", tasks: [] },
     });
     expect(meetingResumes(work(), planned)).toBe(false);
-  });
-
-  it("not once a participant has left the team", () => {
-    expect(meetingResumes(work({ members: ["ann"] }), meeting({ status: "failed" }))).toBe(false);
   });
 });

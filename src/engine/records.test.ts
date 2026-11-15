@@ -3,9 +3,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Places } from "./git.ts";
-import { recordFile, Records } from "./records.ts";
+import { Records } from "./records.ts";
 import type { ToolCall } from "./turns.ts";
 import type { Meeting } from "./types.ts";
+import { goalFiles } from "./goal-files.ts";
 
 let dir: string;
 let places: Places;
@@ -65,7 +66,7 @@ describe("Records", () => {
       { kind: "text", text: "Read it." },
     ]);
     expect(live).toEqual({ running: [] });
-    expect(next).toBe((await readFile(recordFile(places, "s1"))).length);
+    expect(next).toBe((await readFile(goalFiles(places.root).record("s1"))).length);
 
     run.steps?.([{ content: "Write the rules", status: "in_progress" }]);
     await records.flush();
@@ -79,7 +80,7 @@ describe("Records", () => {
     expect(await records.read("s2")).toEqual({ entries: [], next: 0 });
     records.recorder("s2").notice?.({ kind: "refusal", model: "glm-5" });
     await records.flush();
-    const file = recordFile(places, "s2");
+    const file = goalFiles(places.root).record("s2");
     await appendFile(file, '{"at":1,"kind":"text"');
     const first = await records.read("s2");
     expect(first.entries).toHaveLength(1);

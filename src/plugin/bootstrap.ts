@@ -7,13 +7,13 @@
  */
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 // Whole, so an older Node.js gets to say what it lacks.
 import * as nodeModule from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
-import { renameOver } from "../engine/files.ts";
+import { exists, renameOver } from "../engine/files.ts";
 import { running } from "../engine/running.ts";
 import { dataFolder } from "./data-folder.ts";
 
@@ -40,12 +40,6 @@ const home = path.join(
     .digest("hex")
     .slice(0, 12),
 );
-
-const exists = (file: string) =>
-  stat(file).then(
-    () => true,
-    () => false,
-  );
 
 const installed = () => exists(path.join(home, "node_modules"));
 

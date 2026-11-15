@@ -69,10 +69,6 @@ const progressOf = (steps: Step[]): Progress => {
   };
 };
 
-/** When a subtask in review or being merged was delivered; the rest keep their order. */
-const handedAt = (subtask: Subtask) =>
-  subtask.status === "reviewing" || subtask.status === "merging" ? (subtask.delivery?.at ?? 0) : 0;
-
 /** The stages a subtask is taken up in: run, reviewed, merged. */
 const TAKEN_UP: readonly Subtask["status"][] = ["pending", "reviewing", "merging"];
 
@@ -253,7 +249,7 @@ export class Scheduler {
     if (subtask.status === "merging") {
       // A merge under way finishes; one waiting on you is undone, its worktree back as delivered.
       if (live) return;
-      await abortMerge(this.core.places, this.goal.slug, subtask.id);
+      await abortMerge(this.core.places, subtask.id);
       // Stopped meanwhile: that stop did it.
       if (!can(SUBTASK_MACHINE, subtask.status, "stop")) return;
     }
@@ -323,7 +319,7 @@ export class Scheduler {
     question: Extract<Question, { kind: "decision" }>,
     answer: Extract<Answer, { decision: DecisionOption }>,
   ) {
-    const subtask = this.subtask(question.subtaskId ?? "");
+    const subtask = this.subtask(question.subtaskId);
     if (!subtask) return;
     const { decision: pick, note = "" } = answer;
     if (question.decision.kind === "delivery") {
@@ -345,11 +341,10 @@ export class Scheduler {
         }
       }
     } else if (subtask.status === "merging") {
-      const { slug } = this.goal;
-      if (pick === "retry") await abortMerge(this.core.places, slug, subtask.id);
+      if (pick === "retry") await abortMerge(this.core.places, subtask.id);
       else if (pick === "stop") await this.stop(subtask);
       else if (pick === "ours" || pick === "theirs")
-        await pickSide(this.core.places, slug, subtask.id, question.decision.files ?? [], pick);
+        await pickSide(this.core.places, subtask.id, question.decision.files ?? [], pick);
     }
     this.core.changed();
     this.pump();
@@ -363,8 +358,9 @@ export class Scheduler {
    */
   pump() {
     if (this.closed) return;
+    // Reviews and merges go in delivery order as the rules say (derive.ts ahead).
     const order = [...this.core.state.subtasks].sort(
-      (a, b) => Number(Boolean(b.goOn)) - Number(Boolean(a.goOn)) || handedAt(a) - handedAt(b),
+      (a, b) => Number(Boolean(b.goOn)) - Number(Boolean(a.goOn)),
     );
     for (;;) {
       const work = workOf(this.core);
@@ -419,10 +415,10 @@ export class Scheduler {
     return this.core.state.meetings.find((m) => m.id === task.meetingId)?.plan?.markdown;
   }
 
-  /** A member by name: one taken off the team since can't work or review. */
+  /** A member by name, as the plan or `assign` checked it against the goal's team, which stays as it was (§6). */
   private memberOf(name: string): Member {
     const member = this.core.team.members.find((m) => m.name === name);
-    if (!member) throw new Error(`${name} is no longer on the team`);
+    if (!member) throw new Error(`${name} isn't on the goal's team`);
     return member;
   }
 

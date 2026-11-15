@@ -1,18 +1,15 @@
 /**
  * What the rules make of the state (docs/design.md §4.5): what each subtask
  * waits on, who is busy, who reviews a delivery, whose upstream was redone,
- * and what you can do to each subtask and goal. Worked out here only and
- * never stored: the scheduler acts on it, and the plugin shows it.
+ * and what you can do to a subtask. Worked out here only and never stored:
+ * the scheduler acts on it, and the plugin shows it.
  */
-import { can, MEETING_MACHINE, GOAL_MACHINE, SUBTASK_MACHINE } from "./machines.ts";
+import { can, MEETING_MACHINE, SUBTASK_MACHINE } from "./machines.ts";
 import {
-  GOAL_ACTIONS,
   SUBTASK_ACTIONS,
   isHalted,
   type Derived,
   type Meeting,
-  type Goal,
-  type GoalAction,
   type Subtask,
   type SubtaskAction,
   type GoalState,
@@ -217,23 +214,13 @@ export function actionsOf(state: Work, subtask: Subtask): SubtaskAction[] {
   );
 }
 
-/** What can be done to a goal where it stands. */
-function goalActions(goal: Goal): GoalAction[] {
-  return GOAL_ACTIONS.filter((event) => can(GOAL_MACHINE, goal.status, event));
-}
-
 /**
  * Whether a meeting can go on from where it stopped: it stopped before its
- * plan was out, its goal is active, and everyone at it is still on the
- * team. Who is busy changes by the minute; it is asked as the meeting starts.
+ * plan was out, and its goal is active. Who is busy changes by the minute;
+ * it is asked as the meeting starts.
  */
 export function meetingResumes(state: Work, meeting: Meeting): boolean {
-  return (
-    can(MEETING_MACHINE, meeting.status, "resume") &&
-    !meeting.plan &&
-    isActive(state) &&
-    meeting.participants.every((m) => state.members.includes(m))
-  );
+  return can(MEETING_MACHINE, meeting.status, "resume") && !meeting.plan && isActive(state);
 }
 
 /** Everything the plugin shows of the rules, worked out once. */
@@ -248,14 +235,12 @@ export function derive(state: Work): Derived {
           s.id,
           {
             waits: waitsIn(state, s, busy),
-            actions: actionsOf(state, s),
             redone,
             ...(reviewed && { reviewedBy: reviewerOf(state, s) }),
           },
         ];
       }),
     ),
-    goal: goalActions(state.goal),
     busy: [...busy],
     resumable: state.meetings.filter((m) => meetingResumes(state, m)).map((m) => m.id),
   };

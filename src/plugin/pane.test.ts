@@ -337,11 +337,13 @@ Tell the user what was done, and ask whether to accept it or send it back with w
         text: "Too small",
         kind: "decision",
         decision: DECISIONS.stuckReview(),
+        subtaskId: "rules",
       }),
       question("q6", {
         text: "a.png\nb.png",
         kind: "decision",
         decision: DECISIONS.mergeFiles(["a.png", "b.png"]),
+        subtaskId: "rules",
       }),
     ];
     const [review, merge] = paneTeam(now, members).needs;

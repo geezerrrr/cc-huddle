@@ -5,11 +5,10 @@
  * working turn. Plan mode is how your session plans its own work, not a
  * permission level: while it plans, members keep the mode they had.
  */
-import { readFileSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import type { PermissionMode } from "@anthropic-ai/claude-agent-sdk";
-import { writeWhole } from "../engine/files.ts";
+import { textIfThere, writeWhole } from "../engine/files.ts";
 import { running } from "../engine/running.ts";
 
 /** The modes a member works in, as the hooks name them. */
@@ -42,9 +41,5 @@ export async function keepMode(dataFolder: string, session: number, mode: string
 
 /** Session `session`'s mode as last kept; undefined before any. */
 export function modeOf(dataFolder: string, session: number): PermissionMode | undefined {
-  try {
-    return readFileSync(fileOf(dataFolder, session), "utf8") as PermissionMode;
-  } catch {
-    return undefined;
-  }
+  return textIfThere(fileOf(dataFolder, session)) as PermissionMode | undefined;
 }

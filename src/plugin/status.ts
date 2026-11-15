@@ -6,15 +6,21 @@
 import type { GoalEntry } from "../engine/data.ts";
 import { derive, type Work } from "../engine/derive.ts";
 import { goalBranch } from "../engine/git.ts";
-import { toYou, type QuestionToYou, type Subtask, type Wait } from "../engine/types.ts";
-import { entryLabel, meetingStatus, needWords, stepText, waitText } from "./words.ts";
+import { toYou, type Derived, type QuestionToYou, type Subtask } from "../engine/types.ts";
+import { entryLabel, meetingStatus, needWords, redoneText, stepText, waitText } from "./words.ts";
 
-/** A subtask on one line: its status, how far it is, what it waits on, what went wrong. */
-function subtaskLine(subtask: Subtask, waits: Wait[], work: Work): string {
+/** A subtask on one line: its status, how far it is, what it waits on, what it is built on that was redone, what went wrong. */
+function subtaskLine(
+  subtask: Subtask,
+  { waits, redone }: Derived["subtasks"][string],
+  work: Work,
+): string {
   const parts: string[] = [subtask.status];
   const step = subtask.status === "running" && stepText(subtask.progress);
   if (step) parts.push(step);
   parts.push(...waits.map((w) => waitText(w, work)));
+  if (redone.length)
+    parts.push(redoneText(redone.map((id) => work.subtasks.find((s) => s.id === id)?.title ?? "")));
   if (subtask.error) parts.push(`error: ${subtask.error}`);
   return `    - ${subtask.title} [${subtask.id}], ${subtask.assignee}: ${parts.join(", ")}`;
 }
@@ -49,7 +55,9 @@ export function statusText(work: Work): string {
       `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", the user accepts it" : ""}`,
     );
     for (const subtask of work.subtasks.filter((s) => s.taskId === task.id))
-      lines.push(subtaskLine(subtask, derived.subtasks[subtask.id]?.waits ?? [], work));
+      lines.push(
+        subtaskLine(subtask, derived.subtasks[subtask.id] ?? { waits: [], redone: [] }, work),
+      );
   }
   const open = work.questions.filter(toYou);
   if (open.length) lines.push("", "Waiting on you:", ...open.map((q) => questionLine(q, work)));

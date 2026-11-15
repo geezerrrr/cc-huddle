@@ -5,11 +5,11 @@
  */
 import { createHash } from "node:crypto";
 import { link, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { readFileSync, unlinkSync } from "node:fs";
+import { unlinkSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 import path from "node:path";
 import { errorCode, errorText } from "./core.ts";
-import { renameOver, writeWhole } from "./files.ts";
+import { renameOver, textIfThere, writeWhole } from "./files.ts";
 import { goalFiles } from "./goal-files.ts";
 import { inOrder } from "./serial.ts";
 import { slugFor, type Repository } from "./git.ts";
@@ -120,18 +120,9 @@ export interface HandedOver {
   meetings: string[];
 }
 
-/** A lock file's text; undefined when there is none. */
-function lockText(file: string): string | undefined {
-  try {
-    return readFileSync(file, "utf8");
-  } catch {
-    return undefined;
-  }
-}
-
 /** The holder a lock file names; undefined when there is none or it can't be read. */
 function readHolder(file: string): Holder | undefined {
-  const text = lockText(file);
+  const text = textIfThere(file);
   try {
     return text === undefined ? undefined : (JSON.parse(text) as Holder);
   } catch {
@@ -182,7 +173,7 @@ export async function takeGoal(
       } catch (error) {
         if (errorCode(error) !== "EEXIST") throw error;
       }
-      const ended = lockText(lock);
+      const ended = textIfThere(lock);
       // Let go of meanwhile: try again.
       if (ended === undefined) continue;
       const holder = readHolder(lock);
@@ -204,7 +195,7 @@ export async function takeGoal(
       } catch (error) {
         if (errorCode(error) !== "EEXIST") throw error;
         // Done with meanwhile: try again. Still there, its taker either replaces the lock or ended partway.
-        if (lockText(claim) === undefined) continue;
+        if (textIfThere(claim) === undefined) continue;
         const replacing = readHolder(claim);
         if (!replacing || !running(replacing.pid))
           throw new Error(`A session taking this goal ended partway: delete ${lock} and ${claim}`, {
@@ -214,7 +205,7 @@ export async function takeGoal(
         continue;
       }
       try {
-        if (lockText(lock) === ended) {
+        if (textIfThere(lock) === ended) {
           await renameOver(mine, lock);
           return handed;
         }

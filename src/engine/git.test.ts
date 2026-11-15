@@ -9,7 +9,6 @@ import {
   git,
   GitError,
   goalBranch,
-  goalFolder,
   memberSigner,
   mergeDesk,
   openDesk,
@@ -23,6 +22,7 @@ import {
   unresolved,
   type Places,
 } from "./git.ts";
+import { goalFiles } from "./goal-files.ts";
 
 const ME = {
   GIT_AUTHOR_NAME: "you",
@@ -225,7 +225,9 @@ describe("mergeDesk", () => {
     const desk = await deliver(places, "s1", "dice.ts", "roll\n");
     expect(await mergeDesk(places, "dice", "s1", glm)).toEqual({ kind: "merged" });
     expect(await show(goalBranch("dice"), "dice.ts")).toBe("roll\n");
-    expect(await readFile(path.join(goalFolder(places), "dice.ts"), "utf8")).toBe("roll\n");
+    expect(await readFile(path.join(goalFiles(places.root).checkout, "dice.ts"), "utf8")).toBe(
+      "roll\n",
+    );
     await expect(readFile(path.join(desk, "dice.ts"))).rejects.toThrow();
     const branch = await git({ cwd: repo }, ["branch", "--list", subtaskBranch("dice", "s1")]);
     expect(branch.stdout).toBe("");
@@ -284,7 +286,7 @@ describe("mergeDesk", () => {
     await commitDesk(places, "dice", "s2", glm, "Remove README");
     await mergeDesk(places, "dice", "s1", glm);
     await mergeDesk(places, "dice", "s2", glm);
-    await pickSide(places, "dice", "s2", ["README.md"], "theirs");
+    await pickSide(places, "s2", ["README.md"], "theirs");
     expect(await mergeDesk(places, "dice", "s2", glm)).toEqual({ kind: "merged" });
     expect(await show(goalBranch("dice"), "README.md")).toBe("changed\n");
   });
@@ -296,7 +298,7 @@ describe("mergeDesk", () => {
     const desk = await deliver(places, "s2", "README.md", "two\n");
     await mergeDesk(places, "dice", "s1", glm);
     await mergeDesk(places, "dice", "s2", glm);
-    await abortMerge(places, "dice", "s2");
+    await abortMerge(places, "s2");
     expect(await readFile(path.join(desk, "README.md"), "utf8")).toBe("two\n");
   });
 
