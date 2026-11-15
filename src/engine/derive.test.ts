@@ -28,7 +28,6 @@ const meeting = (fields: Partial<Meeting> = {}): Meeting => ({
   agenda: "",
   size: "discussion",
   participants: ["host", "ann"],
-  host: "host",
   status: "approved",
   turns: [],
   ...fields,

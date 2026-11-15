@@ -7,18 +7,19 @@ import type { GoalEntry } from "../engine/data.ts";
 import type { Work } from "../engine/derive.ts";
 import { listOf } from "../shared/text.ts";
 import type { Notice } from "../engine/turns.ts";
-import type {
-  DecisionOption,
-  GoalState,
-  Member,
-  Meeting,
-  NoteOption,
-  Permission,
-  PermissionOption,
-  QuestionToYou,
-  Subtask,
-  SubtaskStatus,
-  Wait,
+import {
+  hostOf,
+  type DecisionOption,
+  type GoalState,
+  type Member,
+  type Meeting,
+  type NoteOption,
+  type Permission,
+  type PermissionOption,
+  type QuestionToYou,
+  type Subtask,
+  type SubtaskStatus,
+  type Wait,
 } from "../engine/types.ts";
 
 export const plural = (n: number, one: string, many: string) =>
@@ -32,11 +33,11 @@ export const rosterOf = (members: readonly Member[]) =>
   members.map((m) => `${m.name} (${m.role.title})`).join(", ");
 
 /** Who hosts a meeting: "hosted by ann", ", who only runs it" for a host who does. */
-export const hostText = (meeting: Pick<Meeting, "host" | "hostOnly">) =>
-  `hosted by ${meeting.host}${meeting.hostOnly ? ", who only runs it" : ""}`;
+export const hostText = (meeting: Pick<Meeting, "participants" | "hostOnly">) =>
+  `hosted by ${hostOf(meeting)}${meeting.hostOnly ? ", who only runs it" : ""}`;
 
 /** Who is at a meeting: everyone at it, and who hosts it. */
-export const attendanceText = (meeting: Pick<Meeting, "host" | "hostOnly" | "participants">) =>
+export const attendanceText = (meeting: Pick<Meeting, "hostOnly" | "participants">) =>
   `${listOf(meeting.participants)}, ${hostText(meeting)}`;
 
 /** What the Agent SDK reported while a run went on, in words. */
@@ -139,7 +140,7 @@ export function meetingStatus(meeting: Meeting): string {
   switch (meeting.status) {
     case "running":
       return meeting.planning
-        ? `${meeting.host} writes the plan`
+        ? `${hostOf(meeting)} writes the plan`
         : meeting.speaking
           ? `${meeting.speaking} speaks`
           : meeting.drafting

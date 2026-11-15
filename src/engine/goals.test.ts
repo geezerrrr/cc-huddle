@@ -28,7 +28,6 @@ const meeting = (id: string, status: Meeting["status"]): Meeting => ({
   agenda: "",
   size: "small",
   participants: ["glm"],
-  host: "glm",
   status,
   turns: [],
 });

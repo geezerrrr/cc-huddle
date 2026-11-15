@@ -8,6 +8,7 @@ import { z } from "zod";
 import { errorText } from "../shared/errors.ts";
 import type { MemberOptions } from "./policy.ts";
 import { DELIVER_REMINDER, SESSION_ONLY } from "./prompts.ts";
+import type { Handover } from "./types.ts";
 import {
   keepingSession,
   runTurn,
@@ -20,12 +21,6 @@ import {
 } from "./turns.ts";
 
 const OWN_TOOLS = new Set([turnToolName("ask_teammate"), turnToolName("deliver")]);
-
-/** The work handed over: what was done, and its files, relative to the worktree. */
-interface Handover {
-  summary: string;
-  files: string[];
-}
 
 /** How a run reaches its teammates and hands its work over. */
 export interface Collaboration {

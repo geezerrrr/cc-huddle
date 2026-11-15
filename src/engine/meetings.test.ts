@@ -10,7 +10,7 @@ import { Meetings, nextMove } from "./meetings.ts";
 import { planSchema } from "./plan.ts";
 import type { Scheduler } from "./scheduler.ts";
 import { askOnce, type Reply } from "./turns.ts";
-import type { Meeting, MeetingTurn, Member } from "./types.ts";
+import { hostOf, type Meeting, type MeetingTurn, type Member } from "./types.ts";
 
 // Meeting tools as plain handlers, so a scripted turn can call them.
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
@@ -203,7 +203,7 @@ describe("Meetings", () => {
       size: "small",
       attendees: [],
     });
-    expect(meeting).toMatchObject({ host: "glm", participants: ["glm", "sonnet"] });
+    expect(meeting).toMatchObject({ participants: ["glm", "sonnet"] });
     await ended(meeting);
     expect(meeting.status).toBe("review");
     expect(phases(meeting)).toEqual([
@@ -245,7 +245,7 @@ describe("Meetings", () => {
       attendees: ["sonnet", "glm"],
     });
     await ended(meeting);
-    expect(meeting.host).toBe("sonnet");
+    expect(hostOf(meeting)).toBe("sonnet");
     expect(phases(meeting)).toEqual([
       "opening:sonnet",
       "round:sonnet",

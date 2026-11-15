@@ -3,7 +3,17 @@
  * models read them, so they are in English.
  */
 import { listOf } from "../shared/text.ts";
-import type { Delivery, Goal, GoOn, Meeting, MeetingSize, Member, Subtask, Task } from "./types.ts";
+import {
+  hostOf,
+  type Delivery,
+  type Goal,
+  type GoOn,
+  type Meeting,
+  type MeetingSize,
+  type Member,
+  type Subtask,
+  type Task,
+} from "./types.ts";
 
 /**
  * The kinds of turn a member takes: working on a subtask, or reading only
@@ -235,7 +245,7 @@ function briefing(ctx: MeetingBrief, member: Member) {
   const { meeting } = ctx;
   if (meeting.seats?.[member.name]) return "";
   const part =
-    member.name !== meeting.host
+    member.name !== hostOf(meeting)
       ? "taking part in a"
       : meeting.hostOnly
         ? "only running this; you're not one of its members and take no work in the"
@@ -258,7 +268,7 @@ export function meetingOpening(ctx: MeetingBrief) {
 
 /** An attendee's first judgment: they have heard the opening and nobody else. */
 export function meetingRound(ctx: MeetingBrief, member: Member) {
-  const opened = member.name === ctx.meeting.host ? "You opened with" : "The host opened with";
+  const opened = member.name === hostOf(ctx.meeting) ? "You opened with" : "The host opened with";
   return `${briefing(ctx, member)}${opened}:
 ${ctx.meeting.turns[0]?.text ?? ""}
 

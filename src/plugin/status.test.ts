@@ -37,7 +37,6 @@ describe("statusText", () => {
           agenda: "Scoring",
           size: "small",
           participants: ["sonnet"],
-          host: "sonnet",
           status: "review",
           turns: [],
         },

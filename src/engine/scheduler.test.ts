@@ -235,7 +235,6 @@ describe("Scheduler", () => {
       agenda: "A dice game",
       size: "small",
       participants: ["glm"],
-      host: "glm",
       status: "approved",
       turns: [],
       plan: { summary: "Dice", markdown: "# Dice\n\nTwo players.", tasks: [] },

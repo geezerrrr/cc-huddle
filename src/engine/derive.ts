@@ -7,6 +7,7 @@
 import { actionEvent, can, MEETING_MACHINE } from "./machines.ts";
 import {
   SUBTASK_ACTIONS,
+  hostOf,
   isHalted,
   type Derived,
   type Meeting,
@@ -44,7 +45,8 @@ export function reviewerOf(
   subtask: Subtask,
 ): string {
   const meetingId = state.tasks.find((t) => t.id === subtask.taskId)?.meetingId;
-  const host = state.meetings.find((m) => m.id === meetingId)?.host;
+  const meeting = state.meetings.find((m) => m.id === meetingId);
+  const host = meeting && hostOf(meeting);
   const other = state.members.find((m) => m !== subtask.assignee);
   return [host, other].find((m) => m !== undefined && m !== subtask.assignee) ?? subtask.assignee;
 }

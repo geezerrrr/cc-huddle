@@ -71,12 +71,14 @@ export const isHalted = (status: SubtaskStatus) =>
   status === "stoppedInReview" ||
   status === "stoppedInMerge";
 
-/** What a subtask hands over: what was done, and the files that are the result (relative to its worktree). */
-export interface Delivery {
+/** What a run hands over: what was done, and the files that are the result (relative to its worktree). */
+export interface Handover {
   summary: string;
   files: string[];
-  at: number;
 }
+
+/** A subtask's handover, and when it came. */
+export type Delivery = Handover & { at: number };
 
 /**
  * Why a subtask's next run goes on in its last session instead of starting
@@ -182,8 +184,7 @@ export interface Meeting {
   agenda: string;
   size: MeetingSize;
   /** Everyone at it, the host first. */
-  participants: string[];
-  host: string;
+  participants: [string, ...string[]];
   /**
    * The host only runs it: not one of its members, so no first judgment of
    * their own and no work in the plan (§4.2). Else they host and take part.
@@ -204,6 +205,9 @@ export interface Meeting {
   plan?: Plan;
   error?: string;
 }
+
+/** Who hosts a meeting: the first at it. */
+export const hostOf = (meeting: Pick<Meeting, "participants">) => meeting.participants[0];
 
 /** One multiple-choice question, as Claude Code's AskUserQuestion puts it. */
 export interface Choice {

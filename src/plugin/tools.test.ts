@@ -156,7 +156,6 @@ describe("tools", () => {
       agenda: "Dice",
       size: "small",
       participants: ["glm"],
-      host: "glm",
       status: "review",
       turns: [],
       plan: {

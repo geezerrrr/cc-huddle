@@ -39,7 +39,6 @@ const meeting: Meeting = {
   agenda: "Plan a dice game for two, as the user put it",
   size: "small",
   participants: ["sonnet", "glm"],
-  host: "sonnet",
   status: "approved",
   turns: [{ speaker: "sonnet", text: "Two dice.", at: 0, phase: "opening" }],
   plan: { summary: "A dice game", markdown: "", tasks: [] },

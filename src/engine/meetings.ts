@@ -186,15 +186,14 @@ export class Meetings {
     const attendees = named.length
       ? named
       : core.team.members.map((m) => m.name).sort((a, b) => a.localeCompare(b));
-    const host = this.admit(attendees);
-    if (call.hostOnly && attendees.length < 2)
-      throw new Error(`${host} can't only run a meeting with nobody else at it`);
+    const participants = this.admit(attendees);
+    if (call.hostOnly && participants.length < 2)
+      throw new Error(`${participants[0]} can't only run a meeting with nobody else at it`);
     const meeting: Meeting = {
       id: randomUUID(),
       agenda: call.agenda,
       size: call.size,
-      participants: attendees,
-      host,
+      participants,
       ...(call.hostOnly && { hostOnly: true }),
       status: "running",
       turns: [],
@@ -292,15 +291,15 @@ export class Meetings {
 
   /**
    * Whether these members can sit down together now: the goal
-   * is active, each is on the team and free. Throws why not; gives the first,
-   * who hosts. Nothing is
+   * is active, each is on the team and free. Throws why not; gives them, the
+   * first hosting. Nothing is
    * awaited here or before the meeting is under way, so two meetings can't
    * both take the same member.
    */
-  private admit(attendees: readonly string[]): string {
+  private admit(attendees: readonly string[]): [string, ...string[]] {
     const { core } = this;
     this.activeGoal();
-    const [host] = attendees;
+    const [host, ...rest] = attendees;
     if (host === undefined) throw new Error("The team has no members");
     const names = new Set(core.team.members.map((m) => m.name));
     const stranger = attendees.find((name) => !names.has(name));
@@ -308,7 +307,7 @@ export class Meetings {
     const busy = busyMembers(workOf(core));
     const taken = attendees.find((name) => busy.has(name));
     if (taken) throw new Error(`${taken} is busy: working, reviewing, or at another meeting`);
-    return host;
+    return [host, ...rest];
   }
 
   /** Throws why the goal isn't active, if it isn't. */

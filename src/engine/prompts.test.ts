@@ -146,7 +146,6 @@ describe("meeting prompts", () => {
     agenda: "A two-player dice game",
     size: "small",
     participants: ["sonnet", "glm"],
-    host: "sonnet",
     status: "running",
     turns: [],
     ...fields,
