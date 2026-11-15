@@ -51,7 +51,7 @@ export function statusText(work: Work): string {
     for (const subtask of work.subtasks.filter((s) => s.taskId === task.id))
       lines.push(subtaskLine(subtask, derived.subtasks[subtask.id]?.waits ?? [], work));
   }
-  const open = work.questions.filter(toYou).filter((q) => q.status === "open");
+  const open = work.questions.filter(toYou);
   if (open.length) lines.push("", "Waiting on you:", ...open.map((q) => questionLine(q, work)));
   return lines.join("\n");
 }

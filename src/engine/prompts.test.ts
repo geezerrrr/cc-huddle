@@ -31,7 +31,6 @@ const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
   assignee: "sonnet",
   dependsOn: [],
   status: "done",
-  createdAt: 0,
   progress: { done: 0, total: 0 },
   tokens: 0,
   ...fields,
@@ -54,12 +53,11 @@ describe("systemPrompt", () => {
 describe("taskBrief", () => {
   it("gives the work, where to do it, its plan, what it builds on, and your words for it", () => {
     const brief = taskBrief({
-      goal: { id: "g1", name: "Dice game", slug: "dice-game", status: "active", createdAt: 0 },
+      goal: { name: "Dice game", slug: "dice-game", status: "active", createdAt: 0 },
       task: {
         id: "t1",
         title: "Board",
         outcome: "A board to roll on",
-        createdAt: 0,
         ownerAccepts: true,
       },
       subtask: subtask("Scoreboard", { acceptance: "Shows both scores" }),
@@ -153,12 +151,11 @@ describe("meeting prompts", () => {
     status: "running",
     turns: [],
     tokens: 0,
-    createdAt: 0,
     ...fields,
   });
   const brief = (fields: Partial<Meeting> = {}): MeetingBrief => ({
     meeting: meeting(fields),
-    goal: { id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 },
+    goal: { name: "Dice", slug: "dice", status: "active", createdAt: 0 },
     attendees: [sonnet, glm],
     members: fields.hostOnly ? [glm] : [sonnet, glm],
     cwd: "/goals/dice",

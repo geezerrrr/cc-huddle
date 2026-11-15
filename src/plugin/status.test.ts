@@ -11,7 +11,6 @@ const subtask = (id: string, fields: Partial<Subtask>): Subtask => ({
   assignee: "glm",
   dependsOn: [],
   status: "pending",
-  createdAt: 0,
   progress: { done: 0, total: 0 },
   tokens: 0,
   ...fields,
@@ -19,13 +18,11 @@ const subtask = (id: string, fields: Partial<Subtask>): Subtask => ({
 
 const question = (
   id: string,
-  fields: Partial<Pick<Question, "subtaskId" | "status" | "text">> & Ask,
+  fields: Partial<Pick<Question, "subtaskId" | "text">> & Ask,
 ): Question => ({
   id,
   from: "glm",
   text: "",
-  status: "open",
-  createdAt: 0,
   ...fields,
 });
 
@@ -34,7 +31,7 @@ describe("statusText", () => {
     const text = statusText({
       members: ["glm", "sonnet"],
       underWay: [],
-      goal: { id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 },
+      goal: { name: "Dice", slug: "dice", status: "active", createdAt: 0 },
       meetings: [
         {
           id: "m1",
@@ -45,10 +42,9 @@ describe("statusText", () => {
           status: "review",
           turns: [],
           tokens: 0,
-          createdAt: 0,
         },
       ],
-      tasks: [{ id: "t1", title: "Game", outcome: "", createdAt: 0, ownerAccepts: true }],
+      tasks: [{ id: "t1", title: "Game", outcome: "", ownerAccepts: true }],
       subtasks: [
         subtask("Rules", {
           status: "running",
@@ -69,7 +65,6 @@ describe("statusText", () => {
           kind: "decision",
           decision: { kind: "delivery", options: ["accept", "revise"] },
         }),
-        question("q3", { status: "answered", text: "Old", kind: "choices", choices: [] }),
       ],
     });
     expect(text).toBe(`Goal "Dice": active, on branch openplan/dice/main

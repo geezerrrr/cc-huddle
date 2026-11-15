@@ -167,13 +167,9 @@ A running subtask's member has two tools beyond Claude Code's own, from an in-pr
 
 ### 4.4 Question
 
-| From | Event                   | To        |
-| ---- | ----------------------- | --------- |
-| —    | asked                   | open      |
-| open | answered                | answered  |
-| open | the asker stops waiting | cancelled |
+A question has no status: it is in the state while it is open, and leaves it once answered, or called off when the asker stops waiting.
 
-Kinds: a teammate's question (answered by that teammate in a read-only session), a question to you (Claude Code's own `AskUserQuestion`, intercepted), a permission request, a decision (stuck review, binary conflict, git error), and a finished task you chose to accept. Answered and cancelled questions leave the state.
+Kinds: a teammate's question (answered by that teammate in a read-only session), a question to you (Claude Code's own `AskUserQuestion`, intercepted), a permission request, a decision (stuck review, binary conflict, git error), and a finished task you chose to accept.
 
 ### 4.5 Derived, never stored
 

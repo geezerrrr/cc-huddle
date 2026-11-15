@@ -14,7 +14,6 @@ import type {
   PermissionRuleValue,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { AskUserQuestionInput } from "@anthropic-ai/claude-agent-sdk/sdk-tools";
-import { QUESTION_MACHINE, step } from "./machines.ts";
 import {
   noteNeeded,
   type Ask,
@@ -34,7 +33,7 @@ const ASK_TOOL = "AskUserQuestion";
 const CALLED_OFF = "Stopped.";
 
 /** A member waiting, on a subtask's run, until `signal` ends the run. */
-export interface Asker {
+interface Asker {
   from: string;
   subtaskId?: string;
   signal: AbortSignal;
@@ -105,12 +104,10 @@ export class Questions {
    * task sent back without what to change, or with a subtask not done in it.
    */
   answer(id: string, answer: Answer): Question {
-    const question = this.inbox.state.questions.find(
-      (q) => q.id === id && q.kind !== "teammate" && q.status === "open",
-    );
+    const question = this.inbox.state.questions.find((q) => q.id === id && q.kind !== "teammate");
     if (!question) throw new Error("That question is no longer open.");
     if (!this.fits(question, answer)) throw new Error("That answer doesn't fit the question.");
-    this.close(question, "answer", answer);
+    this.close(question, answer);
     return question;
   }
 
@@ -130,7 +127,8 @@ export class Questions {
     try {
       return await answering();
     } finally {
-      if (question.status === "open") this.close(question, "answer");
+      // Called off meanwhile, it left already.
+      if (this.inbox.state.questions.includes(question)) this.close(question);
     }
   }
 
@@ -275,7 +273,7 @@ export class Questions {
     const question = this.open(asker, ask);
     return new Promise((resolve) => {
       const callOff = () => {
-        this.close(question, "cancel");
+        this.close(question);
       };
       asker.signal.addEventListener("abort", callOff, { once: true });
       this.waiting.set(question.id, (answer) => {
@@ -291,8 +289,6 @@ export class Questions {
       id: randomUUID(),
       ...(asker.subtaskId !== undefined && { subtaskId: asker.subtaskId }),
       from: asker.from,
-      status: "open",
-      createdAt: Date.now(),
       ...ask,
     };
     this.inbox.state.questions.push(question);
@@ -303,13 +299,12 @@ export class Questions {
   /** Calls off every open question that `which` picks. */
   private cancelAll(which: (question: Question) => boolean) {
     // Picked out first: each one called off leaves the list.
-    const picked = this.inbox.state.questions.filter((q) => q.status === "open" && which(q));
-    for (const question of picked) this.close(question, "cancel");
+    const picked = this.inbox.state.questions.filter(which);
+    for (const question of picked) this.close(question);
   }
 
   /** Answers or calls off a question: it leaves the state, and whoever waits on it hears. */
-  private close(question: Question, event: keyof typeof QUESTION_MACHINE, answer?: Answer) {
-    question.status = step(QUESTION_MACHINE, question.status, event);
+  private close(question: Question, answer?: Answer) {
     this.waiting.get(question.id)?.(answer);
     this.waiting.delete(question.id);
     this.inbox.state.questions = this.inbox.state.questions.filter((q) => q !== question);

@@ -277,7 +277,6 @@ function taskLines(work: Work, derived: Derived): string[] {
       (q) =>
         q.kind === "decision" &&
         q.decision.kind === "delivery" &&
-        q.status === "open" &&
         subtasks.some((s) => s.id === q.subtaskId),
     );
     const where = accepting ? "waits for you to accept it" : taskWhere(work, derived, subtasks);
@@ -339,10 +338,7 @@ export function paneTeam(
   }
   const { work, members } = mine;
   const derived = derive(work);
-  const needs = work.questions
-    .filter(toYou)
-    .filter((q) => q.status === "open")
-    .map((q) => needOf(q, work));
+  const needs = work.questions.filter(toYou).map((q) => needOf(q, work));
   const meeting = shownMeeting(work);
   const { goal } = work;
   const here =

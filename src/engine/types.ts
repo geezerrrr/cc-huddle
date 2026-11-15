@@ -30,14 +30,12 @@ export type GoalStatus = "active" | "paused" | "archived";
 
 /** One goal, on a branch of its own cut from your HEAD when it started (§5). */
 export interface Goal {
-  id: string;
   name: string;
   /** Its name in git: its branches are under `openplan/<slug>/` (git.ts). */
   slug: string;
   status: GoalStatus;
+  /** When it started: the repository's goals are listed in that order. */
   createdAt: number;
-  /** When it was archived, while it is. */
-  archivedAt?: number;
 }
 
 /** One result for you: a group of subtasks, done once they all are. */
@@ -46,7 +44,6 @@ export interface Task {
   title: string;
   /** What it delivers. */
   outcome: string;
-  createdAt: number;
   /** The meeting whose approved plan it came from; none when assigned directly. */
   meetingId?: string;
   /**
@@ -75,8 +72,7 @@ export interface Delivery {
  * on, the review sent it back, a merge left conflicts, its upstream was
  * redone, or you sent its task back with what to change.
  */
-export type GoOnReason =
-  "held" | "carried" | "continued" | "rejected" | "conflict" | "redo" | "revised";
+type GoOnReason = "held" | "carried" | "continued" | "rejected" | "conflict" | "redo" | "revised";
 
 /** One reason a subtask goes on in its session, with what it carries (the notes, the files, your words). */
 export interface GoOn {
@@ -100,7 +96,6 @@ export interface Subtask {
   assignee: string;
   dependsOn: string[];
   status: SubtaskStatus;
-  createdAt: number;
   startedAt?: number;
   finishedAt?: number;
   progress: Progress;
@@ -169,7 +164,7 @@ export interface MeetingHand {
 }
 
 /** A member's session for a whole meeting, and how many turns of it they have heard. */
-export interface MeetingSeat {
+interface MeetingSeat {
   session: string;
   heard: number;
 }
@@ -202,10 +197,7 @@ export interface Meeting {
   plan?: Plan;
   tokens: number;
   error?: string;
-  createdAt: number;
 }
-
-export type QuestionStatus = "open" | "answered" | "cancelled";
 
 /** One multiple-choice question, as Claude Code's AskUserQuestion puts it. */
 export interface Choice {
@@ -228,7 +220,7 @@ export const DECISION_OPTIONS = [
 ] as const;
 export type DecisionOption = (typeof DECISION_OPTIONS)[number];
 
-export type DecisionKind = "review" | "merge" | "delivery";
+type DecisionKind = "review" | "merge" | "delivery";
 
 /**
  * What a decision of each kind offers, and the option a note typed instead
@@ -276,6 +268,7 @@ export interface Permission {
  * Something a member waits on, or a decision that waits on you (§4.4): a
  * teammate's answer, or, put to you, your picks among choices, your leave for
  * a tool call, or a call the scheduler acts on, with no run waiting on it.
+ * It is in the state while it is open; answered or called off, it leaves.
  */
 export type Question = {
   id: string;
@@ -283,8 +276,6 @@ export type Question = {
   /** Who asks. */
   from: string;
   text: string;
-  status: QuestionStatus;
-  createdAt: number;
 } & Ask;
 
 /** What a question asks for. */

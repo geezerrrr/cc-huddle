@@ -5,7 +5,7 @@
  * table lacks is refused. What you can be offered is asked of the same table
  * with `can`, in derive.ts.
  */
-import type { MeetingStatus, GoalStatus, QuestionStatus, SubtaskStatus } from "./types.ts";
+import type { MeetingStatus, GoalStatus, SubtaskStatus } from "./types.ts";
 
 /** Each event: the states it may happen in, and the state it leads to. */
 type Machine<S extends string> = Record<string, { from: readonly S[]; to: S }>;
@@ -58,11 +58,6 @@ export const SUBTASK_MACHINE = {
   /** Done, then redone in its session: its upstream changed, you added to it, or you sent its task back. */
   redo: { from: ["done"], to: "pending" },
 } as const satisfies Machine<SubtaskStatus>;
-
-export const QUESTION_MACHINE = {
-  answer: { from: ["open"], to: "answered" },
-  cancel: { from: ["open"], to: "cancelled" },
-} as const satisfies Machine<QuestionStatus>;
 
 /** The states a machine knows: every one it moves from or to. */
 type StateOf<M extends Machine<string>> = M[keyof M]["from"][number] | M[keyof M]["to"];

@@ -23,7 +23,6 @@ const subtask = (id: string, fields: Partial<Subtask>): Subtask => ({
   assignee: "glm",
   dependsOn: [],
   status: "pending",
-  createdAt: 0,
   progress: { done: 0, total: 0 },
   tokens: 0,
   ...fields,
@@ -39,7 +38,6 @@ const meeting: Meeting = {
   turns: [{ speaker: "sonnet", text: "Two dice.", at: 0, phase: "opening", tokens: 30 }],
   plan: { summary: "A dice game", markdown: "", tasks: [] },
   tokens: 30,
-  createdAt: 0,
 };
 
 const question = (
@@ -50,21 +48,18 @@ const question = (
   subtaskId: "rules",
   from: "glm",
   text: "",
-  status: "open",
-  createdAt: 0,
   ...fields,
 });
 
 const work = (): Work => ({
   members: ["glm", "sonnet"],
   underWay: [],
-  goal: { id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 },
+  goal: { name: "Dice", slug: "dice", status: "active", createdAt: 0 },
   tasks: [
     {
       id: "t1",
       title: "Game",
       outcome: "",
-      createdAt: 0,
       meetingId: "m1",
       ownerAccepts: true,
     },
@@ -125,7 +120,6 @@ describe("paneTeam", () => {
       id,
       title,
       outcome: "",
-      createdAt: 0,
       ownerAccepts: false,
     });
     now.tasks.push(task("t2", "Score"), task("t3", "Docs"));

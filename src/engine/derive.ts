@@ -29,7 +29,7 @@ export interface Work extends GoalState {
 }
 
 const openQuestions = (state: Pick<GoalState, "questions">, subtaskId: string) =>
-  state.questions.filter((q) => q.subtaskId === subtaskId && q.status === "open");
+  state.questions.filter((q) => q.subtaskId === subtaskId);
 
 const isActive = (state: Pick<GoalState, "goal">) => state.goal.status === "active";
 
@@ -51,7 +51,6 @@ export function reviewerOf(
 function acceptanceOf(state: Pick<GoalState, "questions" | "subtasks">, taskId: string) {
   return state.questions.find(
     (q) =>
-      q.status === "open" &&
       q.kind === "decision" &&
       q.decision.kind === "delivery" &&
       state.subtasks.find((s) => s.id === q.subtaskId)?.taskId === taskId,

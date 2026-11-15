@@ -40,7 +40,6 @@ const meeting = (id: string, status: Meeting["status"]): Meeting => ({
   status,
   turns: [],
   tokens: 0,
-  createdAt: 0,
 });
 
 let dir: string;
@@ -67,7 +66,7 @@ beforeEach(async () => {
   await git({ cwd: repo, env: ME }, ["commit", "-q", "-m", "start"]);
   core = {
     state: {
-      goal: { id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 },
+      goal: { name: "Dice", slug: "dice", status: "active", createdAt: 0 },
       tasks: [],
       subtasks: [],
       meetings: [],
@@ -117,12 +116,12 @@ describe("Goals", () => {
     expect(meetings.cancel.mock.calls).toEqual([["m1"]]);
 
     await goals.archive();
-    expect(goal).toMatchObject({ status: "archived", archivedAt: expect.any(Number) as number });
+    expect(goal.status).toBe("archived");
     expect(meetings.cancel).toHaveBeenLastCalledWith("m2");
     await expect(goals.pause()).rejects.toThrow("archived: resume it first");
 
     await goals.resume();
-    expect(goal).toMatchObject({ status: "active", archivedAt: undefined });
+    expect(goal.status).toBe("active");
     expect(scheduler.pump).toHaveBeenCalled();
   });
 
@@ -150,7 +149,6 @@ describe("Goals", () => {
       assignee: "glm",
       dependsOn: [],
       status: "stopped",
-      createdAt: 0,
       progress: { done: 0, total: 0 },
       tokens: 0,
     });

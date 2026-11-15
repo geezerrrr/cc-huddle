@@ -16,7 +16,7 @@ import type { Goal, Subtask } from "./types.ts";
 const LIFE = "life";
 
 /** A subtask you give a member directly, without a meeting. */
-export interface DirectWork {
+interface DirectWork {
   title: string;
   description: string;
   acceptance: string;
@@ -54,7 +54,6 @@ export class Goals {
       const { goal } = this;
       if (goal.status === "archived") return;
       goal.status = step(GOAL_MACHINE, goal.status, "archive");
-      goal.archivedAt = Date.now();
       this.hold(true);
     });
   }
@@ -117,7 +116,6 @@ export class Goals {
     const { goal } = this;
     if (goal.status === "active") return false;
     goal.status = step(GOAL_MACHINE, goal.status, "resume");
-    goal.archivedAt = undefined;
     return true;
   }
 

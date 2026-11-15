@@ -209,7 +209,6 @@ const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
   assignee: "glm",
   dependsOn: [],
   status: "done",
-  createdAt: 0,
   progress: { done: 0, total: 0 },
   tokens: 0,
   ...fields,
@@ -280,8 +279,6 @@ describe("calling off", () => {
         id: "q1",
         from: "glm",
         text: "Allow?",
-        status: "open",
-        createdAt: 0,
         kind: "permission",
         permission: { tool: "Bash", input: {}, options: ["once", "deny"] },
       },
@@ -289,8 +286,6 @@ describe("calling off", () => {
         id: "q2",
         from: "glm",
         text: "Font?",
-        status: "open",
-        createdAt: 0,
         kind: "teammate",
         to: "sonnet",
       },
@@ -325,7 +320,7 @@ describe("a teammate's question", () => {
       () => promise,
     );
     expect(box.state.questions).toMatchObject([
-      { from: "glm", to: "sonnet", subtaskId: "s1", text: "Which font?", status: "open" },
+      { from: "glm", to: "sonnet", subtaskId: "s1", text: "Which font?" },
     ]);
     resolve("Inter");
     expect(await answered).toBe("Inter");

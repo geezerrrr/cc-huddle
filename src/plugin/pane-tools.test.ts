@@ -213,8 +213,6 @@ describe("the pane's socket and tools", () => {
           multiSelect: false,
         },
       ],
-      status: "open",
-      createdAt: 0,
     };
     (await session.start("Dice")).state.questions.push(question);
     expect(await call("answer", { question: "q1", option: "once" })).toEqual({
@@ -225,6 +223,6 @@ describe("the pane's socket and tools", () => {
       text: "Answered q1.",
       error: false,
     });
-    expect(question.status).toBe("answered");
+    expect(session.current?.state.questions).toEqual([]);
   });
 });

@@ -26,7 +26,7 @@ export const turnToolName = (name: string) => `mcp__${TURN_SERVER}__${name}`;
 export const toolText = (text: string) => ({ content: [{ type: "text" as const, text }] });
 
 /** How a turn ended: its final text, or why it failed, and the tokens it used. */
-export type TurnOutcome = (
+type TurnOutcome = (
   { ok: true; text: string; structured?: unknown } | { ok: false; error: string }
 ) & { tokens: number };
 
@@ -76,7 +76,7 @@ export interface ToolCall {
 }
 
 /** A whole block of a reply: thinking or words as they ended, or a tool call as it was made. */
-export type Block = { kind: "thinking"; text: string } | { kind: "text"; text: string } | ToolCall;
+type Block = { kind: "thinking"; text: string } | { kind: "text"; text: string } | ToolCall;
 
 /** Something the Agent SDK reports while a turn goes on. */
 export type Notice =

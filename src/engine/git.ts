@@ -37,18 +37,18 @@ export class GitError extends Error {
 }
 
 /** Where a git command runs, and the environment it adds. */
-export interface At {
+interface At {
   cwd: string;
   env?: Record<string, string>;
 }
 
-export interface Result {
+interface Result {
   code: number;
   stdout: string;
   stderr: string;
 }
 
-export interface GitOptions {
+interface GitOptions {
   /** Exit codes that are answers, not failures (`rev-parse --verify` answers 1). */
   allow?: number[];
   /** What the command reads on stdin. */
@@ -77,7 +77,7 @@ export function git(at: At, args: string[], options: GitOptions = {}): Promise<R
 }
 
 /** Who a commit is by. */
-export interface Signer {
+interface Signer {
   name: string;
   email: string;
 }
@@ -292,8 +292,7 @@ export function commitDesk(
 }
 
 /** What merging a delivery came to: merged into the goal, or conflicts (text ones for the member, the rest for you). */
-export type MergeOutcome =
-  { kind: "merged" } | { kind: "conflict"; text: string[]; other: string[] };
+type MergeOutcome = { kind: "merged" } | { kind: "conflict"; text: string[]; other: string[] };
 
 /** A conflict git wrote into a text file (its lines may end in \r\n). */
 const MARKERS = /^<{7} [\s\S]*?^={7}\r?$[\s\S]*?^>{7} /m;

@@ -3,7 +3,6 @@
  * team and its parts, put together. It knows nothing of the plugin: what it
  * is to run with, and where its failures go, come in its options.
  */
-import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
 import path from "node:path";
@@ -134,7 +133,7 @@ export class Engine {
       const places: Places = { repo, root: folder };
       await openGoal(places, slug);
       const state: GoalState = {
-        goal: { id: randomUUID(), name, slug, status: "active", createdAt: Date.now() },
+        goal: { name, slug, status: "active", createdAt: Date.now() },
         tasks: [],
         subtasks: [],
         meetings: [],

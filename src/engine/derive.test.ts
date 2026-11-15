@@ -11,7 +11,6 @@ const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
   assignee: "ann",
   dependsOn: [],
   status: "pending",
-  createdAt: 0,
   progress: { done: 0, total: 0 },
   tokens: 0,
   ...fields,
@@ -26,28 +25,24 @@ const meeting = (fields: Partial<Meeting> = {}): Meeting => ({
   status: "approved",
   turns: [],
   tokens: 0,
-  createdAt: 0,
   ...fields,
 });
 
 const question = (fields: Pick<Question, "id" | "subtaskId"> & Ask): Question => ({
   from: "ann",
   text: "",
-  status: "open",
-  createdAt: 0,
   ...fields,
 });
 
 const work = (fields: Partial<Work> = {}): Work => ({
   members: ["host", "ann", "bob"],
   underWay: [],
-  goal: { id: "p1", name: "dice", slug: "dice", status: "active", createdAt: 0 },
+  goal: { name: "dice", slug: "dice", status: "active", createdAt: 0 },
   tasks: [
     {
       id: "t1",
       title: "",
       outcome: "",
-      createdAt: 0,
       meetingId: "m1",
       ownerAccepts: true,
     },
@@ -66,7 +61,7 @@ describe("reviewerOf", () => {
   it("is another member when the host is the assignee or there was no meeting", () => {
     expect(reviewerOf(work(), subtask("s1", { assignee: "host" }))).toBe("ann");
     const direct = work({
-      tasks: [{ id: "t1", title: "", outcome: "", createdAt: 0, ownerAccepts: true }],
+      tasks: [{ id: "t1", title: "", outcome: "", ownerAccepts: true }],
     });
     expect(reviewerOf(direct, subtask("s1"))).toBe("host");
   });
@@ -99,7 +94,6 @@ describe("waitsIn", () => {
       id: "t0",
       title: "",
       outcome: "",
-      createdAt: 0,
       ownerAccepts,
     });
     const up = subtask("up", { taskId: "t0", status: "done" });
@@ -126,7 +120,7 @@ describe("waitsIn", () => {
 
   it("holds what is pending or yet to merge while its goal is paused", () => {
     const state = work({
-      goal: { id: "p1", name: "dice", slug: "dice", status: "paused", createdAt: 0 },
+      goal: { name: "dice", slug: "dice", status: "paused", createdAt: 0 },
     });
     const held = [{ kind: "goal", status: "paused" }];
     expect(waitsIn(state, subtask("s1"), new Set())).toEqual(held);
@@ -224,7 +218,7 @@ describe("derive", () => {
 
   it("offers delete only for an archived goal", () => {
     const state = work({
-      goal: { id: "p1", name: "dice", slug: "dice", status: "archived", createdAt: 0 },
+      goal: { name: "dice", slug: "dice", status: "archived", createdAt: 0 },
     });
     expect(derive(state).goal).toEqual(["resume", "delete"]);
   });

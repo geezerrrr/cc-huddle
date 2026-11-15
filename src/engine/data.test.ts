@@ -31,7 +31,7 @@ afterEach(async () => {
 });
 
 const fresh = (slug = "dice", createdAt = 0): GoalState => ({
-  goal: { id: slug, name: "Dice", slug, status: "active", createdAt },
+  goal: { name: "Dice", slug, status: "active", createdAt },
   tasks: [],
   subtasks: [],
   meetings: [],

@@ -278,7 +278,6 @@ describe("Engine", () => {
       assignee: "glm",
       dependsOn: [],
       status: "running",
-      createdAt: 0,
       progress: { done: 0, total: 0 },
       tokens: 0,
       session: "glm-1",
@@ -291,7 +290,6 @@ describe("Engine", () => {
       id: "t1",
       title: "Game",
       outcome: "",
-      createdAt: 0,
       ownerAccepts: false,
     });
     was.state.subtasks.push(subtask);
@@ -327,7 +325,6 @@ describe("Engine", () => {
       id: "t1",
       title: "Game",
       outcome: "",
-      createdAt: 0,
       ownerAccepts: true,
     });
     const subtask = {
@@ -339,7 +336,6 @@ describe("Engine", () => {
       assignee: "glm",
       dependsOn: [],
       status: "done" as const,
-      createdAt: 0,
       progress: { done: 0, total: 0 },
       tokens: 0,
     };
@@ -354,7 +350,7 @@ describe("Engine", () => {
       "doesn't fit",
     );
     await engine.answer(question?.id ?? "", { decision: "revise", note: "Bigger dice" });
-    expect(question?.status).toBe("answered");
+    expect(engine.state.questions).toEqual([]);
     expect(engine.state.subtasks[0]).toMatchObject({
       status: "pending",
       goOn: [{ why: "revised", note: "Bigger dice" }],

@@ -22,7 +22,7 @@ import { busyMembers, meetingResumes } from "./derive.ts";
 import { openGoal } from "./git.ts";
 import { goalFiles } from "./goal-files.ts";
 import { can, MEETING_MACHINE, step } from "./machines.ts";
-import { hostPlanSchema, hostWritten, planSchema, soundPlan } from "./plan.ts";
+import { hostPlanSchema, hostWritten, soundPlan, type WrittenPlan } from "./plan.ts";
 import {
   MEETING_TOOLS,
   meetingAnswer,
@@ -120,10 +120,8 @@ const quiet = (meeting: Meeting) =>
   });
 
 /** Who takes part as a member (§4.2): everyone at it, but a host who only runs it. */
-export const meetingMembers = ({
-  participants,
-  hostOnly,
-}: Pick<Meeting, "participants" | "hostOnly">) => (hostOnly ? participants.slice(1) : participants);
+const meetingMembers = ({ participants, hostOnly }: Pick<Meeting, "participants" | "hostOnly">) =>
+  hostOnly ? participants.slice(1) : participants;
 
 type Move =
   | { kind: "open" }
@@ -161,7 +159,7 @@ export function nextMove(
  * What calling a meeting takes: what to plan, its size, who
  * attends, the host first, and whether the host only runs it.
  */
-export interface MeetingCall {
+interface MeetingCall {
   agenda: string;
   size: MeetingSize;
   /** Everyone, when empty. */
@@ -200,7 +198,6 @@ export class Meetings {
       status: "running",
       turns: [],
       tokens: 0,
-      createdAt: Date.now(),
     };
     core.state.meetings.push(meeting);
     core.changed();
@@ -237,17 +234,14 @@ export class Meetings {
   }
 
   /**
-   * Your changes to a plan under review: `raw` is the whole plan, which may
-   * give work to any member and names the tasks you accept (planSchema).
-   * Dependencies that loop are refused.
+   * Your changes to a plan under review: `plan` is the whole plan, which may
+   * give work to any member and names the tasks you accept, as the
+   * change_plan tool took it (planSchema). Dependencies that loop are refused.
    */
-  change(id: string, raw: unknown) {
-    const { core } = this;
+  change(id: string, plan: WrittenPlan) {
     const { meeting } = this.underReview(id, "change");
-    // A plan under review came out of a meeting, so the team has members.
-    const names = core.team.members.map((m) => m.name) as [string, ...string[]];
-    meeting.plan = soundPlan(planSchema(z.enum(names)).parse(raw), "refuse");
-    core.changed();
+    meeting.plan = soundPlan(plan, "refuse");
+    this.core.changed();
   }
 
   /**
@@ -338,121 +332,121 @@ export class Meetings {
 
   private async run(meeting: Meeting, signal: AbortSignal) {
     const { core } = this;
-    // All there: admit() has just checked, and nothing was awaited since.
-    const named = (names: readonly string[]) =>
-      names.flatMap((name) => core.team.members.filter((m) => m.name === name));
-    const [host, ...others] = named(meeting.participants);
-    // A host who only runs it has someone else at it (start), so there are members.
-    const [member, ...more] = named(meetingMembers(meeting));
-    const { goal } = core.state;
-    if (!host || !member) return;
-    let ctx: MeetingBrief = {
-      meeting,
-      goal,
-      attendees: [host, ...others],
-      members: [member, ...more],
-      cwd: "",
-    };
-
-    /**
-     * One exchange in this member's session for the meeting, which goes on
-     * across all their turns. `heard`: how many of the meeting's turns it
-     * has taken in once done.
-     */
-    const ask = async (
-      member: Member,
-      prompt: string,
-      turn: {
-        heard?: number;
-        tool?: TurnTool;
-        schema?: z.ZodType;
-        signal?: AbortSignal;
-        listener?: TurnListener;
-      } = {},
-    ): Promise<Reply> => {
-      const heard = turn.heard ?? meeting.turns.length;
-      const options = core.options(member, "readOnly", ctx.cwd);
-      const seat = meeting.seats?.[member.name];
-      const reply = await askOnce({
-        prompt,
-        options: {
-          ...options,
-          ...(seat && { resume: seat.session }),
-          ...(turn.tool && {
-            mcpServers: { ...options.mcpServers, [TURN_SERVER]: turn.tool.server },
-            allowedTools: [turn.tool.name],
-          }),
-        },
-        ...(turn.schema && { schema: turn.schema }),
-        signal: turn.signal ?? signal,
-        ...(turn.listener && { listener: turn.listener }),
-      });
-      meeting.seats = { ...meeting.seats, [member.name]: { session: reply.session, heard } };
-      meeting.tokens += reply.tokens;
-      return reply;
-    };
-    /**
-     * A turn said aloud: it streams as it is said, and becomes the meeting's
-     * next turn once done; nobody is speaking then. `saying`: the message
-     * under way, each time it grows.
-     */
-    const speak = async (
-      member: Member,
-      prompt: string,
-      turn: {
-        heard?: number;
-        tool?: TurnTool;
-        schema?: z.ZodType;
-        saying?: (words: string) => void;
-      } = {},
-    ) => {
-      const { saying, ...asked } = turn;
-      meeting.speaking = member.name;
-      // The closing turn hands the plan back in its shape, with no words to stream.
-      meeting.planning = turn.schema !== undefined;
-      core.changed();
-      const speech = core.speech(meeting, member.name);
-      let words = "";
-      try {
-        return await ask(member, prompt, {
-          ...asked,
-          listener: {
-            ...speech,
-            text: (delta, fresh) => {
-              speech.text?.(delta, fresh);
-              words = fresh ? delta : words + delta;
-              saying?.(words);
-            },
-          },
-        });
-      } finally {
-        meeting.speaking = undefined;
-        meeting.planning = undefined;
-      }
-    };
-    const said = (
-      speaker: Member,
-      { text, tokens }: { text: string; tokens: number },
-      phase: MeetingTurn["phase"],
-      calls?: string,
-    ) => {
-      meeting.turns.push({
-        speaker: speaker.name,
-        text,
-        at: Date.now(),
-        phase,
-        tokens,
-        ...(calls !== undefined && { calls }),
-      });
-      core.changed();
-    };
-    const attendee = (name: string) => {
-      const found = ctx.attendees.find((m) => m.name === name);
-      if (!found) throw new Error(`${name} isn't at this meeting`);
-      return found;
-    };
-
     try {
+      // All there: admit() has just checked, and nothing was awaited since.
+      const named = (names: readonly string[]) =>
+        names.flatMap((name) => core.team.members.filter((m) => m.name === name));
+      const [host, ...others] = named(meeting.participants);
+      // A host who only runs it has someone else at it (start), so there are members.
+      const [member, ...more] = named(meetingMembers(meeting));
+      const { goal } = core.state;
+      if (!host || !member) throw new Error("The meeting's host or members aren't on the team");
+      let ctx: MeetingBrief = {
+        meeting,
+        goal,
+        attendees: [host, ...others],
+        members: [member, ...more],
+        cwd: "",
+      };
+
+      /**
+       * One exchange in this member's session for the meeting, which goes on
+       * across all their turns. `heard`: how many of the meeting's turns it
+       * has taken in once done.
+       */
+      const ask = async (
+        member: Member,
+        prompt: string,
+        turn: {
+          heard?: number;
+          tool?: TurnTool;
+          schema?: z.ZodType;
+          signal?: AbortSignal;
+          listener?: TurnListener;
+        } = {},
+      ): Promise<Reply> => {
+        const heard = turn.heard ?? meeting.turns.length;
+        const options = core.options(member, "readOnly", ctx.cwd);
+        const seat = meeting.seats?.[member.name];
+        const reply = await askOnce({
+          prompt,
+          options: {
+            ...options,
+            ...(seat && { resume: seat.session }),
+            ...(turn.tool && {
+              mcpServers: { ...options.mcpServers, [TURN_SERVER]: turn.tool.server },
+              allowedTools: [turn.tool.name],
+            }),
+          },
+          ...(turn.schema && { schema: turn.schema }),
+          signal: turn.signal ?? signal,
+          ...(turn.listener && { listener: turn.listener }),
+        });
+        meeting.seats = { ...meeting.seats, [member.name]: { session: reply.session, heard } };
+        meeting.tokens += reply.tokens;
+        return reply;
+      };
+      /**
+       * A turn said aloud: it streams as it is said, and becomes the meeting's
+       * next turn once done; nobody is speaking then. `saying`: the message
+       * under way, each time it grows.
+       */
+      const speak = async (
+        member: Member,
+        prompt: string,
+        turn: {
+          heard?: number;
+          tool?: TurnTool;
+          schema?: z.ZodType;
+          saying?: (words: string) => void;
+        } = {},
+      ) => {
+        const { saying, ...asked } = turn;
+        meeting.speaking = member.name;
+        // The closing turn hands the plan back in its shape, with no words to stream.
+        meeting.planning = turn.schema !== undefined;
+        core.changed();
+        const speech = core.speech(meeting, member.name);
+        let words = "";
+        try {
+          return await ask(member, prompt, {
+            ...asked,
+            listener: {
+              ...speech,
+              text: (delta, fresh) => {
+                speech.text?.(delta, fresh);
+                words = fresh ? delta : words + delta;
+                saying?.(words);
+              },
+            },
+          });
+        } finally {
+          meeting.speaking = undefined;
+          meeting.planning = undefined;
+        }
+      };
+      const said = (
+        speaker: Member,
+        { text, tokens }: { text: string; tokens: number },
+        phase: MeetingTurn["phase"],
+        calls?: string,
+      ) => {
+        meeting.turns.push({
+          speaker: speaker.name,
+          text,
+          at: Date.now(),
+          phase,
+          tokens,
+          ...(calls !== undefined && { calls }),
+        });
+        core.changed();
+      };
+      const attendee = (name: string) => {
+        const found = ctx.attendees.find((m) => m.name === name);
+        if (!found) throw new Error(`${name} isn't at this meeting`);
+        return found;
+      };
+
       ctx = { ...ctx, cwd: await openGoal(core.places, goal.slug) };
       /** Whoever has the floor speaks: about what they raised their hand for, if they did. */
       const answer = async (name: string) => {

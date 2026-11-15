@@ -35,7 +35,7 @@ export interface LiveRun {
 }
 
 /** A meeting turn as it is spoken: who, what it did so far, and what it does now. */
-export interface Spoken {
+interface Spoken {
   speaker: string;
   entries: RecordEntry[];
   live: LiveRun;

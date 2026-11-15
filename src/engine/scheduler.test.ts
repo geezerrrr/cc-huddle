@@ -38,7 +38,6 @@ const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
   assignee: "glm",
   dependsOn: [],
   status: "pending",
-  createdAt: 0,
   progress: { done: 0, total: 0 },
   tokens: 0,
   ...fields,
@@ -58,8 +57,8 @@ beforeEach(async () => {
   await git({ cwd: repo, env: ME }, ["commit", "-q", "-m", "start"]);
   core = {
     state: {
-      goal: { id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 },
-      tasks: [{ id: "t1", title: "Board", outcome: "", createdAt: 0, ownerAccepts: true }],
+      goal: { name: "Dice", slug: "dice", status: "active", createdAt: 0 },
+      tasks: [{ id: "t1", title: "Board", outcome: "", ownerAccepts: true }],
       subtasks: [],
       meetings: [],
       questions: [],
@@ -237,14 +236,12 @@ describe("Scheduler", () => {
       turns: [],
       plan: { summary: "Dice", markdown: "# Dice\n\nTwo players.", tasks: [] },
       tokens: 0,
-      createdAt: 0,
     });
     core.state.tasks = [
       {
         id: "t1",
         title: "Board",
         outcome: "",
-        createdAt: 0,
         meetingId: "m1",
         ownerAccepts: true,
       },

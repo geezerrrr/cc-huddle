@@ -5,7 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Core } from "./core.ts";
 import { goalFiles } from "./goal-files.ts";
 import { git, goalFolder, openRepository } from "./git.ts";
+import { z } from "zod";
 import { Meetings, nextMove } from "./meetings.ts";
+import { planSchema } from "./plan.ts";
 import type { Scheduler } from "./scheduler.ts";
 import { askOnce, type Reply } from "./turns.ts";
 import type { Meeting, MeetingTurn, Member } from "./types.ts";
@@ -47,7 +49,7 @@ beforeEach(async () => {
   await git({ cwd: repo, env: me }, ["commit", "-q", "-m", "start"]);
   core = {
     state: {
-      goal: { id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 },
+      goal: { name: "Dice", slug: "dice", status: "active", createdAt: 0 },
       tasks: [],
       subtasks: [],
       meetings: [],
@@ -391,7 +393,6 @@ describe("Meetings", () => {
       assignee: "glm",
       dependsOn: [],
       status: "running",
-      createdAt: 0,
       progress: { done: 0, total: 0 },
       tokens: 0,
     });
@@ -411,26 +412,26 @@ describe("A plan under review", () => {
     await ended(meeting);
     return meeting;
   };
-  const changed = (assignee: string) => ({
-    ...plan,
-    plan_markdown: "# Plan, changed",
-    tasks: [
-      { ...plan.tasks[0], subtasks: plan.tasks[0]?.subtasks.map((s) => ({ ...s, assignee })) },
-    ],
-  });
+  /** The plan with its subtasks given to `assignee`, as the change_plan tool takes it. */
+  const changed = (assignee: string) =>
+    planSchema(z.string()).parse({
+      ...plan,
+      plan_markdown: "# Plan, changed",
+      tasks: [
+        { ...plan.tasks[0], subtasks: plan.tasks[0]?.subtasks.map((s) => ({ ...s, assignee })) },
+      ],
+    });
 
   it("takes your changes, and is approved into the goal's work with its document saved", async () => {
     const meeting = await reviewed();
-    expect(() => {
-      meetings.change(meeting.id, changed("ann"));
-    }).toThrow();
     expect(meeting.plan?.tasks[0]?.ownerAccepts).toBe(false);
     meetings.change(meeting.id, changed("sonnet"));
     expect(meeting.plan?.tasks[0]?.subtasks.map((s) => s.assignee)).toEqual(["sonnet", "sonnet"]);
     expect(meeting.plan?.tasks[0]?.ownerAccepts).toBe(false);
+    const mine = changed("sonnet");
     meetings.change(meeting.id, {
-      ...changed("sonnet"),
-      tasks: [{ ...changed("sonnet").tasks[0], owner_accepts: true }],
+      ...mine,
+      tasks: mine.tasks.map((task) => ({ ...task, owner_accepts: true })),
     });
     expect(meeting.plan?.tasks[0]?.ownerAccepts).toBe(true);
 

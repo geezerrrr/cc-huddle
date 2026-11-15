@@ -126,7 +126,6 @@ export class Scheduler {
    */
   assign(tasks: readonly PlanTask[], meetingId?: string): Subtask[] {
     const { state } = this.core;
-    const now = Date.now();
     const ids = new Map<string, string>();
     const added = tasks.flatMap(({ title, outcome, ownerAccepts, subtasks }) => {
       const task: Task = {
@@ -134,7 +133,6 @@ export class Scheduler {
         title,
         outcome,
         ownerAccepts,
-        createdAt: now,
         ...(meetingId !== undefined && { meetingId }),
       };
       state.tasks.push(task);
@@ -146,7 +144,6 @@ export class Scheduler {
           id,
           taskId: task.id,
           status: "pending",
-          createdAt: now,
           progress: { done: 0, total: 0 },
           tokens: 0,
         };

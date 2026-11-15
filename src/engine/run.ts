@@ -24,7 +24,7 @@ import {
 const OWN_TOOLS = new Set([turnToolName("ask_teammate"), turnToolName("deliver")]);
 
 /** The work handed over: what was done, and its files, relative to the worktree. */
-export interface Handover {
+interface Handover {
   summary: string;
   files: string[];
 }
