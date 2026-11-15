@@ -16,6 +16,7 @@ import { executableOf } from "./claude.ts";
 import { dataFolder } from "./data-folder.ts";
 import { pluginId } from "./plugin-id.ts";
 import { askToLetGo, servePane } from "./pane-server.ts";
+import { modeOf } from "./session-mode.ts";
 import { addPaneTools } from "./pane-tools.ts";
 import { addTools } from "./tools.ts";
 
@@ -47,6 +48,7 @@ const openTeam = async (take: boolean) =>
           );
         }),
     }),
+    sessionMode: () => modeOf(dataFolder, process.ppid),
     plugin: pluginId(dataFolder),
     userTeam: userTeamFolder(process.env),
     env: process.env,

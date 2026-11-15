@@ -13,6 +13,7 @@ import type {
 import { derive, reviewerOf, type Work } from "../engine/derive.ts";
 import {
   toYou,
+  type Derived,
   type Member,
   type Meeting,
   type Permission,
@@ -211,7 +212,7 @@ function prompts(work: Work): OpenplanTeam["prompts"] {
     if (meeting.status === "review" && meeting.plan)
       asked.push({
         key: `review:${meeting.id}`,
-        text: `The meeting [${meeting.id}] on "${aboutOf(work, meeting)}" has a plan: ${meeting.plan.summary}. Show it to the user with show_plan, and ask whether to approve it, change it, or cancel it, and which tasks, if any, they want to accept themselves once done: none is unless they say, since reviews and checks confirm the work; it is worth it for a result only looking at it or trying it can judge.`,
+        text: `The meeting [${meeting.id}] on "${aboutOf(work, meeting)}" has a plan: ${meeting.plan.summary}. Get it with show_plan and show it to the user in full: its document as it is written, then its tasks, each with its subtasks, who does them and what each waits on. Then ask whether to approve it, change it, or cancel it, and which tasks, if any, they want to accept themselves once done: none is unless they say, since reviews and checks confirm the work; it is worth it for a result only looking at it or trying it can judge.`,
       });
   for (const question of work.questions) {
     if (question.kind !== "decision" || question.decision.kind !== "delivery") continue;
@@ -229,6 +230,60 @@ function prompts(work: Work): OpenplanTeam["prompts"] {
     });
   }
   return asked;
+}
+
+/** How many tasks the band lists, one a line; more are counted. */
+const BAND_TASKS = 5;
+
+/** Where a task's work is, in words: the subtask under way, else the next one and what it waits on. */
+function taskWhere(work: Work, derived: Derived, subtasks: Subtask[]): string | undefined {
+  const at =
+    subtasks.find(
+      (s) => s.status === "running" || s.status === "reviewing" || s.status === "merging",
+    ) ?? subtasks.find((s) => s.status !== "done");
+  if (!at) return undefined;
+  switch (at.status) {
+    case "running":
+      return `${at.assignee} works on "${at.title}"`;
+    case "reviewing":
+      return `"${at.title}" in review`;
+    case "merging":
+      return `"${at.title}" merging`;
+    case "pending": {
+      const [wait] = derived.subtasks[at.id]?.waits ?? [];
+      return `"${at.title}" ${wait ? waitText(wait, work) : "starts next"}`;
+    }
+    default:
+      return `"${at.title}" ${at.status}`;
+  }
+}
+
+/**
+ * The band's task lines: each task of a goal not archived that isn't done,
+ * with where it stands; one done that waits for you to accept it says so.
+ */
+function taskLines(work: Work, derived: Derived): string[] {
+  const lines: string[] = [];
+  for (const task of work.tasks) {
+    const goal = work.goals.find((g) => g.id === task.goalId);
+    if (!goal || goal.status === "archived") continue;
+    const subtasks = work.subtasks.filter((s) => s.taskId === task.id);
+    const accepting = work.questions.some(
+      (q) =>
+        q.kind === "decision" &&
+        q.decision.kind === "delivery" &&
+        q.status === "open" &&
+        subtasks.some((s) => s.id === q.subtaskId),
+    );
+    const where = accepting ? "waits for you to accept it" : taskWhere(work, derived, subtasks);
+    if (where) lines.push(`${task.title} · ${where}`);
+  }
+  return lines.length > BAND_TASKS
+    ? [
+        ...lines.slice(0, BAND_TASKS),
+        `and ${plural(lines.length - BAND_TASKS, "more task", "more tasks")}`,
+      ]
+    : lines;
 }
 
 /** The band's words: what goes on and what waits on you; nothing before the first goal. */
@@ -258,6 +313,7 @@ export function paneTeam(work: Work, members: readonly Member[]): OpenplanTeam {
   const band = bandText(work, needs.length);
   return {
     ...(band && { band }),
+    tasks: taskLines(work, derived),
     ...(meeting && { meeting: meetingOf(meeting, work) }),
     members: members.map((m) => memberOf(m, work, derived)),
     needs,

@@ -1,8 +1,10 @@
 /**
- * The tools of openplan's pane (docs/design.md §7.2): where it reads the team
- * (`pane`, its socket), and how it answers what waits on you (`answer`).
- * They are the pane's, not your session's: the mod keeps the model from
- * calling them, so a permission is granted only by you, pressing its button.
+ * The tools of openplan's mod (docs/design.md §7.2, §7.3): where the pane
+ * reads the team (`pane`, its socket), how it answers what waits on you
+ * (`answer`), and what `/openplan pause` and `/openplan resume` do
+ * (`every_goal`). They are the mod's, not your session's: the mod keeps the
+ * model from calling them, so a permission is granted only by you, pressing
+ * its button, and your session has `goal_action` for a goal of its own.
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -47,6 +49,26 @@ export function addPaneTools(server: McpServer, team: () => Promise<Engine>, pan
           : { picks: picks ?? [] };
       await (await team()).answer(question, answer);
       return toolText(`Answered ${question}.`);
+    },
+  );
+
+  server.registerTool(
+    "every_goal",
+    {
+      description: `${PANE_ONLY} Pauses every active goal, or resumes every paused one, as /openplan pause or resume.`,
+      inputSchema: { action: z.enum(["pause", "resume"]) },
+    },
+    async ({ action }) => {
+      const engine = await team();
+      const from = action === "pause" ? "active" : "paused";
+      const goals = engine.state.goals.filter((g) => g.status === from);
+      for (const goal of goals) await engine.goals[action](goal.id);
+      const done = action === "pause" ? "Paused" : "Resumed";
+      return toolText(
+        goals.length
+          ? `${done} ${goals.map((g) => `"${g.name}"`).join(", ")}.`
+          : `No goal is ${from}.`,
+      );
     },
   );
 }

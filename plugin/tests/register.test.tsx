@@ -45,6 +45,7 @@ const NEED: OpenplanNeed = {
 
 const TEAM: OpenplanTeam = {
   band: "1 working · 1 needs you",
+  tasks: ['Rules · glm works on "Rules"'],
   members: [
     {
       name: "glm",
@@ -107,6 +108,9 @@ test("the band and the pane show the team, and a press answers what needs you", 
   const band = await $.ui.mount({ ...BAND, surface: "terminal" });
   expect((await band.find({ type: "Text", text: /openplan/ }))?.text).toBe(
     "openplan · 1 working · 1 needs you",
+  );
+  expect((await band.find({ type: "Text", text: /Rules ·/ }))?.text).toBe(
+    '  Rules · glm works on "Rules"',
   );
   await band.unmount();
 
@@ -327,6 +331,22 @@ test("/openplan status prints where the team stands", async ($, on) => {
     presentation: { isFullscreen: true, columns: 120 },
   });
   expect(text).toBe("Team: glm");
+});
+
+test("/openplan pause and resume pause or resume every goal, with no model turn", async ($, on) => {
+  const calls = serve(on, [{ revision: 1, team: TEAM }]);
+  await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
+  for (const action of ["pause", "resume"])
+    await $.command.run({
+      command: "openplan",
+      args: action,
+      origin: { kind: "composer" },
+      presentation: { isFullscreen: true, columns: 120 },
+    });
+  expect(calls.filter((c) => c.tool === "every_goal")).toEqual([
+    { tool: "every_goal", args: { action: "pause" } },
+    { tool: "every_goal", args: { action: "resume" } },
+  ]);
 });
 
 test("/openplan with a task hands it to your session for the team, with who is on it", async ($, on) => {

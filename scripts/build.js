@@ -8,7 +8,7 @@
  *   here names them, at the versions this repository locks, and as
  *   `package-lock.json` locks theirs. The lock is kept while the versions
  *   stay; npm writes a new one when they change.
- * - `session-start.mjs`: the SessionStart hook, whole.
+ * - `session-start.mjs`, `permission-mode.mjs`: the hooks, whole.
  */
 import { execFile } from "node:child_process";
 import { readFile, rm, writeFile } from "node:fs/promises";
@@ -44,7 +44,10 @@ await build({
   chunkNames: "chunks/[name]-[hash]",
   external: INSTALLED,
 });
-await build({ ...common, entryPoints: ["src/plugin/session-start.ts"] });
+await build({
+  ...common,
+  entryPoints: ["src/plugin/session-start.ts", "src/plugin/permission-mode.ts"],
+});
 
 const version = async (name) =>
   JSON.parse(await readFile(`node_modules/${name}/package.json`, "utf8")).version;

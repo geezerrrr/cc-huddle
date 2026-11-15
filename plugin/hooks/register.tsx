@@ -25,9 +25,9 @@ type Ui = Pick<Elements["terminal"], "Box" | "Button" | "Input" | "Markdown" | "
 const PANE = "openplan";
 /** The server's tools, as the model names them. */
 const TOOLS = /^mcp__plugin_openplan_openplan__/;
-/** The tools only the pane calls, as the model would name them. */
-const PANE_ONLY = /^mcp__plugin_openplan_openplan__(pane|answer)$/;
-const PANE_ONLY_REASON = "This tool is openplan's pane's: the user answers there, in /openplan.";
+/** The tools only the mod calls, as the model would name them. */
+const PANE_ONLY = /^mcp__plugin_openplan_openplan__(pane|answer|every_goal)$/;
+const PANE_ONLY_REASON = "This tool is the user's, in /openplan.";
 /** How often the pane asks the team how it stands. */
 const POLL_MS = 500;
 /** How many of a followed record's entries the pane keeps. */
@@ -543,8 +543,8 @@ export const register: Register = (on) => {
     await $.command.register({
       name: "openplan",
       description:
-        "Hand openplan's team a task; with none, show the team in a pane; `/openplan status` prints where it stands",
-      argumentHint: "[task | status]",
+        "Hand openplan's team a task; with none, show the team in a pane; `/openplan status` prints where it stands, `pause` and `resume` every goal",
+      argumentHint: "[task | status | pause | resume]",
     });
     watch($);
     return next(e);
@@ -554,9 +554,16 @@ export const register: Register = (on) => {
     taking = true;
     watch($);
     const task = e.args.trim();
-    if (task === "status") {
+    // Certain, so said without a model turn.
+    const certain: Record<string, () => Promise<string>> = {
+      status: () => call($, "status"),
+      pause: () => call($, "every_goal", { action: "pause" }),
+      resume: () => call($, "every_goal", { action: "resume" }),
+    };
+    const run = certain[task];
+    if (run) {
       try {
-        return { text: await call($, "status") };
+        return { text: await run() };
       } catch (error) {
         return { text: `openplan: ${words(error)}` };
       }
@@ -598,10 +605,16 @@ export const register: Register = (on) => {
     if (!now?.band || e.props.hasSurvey) return next(e);
     const { Box, Button, Text } = $.ui.resolve(e);
     return (
-      <Box>
+      <Box flexDirection="column">
         <Button key="openplan" plain onPress={() => void openPane($)}>
           <Text dimColor>openplan · {now.band}</Text>
         </Button>
+        {now.tasks.map((line, i) => (
+          <Text key={`task-${String(i)}`} dimColor>
+            {"  "}
+            {line}
+          </Text>
+        ))}
       </Box>
     );
   });

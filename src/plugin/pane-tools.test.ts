@@ -47,6 +47,7 @@ beforeEach(async () => {
     claude: "claude",
     session: 41,
     address: "here",
+    sessionMode: () => undefined,
     plugin: "openplan@inline",
     userTeam: path.join(dir, "user-team"),
     env: {},
@@ -103,6 +104,16 @@ describe("the pane's socket and tools", () => {
     expect(engine.state.goals[0]?.status).toBe("paused");
   });
 
+  it("pause every active goal, and resume every paused one", async () => {
+    await engine.goals.start("Dice");
+    const chess = await engine.goals.start("Chess");
+    await engine.goals.pause(chess.id);
+    expect((await call("every_goal", { action: "pause" })).text).toBe('Paused "Dice".');
+    expect((await call("every_goal", { action: "pause" })).text).toBe("No goal is active.");
+    expect((await call("every_goal", { action: "resume" })).text).toBe('Resumed "Dice", "Chess".');
+    expect(engine.state.goals.map((g) => g.status)).toEqual(["active", "active"]);
+  });
+
   it("serve only the view and the release, and say why an ask doesn't fit", async () => {
     expect((await ask("/answer", "{}")).status).toBe(404);
     expect(await ask("/view", '{ "revision": "one" }')).toMatchObject({ status: 409 });
@@ -114,6 +125,7 @@ describe("the pane's socket and tools", () => {
   it("give the team only when it changed since the pane's revision", async () => {
     const first = await view();
     expect(first.team).toEqual({
+      tasks: [],
       members: [{ name: "glm", role: "Developer", model: "glm-5", doing: "free", tokens: 0 }],
       needs: [],
       milestones: [],

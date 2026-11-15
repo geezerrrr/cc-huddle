@@ -116,6 +116,38 @@ const work = (): Work => ({
 });
 
 describe("paneTeam", () => {
+  it("lists under the band each task not done, with where it stands", () => {
+    const now = work();
+    const task = (id: string, title: string, goalId = "g1") => ({
+      id,
+      goalId,
+      title,
+      outcome: "",
+      createdAt: 0,
+      ownerAccepts: false,
+    });
+    now.goals.push({ id: "g2", name: "Old", slug: "old", status: "archived", createdAt: 0 });
+    now.tasks.push(task("t2", "Score"), task("t3", "Docs"), task("t4", "Old", "g2"));
+    now.subtasks = [
+      ...now.subtasks.map((s) => (s.id === "score" ? { ...s, taskId: "t2" } : s)),
+      subtask("readme", { taskId: "t3", status: "done" }),
+      subtask("legacy", { taskId: "t4", goalId: "g2" }),
+    ];
+    expect(paneTeam(now, members).tasks).toEqual([
+      "Game · waits for you to accept it",
+      'Score · "score" waits on "rules" by glm',
+    ]);
+    now.questions = now.questions.filter((q) => q.id !== "q3");
+    expect(paneTeam(now, members).tasks[0]).toBe('Game · glm works on "rules"');
+
+    for (const n of ["5", "6", "7", "8", "9"]) {
+      now.tasks.push(task(`t${n}`, `Part ${n}`));
+      now.subtasks.push(subtask(`p${n}`, { taskId: `t${n}` }));
+    }
+    expect(paneTeam(now, members).tasks).toHaveLength(6);
+    expect(paneTeam(now, members).tasks.at(-1)).toBe("and 2 more tasks");
+  });
+
   it("shows what goes on, each member at what they do, and what waits on you", () => {
     const team = paneTeam(work(), members);
     expect(team.band).toBe("1 working · 3 need you");
@@ -218,7 +250,7 @@ Tell the user what was done, and ask whether to accept it or send it back with w
     expect(review.prompts).toEqual([
       {
         key: "review:m1",
-        text: 'The meeting [m1] on "Dice" has a plan: A dice game. Show it to the user with show_plan, and ask whether to approve it, change it, or cancel it, and which tasks, if any, they want to accept themselves once done: none is unless they say, since reviews and checks confirm the work; it is worth it for a result only looking at it or trying it can judge.',
+        text: 'The meeting [m1] on "Dice" has a plan: A dice game. Get it with show_plan and show it to the user in full: its document as it is written, then its tasks, each with its subtasks, who does them and what each waits on. Then ask whether to approve it, change it, or cancel it, and which tasks, if any, they want to accept themselves once done: none is unless they say, since reviews and checks confirm the work; it is worth it for a result only looking at it or trying it can judge.',
       },
     ]);
   });

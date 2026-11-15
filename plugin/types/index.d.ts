@@ -7,6 +7,8 @@
 export type OpenplanTeam = {
   /** The band's words: what goes on, and what waits on you. Absent with nothing to say. */
   band?: string;
+  /** A line for each task not yet done, under the band: its title and where it stands. */
+  tasks: string[];
   meeting?: OpenplanMeeting;
   members: OpenplanMember[];
   needs: OpenplanNeed[];

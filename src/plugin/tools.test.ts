@@ -49,6 +49,7 @@ beforeEach(async () => {
     claude: "claude",
     session: 41,
     address: "here",
+    sessionMode: () => undefined,
     plugin: "openplan@inline",
     userTeam: path.join(dir, "user-team"),
     env: {},
