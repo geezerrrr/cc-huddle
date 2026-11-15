@@ -67,6 +67,7 @@ const TEAM: OpenplanTeam = {
   resumable: [],
   resumeRefused:
     '"Dice" is under way in this session, which runs one goal: /openplan pause it first, or take the other up in another session.',
+  typedAnswersNone: "openplan: what you typed answers none of it; it waits in Needs you",
 };
 
 /** The team of a session that runs no goal. */
@@ -79,6 +80,7 @@ const NO_GOAL: OpenplanTeam = {
   milestones: [],
   prompts: [],
   resumable: [],
+  typedAnswersNone: "openplan: what you typed answers none of it; it waits in Needs you",
 };
 
 const SOCKET = "/tmp/openplan-test/pane.sock";

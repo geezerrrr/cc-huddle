@@ -22,7 +22,7 @@ import {
 import type { OpenplanCalls } from "../../plugin/types/index.d.ts";
 import type { Session } from "./session.ts";
 import { othersText, statusText } from "./status.ts";
-import { attendanceText, plural, rosterOf, STATUS_WORDS } from "./words.ts";
+import { attendanceText, plural, rosterOf, STATUS_WORDS, SENT_BACK_FIELD } from "./words.ts";
 import { toolText } from "../shared/text.ts";
 
 const meeting = z.string().describe("The meeting's id");
@@ -34,7 +34,7 @@ const goalActionInput = z.object({ action: z.enum(GOAL_ACTIONS) }) satisfies z.Z
 
 /** A member's name: any, until the team is read; then one of its members, each with their role (§7.3). */
 function memberName(members?: readonly Member[]): z.ZodType<string> {
-  if (!members) return z.string().describe("A member's name");
+  if (!members) return z.string().trim().describe("A member's name");
   // A team has a member at least (team.ts loadTeam).
   const names = members.map((m) => m.name) as [string, ...string[]];
   return z.enum(names).describe(`One of the team: ${rosterOf(members)}`);
@@ -224,11 +224,8 @@ export function addTools(server: McpServer, session: Session) {
     },
     async ({ subtask: id, action }) => {
       const engine = session.goal;
-      await engine.scheduler.act(id, action);
-      const acted = engine.work.subtasks.find((s) => s.id === id);
-      return toolText(
-        acted ? `"${acted.title}" is ${STATUS_WORDS[acted.status]} now.` : "It is gone now.",
-      );
+      const acted = await engine.scheduler.act(id, action);
+      return toolText(`"${acted.title}" is ${STATUS_WORDS[acted.status]} now.`);
     },
   );
 
@@ -260,7 +257,7 @@ export function addTools(server: McpServer, session: Session) {
         question: z.string().describe("The id of what waits on the user"),
         decision: z.enum(DECISION_OPTIONS),
         note: z.string().trim().optional().describe("What to change, in the user's words"),
-        sent_back: z.string().optional().describe("The subtask a revised task goes back to"),
+        sent_back: z.string().optional().describe(SENT_BACK_FIELD),
       },
     },
     async ({ question, decision, note, sent_back }) => {

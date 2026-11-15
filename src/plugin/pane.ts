@@ -50,6 +50,7 @@ import {
   whereOf,
   STATUS_WORDS,
   stepText,
+  goalsWhere,
 } from "./words.ts";
 
 /** The meeting the pane shows: one under way, else one whose plan waits on you, else the latest. */
@@ -319,14 +320,15 @@ function bandText(work: Work, needs: number): string {
 
 /** The band of a session without a goal: the goals it can take up, but those archived; nothing with none. */
 function othersBand(others: readonly GoalEntry[]): string | undefined {
-  const paused = others.filter((e) => whereOf(e) === "paused").length;
-  const elsewhere = others.filter((e) => whereOf(e) === "elsewhere").length;
-  const parts = [
-    ...(paused ? [plural(paused, "goal paused", "goals paused")] : []),
-    ...(elsewhere ? [`${plural(elsewhere, "goal", "goals")} in another session`] : []),
-  ];
+  const parts = (["paused", "elsewhere"] as const).flatMap((where) => {
+    const count = others.filter((e) => whereOf(e) === where).length;
+    return count ? [goalsWhere(count, where)] : [];
+  });
   return parts.length ? parts.join(" · ") : undefined;
 }
+
+/** What you typed in a need's dialog answers none of it: it stays. */
+const TYPED_ANSWERS_NONE = "openplan: what you typed answers none of it; it waits in Needs you";
 
 /** Why `/openplan resume` takes nothing up when the repository has no goal this session doesn't run. */
 const NOTHING_TO_RESUME = "No goal to resume.";
@@ -357,6 +359,7 @@ export function paneTeam(
       resumable: resumableOf(others),
       ...(!others.length && { resumeRefused: NOTHING_TO_RESUME }),
       pauseRefused: noGoal,
+      typedAnswersNone: TYPED_ANSWERS_NONE,
     };
   }
   const { work, members } = mine;
@@ -381,6 +384,7 @@ export function paneTeam(
     ...(goal.status === "active"
       ? { resumeRefused: resumeRefusal(goal.name) }
       : { pauseRefused: `"${goal.name}" isn't under way: it is ${goal.status}.` }),
+    typedAnswersNone: TYPED_ANSWERS_NONE,
   };
 }
 

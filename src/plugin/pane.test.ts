@@ -44,7 +44,7 @@ const meeting: Meeting = {
   size: "small",
   participants: ["sonnet", "glm"],
   status: "approved",
-  turns: [{ speaker: "sonnet", text: "Two dice.", at: 0, phase: "opening" }],
+  turns: [{ speaker: "sonnet", text: "Two dice.", phase: "opening" }],
   plan: { summary: "A dice game", markdown: "", tasks: [] },
 };
 
@@ -342,6 +342,7 @@ Take it to the user as openplan's team skill says.`,
       resumable: [],
       resumeRefused: "No goal to resume.",
       pauseRefused: none,
+      typedAnswersNone: "openplan: what you typed answers none of it; it waits in Needs you",
     });
     expect(noGoal([], "Dice").noGoal).toBe(
       '"Dice" moved to another Claude Code session. Bring it back here with /openplan resume.',
@@ -396,16 +397,15 @@ describe("viewEntries and viewLive", () => {
   it("name each tool call by its main argument", () => {
     expect(
       viewEntries([
-        { at: 0, kind: "text", text: "Done." },
+        { kind: "text", text: "Done." },
         {
-          at: 0,
           kind: "tool",
           name: "Bash",
           input: { command: "npm test", timeout: 5 },
           state: "done",
           output: "ok",
         },
-        { at: 0, kind: "tool", name: "TodoWrite", input: {}, state: "error", output: "" },
+        { kind: "tool", name: "TodoWrite", input: {}, state: "error", output: "" },
       ]),
     ).toEqual([
       { kind: "text", text: "Done." },

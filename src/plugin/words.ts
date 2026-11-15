@@ -70,9 +70,9 @@ export const STATUS_WORDS: Record<SubtaskStatus, string> = {
   pending: "pending",
   running: "running",
   reviewing: "in review",
-  waitingInReview: "in review, waits for a decision",
+  waitingInReview: "stuck in review",
   merging: "being merged",
-  waitingInMerge: "being merged, waits for a decision",
+  waitingInMerge: "stuck while merging",
   done: "done",
   failed: "failed",
   stopped: "stopped",
@@ -141,7 +141,8 @@ export function needWords(
   question: QuestionToYou,
   work: Work,
 ): { headline: string; detail?: string } {
-  const title = work.subtasks.find((s) => s.id === question.subtaskId)?.title;
+  const subtask = work.subtasks.find((s) => s.id === question.subtaskId);
+  const title = subtask?.title;
   const about = title ? ` for "${title}"` : "";
   switch (question.kind) {
     case "permission":
@@ -153,20 +154,22 @@ export function needWords(
       return { headline: `${question.from} asks${about}:` };
     case "decision":
       switch (question.decision.kind) {
-        case "review":
+        case "review": {
+          // Sent back too often, the review's notes say why; failed, what it came to does.
+          const detail = question.text || subtask?.review?.notes;
           return {
             headline: `The review of "${title ?? ""}" is stuck. What now?`,
-            detail: question.text,
+            ...(detail && { detail }),
           };
+        }
         case "conflict":
-          return {
-            headline: `Merging "${title ?? ""}" is stuck. What now?`,
-            detail: question.decision.files.join(", "),
-          };
         case "merge":
           return {
             headline: `Merging "${title ?? ""}" is stuck. What now?`,
-            detail: question.text,
+            detail:
+              question.decision.kind === "conflict"
+                ? question.decision.files.join(", ")
+                : question.text,
           };
         case "delivery":
           return { headline: `The task "${question.text}" is done. Accept it?` };
@@ -192,6 +195,13 @@ const WHERE_WORDS: Record<GoalWhere, string> = {
   archived: "archived",
   paused: "paused",
 };
+
+/** How many of the repository's goals are `where`: "2 goals paused". */
+export const goalsWhere = (count: number, where: GoalWhere) =>
+  `${plural(count, "goal", "goals")} ${WHERE_WORDS[where]}`;
+
+/** What the subtask a revised task goes back to is, as both tools that send one back describe it. */
+export const SENT_BACK_FIELD = "The subtask a revised task goes back to";
 
 /** How far a goal got, in words. */
 function progressOf({ subtasks, meetings }: Pick<GoalState, "subtasks" | "meetings">): string {

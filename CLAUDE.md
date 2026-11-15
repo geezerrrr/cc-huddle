@@ -48,6 +48,6 @@ How openplan behaves is `docs/design.md`: change it first, then the code. This f
 - Input is checked once, where it enters (a tool's schema, the view's schema, a file's read).
 - An error is caught only where it is expected, by its kind (`ENOENT`, `GitError`); anything else goes on up.
 - The same logic is written once. A second use moves it where both can reach.
-- Types say the invariant: a field always set is required, alternatives are a discriminated union, one fact is stored once.
+- Types say the invariant: a field always set is required, alternatives are a discriminated union, one fact is stored once. A field only some statuses guarantee, on a record its machine moves in place, stays optional and is asserted once where a status needs it.
 - Comments say why, in the code's own terms; a comment that no longer matches is a bug.
 - Commits: one-line conventional messages, small.
