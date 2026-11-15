@@ -377,3 +377,14 @@ Requirements:
 - plan_markdown is the plan document for the user and the team: the goal and scope; what was decided, why, and what was turned down; where people didn't agree and how you ruled; what the meeting didn't get to; then who does what, dependencies and risks.
 - summary states the outcome in one sentence.`;
 }
+
+/** What each field of a plan is, as the host writes it and your session changes it (plan.ts). */
+export const PLAN_FIELDS = {
+  summary: "The outcome in one sentence",
+  markdown: "The plan document",
+  outcome: "What the task delivers",
+  key: "A short id, unique within this plan, such as api-1",
+  assignee: "The name of the member it goes to",
+  dependsOn: "The keys of the subtasks it waits for",
+  ownerAccepts: "Whether the user accepts this task themselves once it is done",
+};

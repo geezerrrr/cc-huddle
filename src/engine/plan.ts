@@ -3,19 +3,20 @@
  * and the checks that make it one the scheduler can carry out.
  */
 import { z } from "zod";
+import { PLAN_FIELDS } from "./prompts.ts";
 import type { Plan, PlanSubtask, PlanTask } from "./types.ts";
 
 /** A task as a model writes it, each subtask going to a member by name (`assignee`). */
 const taskShape = (assignee: z.ZodType<string>) => ({
   title: z.string().trim(),
-  outcome: z.string().trim().describe("What the task delivers"),
+  outcome: z.string().trim().describe(PLAN_FIELDS.outcome),
   subtasks: z.array(
     z.object({
-      key: z.string().trim().describe("A short id, unique within this plan, such as api-1"),
+      key: z.string().trim().describe(PLAN_FIELDS.key),
       title: z.string().trim(),
       description: z.string().trim(),
       assignee,
-      depends_on: z.array(z.string()).describe("The keys of the subtasks it waits for"),
+      depends_on: z.array(z.string()).describe(PLAN_FIELDS.dependsOn),
       acceptance: z.string().trim(),
     }),
   ),
@@ -23,8 +24,8 @@ const taskShape = (assignee: z.ZodType<string>) => ({
 
 const planShape = <T extends z.ZodType>(task: T) =>
   z.object({
-    summary: z.string().trim().describe("The outcome in one sentence"),
-    plan_markdown: z.string().trim().describe("The plan document"),
+    summary: z.string().trim().describe(PLAN_FIELDS.summary),
+    plan_markdown: z.string().trim().describe(PLAN_FIELDS.markdown),
     tasks: z.array(task),
   });
 
@@ -39,13 +40,13 @@ export const planSchema = (assignee: z.ZodType<string>) =>
       owner_accepts: z
         .boolean()
         .default(false)
-        .describe("Whether the user accepts this task themselves once it is done"),
+        .describe(PLAN_FIELDS.ownerAccepts),
     }),
   );
 
 /** The host's plan, each subtask going to a member. Which tasks you accept is yours to say, in review. */
 export const hostPlanSchema = (members: readonly [string, ...string[]]) =>
-  planShape(z.object(taskShape(z.enum(members).describe("The name of the member it goes to"))));
+  planShape(z.object(taskShape(z.enum(members).describe(PLAN_FIELDS.assignee))));
 
 /** A plan as written: by you, or by the host, with no task for you to accept. */
 export type WrittenPlan = z.output<ReturnType<typeof planSchema>>;
