@@ -1,22 +1,22 @@
 /**
  * What openplan keeps in its data folder for a repository (docs/design.md
- * §3.2, §3.4): the team's state, the lock that gives the team to one session,
- * and where everything else in that folder goes.
+ * §3.2, §3.4): a folder for each goal, with its state, the lock that gives
+ * the goal to one session, and where everything else of the goal goes.
  */
 import { createHash } from "node:crypto";
-import { link, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { link, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { readFileSync, unlinkSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 import path from "node:path";
 import { errorText } from "./core.ts";
 import { writeWhole } from "./files.ts";
-import type { Repository } from "./git.ts";
+import { slugFor, type Repository } from "./git.ts";
 import { running } from "./running.ts";
-import type { TeamState } from "./types.ts";
+import type { GoalState } from "./types.ts";
 
 /**
  * A repository's folder in the data folder: its name, and a hash of its git
- * folder, which its own worktrees share, so they all have the one team.
+ * folder, which its own worktrees share, so they all have the same goals.
  */
 export function repoFolder(dataFolder: string, repo: Repository): string {
   const name = path.basename(repo.top).replace(/[^\w.-]+/g, "-");
@@ -24,11 +24,16 @@ export function repoFolder(dataFolder: string, repo: Repository): string {
   return path.join(dataFolder, "repos", `${name}-${hash}`);
 }
 
-/** The files in a repository's folder. */
-export const dataFiles = (folder: string) => ({
+/** The folder of a repository's goals, each in a folder named by its slug. */
+export const goalsFolder = (repoFolder: string) => path.join(repoFolder, "goals");
+
+/** The files in a goal's folder. */
+export const goalFiles = (folder: string) => ({
   state: path.join(folder, "state.json"),
   lock: path.join(folder, "lock"),
   members: path.join(folder, "members.json"),
+  /** The goal's copy of the team (team.ts copyTeam). */
+  team: path.join(folder, "team.json"),
   /** A member's settings file (policy.ts writeSettings). */
   settings: (member: string) => path.join(folder, "settings", `${member}.json`),
 });
@@ -39,19 +44,10 @@ const STATE_VERSION = 1;
 /** How long after a change the state is written: a burst of changes is written once. */
 const SAVE_DELAY_MS = 200;
 
-/**
- * The team's state from its file: an empty one when there is none yet.
- * Throws when the file can't be read as this openplan's.
- */
-export async function readState(file: string): Promise<TeamState> {
-  let text: string;
-  try {
-    text = await readFile(file, "utf8");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    return { goals: [], tasks: [], subtasks: [], meetings: [], questions: [] };
-  }
-  let saved: { version: number; state: TeamState };
+/** A goal's state from its file. Throws when the file can't be read as this openplan's. */
+export async function readState(file: string): Promise<GoalState> {
+  const text = await readFile(file, "utf8");
+  let saved: { version: number; state: GoalState };
   try {
     saved = JSON.parse(text) as typeof saved;
   } catch (error) {
@@ -66,7 +62,7 @@ export async function readState(file: string): Promise<TeamState> {
 
 /**
  * Writes the state a moment after it changes (`changed`), and at once on
- * `flush`. Once `close`d it writes no more: the team is another session's.
+ * `flush`. Once `close`d it writes no more: the goal is another session's.
  */
 export interface StateWriter {
   changed(): void;
@@ -80,7 +76,7 @@ export interface StateWriter {
  */
 export function stateWriter(
   file: string,
-  state: () => TeamState,
+  state: () => GoalState,
   failed: (error: unknown) => void,
 ): StateWriter {
   let timer: NodeJS.Timeout | undefined;
@@ -112,25 +108,24 @@ export function stateWriter(
   };
 }
 
-/** A process that runs a repository's team, or would: its session's pid, and where it is asked to let the team go. */
+/** A process that runs a goal, or would: its session's pid, and where it is asked to let the goal go. */
 export interface Runner {
   session: number;
   address: string;
 }
 
 /**
- * Who has a repository's team: the process that runs it, the session that
- * started that process, where it is asked to let the team go, and whether it
- * has opened the team yet (`Engine.open`).
+ * Who has a goal: the process that runs it, the session that started that
+ * process, where it is asked to let the goal go, and whether it has opened
+ * the goal yet (`Engine.takeUp`).
  */
 export interface Holder extends Runner {
   pid: number;
   open: boolean;
 }
 
-/** What a holder stopped as it let the team go, for the session taking it over to resume. */
+/** What a holder stopped as it let a goal go, for the session taking it up to resume: its meetings under way. */
 export interface HandedOver {
-  goals: string[];
   meetings: string[];
 }
 
@@ -159,11 +154,6 @@ export function holderOf(lock: string): Holder | undefined {
   return holder && running(holder.pid) ? holder : undefined;
 }
 
-const busy = (holder: Holder) =>
-  new Error(
-    `Another Claude Code session runs this repository's team (pid ${String(holder.session)}). Using openplan here brings it to this session.`,
-  );
-
 /** This process as the holder, in a file of its own beside the lock, to be put in place whole. */
 async function holding(lock: string, me: Runner, open: boolean): Promise<string> {
   await mkdir(path.dirname(lock), { recursive: true });
@@ -179,22 +169,21 @@ const code = (error: unknown) => (error as NodeJS.ErrnoException).code;
 const REPLACING_WAIT_MS = 10;
 
 /**
- * Takes a repository's team for this process as `me`. A holder that runs is
- * asked to let it go (`takeOver`), and what it stopped is given back; without
- * `takeOver`, it is thrown which session holds the team. A lock is put in
+ * Takes a goal for this process as `me`. A holder that runs is asked to let
+ * it go (`takeOver`), and what it stopped is given back. A lock is put in
  * place whole or not at all, so of several sessions starting at once one
  * takes it. A lock whose holder has ended is replaced by one taker only: the
  * one that claims that ending, which replaces the lock only if it is still
  * the ended holder's, so a lock taken meanwhile is never replaced.
  */
-export async function takeTeam(
+export async function takeGoal(
   lock: string,
   me: Runner,
-  takeOver?: (holder: Holder) => Promise<HandedOver>,
+  takeOver: (holder: Holder) => Promise<HandedOver>,
 ): Promise<HandedOver> {
   const mine = await holding(lock, me, false);
   // What every holder asked stopped: another taker may get in between.
-  const handed: HandedOver = { goals: [], meetings: [] };
+  const handed: HandedOver = { meetings: [] };
   try {
     for (;;) {
       try {
@@ -212,9 +201,7 @@ export async function takeTeam(
           await rename(mine, lock);
           return handed;
         }
-        if (!takeOver) throw busy(holder);
         const stopped = await takeOver(holder);
-        handed.goals.push(...stopped.goals);
         handed.meetings.push(...stopped.meetings);
         continue;
       }
@@ -227,10 +214,9 @@ export async function takeTeam(
         if (lockText(claim) === undefined) continue;
         const replacing = readHolder(claim);
         if (!replacing || !running(replacing.pid))
-          throw new Error(
-            `A session taking this repository's team ended partway: delete ${lock} and ${claim}`,
-            { cause: error },
-          );
+          throw new Error(`A session taking this goal ended partway: delete ${lock} and ${claim}`, {
+            cause: error,
+          });
         await delay(REPLACING_WAIT_MS);
         continue;
       }
@@ -248,12 +234,77 @@ export async function takeTeam(
   }
 }
 
-/** Tells the lock that this process has opened the team: its state is the team's as it goes on. */
-export async function openedTeam(lock: string, me: Runner): Promise<void> {
+/** Tells the lock that this process has opened the goal: its state is the goal's as it goes on. */
+export async function openedGoal(lock: string, me: Runner): Promise<void> {
   await rename(await holding(lock, me, true), lock);
 }
 
-/** Lets the team go, as this process ends: at once, since it may be exiting. */
-export function releaseTeam(lock: string) {
+/** Lets the goal go, as this process ends: at once, since it may be exiting. */
+export function releaseGoal(lock: string) {
   if (holderOf(lock)?.pid === process.pid) unlinkSync(lock);
+}
+
+/**
+ * Makes a new goal's folder in a repository's folder (`repoFolder`), named by
+ * a slug from `name` that no goal has (`taken`, and every folder there): of
+ * goals starting at once, each makes a folder of its own.
+ */
+export async function newGoalFolder(
+  repoFolder: string,
+  name: string,
+  taken: Set<string>,
+): Promise<{ slug: string; folder: string }> {
+  const goals = goalsFolder(repoFolder);
+  await mkdir(goals, { recursive: true });
+  for (const slug of await readdir(goals)) taken.add(slug);
+  for (;;) {
+    const slug = slugFor(name, taken);
+    const folder = path.join(goals, slug);
+    try {
+      await mkdir(folder);
+      return { slug, folder };
+    } catch (error) {
+      if (code(error) !== "EEXIST") throw error;
+      taken.add(slug);
+    }
+  }
+}
+
+/** A goal of a repository as its folder has it: its slug, its state, and who runs it, if anyone. */
+export interface GoalEntry {
+  slug: string;
+  state: GoalState;
+  holder?: Holder;
+}
+
+/**
+ * A repository's goals, oldest first, from their folders (`repoFolder`). A
+ * folder with no state yet is a goal starting: it isn't one yet.
+ */
+export async function listGoals(repoFolder: string): Promise<GoalEntry[]> {
+  const folder = goalsFolder(repoFolder);
+  let slugs: string[];
+  try {
+    slugs = await readdir(folder);
+  } catch (error) {
+    if (code(error) === "ENOENT") return [];
+    throw error;
+  }
+  const found = await Promise.all(
+    slugs.map(async (slug): Promise<GoalEntry | undefined> => {
+      const files = goalFiles(path.join(folder, slug));
+      let state: GoalState;
+      try {
+        state = await readState(files.state);
+      } catch (error) {
+        if (code(error) === "ENOENT" || code(error) === "ENOTDIR") return undefined;
+        throw error;
+      }
+      const holder = holderOf(files.lock);
+      return { slug, state, ...(holder && { holder }) };
+    }),
+  );
+  return found
+    .filter((entry) => entry !== undefined)
+    .sort((a, b) => a.state.goal.createdAt - b.state.goal.createdAt);
 }

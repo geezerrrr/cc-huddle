@@ -184,23 +184,44 @@ export async function loadTeam(folders: readonly string[]): Promise<TeamFiles> {
 /** One write to the team's settings at a time, so no rule added is lost to another. */
 const writing = serialBy();
 
-/**
- * Adds allow rules to the team's `settings.json`, keeping everything else in
- * it, for every member's turns from then on.
- */
+/** Settings with allow rules added, everything else in them kept; `file` is where they are, for what is wrong with them. */
+function allowing(settings: Record<string, unknown>, rules: readonly string[], file: string) {
+  const permissions = parsed(
+    z.looseObject({ allow: z.array(z.string()).default([]) }),
+    settings.permissions ?? {},
+    file,
+  );
+  const allow = [...new Set([...permissions.allow, ...rules])];
+  return { ...settings, permissions: { ...permissions, allow } };
+}
+
+/** Adds allow rules to the repository's team `settings.json`, keeping everything else in it, for goals started after (§6). */
 export function allowInTeam(top: string, rules: readonly string[]): Promise<void> {
   const file = path.join(teamFolder(top), "settings.json");
   return writing(file, async () => {
     const settings = parsed(settingsSchema, (await jsonFile(file)) ?? {}, file);
-    const permissions = parsed(
-      z.looseObject({ allow: z.array(z.string()).default([]) }),
-      settings.permissions ?? {},
-      file,
-    );
-    const allow = [...new Set([...permissions.allow, ...rules])];
-    await writeWhole(
-      file,
-      `${JSON.stringify({ ...settings, permissions: { ...permissions, allow } }, null, 2)}\n`,
-    );
+    await writeWhole(file, `${JSON.stringify(allowing(settings, rules, file), null, 2)}\n`);
+  });
+}
+
+/**
+ * Writes a goal's copy of the team (§6) to `file`: as read when it started,
+ * each member's `env` as written, its `${VAR}`s not filled in.
+ */
+export const copyTeam = (file: string, team: TeamFiles) => writeWhole(file, JSON.stringify(team));
+
+/** A goal's copy of the team, from its file (copyTeam). */
+export async function readCopy(file: string): Promise<TeamFiles> {
+  return JSON.parse(await readFile(file, "utf8")) as TeamFiles;
+}
+
+/** Adds allow rules to a goal's copy of the team, for its members' next turns; gives the copy as it is now. */
+export function allowInCopy(file: string, rules: readonly string[]): Promise<TeamFiles> {
+  return writing(file, async () => {
+    const copy = await readCopy(file);
+    const settings = allowing(copy.settings, rules, file) as Settings;
+    const now = { ...copy, settings };
+    await copyTeam(file, now);
+    return now;
   });
 }

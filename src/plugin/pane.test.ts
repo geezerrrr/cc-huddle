@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
+import type { GoalEntry } from "../engine/data.ts";
 import type { Work } from "../engine/derive.ts";
 import type { Ask, Member, Meeting, Question, Subtask } from "../engine/types.ts";
-import { paneTeam } from "./pane.ts";
+import { paneTeam as paneOf } from "./pane.ts";
+
+/** The pane for a session running the goal of `work`, with no other goals. */
+const paneTeam = (work: Work, team: readonly Member[], others: readonly GoalEntry[] = []) =>
+  paneOf({ work, members: team }, others);
 
 const role = { id: "dev", title: "Developer", duties: "" };
 const members: Member[] = [
@@ -12,7 +17,6 @@ const members: Member[] = [
 const subtask = (id: string, fields: Partial<Subtask>): Subtask => ({
   id,
   taskId: "t1",
-  goalId: "g1",
   title: id,
   description: "",
   acceptance: "",
@@ -27,7 +31,6 @@ const subtask = (id: string, fields: Partial<Subtask>): Subtask => ({
 
 const meeting: Meeting = {
   id: "m1",
-  goalId: "g1",
   agenda: "Plan a dice game for two, as the user put it",
   size: "small",
   participants: ["sonnet", "glm"],
@@ -54,11 +57,10 @@ const question = (
 
 const work = (): Work => ({
   members: ["glm", "sonnet"],
-  goals: [{ id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 }],
+  goal: { id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 },
   tasks: [
     {
       id: "t1",
-      goalId: "g1",
       title: "Game",
       outcome: "",
       createdAt: 0,
@@ -118,20 +120,17 @@ const work = (): Work => ({
 describe("paneTeam", () => {
   it("lists under the band each task not done, with where it stands", () => {
     const now = work();
-    const task = (id: string, title: string, goalId = "g1") => ({
+    const task = (id: string, title: string) => ({
       id,
-      goalId,
       title,
       outcome: "",
       createdAt: 0,
       ownerAccepts: false,
     });
-    now.goals.push({ id: "g2", name: "Old", slug: "old", status: "archived", createdAt: 0 });
-    now.tasks.push(task("t2", "Score"), task("t3", "Docs"), task("t4", "Old", "g2"));
+    now.tasks.push(task("t2", "Score"), task("t3", "Docs"));
     now.subtasks = [
       ...now.subtasks.map((s) => (s.id === "score" ? { ...s, taskId: "t2" } : s)),
       subtask("readme", { taskId: "t3", status: "done" }),
-      subtask("legacy", { taskId: "t4", goalId: "g2" }),
     ];
     expect(paneTeam(now, members).tasks).toEqual([
       "Game · waits for you to accept it",
@@ -146,6 +145,8 @@ describe("paneTeam", () => {
     }
     expect(paneTeam(now, members).tasks).toHaveLength(6);
     expect(paneTeam(now, members).tasks.at(-1)).toBe("and 2 more tasks");
+    now.goal.status = "archived";
+    expect(paneTeam(now, members).tasks).toEqual([]);
   });
 
   it("shows what goes on, each member at what they do, and what waits on you", () => {
@@ -230,7 +231,7 @@ Tell the user what was done, and ask whether to accept it or send it back with w
     ]);
   });
 
-  it("says who speaks at a meeting under way, a plan to review, and nothing before the first goal", () => {
+  it("says who speaks at a meeting under way, and a plan to review", () => {
     const now = work();
     now.meetings = [{ ...meeting, status: "running", speaking: "glm" }];
     now.subtasks = [];
@@ -244,7 +245,6 @@ Tell the user what was done, and ask whether to accept it or send it back with w
     ]);
     now.meetings = [{ ...meeting, status: "running", drafting: true }];
     expect(paneTeam(now, members).meeting?.status).toBe("the members form their first judgments");
-    expect(paneTeam({ ...now, goals: [], meetings: [] }, members).band).toBeUndefined();
     now.meetings = [{ ...meeting, status: "review" }];
     const review = paneTeam(now, members);
     expect(review.band).toBe("plan to review");
@@ -254,5 +254,58 @@ Tell the user what was done, and ask whether to accept it or send it back with w
         text: 'The meeting [m1] on "Dice" has a plan: A dice game. Get it with show_plan and show it to the user in full: its document as it is written, then its tasks, each with its subtasks, who does them and what each waits on. Then ask whether to approve it, change it, or cancel it, and which tasks, if any, they want to accept themselves once done: none is unless they say, since reviews and checks confirm the work; it is worth it for a result only looking at it or trying it can judge.',
       },
     ]);
+  });
+
+  it("says where the goal is when nothing goes on, and lists what /openplan resume takes up", () => {
+    const now = work();
+    now.subtasks = [];
+    now.questions = [];
+    now.goal.status = "paused";
+    const entry = (slug: string, status: "active" | "paused" | "archived", held = false) => ({
+      slug,
+      state: { ...work(), goal: { ...now.goal, name: slug, slug, status } },
+      ...(held && { holder: { pid: 1, session: 7, address: "there", open: true } }),
+    });
+    const others = [
+      entry("chess", "paused"),
+      entry("go", "active", true),
+      entry("old", "archived"),
+    ];
+    const team = paneTeam(now, members, others);
+    expect(team.band).toBe("paused");
+    expect(team.goal).toEqual({ name: "Dice", slug: "dice", active: false });
+    expect(team.resumable).toEqual([
+      { slug: "dice", label: "Dice · no plan yet · paused, in this session" },
+      { slug: "chess", label: "chess · 1/3 subtasks done · paused" },
+      { slug: "go", label: "go · 1/3 subtasks done · in another session" },
+      { slug: "old", label: "old · 1/3 subtasks done · archived" },
+    ]);
+    now.goal.status = "active";
+    expect(paneTeam(now, members, others).resumable.map((r) => r.slug)).toEqual([
+      "chess",
+      "go",
+      "old",
+    ]);
+  });
+
+  it("without a goal, has a band only for goals it can take up, archived ones aside", () => {
+    const entry = (slug: string, status: "paused" | "archived", held = false) => ({
+      slug,
+      state: { ...work(), subtasks: [], goal: { ...work().goal, name: slug, slug, status } },
+      ...(held && { holder: { pid: 1, session: 7, address: "there", open: true } }),
+    });
+    expect(paneOf(undefined, [])).toEqual({
+      tasks: [],
+      members: [],
+      needs: [],
+      milestones: [],
+      prompts: [],
+      resumable: [],
+    });
+    expect(paneOf(undefined, [entry("old", "archived")]).band).toBeUndefined();
+    expect(
+      paneOf(undefined, [entry("a", "paused"), entry("b", "paused"), entry("c", "paused", true)])
+        .band,
+    ).toBe("2 goals paused · 1 goal in another session");
   });
 });

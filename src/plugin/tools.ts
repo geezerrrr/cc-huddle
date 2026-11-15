@@ -8,7 +8,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { workOf, type Team } from "../engine/core.ts";
-import type { Engine } from "../engine/engine.ts";
 import { goalBranch } from "../engine/git.ts";
 import { planSchema } from "../engine/plan.ts";
 import { derive } from "../engine/derive.ts";
@@ -21,11 +20,11 @@ import {
   MEETING_SIZES,
   SUBTASK_ACTIONS,
   type DecisionOption,
-  type Goal,
   type Member,
   type Plan,
 } from "../engine/types.ts";
-import { statusText } from "./status.ts";
+import type { Session } from "./session.ts";
+import { othersText, statusText } from "./status.ts";
 
 /** A decision as the tools take it: `sentBack`, the subtask a revised task goes back to. */
 export const decisionOf = (decision: DecisionOption, note?: string, sentBack?: string): Answer => ({
@@ -33,20 +32,6 @@ export const decisionOf = (decision: DecisionOption, note?: string, sentBack?: s
   ...(note && { note }),
   ...(sentBack !== undefined && { sentBack }),
 });
-
-/** A goal by its id, or by its name when no other goal has it. */
-function goalOf(engine: Engine, ref: string): Goal {
-  const { goals } = engine.state;
-  const byId = goals.find((g) => g.id === ref);
-  if (byId) return byId;
-  const named = goals.filter((g) => g.name.toLowerCase() === ref.trim().toLowerCase());
-  if (named.length === 1 && named[0]) return named[0];
-  throw new Error(
-    named.length
-      ? `More than one goal is called "${ref}": give its id`
-      : `There is no goal "${ref}"`,
-  );
-}
 
 /** A plan in the shape change_plan takes. */
 const writtenPlan = (plan: Plan) => ({
@@ -63,11 +48,10 @@ const writtenPlan = (plan: Plan) => ({
   })),
 });
 
-const goal = z.string().describe("The goal's id, or its name");
 const meeting = z.string().describe("The meeting's id");
 const subtask = z.string().describe("The subtask's id");
 
-/** A member's name: any, until the team is read; then one of its members, each with their role. */
+/** A member's name: any, until the team is read; then one of its members, each with their role (§7.3). */
 function memberName(members?: readonly Member[]): z.ZodType<string> {
   if (!members) return z.string().describe("A member's name");
   // A team has a member at least (team.ts loadTeam).
@@ -77,7 +61,6 @@ function memberName(members?: readonly Member[]): z.ZodType<string> {
 }
 
 const meetingInput = (member: z.ZodType<string>) => ({
-  goal,
   agenda: z.string().trim().min(1).describe("What to plan, with everything the user said about it"),
   size: z
     .enum(MEETING_SIZES)
@@ -95,7 +78,6 @@ const meetingInput = (member: z.ZodType<string>) => ({
 const changePlanInput = (member: z.ZodType<string>) => ({ meeting, plan: planSchema(member) });
 
 const assignInput = (member: z.ZodType<string>) => ({
-  goal,
   assignee: member,
   title: z.string().trim().min(1),
   description: z.string().trim().describe("Everything the user said about it"),
@@ -103,21 +85,27 @@ const assignInput = (member: z.ZodType<string>) => ({
 });
 
 /**
- * Adds the tools to `server`; each opens the team first, if it isn't open
- * (`team`). Returns what to call as the team is read, so the tools that name
- * a member list its members, and your session is told they changed.
+ * Adds the tools to `server`, all about the goal the session runs
+ * (`session`). Returns what to call as the team they name is read, so the
+ * tools that name a member list its members, and your session is told they
+ * changed.
  */
-export function addTools(server: McpServer, team: () => Promise<Engine>) {
+export function addTools(server: McpServer, session: Session) {
   server.registerTool(
     "status",
     {
       description:
-        "Where the team stands: each goal with its meetings, tasks and subtasks, who is busy, and what waits on the user. Ids are in brackets.",
+        "Where this session's goal stands: its meetings, tasks and subtasks, who is busy, and what waits on the user; and the repository's other goals. Ids are in brackets.",
       annotations: { readOnlyHint: true },
     },
     async () => {
-      const engine = await team();
-      return toolText(statusText(workOf(engine)));
+      const engine = session.current;
+      const others = othersText(await session.others());
+      return toolText(
+        [engine ? statusText(workOf(engine)) : session.none, ...(others ? [others] : [])].join(
+          "\n\n",
+        ),
+      );
     },
   );
 
@@ -125,14 +113,12 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
     "start_goal",
     {
       description:
-        "Start a goal: something the user wants done. It gets its own branch, cut from the repository's HEAD. Then hold a meeting to plan it, or assign work directly.",
+        "Start a goal in this session: something the user wants done. It gets its own branch, cut from the repository's HEAD, and its own copy of the team. A session runs one goal: refused while its goal is under way. Then hold a meeting to plan it, or assign work directly.",
       inputSchema: { name: z.string().trim().min(1).describe("A few words for what is wanted") },
     },
     async ({ name }) => {
-      const started = await (await team()).goals.start(name);
-      return toolText(
-        `Started the goal "${started.name}" [${started.id}] on branch ${goalBranch(started.slug)}.`,
-      );
+      const { goal } = (await session.start(name)).state;
+      return toolText(`Started the goal "${goal.name}" on branch ${goalBranch(goal.slug)}.`);
     },
   );
 
@@ -143,10 +129,9 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
         "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and the session is told when its plan waits for the user. Hold one only once the user has agreed who attends.",
       inputSchema: meetingInput(memberName()),
     },
-    async ({ goal: ref, agenda, size, attendees, host_only }) => {
-      const engine = await team();
+    ({ agenda, size, attendees, host_only }) => {
+      const engine = session.goal;
       const held = engine.meetings.start({
-        goalId: goalOf(engine, ref).id,
         agenda,
         size: size ?? engine.meetingSize,
         attendees,
@@ -166,8 +151,8 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
       inputSchema: { meeting },
       annotations: { readOnlyHint: true },
     },
-    async ({ meeting: id }) => {
-      const found = (await team()).state.meetings.find((m) => m.id === id);
+    ({ meeting: id }) => {
+      const found = session.goal.state.meetings.find((m) => m.id === id);
       if (!found?.plan) throw new Error("That meeting has no plan");
       return toolText(JSON.stringify(writtenPlan(found.plan), null, 2));
     },
@@ -180,8 +165,8 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
         "Replace a plan under review with the user's changes: the whole plan, as show_plan gives it, changed. Any member can be given work. owner_accepts marks a task the user accepts themselves once done; none is, unless they say.",
       inputSchema: changePlanInput(memberName()),
     },
-    async ({ meeting: id, plan }) => {
-      (await team()).meetings.change(id, plan);
+    ({ meeting: id, plan }) => {
+      session.goal.meetings.change(id, plan);
       return toolText("The plan is changed. It waits for the user's approval.");
     },
   );
@@ -194,7 +179,7 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
       inputSchema: { meeting },
     },
     async ({ meeting: id }) => {
-      const added = await (await team()).meetings.approve(id);
+      const added = await session.goal.meetings.approve(id);
       return toolText(
         `Approved: ${String(added.length)} ${added.length === 1 ? "subtask goes" : "subtasks go"} to work.`,
       );
@@ -208,7 +193,7 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
       inputSchema: { meeting },
     },
     async ({ meeting: id }) => {
-      await (await team()).meetings.cancel(id);
+      await session.goal.meetings.cancel(id);
       return toolText("Cancelled.");
     },
   );
@@ -220,8 +205,8 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
         "Go on with a meeting that failed or was cancelled before its plan, from where it stopped.",
       inputSchema: { meeting },
     },
-    async ({ meeting: id }) => {
-      (await team()).meetings.resume(id);
+    ({ meeting: id }) => {
+      session.goal.meetings.resume(id);
       return toolText("The meeting goes on.");
     },
   );
@@ -233,9 +218,8 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
         "Give a member one subtask directly, without a meeting. It starts once they are free. Assign only once the user has agreed who takes it.",
       inputSchema: assignInput(memberName()),
     },
-    async ({ goal: ref, ...work }) => {
-      const engine = await team();
-      const [added] = engine.goals.assign(goalOf(engine, ref).id, work);
+    (work) => {
+      const [added] = session.goal.goals.assign(work);
       return toolText(`Assigned "${work.title}" [${added?.id ?? ""}] to ${work.assignee}.`);
     },
   );
@@ -244,14 +228,15 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
     "goal_action",
     {
       description:
-        "Pause a goal (its runs stop, to go on later in their sessions), resume it, archive it, or delete an archived one: its worktrees and subtask branches go, its own branch stays. Delete only when the user has confirmed it.",
-      inputSchema: { goal, action: z.enum(GOAL_ACTIONS) },
+        "Pause this session's goal (its runs stop, to go on later in their sessions), resume it, archive it, or delete it once archived: its folder, worktrees and subtask branches go, its own branch stays. Delete only when the user has confirmed it.",
+      inputSchema: { action: z.enum(GOAL_ACTIONS) },
       annotations: { destructiveHint: true },
     },
-    async ({ goal: ref, action }) => {
-      const engine = await team();
-      const { id, name } = goalOf(engine, ref);
-      await engine.goals[action](id);
+    async ({ action }) => {
+      const engine = session.goal;
+      const { name } = engine.state.goal;
+      if (action === "delete") await session.delete();
+      else await engine.goals[action]();
       return toolText(`The goal "${name}": ${action} done.`);
     },
   );
@@ -264,7 +249,7 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
       inputSchema: { subtask, action: z.enum(SUBTASK_ACTIONS) },
     },
     async ({ subtask: id, action }) => {
-      const engine = await team();
+      const engine = session.goal;
       const found = engine.state.subtasks.find((s) => s.id === id);
       if (!found) throw new Error("There is no such subtask");
       if (!derive(workOf(engine)).subtasks[id]?.actions.includes(action))
@@ -281,8 +266,8 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
         "Pass the user's words to the member working on a subtask: a running one takes them at once, in its session; one not started reads them first.",
       inputSchema: { subtask, text: z.string().trim().min(1) },
     },
-    async ({ subtask: id, text }) => {
-      const went = (await team()).scheduler.carry(id, text);
+    ({ subtask: id, text }) => {
+      const went = session.goal.scheduler.carry(id, text);
       return toolText(
         went === "goes"
           ? "Passed on."
@@ -306,7 +291,7 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
       },
     },
     async ({ question, decision, note, sent_back }) => {
-      await (await team()).answer(question, decisionOf(decision, note, sent_back));
+      await session.goal.answer(question, decisionOf(decision, note, sent_back));
       return toolText("Done.");
     },
   );

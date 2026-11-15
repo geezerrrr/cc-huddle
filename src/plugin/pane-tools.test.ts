@@ -7,16 +7,16 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Engine } from "../engine/engine.ts";
 import { git } from "../engine/git.ts";
 import { teamFolder } from "../engine/team.ts";
 import type { Question } from "../engine/types.ts";
 import type { OpenplanView } from "../../plugin/types/index.d.ts";
 import { askToLetGo, servePane, type PaneServer } from "./pane-server.ts";
 import { addPaneTools } from "./pane-tools.ts";
+import { Session } from "./session.ts";
 
 let dir: string;
-let engine: Engine;
+let session: Session;
 let client: Client;
 let pane: PaneServer;
 
@@ -41,25 +41,26 @@ beforeEach(async () => {
     await mkdir(path.dirname(file), { recursive: true });
     await writeFile(file, text);
   }
-  engine = await Engine.open({
-    cwd: repo,
-    dataFolder: path.join(dir, "openplan-inline"),
-    claude: "claude",
-    session: 41,
-    address: "here",
-    sessionMode: () => undefined,
-    plugin: "openplan@inline",
-    userTeam: path.join(dir, "user-team"),
-    env: {},
-    teamRead: vi.fn(),
-    failed: vi.fn(),
-  });
   const server = new McpServer({ name: "openplan", version: "0.0.0" });
-  pane = await servePane(
-    () => Promise.resolve(engine),
-    () => engine.close(),
+  pane = await servePane(() => session);
+  session = new Session(
+    {
+      cwd: repo,
+      dataFolder: path.join(dir, "openplan-inline"),
+      session: 41,
+      address: pane.address,
+      // Another session of the test, at the same socket.
+      takeOver: (holder, slug) => askToLetGo(holder.address, slug),
+      sessionMode: () => undefined,
+      plugin: "openplan@inline",
+      userTeam: path.join(dir, "user-team"),
+      env: {},
+      failed: vi.fn(),
+    },
+    () => Promise.resolve("claude"),
+    vi.fn(),
   );
-  addPaneTools(server, () => Promise.resolve(engine), pane);
+  addPaneTools(server, session, pane);
   const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
   await server.connect(serverSide);
   client = new Client({ name: "test", version: "0.0.0" });
@@ -69,7 +70,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await client.close();
   pane.close();
-  await engine.close();
+  await session.close();
   await rm(dir, { recursive: true, force: true });
 });
 
@@ -98,19 +99,35 @@ const view = async (args: Record<string, unknown> = {}) =>
   JSON.parse((await ask("/view", JSON.stringify(args))).text) as OpenplanView;
 
 describe("the pane's socket and tools", () => {
-  it("let the team go to a session taking it over, and say what that stopped", async () => {
-    const goal = await engine.goals.start("Dice");
-    expect(await askToLetGo(pane.address)).toEqual({ goals: [goal.id], meetings: [] });
-    expect(engine.state.goals[0]?.status).toBe("paused");
+  it("let the session's goal go to a session taking it up, and say what that stopped", async () => {
+    await session.start("Dice");
+    expect(await askToLetGo(pane.address, "chess")).toEqual({ meetings: [] });
+    expect(session.current?.state.goal.status).toBe("active");
+    expect(await askToLetGo(pane.address, "dice")).toEqual({ meetings: [] });
+    expect(session.current).toBeUndefined();
+    expect((await view()).team?.resumable).toEqual([
+      { slug: "dice", label: "Dice · no plan yet · paused" },
+    ]);
   });
 
-  it("pause the goal under way, and resume the one picked", async () => {
-    const dice = await engine.goals.start("Dice");
+  it("pause the session's goal, and take up the one picked", async () => {
+    expect((await call("pause_goal")).text).toContain("This session runs no goal");
+    await session.start("Dice");
     expect((await call("pause_goal")).text).toBe('Paused "Dice".');
-    expect((await view()).team?.paused).toEqual([{ id: dice.id, label: "Dice · no plan yet" }]);
-    expect((await call("pause_goal")).text).toBe("No goal is active.");
-    expect((await call("resume_goal", { goal: dice.id })).text).toBe("Resumed.");
-    expect(dice.status).toBe("active");
+    expect((await call("pause_goal")).text).toBe('"Dice" is paused already.');
+    expect((await view()).team?.resumable).toEqual([
+      { slug: "dice", label: "Dice · no plan yet · paused, in this session" },
+    ]);
+    expect((await call("resume_goal", { goal: "dice" })).text).toBe('Resumed "Dice".');
+    expect(session.current?.state.goal.status).toBe("active");
+    await call("pause_goal");
+    await session.start("Chess");
+    expect((await call("resume_goal", { goal: "dice" })).text).toContain('"Chess" is under way');
+    await call("pause_goal");
+    expect((await call("resume_goal", { goal: "dice" })).text).toBe('Resumed "Dice".');
+    expect((await view()).team?.resumable).toEqual([
+      { slug: "chess", label: "Chess · no plan yet · paused" },
+    ]);
   });
 
   it("serve only the view and the release, and say why an ask doesn't fit", async () => {
@@ -125,20 +142,25 @@ describe("the pane's socket and tools", () => {
     const first = await view();
     expect(first.team).toEqual({
       tasks: [],
-      members: [{ name: "glm", role: "Developer", model: "glm-5", doing: "free", tokens: 0 }],
+      members: [],
       needs: [],
       milestones: [],
       prompts: [],
-      paused: [],
+      resumable: [],
     });
     expect(await view({ revision: first.revision })).toEqual({ revision: first.revision });
-    await engine.goals.start("Dice");
+    await session.start("Dice");
     const next = await view({ revision: first.revision });
     expect(next.revision).toBeGreaterThan(first.revision);
-    expect(next.team?.band).toBe("idle");
+    expect(next.team).toMatchObject({
+      goal: { name: "Dice", slug: "dice", active: true },
+      band: "idle",
+      members: [{ name: "glm", role: "Developer", model: "glm-5", doing: "free", tokens: 0 }],
+    });
   });
 
   it("follow a subtask's record from where the pane read up to", async () => {
+    const engine = await session.start("Dice");
     engine.records.recorder("s1").block?.({ kind: "text", text: "Done." });
     await engine.records.flush();
     const { record } = await view({ record: { subtask: "s1", from: 0 } });
@@ -169,7 +191,7 @@ describe("the pane's socket and tools", () => {
       status: "open",
       createdAt: 0,
     };
-    engine.state.questions.push(question);
+    (await session.start("Dice")).state.questions.push(question);
     expect(await call("answer", { question: "q1", option: "once" })).toEqual({
       text: "That answer doesn't fit the question.",
       error: true,

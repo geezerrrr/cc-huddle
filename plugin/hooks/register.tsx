@@ -37,7 +37,7 @@ const RECORD_KEEP = 200;
 /** How much of a member's thinking, or of a tool's argument, a row shows. */
 const ROW_TEXT = 300;
 
-const team = atom({ plugin: "openplan", key: "team" } as const, null, { shape: "team-1" });
+const team = atom({ plugin: "openplan", key: "team" } as const, null, { shape: "team-2" });
 const speaking = atom({ plugin: "openplan", key: "speaking" } as const, null);
 const record = atom({ plugin: "openplan", key: "record" } as const, null, { shape: "record-1" });
 const problem = atom({ plugin: "openplan", key: "problem" } as const, null);
@@ -70,21 +70,25 @@ let socket: string | undefined;
 let revision: number | undefined;
 /** Milestones and prompts told already; those there at the first look are not news. */
 let told: Set<string> | undefined;
+/**
+ * The goal you took up here (`/openplan resume`), until the view has it:
+ * what waits in it for a conversation is put to your session at once, and
+ * its milestones so far are not news.
+ */
+let takenUp: string | undefined;
 let polling = false;
 /** Needs put to you in a question dialog already; one dismissed waits in the pane. */
 const asked = new Set<string>();
 /** The asks, one after another in the order the needs came. */
 let asking = Promise.resolve();
 /**
- * The poll, while it runs. It stops when the server can't open the team (no
- * team in the repository, another session's), and starts again when you or
- * your session turn to openplan.
+ * The poll, while it runs. It stops when the server can't read the goals (the
+ * session isn't in a repository), and starts again when you or your session
+ * turn to openplan.
  */
 let ticking: Timer | undefined;
-/** You turned to openplan here (`/openplan`): the next look takes the team over from another session. */
-let taking = false;
 
-/** What the server answered with an error: the team can't be opened, or refused what was asked. */
+/** What the server answered with an error: the goals can't be read, or it refused what was asked. */
 class Refused extends Error {}
 
 const clip = (text: string) => (text.length > ROW_TEXT ? `${text.slice(0, ROW_TEXT)}…` : text);
@@ -179,13 +183,18 @@ async function call($: $, tool: string, args: Record<string, unknown> = {}): Pro
 
 /** The prompt `/openplan <task>` gives your session: the task, for the team and not for it. */
 function handOff(task: string, now: OpenplanTeam | null): string {
-  const roster = now && ` The team: ${now.members.map((m) => `${m.name} (${m.role})`).join(", ")}.`;
+  const roster = now?.members.length
+    ? ` The team: ${now.members.map((m) => `${m.name} (${m.role})`).join(", ")}.`
+    : "";
+  const then = now?.goal
+    ? `This session runs the goal "${now.goal.name}"${now.goal.active ? ", under way" : ""}: ask the user too whether this is part of it, for a meeting or work in it (hold_meeting, assign), or a goal of its own (start_goal), which needs that one paused first, or another session.`
+    : "Then start a goal (start_goal) and hold the meeting (hold_meeting) or assign the work (assign).";
   return [
-    `The user hands this to openplan's team. Don't do any of it yourself.${roster ?? ""}`,
+    `The user hands this to openplan's team. Don't do any of it yourself.${roster}`,
     "",
     task,
     "",
-    "Propose who takes it, keeping to anyone the user named: a meeting when it needs planning among several members (who attends, the host first and whether they only run it, and what each brings to it), or one member when it doesn't (what they will do). Ask the user with AskUserQuestion to start with that or say what to change, and propose again until they start. Then start a goal (start_goal) and hold the meeting (hold_meeting) or assign the work (assign).",
+    `Propose who takes it, keeping to anyone the user named: a meeting when it needs planning among several members (who attends, the host first and whether they only run it, and what each brings to it), or one member when it doesn't (what they will do). Ask the user with AskUserQuestion to start with that or say what to change, and propose again until they start. ${then}`,
   ].join("\n");
 }
 
@@ -221,21 +230,24 @@ function watch($: $) {
 const ASK_OPTIONS = 4;
 
 /**
- * Resumes a paused goal (§7.3): the only one; with several, the one you pick
- * in the question dialog, or the one numbered `number` when there are more
- * than it holds, as listed.
+ * Resumes your session's goal or takes up another (§7.3): the only one; with
+ * several, the one you pick in the question dialog, or the one numbered
+ * `number` when there are more than it holds, as listed. While your
+ * session's goal is active, it says to pause it first.
  */
 async function resumeGoal($: $, number?: number): Promise<string> {
-  const paused = (await view($, {})).team?.paused ?? [];
-  if (!paused.length) return "No goal is paused.";
-  const listed = paused.map((goal, i) => ({
-    id: goal.id,
+  const now = (await view($, {})).team;
+  if (now?.goal?.active)
+    return `"${now.goal.name}" is under way in this session, which runs one goal: /openplan pause it first, or take the other up in another session.`;
+  const listed = (now?.resumable ?? []).map((goal, i) => ({
+    slug: goal.slug,
     name: goal.label,
     label: `${String(i + 1)}. ${goal.label}`,
   }));
+  if (!listed.length) return "No goal to resume.";
   if (number === undefined && listed.length > ASK_OPTIONS)
     return [
-      "Paused goals; resume one with /openplan resume <number>:",
+      "Goals; resume one with /openplan resume <number>:",
       ...listed.map((g) => g.label),
     ].join("\n");
   const goal =
@@ -245,11 +257,10 @@ async function resumeGoal($: $, number?: number): Promise<string> {
         ? listed[0]
         : await picked($, listed);
   if (!goal)
-    return number === undefined
-      ? "Nothing resumed."
-      : `No paused goal is numbered ${String(number)}.`;
-  await call($, "resume_goal", { goal: goal.id });
-  return `Resumed ${goal.name}.`;
+    return number === undefined ? "Nothing resumed." : `No goal is numbered ${String(number)}.`;
+  const said = await call($, "resume_goal", { goal: goal.slug });
+  takenUp = goal.slug;
+  return said;
 }
 
 /** The goal you pick in the question dialog; none when you dismiss it or type something else. */
@@ -291,16 +302,19 @@ function tell($: $, now: OpenplanTeam) {
     asking = asking.then(() => askNeed($, need));
   }
   const keys = [...now.milestones.map((m) => m.key), ...now.prompts.map((p) => p.key)];
-  if (told) {
-    for (const milestone of now.milestones)
-      if (!told.has(milestone.key)) $.ui.log(`openplan: ${milestone.text}`);
+  const fresh = takenUp !== undefined && now.goal?.slug === takenUp;
+  if (fresh) takenUp = undefined;
+  if (told || fresh) {
+    if (!fresh)
+      for (const milestone of now.milestones)
+        if (!told?.has(milestone.key)) $.ui.log(`openplan: ${milestone.text}`);
     for (const prompt of now.prompts)
-      if (!told.has(prompt.key))
+      if (!told?.has(prompt.key))
         $.prompt.submit({ text: prompt.text }).catch((error: unknown) => {
           $.ui.toast(`openplan: your session couldn't be told: ${words(error)}`);
         });
   }
-  told = new Set(keys);
+  told = new Set([...(told ?? []), ...keys]);
 }
 
 /** The followed record with what came since, following its member onto new work. */
@@ -327,13 +341,10 @@ async function poll($: $) {
   polling = true;
   try {
     const following = await read($, record);
-    const take = taking;
     const now = await view($, {
       ...(revision !== undefined && { revision }),
       ...(following && { record: { subtask: following.subtask, from: following.next } }),
-      ...(take && { take }),
     });
-    if (take) taking = false;
     revision = now.revision;
     await update($, problem, () => null);
     if (now.team) {
@@ -345,11 +356,10 @@ async function poll($: $) {
     await update($, speaking, (was) => (JSON.stringify(was) === JSON.stringify(said) ? was : said));
     await update($, record, (was) => followed(was, now));
   } catch (error) {
-    // A server still starting is asked again; a team it can't open, or that moved, waits for you.
+    // A server still starting is asked again; goals it can't read wait for you.
     if (error instanceof Refused) {
       ticking?.cancel();
       ticking = undefined;
-      taking = false;
       await update($, team, () => null);
     }
     const why = words(error);
@@ -643,7 +653,7 @@ export const register: Register = (on) => {
     await $.command.register({
       name: "openplan",
       description:
-        "Hand openplan's team a task; with none, show the team in a pane; `/openplan status` prints where it stands, `pause` pauses the goal under way and `resume` resumes one",
+        "Hand openplan's team a task; with none, show the team in a pane; `/openplan status` prints where it stands, `pause` pauses this session's goal and `resume` resumes it or takes up another",
       argumentHint: "[task | status | pause | resume [number]]",
     });
     watch($);
@@ -651,7 +661,6 @@ export const register: Register = (on) => {
   });
 
   on("command.run", { command: "openplan" }, async ($, e) => {
-    taking = true;
     watch($);
     const task = e.args.trim();
     // Certain, so said without a model turn.
@@ -724,7 +733,22 @@ export const register: Register = (on) => {
     const { Box, Button, Text } = ui;
     const now = await read($, team);
     const why = await read($, problem);
-    if (!now) return <Text dimColor>{why ?? "Looking for the repository's team…"}</Text>;
+    if (!now) return <Text dimColor>{why ?? "Looking for the repository's goals…"}</Text>;
+    if (!now.goal)
+      return (
+        <Box flexDirection="column" gap={1}>
+          <Text>
+            This session runs no goal. Hand the team a task with /openplan &lt;task&gt;, or take a
+            goal up with /openplan resume.
+          </Text>
+          {now.resumable.map((goal) => (
+            <Text key={`goal-${goal.slug}`} dimColor>
+              {goal.label}
+            </Text>
+          ))}
+          {why && <Text color="red">{why}</Text>}
+        </Box>
+      );
     const shown = await read($, tab);
     return (
       <Box flexDirection="column" gap={1}>

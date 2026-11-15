@@ -5,6 +5,8 @@
 
 /** The team as the pane shows it; it comes again only when it changed. */
 export type OpenplanTeam = {
+  /** The goal your session runs; absent while it runs none. */
+  goal?: { name: string; slug: string; active: boolean };
   /** The band's words: what goes on, and what waits on you. Absent with nothing to say. */
   band?: string;
   /** A line for each task not yet done, under the band: its title and where it stands. */
@@ -16,8 +18,12 @@ export type OpenplanTeam = {
   milestones: { key: string; text: string }[];
   /** What needs a conversation with you, by a key that names it: your session is prompted with each new one. */
   prompts: { key: string; text: string }[];
-  /** The paused goals, oldest first, each named with how far it got: what `/openplan resume` picks from. */
-  paused: { id: string; label: string }[];
+  /**
+   * What `/openplan resume` picks from, each named with how far it got and
+   * where it is: your session's goal while it isn't active, then the
+   * repository's goals your session doesn't run, oldest first.
+   */
+  resumable: { slug: string; label: string }[];
 };
 
 export type OpenplanMeeting = {

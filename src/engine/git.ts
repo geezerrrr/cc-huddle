@@ -119,7 +119,7 @@ export async function openRepository(folder: string): Promise<Repository> {
   return { top: await realpath(top), common: await realpath(path.resolve(folder, common)) };
 }
 
-/** A repository and the folder in the data folder that holds its goals' and subtasks' worktrees. */
+/** A repository and a goal's folder in the data folder, which holds the goal's worktree and its subtasks'. */
 export interface Places {
   repo: Repository;
   root: string;
@@ -129,7 +129,7 @@ export interface Places {
 export const goalBranch = (slug: string) => `openplan/${slug}/main`;
 
 /** The worktree a goal's branch is checked out in. */
-export const goalFolder = (places: Places, slug: string) => path.join(places.root, "goals", slug);
+export const goalFolder = (places: Places) => path.join(places.root, "checkout");
 
 /** The slugs goals have taken in a repository: every name with a branch under `openplan/<slug>/`. */
 export async function takenSlugs(repo: Repository): Promise<Set<string>> {
@@ -198,7 +198,7 @@ async function checkOut(repo: Repository, folder: string, branch: string, from?:
 export async function openGoal(places: Places, slug: string): Promise<string> {
   const { repo } = places;
   const branch = goalBranch(slug);
-  const folder = goalFolder(places, slug);
+  const folder = goalFolder(places);
   if (!(await hasBranch(repo, branch))) await git({ cwd: repo.top }, ["branch", branch, "HEAD"]);
   if (!(await exists(folder))) await checkOut(repo, folder, branch);
   return folder;
@@ -213,8 +213,7 @@ export const deskFolder = (places: Places, subtaskId: string) =>
 
 /** One git operation per goal at a time: its branch and its worktrees are shared. */
 const serial = serialBy();
-const perGoal = <T>(places: Places, slug: string, task: () => Promise<T>) =>
-  serial(goalFolder(places, slug), task);
+const perGoal = <T>(places: Places, task: () => Promise<T>) => serial(goalFolder(places), task);
 
 /**
  * A subtask's worktree: its own if there (a run going on keeps it), its
@@ -222,7 +221,7 @@ const perGoal = <T>(places: Places, slug: string, task: () => Promise<T>) =>
  * a new branch cut from the goal's branch as it stands now.
  */
 export function openDesk(places: Places, slug: string, subtaskId: string): Promise<string> {
-  return perGoal(places, slug, async () => {
+  return perGoal(places, async () => {
     const { repo } = places;
     const desk = deskFolder(places, subtaskId);
     await openGoal(places, slug);
@@ -281,7 +280,7 @@ export function commitDesk(
   by: Signer,
   message: string,
 ): Promise<void> {
-  return perGoal(places, slug, async () => {
+  return perGoal(places, async () => {
     const at = await worktreeAt(places.repo, deskFolder(places, subtaskId));
     const signed = { ...at, env: { ...at.env, ...authorEnv(by) } };
     await git(signed, ["add", "-A"]);
@@ -355,7 +354,7 @@ export function mergeDesk(
   subtaskId: string,
   by: Signer,
 ): Promise<MergeOutcome> {
-  return perGoal(places, slug, async () => {
+  return perGoal(places, async () => {
     const { repo } = places;
     const folder = deskFolder(places, subtaskId);
     if (!(await exists(folder))) {
@@ -405,7 +404,7 @@ export function pickSide(
   files: string[],
   side: "ours" | "theirs",
 ): Promise<void> {
-  return perGoal(places, slug, async () => {
+  return perGoal(places, async () => {
     const desk = await worktreeAt(places.repo, deskFolder(places, subtaskId));
     const stages = await git(desk, ["ls-files", "-u", "-z", "--", ...files.map(literally)]);
     const wanted = side === "ours" ? "2" : "3";
@@ -428,7 +427,7 @@ export function pickSide(
 
 /** Calls off a merge a subtask's worktree is in the middle of, to try it again from scratch. */
 export function abortMerge(places: Places, slug: string, subtaskId: string): Promise<void> {
-  return perGoal(places, slug, async () => {
+  return perGoal(places, async () => {
     const desk = await worktreeAt(places.repo, deskFolder(places, subtaskId));
     if (await merging(desk)) await git(desk, ["merge", "--abort"]);
   });
@@ -436,7 +435,7 @@ export function abortMerge(places: Places, slug: string, subtaskId: string): Pro
 
 /** Throws a subtask's worktree away with its branch: it starts over, or its goal is deleted. */
 export function dropDesk(places: Places, slug: string, subtaskId: string): Promise<void> {
-  return perGoal(places, slug, () => removeDesk(places, slug, subtaskId));
+  return perGoal(places, () => removeDesk(places, slug, subtaskId));
 }
 
 /**
@@ -444,7 +443,7 @@ export function dropDesk(places: Places, slug: string, subtaskId: string): Promi
  * branches and its own worktree. Its branch stays, yours to merge or delete.
  */
 export function removeGoal(places: Places, slug: string): Promise<void> {
-  return perGoal(places, slug, async () => {
+  return perGoal(places, async () => {
     const { repo } = places;
     const refs = await git({ cwd: repo.top }, [
       "for-each-ref",
@@ -454,7 +453,7 @@ export function removeGoal(places: Places, slug: string): Promise<void> {
     for (const id of refs.stdout.split("\n")) {
       if (id && id !== "main") await removeDesk(places, slug, id);
     }
-    const folder = goalFolder(places, slug);
+    const folder = goalFolder(places);
     await unlist(repo, folder);
     await rm(folder, { recursive: true, force: true });
   });

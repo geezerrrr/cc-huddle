@@ -1,24 +1,22 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { dataFiles, repoFolder, type Holder } from "../engine/data.ts";
+import { goalFiles, goalsFolder, repoFolder, type Holder } from "../engine/data.ts";
 import { git, openRepository } from "../engine/git.ts";
-import { teamFolder } from "../engine/team.ts";
+import { copyTeam, type TeamFiles } from "../engine/team.ts";
 import { sessionContext } from "./context.ts";
 
 let dir: string;
 let repo: string;
 let data: string;
-let user: string;
 
 beforeEach(async () => {
   dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-context-")));
   repo = path.join(dir, "repo");
   data = path.join(dir, "openplan-inline");
-  user = path.join(dir, "user-team");
   const me = {
     GIT_AUTHOR_NAME: "you",
     GIT_AUTHOR_EMAIL: "y@x",
@@ -38,23 +36,28 @@ afterEach(async () => {
 /** This test's session, as the hook's parent process. */
 const SESSION = 41;
 
-async function writeTeamAndGoal(status = "paused") {
-  for (const [name, text] of [
-    ["roles/dev.md", "---\ntitle: Developer\n---\n"],
-    ["members/glm.md", "---\nrole: dev\n---\n"],
-  ] as const) {
-    const file = path.join(teamFolder(repo), name);
-    await mkdir(path.dirname(file), { recursive: true });
-    await writeFile(file, text);
-  }
-  const { state } = dataFiles(repoFolder(data, await openRepository(repo)));
-  await mkdir(path.dirname(state), { recursive: true });
+/** The files of the repository's goal `slug`. */
+const filesOf = async (slug: string) =>
+  goalFiles(path.join(goalsFolder(repoFolder(data, await openRepository(repo))), slug));
+
+/** Writes a goal's folder: its state, and its copy of a team of one, glm. */
+async function writeGoal(slug: string, status = "paused") {
+  const files = await filesOf(slug);
+  const team: TeamFiles = {
+    team: {
+      members: [{ name: "glm", role: { id: "dev", title: "Developer", duties: "" }, env: {} }],
+      review: true,
+    },
+    settings: {},
+    meetingSize: "discussion",
+  };
+  await copyTeam(files.team, team);
   await writeFile(
-    state,
+    files.state,
     JSON.stringify({
       version: 1,
       state: {
-        goals: [{ id: "g1", name: "Dice", slug: "dice", status, createdAt: 0 }],
+        goal: { id: slug, name: slug, slug, status, createdAt: slug.length },
         tasks: [],
         subtasks: [],
         meetings: [],
@@ -64,49 +67,38 @@ async function writeTeamAndGoal(status = "paused") {
   );
 }
 
-/** Writes the team's lock as `holder` holds it. */
-async function hold(holder: Holder) {
-  await writeFile(
-    dataFiles(repoFolder(data, await openRepository(repo))).lock,
-    JSON.stringify(holder),
-  );
+/** Writes a goal's lock as `holder` holds it. */
+async function hold(slug: string, holder: Holder) {
+  await writeFile((await filesOf(slug)).lock, JSON.stringify(holder));
 }
 
 describe("the session's context", () => {
-  it("is where the team stands, once it has a goal", async () => {
-    expect(await sessionContext(repo, data, user, SESSION)).toBeUndefined();
-    await writeTeamAndGoal();
-    expect(await sessionContext(repo, data, user, SESSION))
-      .toBe(`openplan's team on this repository, as it stands:
-
-Team: glm
-
-Goal "Dice" [g1]: paused, on branch openplan/dice/main`);
-    expect(await sessionContext(dir, data, user, SESSION)).toBeUndefined();
+  it("lists the repository's goals the session can take up, once there are any", async () => {
+    expect(await sessionContext(repo, data, SESSION)).toBeUndefined();
+    await writeGoal("dice");
+    await writeGoal("chess", "archived");
+    await writeGoal("go", "active");
+    await hold("go", { pid: process.pid, session: 42, address: "there", open: true });
+    expect(await sessionContext(repo, data, SESSION))
+      .toBe(`openplan: The repository's other goals, which the user takes up here with /openplan resume:
+  - go · no plan yet · in another session
+  - dice · no plan yet · paused
+  - chess · no plan yet · archived`);
+    expect(await sessionContext(dir, data, SESSION)).toBeUndefined();
   });
 
-  it("says what a session that ended without closing the team left going is paused as it opens", async () => {
-    await writeTeamAndGoal("active");
-    const left = "The session before ended without closing the team.";
-    expect(await sessionContext(repo, data, user, SESSION)).toContain(left);
-    // This session's server has the team, but hasn't opened it yet.
-    await hold({ pid: process.pid, session: SESSION, address: "here", open: false });
-    expect(await sessionContext(repo, data, user, SESSION)).toContain(left);
-    // It has: the goal is active in this session (the context after /clear).
-    await hold({ pid: process.pid, session: SESSION, address: "here", open: true });
-    expect(await sessionContext(repo, data, user, SESSION)).not.toContain(left);
-  });
+  it("tells a session that runs a goal where it stands (after /clear)", async () => {
+    await writeGoal("dice", "active");
+    await hold("dice", { pid: process.pid, session: SESSION, address: "here", open: true });
+    expect(await sessionContext(repo, data, SESSION))
+      .toBe(`This session runs openplan's goal "dice", as it stands:
 
-  it("says when another session runs the team", async () => {
-    await writeTeamAndGoal("active");
-    await hold({ pid: process.pid, session: 42, address: "there", open: true });
-    expect(await sessionContext(repo, data, user, SESSION)).toMatch(
-      /^openplan's team on this repository runs in another Claude Code session \(pid 42\)/,
-    );
+Goal "dice": active, on branch openplan/dice/main
+Team: glm`);
   });
 
   it("is what the SessionStart hook adds", async () => {
-    await writeTeamAndGoal();
+    await writeGoal("dice");
     const hook = execFile(
       process.execPath,
       [
@@ -123,7 +115,7 @@ Goal "Dice" [g1]: paused, on branch openplan/dice/main`);
     expect(JSON.parse(stdout)).toMatchObject({
       hookSpecificOutput: {
         hookEventName: "SessionStart",
-        additionalContext: expect.stringContaining('Goal "Dice" [g1]') as string,
+        additionalContext: expect.stringContaining("  - dice · no plan yet · paused") as string,
       },
     });
   });

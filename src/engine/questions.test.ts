@@ -203,7 +203,6 @@ describe("answer", () => {
 const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
   id,
   taskId: "t1",
-  goalId: "g1",
   title: id,
   description: "",
   acceptance: "",

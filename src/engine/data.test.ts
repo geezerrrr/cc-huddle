@@ -5,15 +5,20 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  goalFiles,
+  goalsFolder,
   holderOf,
-  openedTeam,
+  listGoals,
+  newGoalFolder,
+  openedGoal,
   readState,
-  releaseTeam,
+  releaseGoal,
   repoFolder,
   stateWriter,
-  takeTeam,
+  takeGoal,
+  type Holder,
 } from "./data.ts";
-import type { TeamState } from "./types.ts";
+import type { GoalState } from "./types.ts";
 
 let dir: string;
 
@@ -25,8 +30,8 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-const empty = (): TeamState => ({
-  goals: [],
+const fresh = (slug = "dice", createdAt = 0): GoalState => ({
+  goal: { id: slug, name: "Dice", slug, status: "active", createdAt },
   tasks: [],
   subtasks: [],
   meetings: [],
@@ -49,28 +54,26 @@ describe("repoFolder", () => {
 });
 
 describe("the state file", () => {
-  it("starts empty, and is written a moment after a change, or at once when flushed", async () => {
+  it("is written a moment after a change, or at once when flushed", async () => {
     const file = path.join(dir, "repo", "state.json");
-    const state = await readState(file);
-    expect(state).toEqual(empty());
+    const state = fresh();
     const writer = stateWriter(file, () => state, vi.fn());
-    state.goals.push({ id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 });
     writer.changed();
     writer.changed();
     await vi.waitFor(async () => {
       expect(await readState(file)).toEqual(state);
     });
-    state.goals = [];
+    state.goal.status = "paused";
     writer.changed();
     await writer.flush();
-    expect(await readState(file)).toEqual(empty());
+    expect((await readState(file)).goal.status).toBe("paused");
     expect(JSON.parse(await readFile(file, "utf8"))).toMatchObject({ version: 1 });
   });
 
   it("tells a write that failed", async () => {
     await writeFile(path.join(dir, "blocked"), "");
     const failed = vi.fn();
-    const writer = stateWriter(path.join(dir, "blocked", "state.json"), empty, failed);
+    const writer = stateWriter(path.join(dir, "blocked", "state.json"), fresh, failed);
     writer.changed();
     await writer.flush();
     expect(failed).toHaveBeenCalledOnce();
@@ -80,41 +83,44 @@ describe("the state file", () => {
     const file = path.join(dir, "state.json");
     await writeFile(file, "{");
     await expect(readState(file)).rejects.toThrow("can't be read");
-    await writeFile(file, JSON.stringify({ version: 2, state: empty() }));
+    await writeFile(file, JSON.stringify({ version: 2, state: fresh() }));
     await expect(readState(file)).rejects.toThrow("written by a newer openplan");
   });
 });
 
-/** The session the team is taken for, and where it is asked to let it go. */
+/** The session the goal is taken for, and where it is asked to let it go. */
 const SESSION = 41;
 const ME = { session: SESSION, address: "here" };
 
+/** A holder that won't let the goal go. */
+const refuse = (holder: Holder) => Promise.reject(new Error(`held by ${String(holder.session)}`));
+
 describe("the lock", () => {
-  it("gives the team to one running process, and is let go of by its holder", async () => {
+  it("gives the goal to one running process, and is let go of by its holder", async () => {
     const lock = path.join(dir, "repo", "lock");
-    await takeTeam(lock, ME);
-    await takeTeam(lock, ME);
+    await takeGoal(lock, ME, refuse);
+    await takeGoal(lock, ME, refuse);
     const other = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
     await once(other, "spawn");
     await writeFile(
       lock,
       JSON.stringify({ pid: other.pid, session: 7, address: "there", open: true }),
     );
-    releaseTeam(lock);
-    await expect(takeTeam(lock, ME)).rejects.toThrow("(pid 7)");
+    releaseGoal(lock);
+    await expect(takeGoal(lock, ME, refuse)).rejects.toThrow("held by 7");
     other.kill();
     await once(other, "exit");
     expect(holderOf(lock)).toBeUndefined();
-    await takeTeam(lock, ME);
+    await takeGoal(lock, ME, refuse);
     const holder = { pid: process.pid, ...ME };
     expect(holderOf(lock)).toEqual({ ...holder, open: false });
-    await openedTeam(lock, ME);
+    await openedGoal(lock, ME);
     expect(holderOf(lock)).toEqual({ ...holder, open: true });
-    releaseTeam(lock);
+    releaseGoal(lock);
     await expect(stat(lock)).rejects.toThrow();
   });
 
-  it("asks a running holder to let the team go, and gives back what it stopped", async () => {
+  it("asks a running holder to let the goal go, and gives back what it stopped", async () => {
     const lock = path.join(dir, "repo", "lock");
     const other = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
     await once(other, "spawn");
@@ -124,23 +130,23 @@ describe("the lock", () => {
       JSON.stringify({ pid: other.pid, session: 7, address: "there", open: true }),
     );
     const asked: string[] = [];
-    const handed = await takeTeam(lock, ME, async (holder) => {
+    const handed = await takeGoal(lock, ME, async (holder) => {
       asked.push(holder.address);
       await rm(lock);
-      return { goals: ["g1"], meetings: ["m1"] };
+      return { meetings: ["m1"] };
     });
     other.kill();
     expect(asked).toEqual(["there"]);
-    expect(handed).toEqual({ goals: ["g1"], meetings: ["m1"] });
+    expect(handed).toEqual({ meetings: ["m1"] });
     expect(holderOf(lock)).toEqual({ pid: process.pid, ...ME, open: false });
-    releaseTeam(lock);
+    releaseGoal(lock);
   });
 
   it("goes to one of several sessions starting at once, also over one that has ended", async () => {
     const lock = path.join(dir, "repo", "lock");
     const take = `
-      import { takeTeam } from ${JSON.stringify(path.join(import.meta.dirname, "data.ts"))};
-      takeTeam(process.argv[1], { session: 1, address: "" }).then(() => console.log("took"), () => console.log("refused"));
+      import { takeGoal } from ${JSON.stringify(path.join(import.meta.dirname, "data.ts"))};
+      takeGoal(process.argv[1], { session: 1, address: "" }, () => Promise.reject(new Error("held"))).then(() => console.log("took"), () => console.log("refused"));
       setTimeout(() => {}, 2000);
     `;
     const race = async () => {
@@ -166,5 +172,40 @@ describe("the lock", () => {
       return said.filter((word) => word === "took").length;
     };
     expect([await race(), await race()]).toEqual([1, 1]);
+  });
+});
+
+describe("a repository's goals", () => {
+  it("each get a folder of their own, named by a slug no goal has", async () => {
+    const repo = path.join(dir, "repo");
+    const taken = new Set(["dice-3"]);
+    const made = await Promise.all([
+      newGoalFolder(repo, "Dice", taken),
+      newGoalFolder(repo, "Dice", taken),
+    ]);
+    const next = await newGoalFolder(repo, "Dice", new Set(["dice-3"]));
+    expect(made.map((m) => m.slug).sort()).toEqual(["dice", "dice-2"]);
+    expect(next).toEqual({ slug: "dice-4", folder: path.join(goalsFolder(repo), "dice-4") });
+  });
+
+  it("are listed oldest first, with who runs each, but a folder with no state yet", async () => {
+    const repo = path.join(dir, "repo");
+    expect(await listGoals(repo)).toEqual([]);
+    const write = async (slug: string, createdAt: number) => {
+      const files = goalFiles(path.join(goalsFolder(repo), slug));
+      const writer = stateWriter(files.state, () => fresh(slug, createdAt), vi.fn());
+      writer.changed();
+      await writer.flush();
+      return files;
+    };
+    const chess = await write("chess", 2);
+    await write("dice", 1);
+    await mkdir(path.join(goalsFolder(repo), "starting"));
+    await takeGoal(chess.lock, ME, refuse);
+    expect(await listGoals(repo)).toEqual([
+      { slug: "dice", state: fresh("dice", 1) },
+      { slug: "chess", state: fresh("chess", 2), holder: { pid: process.pid, ...ME, open: false } },
+    ]);
+    releaseGoal(chess.lock);
   });
 });

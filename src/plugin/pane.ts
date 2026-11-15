@@ -10,6 +10,7 @@ import type {
   OpenplanNeed,
   OpenplanTeam,
 } from "../../plugin/types/index.d.ts";
+import type { GoalEntry } from "../engine/data.ts";
 import { derive, reviewerOf, type Work } from "../engine/derive.ts";
 import {
   toYou,
@@ -20,17 +21,7 @@ import {
   type QuestionToYou,
   type Subtask,
 } from "../engine/types.ts";
-import { stepText, waitText } from "./status.ts";
-
-/**
- * What a meeting is about, in a line: its goal's name. Its agenda is the
- * brief your session wrote for it, too long for a line.
- */
-function aboutOf(work: Work, meeting: Meeting): string {
-  const goal = work.goals.find((g) => g.id === meeting.goalId);
-  if (!goal) throw new Error(`The goal of the meeting [${meeting.id}] is gone`);
-  return goal.name;
-}
+import { othersOf, progressOf, stepText, waitText, whereOf } from "./status.ts";
 
 const plural = (n: number, one: string, many: string) => `${String(n)} ${n === 1 ? one : many}`;
 
@@ -66,7 +57,8 @@ function meetingStatus(meeting: Meeting): string {
 
 const meetingOf = (meeting: Meeting, work: Work): OpenplanMeeting => ({
   id: meeting.id,
-  about: aboutOf(work, meeting),
+  // Its agenda is the brief your session wrote for it, too long for a line.
+  about: work.goal.name,
   agenda: meeting.agenda,
   status: meetingStatus(meeting),
   participants: meeting.participants,
@@ -98,7 +90,7 @@ function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>
   if (running) {
     const step = stepText(running.progress);
     doing = `works on "${running.title}"${step ? `, ${step}` : ""}`;
-  } else if (meeting) doing = `at the meeting on "${aboutOf(work, meeting)}"`;
+  } else if (meeting) doing = `at the meeting on "${work.goal.name}"`;
   else if (reviewing) doing = `reviews "${reviewing.title}" by ${reviewing.assignee}`;
   else if (at("reviewing")) doing = `"${at("reviewing")?.title ?? ""}" is in review`;
   else if (at("merging")) doing = `"${at("merging")?.title ?? ""}" is being merged`;
@@ -181,7 +173,7 @@ function milestones(work: Work): OpenplanTeam["milestones"] {
   const said: OpenplanTeam["milestones"] = [];
   for (const meeting of work.meetings)
     if (meeting.status === "approved")
-      said.push({ key: `plan:${meeting.id}`, text: `Plan approved: "${aboutOf(work, meeting)}"` });
+      said.push({ key: `plan:${meeting.id}`, text: `Plan approved: "${work.goal.name}"` });
   for (const s of work.subtasks) {
     if (s.review?.rounds)
       said.push({
@@ -213,7 +205,7 @@ function prompts(work: Work): OpenplanTeam["prompts"] {
     if (meeting.status === "review" && meeting.plan)
       asked.push({
         key: `review:${meeting.id}`,
-        text: `The meeting [${meeting.id}] on "${aboutOf(work, meeting)}" has a plan: ${meeting.plan.summary}. Get it with show_plan and show it to the user in full: its document as it is written, then its tasks, each with its subtasks, who does them and what each waits on. Then ask whether to approve it, change it, or cancel it, and which tasks, if any, they want to accept themselves once done: none is unless they say, since reviews and checks confirm the work; it is worth it for a result only looking at it or trying it can judge.`,
+        text: `The meeting [${meeting.id}] on "${work.goal.name}" has a plan: ${meeting.plan.summary}. Get it with show_plan and show it to the user in full: its document as it is written, then its tasks, each with its subtasks, who does them and what each waits on. Then ask whether to approve it, change it, or cancel it, and which tasks, if any, they want to accept themselves once done: none is unless they say, since reviews and checks confirm the work; it is worth it for a result only looking at it or trying it can judge.`,
       });
   for (const question of work.questions) {
     if (question.kind !== "decision" || question.decision.kind !== "delivery") continue;
@@ -260,14 +252,13 @@ function taskWhere(work: Work, derived: Derived, subtasks: Subtask[]): string | 
 }
 
 /**
- * The band's task lines: each task of a goal not archived that isn't done,
- * with where it stands; one done that waits for you to accept it says so.
+ * The band's task lines, while the goal isn't archived: each task that isn't
+ * done, with where it stands; one done that waits for you to accept it says so.
  */
 function taskLines(work: Work, derived: Derived): string[] {
   const lines: string[] = [];
+  if (work.goal.status === "archived") return lines;
   for (const task of work.tasks) {
-    const goal = work.goals.find((g) => g.id === task.goalId);
-    if (!goal || goal.status === "archived") continue;
     const subtasks = work.subtasks.filter((s) => s.taskId === task.id);
     const accepting = work.questions.some(
       (q) =>
@@ -287,55 +278,76 @@ function taskLines(work: Work, derived: Derived): string[] {
     : lines;
 }
 
-/** The band's words: what goes on and what waits on you; nothing before the first goal. */
-function bandText(work: Work, needs: number): string | undefined {
-  if (!work.goals.length) return undefined;
+/** The band's words: what goes on in the goal and what waits on you. */
+function bandText(work: Work, needs: number): string {
   const parts: string[] = [];
   if (work.meetings.some((m) => m.status === "running")) parts.push("meeting");
   if (work.meetings.some((m) => m.status === "review")) parts.push("plan to review");
   const working = work.subtasks.filter((s) => s.status === "running").length;
   if (working) parts.push(`${String(working)} working`);
   if (needs) parts.push(`${plural(needs, "needs", "need")} you`);
-  if (!parts.length) {
-    const paused = work.goals.filter((g) => g.status === "paused").length;
-    parts.push(paused ? plural(paused, "goal paused", "goals paused") : "idle");
-  }
+  const { status } = work.goal;
+  if (!parts.length) parts.push(status === "active" ? "idle" : status);
   return parts.join(" · ");
 }
 
-/** The paused goals, each named with how far it got, for `/openplan resume` to pick from. */
-function pausedGoals(work: Work): OpenplanTeam["paused"] {
-  return work.goals
-    .filter((g) => g.status === "paused")
-    .map((goal) => {
-      const subtasks = work.subtasks.filter((s) => s.goalId === goal.id);
-      const done = subtasks.filter((s) => s.status === "done").length;
-      const where = subtasks.length
-        ? `${String(done)}/${String(subtasks.length)} subtasks done`
-        : work.meetings.some((m) => m.goalId === goal.id && m.status === "review")
-          ? "plan to review"
-          : "no plan yet";
-      return { id: goal.id, label: `${goal.name} · ${where}` };
-    });
+/** The band of a session without a goal: the goals it can take up, but those archived; nothing with none. */
+function othersBand(others: readonly GoalEntry[]): string | undefined {
+  const paused = others.filter((e) => whereOf(e) === "paused").length;
+  const elsewhere = others.filter((e) => whereOf(e) === "in another session").length;
+  const parts = [
+    ...(paused ? [plural(paused, "goal paused", "goals paused")] : []),
+    ...(elsewhere ? [`${plural(elsewhere, "goal", "goals")} in another session`] : []),
+  ];
+  return parts.length ? parts.join(" · ") : undefined;
 }
 
-/** The team as the pane shows it. */
-export function paneTeam(work: Work, members: readonly Member[]): OpenplanTeam {
+/**
+ * The team as the pane shows it: the session's goal (`mine`), if it runs
+ * one, and the repository's goals it doesn't run (`others`).
+ */
+export function paneTeam(
+  mine: { work: Work; members: readonly Member[] } | undefined,
+  others: readonly GoalEntry[],
+): OpenplanTeam {
+  if (!mine) {
+    const band = othersBand(others);
+    return {
+      ...(band && { band }),
+      tasks: [],
+      members: [],
+      needs: [],
+      milestones: [],
+      prompts: [],
+      resumable: othersOf(others),
+    };
+  }
+  const { work, members } = mine;
   const derived = derive(work);
   const needs = work.questions
     .filter(toYou)
     .filter((q) => q.status === "open")
     .map((q) => needOf(q, work));
   const meeting = shownMeeting(work);
-  const band = bandText(work, needs.length);
+  const { goal } = work;
+  const here =
+    goal.status === "active"
+      ? []
+      : [
+          {
+            slug: goal.slug,
+            label: `${goal.name} · ${progressOf(work)} · ${goal.status}, in this session`,
+          },
+        ];
   return {
-    ...(band && { band }),
+    goal: { name: goal.name, slug: goal.slug, active: goal.status === "active" },
+    band: bandText(work, needs.length),
     tasks: taskLines(work, derived),
     ...(meeting && { meeting: meetingOf(meeting, work) }),
     members: members.map((m) => memberOf(m, work, derived)),
     needs,
     milestones: milestones(work),
     prompts: prompts(work),
-    paused: pausedGoals(work),
+    resumable: [...here, ...othersOf(others)],
   };
 }

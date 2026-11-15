@@ -4,8 +4,8 @@
  * `$.mcp.call`: Claude Code runs that as a tool call, with your PreToolUse
  * and PostToolUse hooks around it. `/view` reads; what you answer goes
  * through the `answer` tool. The mod learns the socket from the `pane` tool.
- * The lock names the socket too, so another of your sessions taking the
- * team over asks here for it to be let go (`/release`, §3.2).
+ * A goal's lock names the socket too, so another of your sessions taking the
+ * goal up asks here for it to be let go (`/release`, §3.2).
  */
 import { randomBytes } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -14,39 +14,64 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { text } from "node:stream/consumers";
 import { z } from "zod";
-import type { OpenplanView } from "../../plugin/types/index.d.ts";
+import type { OpenplanTeam, OpenplanView } from "../../plugin/types/index.d.ts";
 import { errorText, workOf } from "../engine/core.ts";
-import type { HandedOver } from "../engine/data.ts";
-import type { Engine } from "../engine/engine.ts";
+import type { GoalEntry, HandedOver } from "../engine/data.ts";
 import { paneTeam, shownMeeting } from "./pane.ts";
+import type { Session } from "./session.ts";
 
 const viewSchema = z.object({
   /** The revision the pane has. */
   revision: z.number().int().optional(),
   /** The subtask whose record the pane follows, and the byte it read up to. */
   record: z.object({ subtask: z.string(), from: z.number().int().min(0) }).optional(),
-  /** You turned to openplan in this session: the team is taken over from another that holds it. */
-  take: z.boolean().optional(),
 });
 
-/** The team as the pane draws it: the team only when it changed since `revision`. */
-export async function paneView(
-  engine: Engine,
-  { revision, record }: z.infer<typeof viewSchema>,
-): Promise<OpenplanView> {
-  const work = workOf(engine);
-  const meeting = shownMeeting(work);
-  const spoken = meeting && engine.records.speaking(meeting);
-  return {
-    revision: engine.revision,
-    ...(revision !== engine.revision && { team: paneTeam(work, engine.team.members) }),
-    ...(spoken && { speaking: { speaker: spoken.speaker, text: spoken.text } }),
-    ...(record && {
-      record: {
-        subtask: record.subtask,
-        ...(await engine.records.read(record.subtask, record.from)),
-      },
-    }),
+const releaseSchema = z.object({ goal: z.string() });
+
+/** How often the pane's view reads the repository's goals from their folders, as it polls. */
+const GOALS_MS = 2000;
+
+/**
+ * The view for a session (`session`): the team only when it changed since
+ * the revision the pane has. As the pane polls, the repository's goals are
+ * read again every GOALS_MS; a look without a revision reads them at once.
+ */
+function viewer(session: () => Session) {
+  let revision = 0;
+  let shown = "";
+  let goals: { at: number; entries: Promise<GoalEntry[]> } | undefined;
+  return async (asked: z.infer<typeof viewSchema>): Promise<OpenplanView> => {
+    if (!goals || asked.revision === undefined || Date.now() - goals.at >= GOALS_MS)
+      goals = { at: Date.now(), entries: session().goals() };
+    const all = await goals.entries.catch((error: unknown) => {
+      goals = undefined;
+      throw error;
+    });
+    const entries = session().othersOf(all);
+    const engine = session().current;
+    const mine = engine && { work: workOf(engine), members: engine.team.members };
+    const team: OpenplanTeam = paneTeam(mine, entries);
+    const text = JSON.stringify(team);
+    if (text !== shown) {
+      shown = text;
+      revision++;
+    }
+    const meeting = mine && shownMeeting(mine.work);
+    const spoken = meeting && engine.records.speaking(meeting);
+    const { record } = asked;
+    return {
+      revision,
+      ...(asked.revision !== revision && { team }),
+      ...(spoken && { speaking: { speaker: spoken.speaker, text: spoken.text } }),
+      ...(record &&
+        engine && {
+          record: {
+            subtask: record.subtask,
+            ...(await engine.records.read(record.subtask, record.from)),
+          },
+        }),
+    };
   };
 }
 
@@ -68,34 +93,33 @@ function socketAddress(): { address: string; folder?: string } {
   return { address: path.join(folder, "pane.sock"), folder };
 }
 
-async function viewOf(team: (take: boolean) => Promise<Engine>, request: IncomingMessage) {
-  const asked = viewSchema.parse(JSON.parse((await text(request)) || "{}"));
-  return paneView(await team(asked.take ?? false), asked);
-}
+const asked = async <T>(schema: z.ZodType<T>, request: IncomingMessage) =>
+  schema.parse(JSON.parse((await text(request)) || "{}"));
 
 /**
- * Serves `POST /view`, which opens the team on the first ask (`team`), and
- * `POST /release`, which lets it go and answers with what that stopped (`letGo`).
+ * Serves `POST /view`, the session's goal and the repository's others as the
+ * pane draws them, and `POST /release`, which lets the goal it names go and
+ * answers with what that stopped (Session.letGo).
  */
-export async function servePane(
-  team: (take: boolean) => Promise<Engine>,
-  letGo: () => Promise<HandedOver>,
-): Promise<PaneServer> {
+export async function servePane(session: () => Session): Promise<PaneServer> {
   const { address, folder } = socketAddress();
+  const view = viewer(session);
   const server = createServer((request, response) => {
-    const route =
-      request.method === "POST" &&
-      { "/view": () => viewOf(team, request), "/release": letGo }[request.url ?? ""];
+    const routes: Record<string, () => Promise<unknown>> = {
+      "/view": async () => view(await asked(viewSchema, request)),
+      "/release": async () => session().letGo((await asked(releaseSchema, request)).goal),
+    };
+    const route = request.method === "POST" && routes[request.url ?? ""];
     if (!route) {
       response.writeHead(404).end();
       return;
     }
     route().then(
-      (view) => {
-        response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(view));
+      (answer) => {
+        response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(answer));
       },
       (error: unknown) => {
-        // The team can't be opened or closed, or the ask doesn't fit: the asker shows why.
+        // The goals can't be read or let go, or the ask doesn't fit: the asker shows why.
         response.writeHead(409, { "content-type": "text/plain" }).end(errorText(error));
       },
     );
@@ -112,8 +136,8 @@ export async function servePane(
   };
 }
 
-/** Asks the server at `address` to let the team go to this one: what it stopped, or why it can't. */
-export function askToLetGo(address: string): Promise<HandedOver> {
+/** Asks the server at `address` to let the goal `slug` go to this one: what it stopped, or why it can't. */
+export function askToLetGo(address: string, slug: string): Promise<HandedOver> {
   return new Promise((resolve, reject) => {
     const asking = request({ socketPath: address, path: "/release", method: "POST" }, (answer) => {
       text(answer).then((body) => {
@@ -121,6 +145,6 @@ export function askToLetGo(address: string): Promise<HandedOver> {
         else reject(new Error(body));
       }, reject);
     });
-    asking.once("error", reject).end();
+    asking.once("error", reject).end(JSON.stringify({ goal: slug }));
   });
 }

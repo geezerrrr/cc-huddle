@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { dataFiles, holderOf, repoFolder } from "../engine/data.ts";
+import { goalFiles, goalsFolder, holderOf, repoFolder } from "../engine/data.ts";
 import { git, openRepository } from "../engine/git.ts";
 import { teamFolder } from "../engine/team.ts";
 
@@ -68,50 +68,62 @@ async function connect() {
   return { client, call };
 }
 
+/** The files of the repository's goal `slug`. */
+const filesOf = async (slug: string) =>
+  goalFiles(
+    path.join(
+      goalsFolder(repoFolder(path.join(dir, "openplan-inline"), await openRepository(repo))),
+      slug,
+    ),
+  );
+
 describe("the MCP server", () => {
-  it("says why there is no team, and opens it once its files are there", async () => {
+  it("runs no goal until the session starts one, and says why it can't", async () => {
     const { client, call } = await connect();
-    expect(await call("status")).toContain("The team has no members");
+    expect(await call("status")).toContain("This session runs no goal");
+    expect(await call("start_goal", { name: "Dice" })).toContain("The team has no members");
     await writeTeam();
-    expect(await call("status")).toBe("Team: glm");
+    expect(await call("start_goal", { name: "Dice" })).toContain("openplan/dice/main");
+    expect(await call("status")).toContain(
+      'Goal "Dice": active, on branch openplan/dice/main\nTeam: glm',
+    );
+    expect(await call("start_goal", { name: "Chess" })).toContain("pause it first");
     await client.close();
   });
 
-  it("goes to the session that uses it, which goes on with what the other one had going", async () => {
+  it("hands its goal over to a session that takes it up, which goes on with it", async () => {
     await writeTeam();
-    const files = dataFiles(
-      repoFolder(path.join(dir, "openplan-inline"), await openRepository(repo)),
-    );
-    const goals = async () =>
-      (JSON.parse(await readFile(files.state, "utf8")) as { state: { goals: unknown[] } }).state
-        .goals;
+    const files = await filesOf("dice");
+    const saved = async () =>
+      (JSON.parse(await readFile(files.state, "utf8")) as { state: { goal: unknown } }).state.goal;
     const first = await connect();
-    expect(await first.call("start_goal", { name: "Dice" })).toContain("openplan/dice/main");
+    await first.call("start_goal", { name: "Dice" });
     const second = await connect();
-    expect(await second.call("status")).toContain("Dice");
-    expect(await goals()).toMatchObject([{ name: "Dice", status: "active" }]);
-    const taker = holderOf(files.lock)?.pid;
-    expect(await first.call("status")).toContain("Dice");
-    expect(holderOf(files.lock)?.pid).not.toBe(taker);
-    // The one that let go ends without touching the team.
-    await second.client.close();
-    expect(holderOf(files.lock)).toBeDefined();
+    expect(await second.call("status")).toContain("Dice · no plan yet · in another session");
+    const holder = holderOf(files.lock)?.pid;
+    expect(await second.call("resume_goal", { goal: "dice" })).toBe('Resumed "Dice".');
+    expect(holderOf(files.lock)?.pid).not.toBe(holder);
+    expect(await saved()).toMatchObject({ name: "Dice", status: "active" });
+    expect(await first.call("status")).toContain(
+      'The goal "Dice" moved to another Claude Code session',
+    );
+    // The one that let go ends without touching the goal.
     await first.client.close();
-    expect(await goals()).toMatchObject([{ name: "Dice", status: "paused" }]);
-  });
+    expect(holderOf(files.lock)).toBeDefined();
+    await second.client.close();
+    expect(await saved()).toMatchObject({ name: "Dice", status: "paused" });
+    // Two servers start, slow while the other test files run alongside.
+  }, 20_000);
 
-  it("closes the team as the session ends: its goals paused, its state written, the lock let go", async () => {
+  it("closes its goal as the session ends: paused, its state written, the lock let go", async () => {
     await writeTeam();
     const { client, call } = await connect();
     expect(await call("start_goal", { name: "Dice" })).toContain("openplan/dice/main");
     await client.close();
-
-    const files = dataFiles(
-      repoFolder(path.join(dir, "openplan-inline"), await openRepository(repo)),
-    );
+    const files = await filesOf("dice");
     await expect(stat(files.lock)).rejects.toThrow();
     expect(JSON.parse(await readFile(files.state, "utf8"))).toMatchObject({
-      state: { goals: [{ name: "Dice", status: "paused" }] },
+      state: { goal: { name: "Dice", status: "paused" } },
     });
   });
 });

@@ -46,7 +46,7 @@ beforeEach(async () => {
   await git({ cwd: repo, env: me }, ["commit", "-q", "-m", "start"]);
   core = {
     state: {
-      goals: [{ id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 }],
+      goal: { id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 },
       tasks: [],
       subtasks: [],
       meetings: [],
@@ -195,7 +195,6 @@ describe("Meetings", () => {
       },
     });
     const meeting = meetings.start({
-      goalId: "g1",
       agenda: "A dice game",
       size: "small",
       attendees: [],
@@ -219,7 +218,7 @@ describe("Meetings", () => {
 
     const asks = vi.mocked(askOnce).mock.calls.map(([ask]) => ask);
     expect(asks[0]?.options).toEqual({
-      cwd: goalFolder(core.places, "dice"),
+      cwd: goalFolder(core.places),
       model: "glm/meeting",
     });
     const hand = asks.find((a) => a.prompt.includes("Would you speak next?"));
@@ -236,7 +235,6 @@ describe("Meetings", () => {
   it("close when nobody raises a hand and the host finds it settled", async () => {
     scripted();
     const meeting = meetings.start({
-      goalId: "g1",
       agenda: "x",
       size: "large",
       attendees: ["sonnet", "glm"],
@@ -259,7 +257,7 @@ describe("Meetings", () => {
         return "";
       },
     });
-    const meeting = meetings.start({ goalId: "g1", agenda: "x", size: "small", attendees: [] });
+    const meeting = meetings.start({ agenda: "x", size: "small", attendees: [] });
     await ended(meeting);
     expect(phases(meeting)).toEqual([
       "opening:glm",
@@ -279,7 +277,7 @@ describe("Meetings", () => {
         return "Sonnet, which?";
       },
     });
-    const meeting = meetings.start({ goalId: "g1", agenda: "x", size: "small", attendees: [] });
+    const meeting = meetings.start({ agenda: "x", size: "small", attendees: [] });
     await ended(meeting);
     expect(meeting.turns.find((t) => t.phase === "steer")).toMatchObject({
       text: "Two views on the renderer.\n\nSonnet, which?",
@@ -306,7 +304,6 @@ describe("Meetings", () => {
       return original?.(ask) ?? Promise.reject(new Error("no script"));
     });
     const meeting = meetings.start({
-      goalId: "g1",
       agenda: "x",
       size: "small",
       attendees: ["glm", "sonnet"],
@@ -322,7 +319,6 @@ describe("Meetings", () => {
     expect(meeting.status).toBe("review");
     expect(() =>
       meetings.start({
-        goalId: "g1",
         agenda: "x",
         size: "small",
         attendees: ["sonnet"],
@@ -339,7 +335,7 @@ describe("Meetings", () => {
         ? Promise.reject(new Error("API Error: 529"))
         : (original?.(ask) ?? Promise.reject(new Error("no script"))),
     );
-    const meeting = meetings.start({ goalId: "g1", agenda: "x", size: "small", attendees: [] });
+    const meeting = meetings.start({ agenda: "x", size: "small", attendees: [] });
     await ended(meeting);
     expect(meeting).toMatchObject({ status: "failed", error: "API Error: 529" });
     scripted();
@@ -370,7 +366,7 @@ describe("Meetings", () => {
           });
         }),
     );
-    const meeting = meetings.start({ goalId: "g1", agenda: "x", size: "small", attendees: [] });
+    const meeting = meetings.start({ agenda: "x", size: "small", attendees: [] });
     await eventually(() => {
       expect(askOnce).toHaveBeenCalled();
     });
@@ -387,7 +383,6 @@ describe("Meetings", () => {
     core.state.subtasks.push({
       id: "s1",
       taskId: "t1",
-      goalId: "g1",
       title: "Rules",
       description: "",
       acceptance: "",
@@ -399,11 +394,10 @@ describe("Meetings", () => {
       tokens: 0,
     });
     const call = (attendees: string[]) => () =>
-      meetings.start({ goalId: "g1", agenda: "x", size: "small", attendees });
+      meetings.start({ agenda: "x", size: "small", attendees });
     expect(call(["sonnet", "glm"])).toThrow("glm is busy");
     expect(call(["ann"])).toThrow('There is no member called "ann"');
-    const [goal] = core.state.goals;
-    if (goal) goal.status = "paused";
+    core.state.goal.status = "paused";
     expect(call(["sonnet"])).toThrow('The goal "Dice" is paused');
   });
 });
@@ -411,7 +405,7 @@ describe("Meetings", () => {
 describe("A plan under review", () => {
   const reviewed = async () => {
     scripted();
-    const meeting = meetings.start({ goalId: "g1", agenda: "x", size: "small", attendees: [] });
+    const meeting = meetings.start({ agenda: "x", size: "small", attendees: [] });
     await ended(meeting);
     return meeting;
   };
@@ -441,10 +435,10 @@ describe("A plan under review", () => {
     await meetings.approve(meeting.id);
     expect(meeting).toMatchObject({
       status: "approved",
-      planFile: path.join(core.places.root, "plans", `dice-${meeting.id}.md`),
+      planFile: path.join(core.places.root, "plans", `${meeting.id}.md`),
     });
     expect(await readFile(meeting.planFile ?? "", "utf8")).toBe("# Plan, changed");
-    expect(assign).toHaveBeenCalledWith("g1", meeting.plan?.tasks, meeting.id);
+    expect(assign).toHaveBeenCalledWith(meeting.plan?.tasks, meeting.id);
     await expect(meetings.approve(meeting.id)).rejects.toThrow("no plan under review");
   });
 
@@ -456,8 +450,7 @@ describe("A plan under review", () => {
     expect(meeting.status).toBe("cancelled");
 
     const next = await reviewed();
-    const [goal] = core.state.goals;
-    if (goal) goal.status = "paused";
+    core.state.goal.status = "paused";
     await expect(meetings.approve(next.id)).rejects.toThrow('The goal "Dice" is paused');
     expect(next.status).toBe("review");
     expect(assign).not.toHaveBeenCalled();

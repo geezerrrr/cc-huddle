@@ -2,23 +2,23 @@
  * The tools of openplan's mod (docs/design.md §7.2, §7.3): where the pane
  * reads the team (`pane`, its socket), how it answers what waits on you
  * (`answer`), and what `/openplan pause` and `/openplan resume` do
- * (`pause_goal`, `resume_goal`). They are the mod's, not your session's: the mod keeps the
- * model from calling them, so a permission is granted only by you, pressing
- * its button, and your session has `goal_action` for a goal of its own.
+ * (`pause_goal`, `resume_goal`). They are the mod's, not your session's: the
+ * mod keeps the model from calling them, so a permission is granted only by
+ * you, pressing its button, and a goal is taken up only on your word.
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { Engine } from "../engine/engine.ts";
 import type { Answer } from "../engine/questions.ts";
 import { DECISION_OPTIONS, PERMISSION_OPTIONS } from "../engine/types.ts";
 import { toolText } from "../engine/turns.ts";
 import type { PaneServer } from "./pane-server.ts";
+import type { Session } from "./session.ts";
 import { decisionOf } from "./tools.ts";
 
 const PANE_ONLY = "For openplan's pane only: your session never calls it.";
 
-/** Adds the pane's tools to `server`; `answer` opens the team first, if it isn't open (`team`). */
-export function addPaneTools(server: McpServer, team: () => Promise<Engine>, pane: PaneServer) {
+/** Adds the pane's tools to `server`, for the goal the session runs (`session`). */
+export function addPaneTools(server: McpServer, session: Session, pane: PaneServer) {
   server.registerTool(
     "pane",
     {
@@ -47,7 +47,7 @@ export function addPaneTools(server: McpServer, team: () => Promise<Engine>, pan
         : decision
           ? decisionOf(decision, note, sent_back)
           : { picks: picks ?? [] };
-      await (await team()).answer(question, answer);
+      await session.goal.answer(question, answer);
       return toolText(`Answered ${question}.`);
     },
   );
@@ -55,14 +55,15 @@ export function addPaneTools(server: McpServer, team: () => Promise<Engine>, pan
   server.registerTool(
     "pause_goal",
     {
-      description: `${PANE_ONLY} Pauses the active goal, as /openplan pause.`,
+      description: `${PANE_ONLY} Pauses the session's goal, as /openplan pause.`,
       inputSchema: {},
     },
     async () => {
-      const engine = await team();
-      const goal = engine.state.goals.find((g) => g.status === "active");
-      if (!goal) return toolText("No goal is active.");
-      await engine.goals.pause(goal.id);
+      const engine = session.current;
+      if (!engine) return toolText(session.none);
+      const { goal } = engine.state;
+      if (goal.status !== "active") return toolText(`"${goal.name}" is ${goal.status} already.`);
+      await engine.goals.pause();
       return toolText(`Paused "${goal.name}".`);
     },
   );
@@ -70,12 +71,12 @@ export function addPaneTools(server: McpServer, team: () => Promise<Engine>, pan
   server.registerTool(
     "resume_goal",
     {
-      description: `${PANE_ONLY} Resumes the paused goal you picked, as /openplan resume.`,
-      inputSchema: { goal: z.string().describe("The goal's id") },
+      description: `${PANE_ONLY} Takes up the goal you picked in this session and resumes it, as /openplan resume.`,
+      inputSchema: { goal: z.string().describe("The goal's slug") },
     },
-    async ({ goal }) => {
-      await (await team()).goals.resume(goal);
-      return toolText("Resumed.");
+    async ({ goal: slug }) => {
+      const { goal } = (await session.takeUp(slug)).state;
+      return toolText(`Resumed "${goal.name}".`);
     },
   );
 }

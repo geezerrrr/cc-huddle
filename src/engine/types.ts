@@ -43,7 +43,6 @@ export interface Goal {
 /** One result for you: a group of subtasks, done once they all are. */
 export interface Task {
   id: string;
-  goalId: string;
   title: string;
   /** What it delivers. */
   outcome: string;
@@ -95,7 +94,6 @@ export interface Progress {
 export interface Subtask {
   id: string;
   taskId: string;
-  goalId: string;
   title: string;
   description: string;
   acceptance: string;
@@ -178,7 +176,6 @@ export interface MeetingSeat {
 
 export interface Meeting {
   id: string;
-  goalId: string;
   /** What the meeting is to plan. */
   agenda: string;
   size: MeetingSize;
@@ -285,9 +282,9 @@ export type QuestionToYou = Exclude<Question, { kind: "teammate" }>;
 export const toYou = (question: Question): question is QuestionToYou =>
   question.kind !== "teammate";
 
-/** The state the engine saves. */
-export interface TeamState {
-  goals: Goal[];
+/** The state the engine saves for a goal: the goal, and its work. */
+export interface GoalState {
+  goal: Goal;
   tasks: Task[];
   subtasks: Subtask[];
   meetings: Meeting[];
@@ -313,7 +310,8 @@ export type GoalAction = (typeof GOAL_ACTIONS)[number];
 /** The rules applied to the state, worked out once for whoever shows it. */
 export interface Derived {
   subtasks: Record<string, { waits: Wait[]; actions: SubtaskAction[]; redone: string[] }>;
-  goals: Record<string, GoalAction[]>;
+  /** What can be done to the goal. */
+  goal: GoalAction[];
   busy: string[];
   /** Meetings that stopped before their plan and can go on from there. */
   resumable: string[];

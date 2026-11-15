@@ -5,7 +5,6 @@ import { statusText } from "./status.ts";
 const subtask = (id: string, fields: Partial<Subtask>): Subtask => ({
   id,
   taskId: "t1",
-  goalId: "g1",
   title: id,
   description: "",
   acceptance: "",
@@ -31,14 +30,13 @@ const question = (
 });
 
 describe("statusText", () => {
-  it("tells each goal with its meetings and work, and what waits on you", () => {
+  it("tells the goal with its team, meetings and work, and what waits on you", () => {
     const text = statusText({
       members: ["glm", "sonnet"],
-      goals: [{ id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 }],
+      goal: { id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 },
       meetings: [
         {
           id: "m1",
-          goalId: "g1",
           agenda: "Scoring",
           size: "small",
           participants: ["sonnet"],
@@ -49,9 +47,7 @@ describe("statusText", () => {
           createdAt: 0,
         },
       ],
-      tasks: [
-        { id: "t1", goalId: "g1", title: "Game", outcome: "", createdAt: 0, ownerAccepts: true },
-      ],
+      tasks: [{ id: "t1", title: "Game", outcome: "", createdAt: 0, ownerAccepts: true }],
       subtasks: [
         subtask("Rules", {
           status: "running",
@@ -75,9 +71,8 @@ describe("statusText", () => {
         question("q3", { status: "answered", text: "Old", kind: "choices", choices: [] }),
       ],
     });
-    expect(text).toBe(`Team: glm (busy), sonnet
-
-Goal "Dice" [g1]: active, on branch openplan/dice/main
+    expect(text).toBe(`Goal "Dice": active, on branch openplan/dice/main
+Team: glm (busy), sonnet
   Meeting [m1], hosted by sonnet: its plan waits for you: approve it, change it, or cancel it
   Task "Game" [t1], the user accepts it
     - Rules [Rules], glm: running, step 2 of 3: Write the rolls, waits on your answer

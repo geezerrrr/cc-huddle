@@ -25,7 +25,6 @@ const sonnet = member("sonnet", "Programmer");
 const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
   id,
   taskId: "t1",
-  goalId: "g1",
   title: id,
   description: "",
   acceptance: "",
@@ -58,7 +57,6 @@ describe("taskBrief", () => {
       goal: { id: "g1", name: "Dice game", slug: "dice-game", status: "active", createdAt: 0 },
       task: {
         id: "t1",
-        goalId: "g1",
         title: "Board",
         outcome: "A board to roll on",
         createdAt: 0,
@@ -148,7 +146,6 @@ describe("teammateQuestion", () => {
 describe("meeting prompts", () => {
   const meeting = (fields: Partial<Meeting> = {}): Meeting => ({
     id: "m1",
-    goalId: "g1",
     agenda: "A two-player dice game",
     size: "small",
     participants: ["sonnet", "glm"],

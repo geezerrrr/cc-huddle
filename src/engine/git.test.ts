@@ -224,7 +224,7 @@ describe("mergeDesk", () => {
     const desk = await deliver(places, "s1", "dice.ts", "roll\n");
     expect(await mergeDesk(places, "dice", "s1", glm)).toEqual({ kind: "merged" });
     expect(await show(goalBranch("dice"), "dice.ts")).toBe("roll\n");
-    expect(await readFile(path.join(goalFolder(places, "dice"), "dice.ts"), "utf8")).toBe("roll\n");
+    expect(await readFile(path.join(goalFolder(places), "dice.ts"), "utf8")).toBe("roll\n");
     await expect(readFile(path.join(desk, "dice.ts"))).rejects.toThrow();
     const branch = await git({ cwd: repo }, ["branch", "--list", subtaskBranch("dice", "s1")]);
     expect(branch.stdout).toBe("");

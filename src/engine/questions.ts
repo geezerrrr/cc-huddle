@@ -23,7 +23,7 @@ import {
   type PermissionOption,
   type Question,
   type Subtask,
-  type TeamState,
+  type GoalState,
 } from "./types.ts";
 
 /** Claude Code's own tool for questions with choices. */
@@ -52,7 +52,7 @@ export type Answer =
 
 /** What questions need from the engine. */
 export interface Inbox {
-  state: Pick<TeamState, "questions" | "subtasks">;
+  state: Pick<GoalState, "questions" | "subtasks">;
   /** The state changed. */
   changed(): void;
   /** Adds allow rules to the team's `settings.json` (§6), for every member's next turns. */

@@ -1,8 +1,9 @@
 /**
- * The team as it stands, in words (docs/design.md §7.2): what your session
+ * A goal as it stands, in words (docs/design.md §7.2): what your session
  * reads from the `status` tool and the SessionStart hook, and what
  * `/openplan status` prints. Ids are given in brackets, for the tools.
  */
+import type { GoalEntry } from "../engine/data.ts";
 import { derive, type Work } from "../engine/derive.ts";
 import { goalBranch } from "../engine/git.ts";
 import {
@@ -77,31 +78,61 @@ function questionLine(question: QuestionToYou, work: Work): string {
   }
 }
 
-/** The team, each goal with its meetings and work, and what waits on you. */
+/** The session's goal with its team, meetings and work, and what waits on you. */
 export function statusText(work: Work): string {
   const derived = derive(work);
   const busy = new Set(derived.busy);
-  const lines = [`Team: ${work.members.map((m) => (busy.has(m) ? `${m} (busy)` : m)).join(", ")}`];
-  for (const goal of work.goals) {
+  const { goal } = work;
+  const lines = [
+    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)}`,
+    `Team: ${work.members.map((m) => (busy.has(m) ? `${m} (busy)` : m)).join(", ")}`,
+  ];
+  for (const meeting of work.meetings.filter((m) => m.status !== "approved"))
     lines.push(
-      "",
-      `Goal "${goal.name}" [${goal.id}]: ${goal.status}, on branch ${goalBranch(goal.slug)}`,
+      `  Meeting [${meeting.id}], hosted by ${meeting.host}${meeting.hostOnly ? ", who only runs it" : ""}: ${MEETING_STATUS[meeting.status]}${meeting.error ? ` (${meeting.error})` : ""}${derived.resumable.includes(meeting.id) ? "; it can go on" : ""}`,
     );
-    for (const meeting of work.meetings.filter(
-      (m) => m.goalId === goal.id && m.status !== "approved",
-    ))
-      lines.push(
-        `  Meeting [${meeting.id}], hosted by ${meeting.host}${meeting.hostOnly ? ", who only runs it" : ""}: ${MEETING_STATUS[meeting.status]}${meeting.error ? ` (${meeting.error})` : ""}${derived.resumable.includes(meeting.id) ? "; it can go on" : ""}`,
-      );
-    for (const task of work.tasks.filter((t) => t.goalId === goal.id)) {
-      lines.push(
-        `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", the user accepts it" : ""}`,
-      );
-      for (const subtask of work.subtasks.filter((s) => s.taskId === task.id))
-        lines.push(subtaskLine(subtask, derived.subtasks[subtask.id]?.waits ?? [], work));
-    }
+  for (const task of work.tasks) {
+    lines.push(
+      `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", the user accepts it" : ""}`,
+    );
+    for (const subtask of work.subtasks.filter((s) => s.taskId === task.id))
+      lines.push(subtaskLine(subtask, derived.subtasks[subtask.id]?.waits ?? [], work));
   }
   const open = work.questions.filter(toYou).filter((q) => q.status === "open");
   if (open.length) lines.push("", "Waiting on you:", ...open.map((q) => questionLine(q, work)));
   return lines.join("\n");
+}
+
+/** Where a goal is: in another session, archived, or paused, as a session that ended left it too. */
+export const whereOf = (entry: GoalEntry) =>
+  entry.holder
+    ? "in another session"
+    : entry.state.goal.status === "archived"
+      ? "archived"
+      : "paused";
+
+/** How far a goal got, in words. */
+export function progressOf({ subtasks, meetings }: GoalEntry["state"]): string {
+  const done = subtasks.filter((s) => s.status === "done").length;
+  return subtasks.length
+    ? `${String(done)}/${String(subtasks.length)} subtasks done`
+    : meetings.some((m) => m.status === "review")
+      ? "plan to review"
+      : "no plan yet";
+}
+
+/** The repository's goals not running here, each named with how far it got and where it is, for `/openplan resume`. */
+export const othersOf = (others: readonly GoalEntry[]): { slug: string; label: string }[] =>
+  others.map((entry) => ({
+    slug: entry.slug,
+    label: `${entry.state.goal.name} · ${progressOf(entry.state)} · ${whereOf(entry)}`,
+  }));
+
+/** The repository's goals a session doesn't run, a line each; undefined when there are none. */
+export function othersText(others: readonly GoalEntry[]): string | undefined {
+  if (!others.length) return undefined;
+  return [
+    "The repository's other goals, which the user takes up here with /openplan resume:",
+    ...othersOf(others).map((o) => `  - ${o.label}`),
+  ].join("\n");
 }

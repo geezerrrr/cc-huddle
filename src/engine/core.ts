@@ -9,7 +9,7 @@ import type { Places } from "./git.ts";
 import type { SessionKind } from "./prompts.ts";
 import type { Inbox } from "./questions.ts";
 import type { TurnListener } from "./turns.ts";
-import type { Meeting, Member, Subtask, TeamState } from "./types.ts";
+import type { Meeting, Member, Subtask, GoalState } from "./types.ts";
 
 /** The team as configured (§6): its members in order, and openplan's own settings. */
 export interface Team {
@@ -19,7 +19,7 @@ export interface Team {
 }
 
 export interface Core extends Inbox {
-  state: TeamState;
+  state: GoalState;
   team: Team;
   places: Places;
   /** The Agent SDK options of a member's turn of `kind` in `cwd`: their settings and system prompt. */

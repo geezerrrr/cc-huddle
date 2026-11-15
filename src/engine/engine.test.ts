@@ -1,15 +1,18 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { PermissionMode } from "@anthropic-ai/claude-agent-sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Core } from "./core.ts";
-import { dataFiles, holderOf, repoFolder } from "./data.ts";
+import { goalFiles, goalsFolder, holderOf, repoFolder } from "./data.ts";
 import { Engine, type EngineOptions } from "./engine.ts";
-import { git, openRepository } from "./git.ts";
-import { teamFolder } from "./team.ts";
+import { git, goalBranch, goalFolder, openRepository } from "./git.ts";
+import { runSubtask, type RunOutcome } from "./run.ts";
+import { readCopy, teamFolder } from "./team.ts";
+
+vi.mock("./run.ts", () => ({ runSubtask: vi.fn() }));
 
 const ME = {
   GIT_AUTHOR_NAME: "you",
@@ -21,7 +24,8 @@ const ME = {
 let dir: string;
 let repo: string;
 let options: EngineOptions;
-let files: ReturnType<typeof dataFiles>;
+/** The folder of the repository's goals. */
+let goals: string;
 const opened: Engine[] = [];
 
 /** Writes a file of the team. */
@@ -31,11 +35,33 @@ async function teamFile(name: string, text: string) {
   await writeFile(file, text);
 }
 
-const open = async (with_: Partial<EngineOptions> = {}) => {
-  const engine = await Engine.open({ ...options, ...with_ });
+const keep = (engine: Engine) => {
   opened.push(engine);
   return engine;
 };
+const start = async (name = "Dice", with_: Partial<EngineOptions> = {}) =>
+  keep(await Engine.start({ ...options, ...with_ }, name));
+const takeUp = async (slug: string, with_: Partial<EngineOptions> = {}) =>
+  keep(await Engine.takeUp({ ...options, ...with_ }, slug));
+/** Closes an engine the test is done with. */
+const close = (engine: Engine) => {
+  opened.splice(opened.indexOf(engine), 1);
+  return engine.close();
+};
+
+const filesOf = (slug: string) => goalFiles(path.join(goals, slug));
+const saved = async (slug: string): Promise<unknown> =>
+  JSON.parse(await readFile(filesOf(slug).state, "utf8"));
+
+/** A member run that goes on until it is stopped. */
+const working: typeof runSubtask = (run) =>
+  new Promise<RunOutcome>((resolve) => {
+    const stopped = () => {
+      resolve({ status: "stopped", tokens: 0 });
+    };
+    if (run.signal.aborted) stopped();
+    else run.signal.addEventListener("abort", stopped);
+  });
 
 beforeEach(async () => {
   dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-engine-")));
@@ -56,14 +82,15 @@ beforeEach(async () => {
     claude: "claude",
     session: 41,
     address: "here",
+    takeOver: () => Promise.reject(new Error("not asked")),
     sessionMode: () => undefined,
     plugin: "openplan@inline",
     userTeam: path.join(dir, "user-team"),
     env: { GLM_KEY: "key-1" },
-    teamRead: vi.fn(),
     failed: vi.fn(),
   };
-  files = dataFiles(repoFolder(dataFolder, await openRepository(repo)));
+  goals = goalsFolder(repoFolder(dataFolder, await openRepository(repo)));
+  vi.mocked(runSubtask).mockImplementation(working);
 });
 
 afterEach(async () => {
@@ -71,28 +98,67 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-const saved = async (): Promise<unknown> => JSON.parse(await readFile(files.state, "utf8"));
-
 describe("Engine", () => {
-  it("opens the team for one session, with each member's settings written", async () => {
-    const engine = await open();
+  it("starts a goal in a folder of its own: its copy of the team, its branch and worktree, the lock", async () => {
+    const engine = await start("Dice game");
+    const { goal } = engine.state;
+    expect(goal).toMatchObject({ name: "Dice game", slug: "dice-game", status: "active" });
     expect(engine.team.members.map((m) => m.name)).toEqual(["glm"]);
     expect(engine.meetingSize).toBe("discussion");
+    const files = filesOf("dice-game");
+    // The copy keeps a member's environment as written; their settings file has it filled in.
+    expect((await readCopy(files.team)).team.members[0]?.env).toEqual({
+      ANTHROPIC_AUTH_TOKEN: "${GLM_KEY}",
+    });
     expect(JSON.parse(await readFile(files.settings("glm"), "utf8"))).toMatchObject({
       env: { ANTHROPIC_AUTH_TOKEN: "key-1" },
       enabledPlugins: { "openplan@inline": false },
     });
+    expect(
+      await readFile(
+        path.join(
+          goalFolder({ repo: await openRepository(repo), root: path.join(goals, "dice-game") }),
+          "README.md",
+        ),
+        "utf8",
+      ),
+    ).toBe("hello\n");
     expect(holderOf(files.lock)).toEqual({
       pid: process.pid,
       session: 41,
       address: "here",
       open: true,
     });
+    expect(await saved("dice-game")).toMatchObject({ state: { goal: { status: "active" } } });
+
+    await engine.goals.pause();
+    await close(engine);
+    const second = await start("Dice game");
+    expect(second.state.goal.slug).toBe("dice-game-2");
+    const refs = await git({ cwd: repo }, [
+      "for-each-ref",
+      "--format=%(refname:short)",
+      "refs/heads/",
+    ]);
+    expect(refs.stdout.split("\n").filter(Boolean).sort()).toEqual(
+      ["main", goalBranch("dice-game"), goalBranch("dice-game-2")].sort(),
+    );
+  });
+
+  it("works its goal with the team as it started, whatever the team's files say after", async () => {
+    const engine = await start();
+    await teamFile("members/ann.md", "---\nrole: dev\n---\n");
+    expect(engine.team.members.map((m) => m.name)).toEqual(["glm"]);
+    await close(engine);
+    const again = await takeUp("dice");
+    expect(again.team.members.map((m) => m.name)).toEqual(["glm"]);
+    const next = await start("Chess");
+    expect(next.team.members.map((m) => m.name)).toEqual(["ann", "glm"]);
   });
 
   it("works members in your session's permission mode, unless the team sets theirs", async () => {
     const session: { mode?: PermissionMode } = {};
-    const engine = await open({ sessionMode: () => session.mode });
+    const engine = await start("Dice", { sessionMode: () => session.mode });
     const { core } = engine as unknown as { core: Core };
     const [glm] = engine.team.members;
     if (!glm) throw new Error("no member");
@@ -101,87 +167,81 @@ describe("Engine", () => {
     session.mode = "bypassPermissions";
     expect(working()).toBe("bypassPermissions");
     expect(core.options(glm, "meeting", repo).permissionMode).toBe("dontAsk");
+
     await teamFile(
       "settings.json",
       JSON.stringify({ permissions: { defaultMode: "acceptEdits" } }),
     );
-    await engine.reloadTeam();
-    expect(working()).toBeUndefined();
+    const set = await start("Chess", { sessionMode: () => session.mode });
+    const { core: setCore } = set as unknown as { core: Core };
+    expect(setCore.options(glm, "task", repo).permissionMode).toBeUndefined();
   });
 
-  it("leaves a repository without a team as it is", async () => {
-    await rm(teamFolder(repo), { recursive: true });
-    await expect(open()).rejects.toThrow("The team has no members");
-    await expect(stat(path.dirname(files.lock))).rejects.toThrow();
+  it("allows a rule always in the repository's team settings and the goal's copy", async () => {
+    const engine = await start();
+    const { core } = engine as unknown as { core: Core };
+    await core.allowAlways(["Bash(npm test)"]);
+    const files = filesOf("dice");
+    expect((await readCopy(files.team)).settings.permissions?.allow).toEqual(["Bash(npm test)"]);
+    expect(JSON.parse(await readFile(files.settings("glm"), "utf8"))).toMatchObject({
+      permissions: { allow: ["Bash(npm test)"] },
+    });
+    expect(
+      JSON.parse(await readFile(path.join(teamFolder(repo), "settings.json"), "utf8")),
+    ).toEqual({ permissions: { allow: ["Bash(npm test)"] } });
   });
 
-  it("pauses every active goal as it closes, writes the state, and lets the team go", async () => {
-    const engine = await open();
-    const goal = await engine.goals.start("Dice");
-    await engine.close();
-    opened.splice(0);
-    expect(await saved()).toMatchObject({ state: { goals: [{ id: goal.id, status: "paused" }] } });
-
-    const again = await open();
-    expect(again.state.goals).toMatchObject([{ id: goal.id, status: "paused" }]);
-  });
-
-  it("gives what it stopped as it closes, and writes no more", async () => {
-    const engine = await open();
-    const goal = await engine.goals.start("Dice");
-    expect(await engine.close()).toEqual({ goals: [goal.id], meetings: [] });
-    opened.splice(0);
-    for (const g of engine.state.goals) g.name = "Gone";
-    await engine.reloadTeam();
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(await saved()).toMatchObject({ state: { goals: [{ name: "Dice", status: "paused" }] } });
-  });
-
-  it("takes a team another session holds only when asked to, and goes on with what it handed over", async () => {
-    const goal = { id: "g1", name: "Dice", slug: "dice", status: "paused", createdAt: 0 };
-    await mkdir(path.dirname(files.state), { recursive: true });
-    await writeFile(
-      files.state,
-      JSON.stringify({
-        version: 1,
-        state: { goals: [goal], tasks: [], subtasks: [], meetings: [], questions: [] },
-      }),
+  it("starts nothing without a team, or without a member's key", async () => {
+    await expect(start("Dice", { env: {} })).rejects.toThrow(
+      "glm: Not set in the environment: GLM_KEY",
     );
+    await rm(teamFolder(repo), { recursive: true });
+    await expect(start()).rejects.toThrow("The team has no members");
+    await expect(stat(goals)).rejects.toThrow();
+  });
+
+  it("pauses its goal as it closes, writes the state, lets the goal go, and writes no more", async () => {
+    const engine = await start();
+    expect(await close(engine)).toEqual({ meetings: [] });
+    expect(await saved("dice")).toMatchObject({ state: { goal: { status: "paused" } } });
+    expect(holderOf(filesOf("dice").lock)).toBeUndefined();
+    engine.state.goal.name = "Gone";
+    (engine as unknown as { core: Core }).core.changed();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(await saved("dice")).toMatchObject({ state: { goal: { name: "Dice" } } });
+  });
+
+  it("takes a goal up, asking the session that holds it to let it go, and resumes it", async () => {
+    await close(await start());
+    const files = filesOf("dice");
     const other = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
     await once(other, "spawn");
     await writeFile(
       files.lock,
       JSON.stringify({ pid: other.pid, session: 7, address: "there", open: true }),
     );
-    await expect(open()).rejects.toThrow("Using openplan here brings it");
-
     const asked: string[] = [];
-    const engine = await open({
-      takeOver: async (holder) => {
-        asked.push(holder.address);
+    const engine = await takeUp("dice", {
+      takeOver: async (holder, slug) => {
+        asked.push(`${holder.address} ${slug}`);
         await rm(files.lock);
-        return { goals: ["g1"], meetings: [] };
+        return { meetings: [] };
       },
     });
     other.kill();
-    expect(asked).toEqual(["there"]);
-    expect(engine.state.goals[0]?.status).toBe("active");
+    expect(asked).toEqual(["there dice"]);
+    expect(engine.state.goal.status).toBe("active");
     expect(holderOf(files.lock)).toMatchObject({ session: 41, address: "here", open: true });
+    await expect(takeUp("chess")).rejects.toThrow('There is no goal "chess"');
   });
 
-  it("lets the team go at once as the process dies", async () => {
-    const engine = await open();
+  it("pauses what a session killed outright left running, then resumes it, its runs going on in their sessions", async () => {
+    const engine = await start();
     engine.abandon();
     opened.splice(0);
-    await expect(stat(files.lock)).rejects.toThrow();
-  });
-
-  it("pauses what a session killed outright left active, its runs to go on in their sessions", async () => {
-    const goal = { id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 };
     const subtask = {
       id: "s1",
       taskId: "t1",
-      goalId: "g1",
       title: "Rules",
       description: "",
       acceptance: "",
@@ -193,28 +253,48 @@ describe("Engine", () => {
       tokens: 0,
       session: "glm-1",
     };
-    await mkdir(path.dirname(files.state), { recursive: true });
-    await writeFile(
-      files.state,
-      JSON.stringify({
-        version: 1,
-        state: { goals: [goal], tasks: [], subtasks: [subtask], meetings: [], questions: [] },
-      }),
-    );
-    const engine = await open();
-    expect(engine.state.goals[0]?.status).toBe("paused");
-    expect(engine.state.subtasks[0]).toMatchObject({ status: "pending", goOn: [{ why: "held" }] });
-    // Written before the lock says the team is open (context.ts reads both).
-    expect(await saved()).toMatchObject({ state: { goals: [{ status: "paused" }] } });
+    const was = (await saved("dice")) as {
+      version: number;
+      state: { tasks: unknown[]; subtasks: unknown[] };
+    };
+    was.state.tasks.push({
+      id: "t1",
+      title: "Game",
+      outcome: "",
+      createdAt: 0,
+      ownerAccepts: false,
+    });
+    was.state.subtasks.push(subtask);
+    await writeFile(filesOf("dice").state, JSON.stringify(was));
+    const again = await takeUp("dice");
+    expect(again.state.goal.status).toBe("active");
+    await vi.waitFor(() => {
+      expect(runSubtask).toHaveBeenCalledWith(
+        expect.objectContaining({ resume: "glm-1" }) as unknown,
+      );
+    });
+  });
+
+  it("deletes an archived goal: its folder goes, its branch stays", async () => {
+    const engine = await start();
+    await expect(engine.delete()).rejects.toThrow("isn't archived");
+    await engine.goals.archive();
+    await engine.delete();
+    opened.splice(0);
+    expect(await readdir(goals)).toEqual([]);
+    const refs = await git({ cwd: repo }, [
+      "for-each-ref",
+      "--format=%(refname:short)",
+      "refs/heads/",
+    ]);
+    expect(refs.stdout.split("\n").filter(Boolean)).toEqual(["main", goalBranch("dice")]);
   });
 
   it("answers a question put to you and carries out the decision", async () => {
-    const engine = await open();
-    const goal = await engine.goals.start("Dice");
-    await engine.goals.pause(goal.id);
+    const engine = await start();
+    await engine.goals.pause();
     engine.state.tasks.push({
       id: "t1",
-      goalId: goal.id,
       title: "Game",
       outcome: "",
       createdAt: 0,
@@ -223,7 +303,6 @@ describe("Engine", () => {
     const subtask = {
       id: "s1",
       taskId: "t1",
-      goalId: goal.id,
       title: "Rules",
       description: "",
       acceptance: "",
@@ -250,20 +329,5 @@ describe("Engine", () => {
       status: "pending",
       goOn: [{ why: "revised", note: "Bigger dice" }],
     });
-  });
-
-  it("won't open without a member's key, and keeps its team when the files can't be filled in", async () => {
-    await expect(open({ env: {} })).rejects.toThrow("glm: Not set in the environment: GLM_KEY");
-    const engine = await open();
-    await teamFile("members/ann.md", "---\nrole: dev\nenv:\n  KEY: ${ANN_KEY}\n---\n");
-    await expect(engine.reloadTeam()).rejects.toThrow("ann: Not set in the environment: ANN_KEY");
-    expect(engine.team.members.map((m) => m.name)).toEqual(["glm"]);
-    await teamFile("members/ann.md", "---\nrole: dev\n---\n");
-    await teamFile("team.json", '{ "meetingSize": "small" }');
-    await engine.reloadTeam();
-    expect([engine.team.members.map((m) => m.name), engine.meetingSize]).toEqual([
-      ["ann", "glm"],
-      "small",
-    ]);
   });
 });

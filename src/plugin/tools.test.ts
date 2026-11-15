@@ -6,10 +6,10 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Engine } from "../engine/engine.ts";
 import { git } from "../engine/git.ts";
 import { runSubtask, type RunOutcome } from "../engine/run.ts";
 import { teamFolder } from "../engine/team.ts";
+import { Session } from "./session.ts";
 import { addTools } from "./tools.ts";
 
 vi.mock("../engine/run.ts", () => ({ runSubtask: vi.fn() }));
@@ -22,8 +22,11 @@ const ME = {
 };
 
 let dir: string;
-let engine: Engine;
+let session: Session;
 let client: Client;
+
+/** The session's goal, which a test has started. */
+const goal = () => session.goal;
 
 beforeEach(async () => {
   dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-tools-")));
@@ -42,20 +45,25 @@ beforeEach(async () => {
     await writeFile(file, text);
   }
   const server = new McpServer({ name: "openplan", version: "0.0.0" });
-  const listMembers = addTools(server, () => Promise.resolve(engine));
-  engine = await Engine.open({
-    cwd: repo,
-    dataFolder: path.join(dir, "openplan-inline"),
-    claude: "claude",
-    session: 41,
-    address: "here",
-    sessionMode: () => undefined,
-    plugin: "openplan@inline",
-    userTeam: path.join(dir, "user-team"),
-    env: {},
-    teamRead: listMembers,
-    failed: vi.fn(),
-  });
+  session = new Session(
+    {
+      cwd: repo,
+      dataFolder: path.join(dir, "openplan-inline"),
+      session: 41,
+      address: "here",
+      takeOver: () => Promise.reject(new Error("not asked")),
+      sessionMode: () => undefined,
+      plugin: "openplan@inline",
+      userTeam: path.join(dir, "user-team"),
+      env: {},
+      failed: vi.fn(),
+    },
+    () => Promise.resolve("claude"),
+    (engine) => {
+      if (engine) listMembers(engine.team);
+    },
+  );
+  const listMembers = addTools(server, session);
   // A run goes on until it is stopped.
   vi.mocked(runSubtask).mockImplementation(
     ({ signal }) =>
@@ -75,7 +83,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await client.close();
-  await engine.close();
+  await session.close();
   await rm(dir, { recursive: true, force: true });
 });
 
@@ -87,32 +95,22 @@ async function call(name: string, args: Record<string, unknown> = {}) {
 }
 
 describe("tools", () => {
-  it("name members only from the team, each with their role", async () => {
+  it("name members only from the goal's team, each with their role", async () => {
+    const told = vi.fn();
+    client.setNotificationHandler(ToolListChangedNotificationSchema, told);
+    await call("start_goal", { name: "Dice" });
+    await vi.waitFor(() => {
+      expect(told).toHaveBeenCalled();
+    });
     const { tools } = await client.listTools();
     const assign = tools.find((t) => t.name === "assign")?.inputSchema.properties?.assignee;
     expect(assign).toMatchObject({
       enum: ["glm", "sonnet"],
       description: "One of the team: glm (Developer), sonnet (Developer)",
     });
-    await call("start_goal", { name: "Dice" });
     expect(
-      await call("assign", { goal: "dice", assignee: "ann", title: "Rules", description: "" }),
+      await call("assign", { assignee: "ann", title: "Rules", description: "" }),
     ).toMatchObject({ error: true, text: expect.stringContaining('"glm"') as string });
-
-    const told = vi.fn();
-    client.setNotificationHandler(ToolListChangedNotificationSchema, told);
-    await writeFile(
-      path.join(teamFolder(path.join(dir, "repo")), "members/ann.md"),
-      "---\nrole: dev\n---\n",
-    );
-    await engine.reloadTeam();
-    await vi.waitFor(() => {
-      expect(told).toHaveBeenCalled();
-    });
-    const { tools: now } = await client.listTools();
-    expect(now.find((t) => t.name === "assign")?.inputSchema.properties?.assignee).toMatchObject({
-      enum: ["ann", "glm", "sonnet"],
-    });
   });
 
   it("start a goal, assign work, pass a message, stop it, and tell where it stands", async () => {
@@ -120,13 +118,12 @@ describe("tools", () => {
       text: expect.stringContaining("on branch openplan/dice/main") as string,
     });
     const assigned = await call("assign", {
-      goal: "dice",
       assignee: "glm",
       title: "Rules",
       description: "Two dice",
     });
     expect(assigned.text).toMatch(/^Assigned "Rules" \[.+\] to glm\.$/);
-    const [subtask] = engine.state.subtasks;
+    const [subtask] = goal().state.subtasks;
     expect(subtask?.status).toBe("running");
     const id = subtask?.id ?? "";
 
@@ -145,7 +142,7 @@ describe("tools", () => {
   });
 
   it("show, change and approve a plan under review", async () => {
-    const goal = await engine.goals.start("Dice");
+    await session.start("Dice");
     const subtask = {
       key: "a",
       title: "Rules",
@@ -154,9 +151,8 @@ describe("tools", () => {
       dependsOn: [],
       acceptance: "",
     };
-    engine.state.meetings.push({
+    goal().state.meetings.push({
       id: "m1",
-      goalId: goal.id,
       agenda: "Dice",
       size: "small",
       participants: ["glm"],
@@ -185,18 +181,25 @@ describe("tools", () => {
     expect((await call("approve_plan", { meeting: "m1" })).text).toBe(
       "Approved: 1 subtask goes to work.",
     );
-    expect(engine.state.subtasks).toMatchObject([{ title: "Rules", assignee: "sonnet" }]);
+    expect(goal().state.subtasks).toMatchObject([{ title: "Rules", assignee: "sonnet" }]);
   });
 
-  it("find a goal by its name only when that is enough", async () => {
-    expect(await call("goal_action", { goal: "dice", action: "pause" })).toEqual({
-      text: 'There is no goal "dice"',
+  it("act on the session's one goal: another starts only once it is paused, and it is deleted once archived", async () => {
+    expect(await call("goal_action", { action: "pause" })).toEqual({
+      text: "This session runs no goal: start one (start_goal), or the user takes one up with /openplan resume.",
       error: true,
     });
-    await engine.goals.pause((await engine.goals.start("Dice")).id);
-    await engine.goals.start("Dice");
-    expect((await call("goal_action", { goal: "Dice", action: "pause" })).text).toBe(
-      'More than one goal is called "Dice": give its id',
+    await call("start_goal", { name: "Dice" });
+    expect((await call("start_goal", { name: "Chess" })).text).toContain(
+      'This session\'s goal "Dice" is under way',
     );
+    await call("goal_action", { action: "pause" });
+    await call("start_goal", { name: "Chess" });
+    expect((await call("status")).text).toContain("  - Dice · no plan yet · paused");
+    await call("goal_action", { action: "archive" });
+    expect((await call("goal_action", { action: "delete" })).text).toBe(
+      'The goal "Chess": delete done.',
+    );
+    expect((await call("status")).text).toContain("This session runs no goal");
   });
 });

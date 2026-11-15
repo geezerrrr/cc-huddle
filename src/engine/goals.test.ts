@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -9,12 +9,12 @@ import {
   goalBranch,
   goalFolder,
   openDesk,
+  openGoal,
   openRepository,
   subtaskBranch,
 } from "./git.ts";
 import { Goals } from "./goals.ts";
 import type { Meetings } from "./meetings.ts";
-import { recordFile } from "./records.ts";
 import type { Scheduler } from "./scheduler.ts";
 import type { Meeting, Member } from "./types.ts";
 
@@ -31,9 +31,8 @@ const member = (name: string): Member => ({
   env: {},
 });
 
-const meeting = (id: string, status: Meeting["status"], planFile?: string): Meeting => ({
+const meeting = (id: string, status: Meeting["status"]): Meeting => ({
   id,
-  goalId: "",
   agenda: "",
   size: "small",
   participants: ["glm"],
@@ -42,7 +41,6 @@ const meeting = (id: string, status: Meeting["status"], planFile?: string): Meet
   turns: [],
   tokens: 0,
   createdAt: 0,
-  ...(planFile !== undefined && { planFile }),
 });
 
 let dir: string;
@@ -54,7 +52,11 @@ const scheduler = {
   release: vi.fn(() => Promise.resolve()),
   assign: vi.fn(() => []),
 };
-const meetings = { cancel: vi.fn(), settled: vi.fn(() => Promise.resolve()) };
+const meetings = {
+  cancel: vi.fn(),
+  resume: vi.fn(),
+  settled: vi.fn(() => Promise.resolve()),
+};
 
 beforeEach(async () => {
   dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-goals-")));
@@ -64,7 +66,13 @@ beforeEach(async () => {
   await git({ cwd: repo, env: ME }, ["add", "-A"]);
   await git({ cwd: repo, env: ME }, ["commit", "-q", "-m", "start"]);
   core = {
-    state: { goals: [], tasks: [], subtasks: [], meetings: [], questions: [] },
+    state: {
+      goal: { id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 },
+      tasks: [],
+      subtasks: [],
+      meetings: [],
+      questions: [],
+    },
     team: { members: [member("glm")], review: false },
     places: { repo: await openRepository(repo), root: path.join(dir, "data") },
     changed: vi.fn(),
@@ -98,78 +106,43 @@ const branches = async () =>
     .filter(Boolean);
 
 describe("Goals", () => {
-  it("start on a branch and worktree of their own, a name taken getting the next slug", async () => {
-    const first = await goals.start("Dice game");
-    await goals.pause(first.id);
-    const second = await goals.start("Dice game");
-    expect([first.slug, second.slug]).toEqual(["dice-game", "dice-game-2"]);
-    expect(second).toMatchObject({ name: "Dice game", status: "active" });
-    expect(new Set(await branches())).toEqual(
-      new Set(["main", goalBranch("dice-game"), goalBranch("dice-game-2")]),
-    );
-    expect(
-      await readFile(path.join(goalFolder(core.places, "dice-game"), "README.md"), "utf8"),
-    ).toBe("hello\n");
-  });
-
-  it("run one at a time: a start or a resume while another is under way is refused", async () => {
-    const dice = await goals.start("Dice");
-    await expect(goals.start("Chess")).rejects.toThrow(`"Dice" [${dice.id}] is under way`);
-    await goals.pause(dice.id);
-    const chess = await goals.start("Chess");
-    await expect(goals.resume(dice.id)).rejects.toThrow(`"Chess" [${chess.id}] is under way`);
-    expect(dice.status).toBe("paused");
-    await goals.archive(chess.id);
-    await goals.resume(dice.id);
-    expect([dice.status, chess.status]).toEqual(["active", "archived"]);
-  });
-
   it("pause and archive, holding their work and cancelling their meetings, and resume", async () => {
-    const goal = await goals.start("Dice");
-    core.state.meetings.push(
-      { ...meeting("m1", "running"), goalId: goal.id },
-      { ...meeting("m2", "review"), goalId: goal.id },
-    );
-    await goals.pause(goal.id);
-    await goals.pause(goal.id);
+    const { goal } = core.state;
+    core.state.meetings.push(meeting("m1", "running"), meeting("m2", "review"));
+    await goals.pause();
+    await goals.pause();
     expect(goal.status).toBe("paused");
     expect(scheduler.hold).toHaveBeenCalledTimes(1);
     expect(meetings.cancel.mock.calls).toEqual([["m1"]]);
 
-    await goals.archive(goal.id);
+    await goals.archive();
     expect(goal).toMatchObject({ status: "archived", archivedAt: expect.any(Number) as number });
     expect(meetings.cancel).toHaveBeenLastCalledWith("m2");
-    await expect(goals.pause(goal.id)).rejects.toThrow("archived: resume it first");
+    await expect(goals.pause()).rejects.toThrow("archived: resume it first");
 
-    await goals.resume(goal.id);
+    await goals.resume();
     expect(goal).toMatchObject({ status: "active", archivedAt: undefined });
     expect(scheduler.pump).toHaveBeenCalled();
   });
 
-  it("are deleted once archived: worktrees, subtask branches, records and plans go, the goal's branch stays", async () => {
-    const goal = await goals.start("Dice");
-    await openDesk(core.places, goal.slug, "s1");
+  it("resume the meetings a session stopped as it let the goal go, before other work", async () => {
+    await goals.pause();
+    await goals.resume(["m1"]);
+    expect(meetings.resume).toHaveBeenCalledWith("m1");
+    expect(meetings.resume.mock.invocationCallOrder[0]).toBeLessThan(
+      scheduler.pump.mock.invocationCallOrder[0] ?? 0,
+    );
+    await goals.resume(["m2"]);
+    expect(meetings.resume).toHaveBeenCalledTimes(1);
+  });
+
+  it("are deleted once archived: worktrees and subtask branches go, the goal's branch stays", async () => {
+    await openGoal(core.places, "dice");
+    await openDesk(core.places, "dice", "s1");
     expect(await branches()).toContain(subtaskBranch("dice", "s1"));
-    const plans = path.join(core.places.root, "plans");
-    await mkdir(plans);
-    const planFile = path.join(plans, "dice-m1.md");
-    await writeFile(planFile, "# Plan");
-    const record = recordFile(core.places, "s1");
-    await mkdir(path.dirname(record));
-    await writeFile(record, "");
-    const { state } = core;
-    state.tasks.push({
-      id: "t1",
-      goalId: goal.id,
-      title: "",
-      outcome: "",
-      createdAt: 0,
-      ownerAccepts: true,
-    });
-    state.subtasks.push({
+    core.state.subtasks.push({
       id: "s1",
       taskId: "t1",
-      goalId: goal.id,
       title: "",
       description: "",
       acceptance: "",
@@ -180,39 +153,24 @@ describe("Goals", () => {
       progress: { done: 0, total: 0 },
       tokens: 0,
     });
-    state.meetings.push({ ...meeting("m1", "approved", planFile), goalId: goal.id });
-    state.questions.push({
-      id: "q1",
-      subtaskId: "s1",
-      from: "glm",
-      text: "",
-      status: "open",
-      createdAt: 0,
-      kind: "choices",
-      choices: [],
-    });
 
-    await expect(goals.delete(goal.id)).rejects.toThrow("isn't archived");
-    await goals.archive(goal.id);
-    await goals.delete(goal.id);
+    await expect(goals.delete()).rejects.toThrow("isn't archived");
+    await goals.archive();
+    await goals.delete();
     expect(scheduler.release).toHaveBeenCalledWith(["s1"]);
-    expect(state).toEqual({ goals: [], tasks: [], subtasks: [], meetings: [], questions: [] });
+    expect(meetings.settled).toHaveBeenCalled();
     expect(await branches()).toEqual(["main", goalBranch("dice")]);
     expect(await exists(deskFolder(core.places, "s1"))).toBe(false);
-    expect(await exists(goalFolder(core.places, "dice"))).toBe(false);
-    expect(await exists(planFile)).toBe(false);
-    expect(await exists(record)).toBe(false);
-    await goals.delete(goal.id);
+    expect(await exists(goalFolder(core.places))).toBe(false);
   });
 
   it("take a subtask directly, as a task of its own, for a member on the team", async () => {
-    const goal = await goals.start("Dice");
     const work = { title: "Scoreboard", description: "Top right", acceptance: "", assignee: "glm" };
-    expect(() => goals.assign(goal.id, { ...work, assignee: "ann" })).toThrow(
+    expect(() => goals.assign({ ...work, assignee: "ann" })).toThrow(
       'There is no member called "ann"',
     );
-    goals.assign(goal.id, work);
-    expect(scheduler.assign).toHaveBeenCalledWith(goal.id, [
+    goals.assign(work);
+    expect(scheduler.assign).toHaveBeenCalledWith([
       {
         title: "Scoreboard",
         outcome: "",
@@ -220,7 +178,7 @@ describe("Goals", () => {
         subtasks: [{ ...work, key: "", dependsOn: [] }],
       },
     ]);
-    await goals.archive(goal.id);
-    expect(() => goals.assign(goal.id, work)).toThrow("archived: resume it first");
+    await goals.archive();
+    expect(() => goals.assign(work)).toThrow("archived: resume it first");
   });
 });

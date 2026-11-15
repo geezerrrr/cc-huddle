@@ -32,7 +32,6 @@ const member = (name: string): Member => ({
 const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
   id,
   taskId: "t1",
-  goalId: "g1",
   title: `Make ${id}`,
   description: "",
   acceptance: "",
@@ -59,10 +58,8 @@ beforeEach(async () => {
   await git({ cwd: repo, env: ME }, ["commit", "-q", "-m", "start"]);
   core = {
     state: {
-      goals: [{ id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 }],
-      tasks: [
-        { id: "t1", goalId: "g1", title: "Board", outcome: "", createdAt: 0, ownerAccepts: true },
-      ],
+      goal: { id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 },
+      tasks: [{ id: "t1", title: "Board", outcome: "", createdAt: 0, ownerAccepts: true }],
       subtasks: [],
       meetings: [],
       questions: [],
@@ -124,7 +121,7 @@ async function decide(id: string, answer: Extract<Answer, { decision: DecisionOp
   await scheduler.decide(question, answer);
 }
 
-const onGoal = (file: string) => readFile(path.join(goalFolder(core.places, "dice"), file), "utf8");
+const onGoal = (file: string) => readFile(path.join(goalFolder(core.places), file), "utf8");
 
 describe("Scheduler", () => {
   it("runs a subtask in its worktree, merges its delivery, and puts the task to you", async () => {
@@ -197,7 +194,6 @@ describe("Scheduler", () => {
       acceptance: "",
     });
     const [rules, board, score] = scheduler.assign(
-      "g1",
       [
         {
           title: "Game",
@@ -215,8 +211,8 @@ describe("Scheduler", () => {
       "m1",
     );
     expect(core.state.tasks.slice(1)).toMatchObject([
-      { goalId: "g1", title: "Game", outcome: "Playable", meetingId: "m1" },
-      { goalId: "g1", title: "Score" },
+      { title: "Game", outcome: "Playable", meetingId: "m1" },
+      { title: "Score" },
     ]);
     expect(board?.dependsOn).toEqual([rules?.id]);
     expect(score?.dependsOn).toEqual([board?.id]);
@@ -232,7 +228,6 @@ describe("Scheduler", () => {
   it("gives a subtask from a plan the plan's document in its brief", async () => {
     core.state.meetings.push({
       id: "m1",
-      goalId: "g1",
       agenda: "A dice game",
       size: "small",
       participants: ["glm"],
@@ -246,7 +241,6 @@ describe("Scheduler", () => {
     core.state.tasks = [
       {
         id: "t1",
-        goalId: "g1",
         title: "Board",
         outcome: "",
         createdAt: 0,
@@ -324,7 +318,7 @@ describe("Scheduler", () => {
       "That's you; no need to ask.",
     ]);
     expect(vi.mocked(askOnce).mock.lastCall?.[0].options).toEqual({
-      cwd: goalFolder(core.places, "dice"),
+      cwd: goalFolder(core.places),
       model: "answer",
     });
     expect(s1.tokens).toBe(5);
@@ -603,14 +597,14 @@ describe("Scheduler", () => {
         .mockImplementationOnce(delivering({ "score.txt": "1\n" }));
       scheduler.pump();
       await started(1);
-      const [goal] = core.state.goals;
-      if (goal) goal.status = "paused";
-      scheduler.hold("g1");
+      const { goal } = core.state;
+      goal.status = "paused";
+      scheduler.hold();
       await settled(s1, "pending");
       expect(s1.goOn).toEqual([{ why: "held" }]);
       scheduler.pump();
       expect(runs()).toHaveLength(1);
-      if (goal) goal.status = "active";
+      goal.status = "active";
       scheduler.pump();
       await settled(s1, "done");
       expect(runs()[1]).toMatchObject({
@@ -645,8 +639,8 @@ describe("Scheduler", () => {
     it("isn't added to while handed over, while its goal is paused, or when there is none", () => {
       core.state.subtasks.push(subtask("s1", { status: "reviewing" }), subtask("s2"));
       expect(scheduler.carry("s1", "x")).toBe("handedOver");
-      const [goal] = core.state.goals;
-      if (goal) goal.status = "paused";
+      const { goal } = core.state;
+      goal.status = "paused";
       expect(scheduler.carry("s2", "x")).toBe("onHold");
       expect(() => scheduler.carry("s9", "x")).toThrow("There is no such subtask");
     });
@@ -657,7 +651,7 @@ describe("Scheduler", () => {
       vi.mocked(runSubtask).mockImplementation(working);
       scheduler.pump();
       await started(1);
-      scheduler.hold("g1");
+      scheduler.hold();
       await scheduler.release(["s1"]);
       expect(s1.status).toBe("stopped");
     });

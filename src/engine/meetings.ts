@@ -42,7 +42,6 @@ import {
   type TurnListener,
 } from "./turns.ts";
 import type {
-  Goal,
   Meeting,
   MeetingHand,
   MeetingSize,
@@ -158,11 +157,10 @@ export function nextMove(
 }
 
 /**
- * What calling a meeting takes: its goal, what to plan, its size, who
+ * What calling a meeting takes: what to plan, its size, who
  * attends, the host first, and whether the host only runs it.
  */
 export interface MeetingCall {
-  goalId: string;
   agenda: string;
   size: MeetingSize;
   /** Everyone, when empty. */
@@ -188,12 +186,11 @@ export class Meetings {
     const attendees = named.length
       ? named
       : core.team.members.map((m) => m.name).sort((a, b) => a.localeCompare(b));
-    const host = this.admit(call.goalId, attendees);
+    const host = this.admit(attendees);
     if (call.hostOnly && attendees.length < 2)
       throw new Error(`${host} can't only run a meeting with nobody else at it`);
     const meeting: Meeting = {
       id: randomUUID(),
-      goalId: call.goalId,
       agenda: call.agenda,
       size: call.size,
       participants: attendees,
@@ -216,7 +213,7 @@ export class Meetings {
     const meeting = core.state.meetings.find((m) => m.id === id);
     if (!meeting || !meetingResumes(workOf(core), meeting))
       throw new Error("That meeting can't go on: its plan is out, or its goal isn't active");
-    this.admit(meeting.goalId, meeting.participants);
+    this.admit(meeting.participants);
     meeting.status = step(MEETING_MACHINE, meeting.status, "resume");
     meeting.error = undefined;
     core.changed();
@@ -253,30 +250,29 @@ export class Meetings {
   }
 
   /**
-   * Approves a plan under review: its document is saved in the data folder,
+   * Approves a plan under review: its document is saved in the goal's folder,
    * and its tasks and subtasks go to the scheduler, pending until they can
    * start. Returns the subtasks.
    */
   async approve(id: string): Promise<Subtask[]> {
     const { core } = this;
     const { meeting, plan } = this.underReview(id, "approve");
-    const goal = this.activeGoal(meeting.goalId);
-    const file = path.join(core.places.root, "plans", `${goal.slug}-${meeting.id}.md`);
+    this.activeGoal();
+    const file = path.join(core.places.root, "plans", `${meeting.id}.md`);
     await mkdir(path.dirname(file), { recursive: true });
     await writeFile(file, plan.markdown);
     // Changed, called off or approved meanwhile, or its goal held: not approved now (the file stays).
     if (meeting.plan !== plan || !can(MEETING_MACHINE, meeting.status, "approve"))
       throw new Error("The plan changed while it was being approved");
-    this.activeGoal(goal.id);
+    this.activeGoal();
     meeting.status = step(MEETING_MACHINE, meeting.status, "approve");
     meeting.planFile = file;
-    return this.scheduler.assign(goal.id, plan.tasks, meeting.id);
+    return this.scheduler.assign(plan.tasks, meeting.id);
   }
 
-  /** Settles once no meeting of a goal is under way: one being cancelled has ended. */
-  async settled(goalId: string) {
-    const ids = this.core.state.meetings.filter((m) => m.goalId === goalId).map((m) => m.id);
-    await Promise.all(ids.flatMap((id) => this.ongoing.get(id) ?? []));
+  /** Settles once no meeting is under way: one being cancelled has ended. */
+  async settled() {
+    await Promise.all(this.ongoing.values());
   }
 
   /** Stops every meeting under way, as cancelled; settles once they have ended. */
@@ -295,15 +291,15 @@ export class Meetings {
   }
 
   /**
-   * Whether these members can sit down together now for this goal: the goal
+   * Whether these members can sit down together now: the goal
    * is active, each is on the team and free. Throws why not; gives the first,
    * who hosts. Nothing is
    * awaited here or before the meeting is under way, so two meetings can't
    * both take the same member.
    */
-  private admit(goalId: string, attendees: readonly string[]): string {
+  private admit(attendees: readonly string[]): string {
     const { core } = this;
-    this.activeGoal(goalId);
+    this.activeGoal();
     const [host] = attendees;
     if (host === undefined) throw new Error("The team has no members");
     const names = new Set(core.team.members.map((m) => m.name));
@@ -315,12 +311,10 @@ export class Meetings {
     return host;
   }
 
-  /** A goal that is active, or throws why it isn't. */
-  private activeGoal(goalId: string): Goal {
-    const goal = this.core.state.goals.find((g) => g.id === goalId);
-    if (!goal) throw new Error("There is no such goal");
+  /** Throws why the goal isn't active, if it isn't. */
+  private activeGoal() {
+    const { goal } = this.core.state;
     if (goal.status !== "active") throw new Error(`The goal "${goal.name}" is ${goal.status}`);
-    return goal;
   }
 
   /** A meeting whose plan is under review and can take `event`, or throws. */
@@ -350,8 +344,8 @@ export class Meetings {
     const [host, ...others] = named(meeting.participants);
     // A host who only runs it has someone else at it (start), so there are members.
     const [member, ...more] = named(meetingMembers(meeting));
-    const goal = core.state.goals.find((g) => g.id === meeting.goalId);
-    if (!host || !member || !goal) return;
+    const { goal } = core.state;
+    if (!host || !member) return;
     let ctx: MeetingBrief = {
       meeting,
       goal,

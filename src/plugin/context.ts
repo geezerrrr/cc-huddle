@@ -1,39 +1,40 @@
 /**
- * What the SessionStart hook tells your session (docs/design.md §3.3): where
- * the repository's team stands, read from its files, as context. A
- * repository with no team, or a team with no goals yet, adds nothing.
+ * What the SessionStart hook tells your session (docs/design.md §3.3): the
+ * goal it runs, if it does (after `/clear`), and the repository's goals it
+ * can take up, read from their folders, as context. A repository with no
+ * goals adds nothing.
  */
-import { dataFiles, holderOf, readState, repoFolder } from "../engine/data.ts";
+import path from "node:path";
+import { goalFiles, goalsFolder, listGoals, repoFolder } from "../engine/data.ts";
 import { openRepository } from "../engine/git.ts";
-import { loadTeam, teamFolder } from "../engine/team.ts";
-import { statusText } from "./status.ts";
+import { readCopy } from "../engine/team.ts";
+import { othersText, statusText } from "./status.ts";
 
-/** The context for session `session` (its pid) in `cwd`, with your own team's folder `userTeam`. */
+/** The context for session `session` (its pid) in `cwd`. */
 export async function sessionContext(
   cwd: string,
   dataFolder: string,
-  userTeam: string,
   session: number,
 ): Promise<string | undefined> {
   let repo;
-  let team;
   try {
     repo = await openRepository(cwd);
-    ({ team } = await loadTeam([userTeam, teamFolder(repo.top)]));
   } catch {
-    // No repository, or no team in it: openplan has nothing to say here.
+    // No repository: openplan has nothing to say here.
     return undefined;
   }
-  const files = dataFiles(repoFolder(dataFolder, repo));
-  const state = await readState(files.state);
-  if (!state.goals.length) return undefined;
-  const status = statusText({ ...state, members: team.members.map((m) => m.name) });
-  const holder = holderOf(files.lock);
-  if (holder && holder.session !== session)
-    return `openplan's team on this repository runs in another Claude Code session (pid ${String(holder.session)}); it moves to this one when the user uses openplan here, or this session does. As it stands:\n\n${status}`;
-  const context = `openplan's team on this repository, as it stands:\n\n${status}`;
-  // Active goals the team isn't open on yet: a session ended without closing it (§3.2).
-  return !holder?.open && state.goals.some((g) => g.status === "active")
-    ? `${context}\n\nThe session before ended without closing the team. This session pauses what it left going as it opens the team; nothing goes on until a goal is resumed.`
-    : context;
+  const root = repoFolder(dataFolder, repo);
+  const goals = await listGoals(root);
+  const mine = goals.find((g) => g.holder?.session === session);
+  const parts: string[] = [];
+  if (mine) {
+    const { team } = await readCopy(goalFiles(path.join(goalsFolder(root), mine.slug)).team);
+    const status = statusText({ ...mine.state, members: team.members.map((m) => m.name) });
+    parts.push(
+      `This session runs openplan's goal "${mine.state.goal.name}", as it stands:\n\n${status}`,
+    );
+  }
+  const others = othersText(goals.filter((g) => g !== mine));
+  if (others) parts.push(`openplan: ${others}`);
+  return parts.length ? parts.join("\n\n") : undefined;
 }

@@ -14,20 +14,19 @@ import {
   type GoalAction,
   type Subtask,
   type SubtaskAction,
-  type TeamState,
+  type GoalState,
   type Wait,
 } from "./types.ts";
 
 /** What the rules read: the state, and the team's members in their order. */
-export interface Work extends TeamState {
+export interface Work extends GoalState {
   members: readonly string[];
 }
 
-const openQuestions = (state: Pick<TeamState, "questions">, subtaskId: string) =>
+const openQuestions = (state: Pick<GoalState, "questions">, subtaskId: string) =>
   state.questions.filter((q) => q.subtaskId === subtaskId && q.status === "open");
 
-const isActive = (state: Pick<TeamState, "goals">, goalId: string) =>
-  state.goals.find((p) => p.id === goalId)?.status === "active";
+const isActive = (state: Pick<GoalState, "goal">) => state.goal.status === "active";
 
 /**
  * Who reviews a subtask's delivery (§4.5): its meeting's host, else the first
@@ -44,7 +43,7 @@ export function reviewerOf(
 }
 
 /** The acceptance a task waits for, its subtasks all done. */
-function acceptanceOf(state: Pick<TeamState, "questions" | "subtasks">, taskId: string) {
+function acceptanceOf(state: Pick<GoalState, "questions" | "subtasks">, taskId: string) {
   return state.questions.find(
     (q) =>
       q.status === "open" &&
@@ -55,9 +54,9 @@ function acceptanceOf(state: Pick<TeamState, "questions" | "subtasks">, taskId: 
 }
 
 /** Whether a subtask in review is being reviewed now: its goal is active and you aren't deciding on it. */
-const underReview = (state: Pick<TeamState, "goals" | "questions">, subtask: Subtask) =>
+const underReview = (state: Pick<GoalState, "goal" | "questions">, subtask: Subtask) =>
   subtask.status === "reviewing" &&
-  isActive(state, subtask.goalId) &&
+  isActive(state) &&
   !openQuestions(state, subtask.id).some((q) => q.kind === "decision");
 
 /**
@@ -99,9 +98,8 @@ function reviewerAway(state: Work, subtask: Subtask): string | undefined {
 
 /** What a subtask waits on in its stage; `busy` is busyMembers. */
 export function waitsIn(state: Work, subtask: Subtask, busy: Set<string>): Wait[] {
-  const goal = state.goals.find((p) => p.id === subtask.goalId);
-  const held: Wait[] =
-    goal && goal.status !== "active" ? [{ kind: "goal", status: goal.status }] : [];
+  const { goal } = state;
+  const held: Wait[] = goal.status !== "active" ? [{ kind: "goal", status: goal.status }] : [];
   const asked = (): Wait[] =>
     openQuestions(state, subtask.id).map((q) =>
       q.kind === "teammate"
@@ -155,7 +153,7 @@ export function waitsIn(state: Work, subtask: Subtask, busy: Set<string>): Wait[
 }
 
 /** The upstream subtasks a done subtask built on that were done again after it started. */
-export function redoneUpstream(state: Pick<TeamState, "subtasks">, subtask: Subtask): Subtask[] {
+export function redoneUpstream(state: Pick<GoalState, "subtasks">, subtask: Subtask): Subtask[] {
   const startedAt = subtask.startedAt;
   if (subtask.status !== "done" || startedAt === undefined) return [];
   return subtask.dependsOn.flatMap((id) => {
@@ -191,7 +189,7 @@ export function meetingResumes(state: Work, meeting: Meeting): boolean {
   return (
     can(MEETING_MACHINE, meeting.status, "resume") &&
     !meeting.plan &&
-    isActive(state, meeting.goalId) &&
+    isActive(state) &&
     meeting.participants.every((m) => state.members.includes(m))
   );
 }
@@ -207,7 +205,7 @@ export function derive(state: Work): Derived {
         return [s.id, { waits: waitsIn(state, s, busy), actions, redone }];
       }),
     ),
-    goals: Object.fromEntries(state.goals.map((p) => [p.id, goalActions(p)])),
+    goal: goalActions(state.goal),
     busy: [...busy],
     resumable: state.meetings.filter((m) => meetingResumes(state, m)).map((m) => m.id),
   };

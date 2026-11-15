@@ -44,6 +44,7 @@ const NEED: OpenplanNeed = {
 };
 
 const TEAM: OpenplanTeam = {
+  goal: { name: "Dice", slug: "dice", active: true },
   band: "1 working · 1 needs you",
   tasks: ['Rules · glm works on "Rules"'],
   members: [
@@ -59,7 +60,17 @@ const TEAM: OpenplanTeam = {
   needs: [NEED],
   milestones: [],
   prompts: [],
-  paused: [],
+  resumable: [],
+};
+
+/** The team of a session that runs no goal. */
+const NO_GOAL: OpenplanTeam = {
+  tasks: [],
+  members: [],
+  needs: [],
+  milestones: [],
+  prompts: [],
+  resumable: [],
 };
 
 const SOCKET = "/tmp/openplan-test/pane.sock";
@@ -78,7 +89,12 @@ function serve(on: On, views: OpenplanView[]) {
   on("mcp.connect", () => ({ value: { isConnected: true, server: SERVER } }));
   on("mcp.call", (_, e) => {
     calls.push({ tool: e.tool, args: e.args });
-    const text = e.tool === "pane" ? SOCKET : "Team: glm";
+    const text =
+      e.tool === "pane"
+        ? SOCKET
+        : e.tool === "resume_goal"
+          ? `Resumed ${String(e.args.goal)}.`
+          : "Team: glm";
     return { value: { content: [{ type: "text", text }], isError: false } };
   });
   on("http.fetch", (_, e) => {
@@ -281,14 +297,14 @@ test("each need is asked as it comes, in turn, and answered as you said; a task 
   ]);
 });
 
-test("the pane stops asking a team that can't be opened, until you or your session turn to it", async ($, on) => {
+test("the pane stops asking when the goals can't be read, until you or your session turn to it", async ($, on) => {
   const clock = mock.clock(on);
   let views = 0;
   on("mcp.connect", () => ({ value: { isConnected: true, server: SERVER } }));
   on("mcp.call", () => ({ value: { content: [{ type: "text", text: SOCKET }], isError: false } }));
   on("http.fetch", () => {
     views++;
-    return served(409, "The team has no members");
+    return served(409, "/ is not in a git repository");
   });
   on("command.register", (_, e) => ({ value: { command: e.name } }));
   on("ui.open", () => ({ value: { isPlaced: true } }));
@@ -310,23 +326,19 @@ test("the pane stops asking a team that can't be opened, until you or your sessi
   expect(views).toBe(3);
 });
 
-test("a team that moved to another session leaves the band, and /openplan takes it back", async ($, on) => {
+test("a goal that moved to another session leaves the pane, and the band says where it is", async ($, on) => {
   const clock = mock.clock(on);
-  const asked: Record<string, unknown>[] = [];
-  let moved = false;
-  on("mcp.connect", () => ({ value: { isConnected: true, server: SERVER } }));
-  on("mcp.call", () => ({ value: { content: [{ type: "text", text: SOCKET }], isError: false } }));
-  on("http.fetch", (_, e) => {
-    const body = e.init?.body;
-    const args = JSON.parse(typeof body === "string" ? body : "{}") as Record<string, unknown>;
-    asked.push(args);
-    return moved && !args.take
-      ? served(409, "Another Claude Code session runs this repository's team (pid 7).")
-      : served(200, JSON.stringify({ revision: asked.length, team: TEAM }));
-  });
-  on("command.register", (_, e) => ({ value: { command: e.name } }));
-  on("ui.open", () => ({ value: { isPlaced: true } }));
-  on("session.start", (_, e) => ({ cwd: e.cwd }));
+  serve(on, [
+    { revision: 1, team: TEAM },
+    {
+      revision: 2,
+      team: {
+        ...NO_GOAL,
+        band: "1 goal in another session",
+        resumable: [{ slug: "dice", label: "Dice · no plan yet · in another session" }],
+      },
+    },
+  ]);
   await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
   await clock.advance(500);
   const band = async () => {
@@ -336,21 +348,14 @@ test("a team that moved to another session leaves the band, and /openplan takes 
     return text;
   };
   expect(await band()).toBe("openplan · 1 working · 1 needs you");
-
-  moved = true;
   await clock.advance(500);
-  expect(await band()).toBeUndefined();
-  expect(asked.every((args) => !args.take)).toBe(true);
-
-  await $.command.run({
-    command: "openplan",
-    args: "",
-    origin: { kind: "composer" },
-    presentation: { isFullscreen: true, columns: 120 },
-  });
-  await clock.advance(500);
-  expect(asked.at(-1)).toMatchObject({ take: true });
-  expect(await band()).toBe("openplan · 1 working · 1 needs you");
+  expect(await band()).toBe("openplan · 1 goal in another session");
+  const pane = await $.ui.mount({ ...PANE, surface: "terminal" });
+  expect(await pane.find({ type: "Text", text: /This session runs no goal/ })).toBeDefined();
+  expect(
+    await pane.find({ type: "Text", text: "Dice · no plan yet · in another session" }),
+  ).toBeDefined();
+  await pane.unmount();
 });
 
 test("the model can't call the pane's tools", async ($) => {
@@ -398,26 +403,44 @@ async function openplan($: Engine, args: string) {
   return text;
 }
 
-const paused = (count: number) =>
+const resumable = (count: number) =>
   Array.from({ length: count }, (_, i) => ({
-    id: `g${String(i + 1)}`,
-    label: "Dice · no plan yet",
+    slug: `g${String(i + 1)}`,
+    label: "Dice · no plan yet · paused",
   }));
 
-test("/openplan pause pauses the goal under way, and resume resumes the only one paused, with no model turn", async ($, on) => {
-  const calls = serve(on, [{ revision: 1, team: { ...TEAM, paused: paused(1) } }]);
+test("/openplan pause pauses the session's goal, and resume takes up the only one, with no model turn", async ($, on) => {
+  const calls = serve(on, [
+    {
+      revision: 1,
+      team: {
+        ...TEAM,
+        goal: { name: "Dice", slug: "g1", active: false },
+        resumable: resumable(1),
+      },
+    },
+  ]);
   await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
   await openplan($, "pause");
-  expect(await openplan($, "resume")).toBe("Resumed Dice · no plan yet.");
+  expect(await openplan($, "resume")).toBe("Resumed g1.");
   expect(calls.filter((c) => c.tool.endsWith("_goal"))).toEqual([
     { tool: "pause_goal", args: {} },
     { tool: "resume_goal", args: { goal: "g1" } },
   ]);
 });
 
-test("/openplan resume asks which goal when several are paused, each numbered", async ($, on) => {
+test("/openplan resume says to pause the session's goal first while it is under way", async ($, on) => {
+  const calls = serve(on, [{ revision: 1, team: { ...TEAM, resumable: resumable(1) } }]);
+  await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
+  expect(await openplan($, "resume")).toBe(
+    '"Dice" is under way in this session, which runs one goal: /openplan pause it first, or take the other up in another session.',
+  );
+  expect(calls.filter((c) => c.tool === "resume_goal")).toEqual([]);
+});
+
+test("/openplan resume asks which goal when there are several, each numbered", async ($, on) => {
   const asked: string[][] = [];
-  const said = ["2. Dice · no plan yet"];
+  const said = ["2. Dice · no plan yet · paused"];
   on("tool.call", { tool: "AskUserQuestion" }, (_, e) => {
     const [question] = e.questions as { question: string; options: { label: string }[] }[];
     asked.push(question?.options.map((o) => o.label) ?? []);
@@ -426,33 +449,65 @@ test("/openplan resume asks which goal when several are paused, each numbered", 
       ? { result: { answers: { [question?.question ?? ""]: answer } } }
       : { deny: "dismissed" };
   });
-  const calls = serve(on, [{ revision: 1, team: { ...TEAM, paused: paused(2) } }]);
+  const calls = serve(on, [{ revision: 1, team: { ...NO_GOAL, resumable: resumable(2) } }]);
   await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
-  expect(await openplan($, "resume")).toBe("Resumed Dice · no plan yet.");
+  expect(await openplan($, "resume")).toBe("Resumed g2.");
   expect(await openplan($, "resume")).toBe("Nothing resumed.");
   expect(asked).toEqual([
-    ["1. Dice · no plan yet", "2. Dice · no plan yet"],
-    ["1. Dice · no plan yet", "2. Dice · no plan yet"],
+    ["1. Dice · no plan yet · paused", "2. Dice · no plan yet · paused"],
+    ["1. Dice · no plan yet · paused", "2. Dice · no plan yet · paused"],
   ]);
   expect(calls.filter((c) => c.tool === "resume_goal")).toEqual([
     { tool: "resume_goal", args: { goal: "g2" } },
   ]);
 });
 
-test("/openplan resume lists more paused goals than the dialog holds, to pick by number", async ($, on) => {
-  const calls = serve(on, [{ revision: 1, team: { ...TEAM, paused: paused(5) } }]);
+test("/openplan resume lists more goals than the dialog holds, to pick by number", async ($, on) => {
+  const calls = serve(on, [{ revision: 1, team: { ...NO_GOAL, resumable: resumable(5) } }]);
   await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
   expect(await openplan($, "resume")).toBe(
     [
-      "Paused goals; resume one with /openplan resume <number>:",
-      ...paused(5).map((g, i) => `${String(i + 1)}. ${g.label}`),
+      "Goals; resume one with /openplan resume <number>:",
+      ...resumable(5).map((g, i) => `${String(i + 1)}. ${g.label}`),
     ].join("\n"),
   );
-  expect(await openplan($, "resume 6")).toBe("No paused goal is numbered 6.");
-  expect(await openplan($, "resume 5")).toBe("Resumed Dice · no plan yet.");
+  expect(await openplan($, "resume 6")).toBe("No goal is numbered 6.");
+  expect(await openplan($, "resume 5")).toBe("Resumed g5.");
   expect(calls.filter((c) => c.tool === "resume_goal")).toEqual([
     { tool: "resume_goal", args: { goal: "g5" } },
   ]);
+});
+
+test("a goal taken up puts what waits in it to your session at once; its milestones so far are not news", async ($, on) => {
+  const clock = mock.clock(on);
+  const rows: string[] = [];
+  const prompts: string[] = [];
+  on("prompt.submit", (_, e) => {
+    prompts.push(e.text);
+    return { text: e.text };
+  });
+  on("ui.log", (_, e) => {
+    rows.push(e.text);
+    return { value: undefined };
+  });
+  const taken: OpenplanTeam = {
+    ...TEAM,
+    needs: [],
+    goal: { name: "Dice", slug: "g1", active: true },
+    milestones: [{ key: "plan:m1", text: 'Plan approved: "Dice"' }],
+    prompts: [{ key: "accept:q2", text: "A task to accept" }],
+  };
+  serve(on, [
+    { revision: 1, team: { ...NO_GOAL, resumable: resumable(1) } },
+    { revision: 1, team: { ...NO_GOAL, resumable: resumable(1) } },
+    { revision: 2, team: taken },
+  ]);
+  await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
+  await clock.advance(500);
+  expect(await openplan($, "resume")).toBe("Resumed g1.");
+  await clock.advance(500);
+  expect(rows).toEqual([]);
+  expect(prompts).toEqual(["A task to accept"]);
 });
 
 test("/openplan with a task hands it to your session for the team, with who is on it", async ($, on) => {

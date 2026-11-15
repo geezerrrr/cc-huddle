@@ -3,7 +3,7 @@
  * subtask (SUBTASK_MACHINE). It starts every subtask that can start (its
  * upstream merged, its member free, its goal active) in its own worktree,
  * has what is delivered reviewed when review is on, and merges it into the
- * goal's branch, one merge at a time per goal.
+ * goal's branch, one merge at a time.
  */
 import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
@@ -120,18 +120,17 @@ export class Scheduler {
   }
 
   /**
-   * Gives a goal new work: tasks, each with its subtasks, their dependencies
+   * Gives the goal new work: tasks, each with its subtasks, their dependencies
    * by the keys they have in `tasks`. They wait as pending until they can
    * start. `meetingId`: the meeting whose plan they come from.
    */
-  assign(goalId: string, tasks: readonly PlanTask[], meetingId?: string): Subtask[] {
+  assign(tasks: readonly PlanTask[], meetingId?: string): Subtask[] {
     const { state } = this.core;
     const now = Date.now();
     const ids = new Map<string, string>();
     const added = tasks.flatMap(({ title, outcome, ownerAccepts, subtasks }) => {
       const task: Task = {
         id: randomUUID(),
-        goalId,
         title,
         outcome,
         ownerAccepts,
@@ -146,7 +145,6 @@ export class Scheduler {
           ...planned,
           id,
           taskId: task.id,
-          goalId,
           status: "pending",
           createdAt: now,
           progress: { done: 0, total: 0 },
@@ -164,14 +162,14 @@ export class Scheduler {
   }
 
   /**
-   * Puts a goal's work on hold (it was paused or archived): its runs stop, to
+   * Puts the goal's work on hold (it was paused or archived): its runs stop, to
    * go on in their sessions when it is resumed; its reviews stop, to be done
    * again then. Nothing of it starts meanwhile; a merge under way finishes.
    */
-  hold(goalId: string) {
+  hold() {
     for (const subtask of this.core.state.subtasks) {
       const live = this.live.get(subtask.id);
-      if (subtask.goalId !== goalId || !live || live.kind === "merge") continue;
+      if (!live || live.kind === "merge") continue;
       if (live.kind === "run") this.keepOn(subtask.id, { why: "held" });
       live.abort.abort();
     }
@@ -181,13 +179,13 @@ export class Scheduler {
    * You add to a subtask (a message to its member): it goes on in its
    * session, from where it stopped, with `note`; a running one stops first,
    * one not started yet hears it in its brief. One being reviewed or merged
-   * is handed over already, and a paused or archived goal's work waits for
+   * is handed over already, and the work of a paused or archived goal waits for
    * the goal to be resumed. Throws when there is no such subtask.
    */
   carry(subtaskId: string, note: string): "goes" | "handedOver" | "onHold" {
     const subtask = this.subtask(subtaskId);
     if (!subtask) throw new Error("There is no such subtask");
-    if (this.goalOf(subtask).status !== "active") return "onHold";
+    if (this.goal.status !== "active") return "onHold";
     if (subtask.status === "reviewing" || subtask.status === "merging") return "handedOver";
     const live = this.live.get(subtaskId);
     if (live) {
@@ -238,7 +236,7 @@ export class Scheduler {
     if (subtask.status === "merging") {
       // A merge under way finishes; one waiting on you is undone, its worktree back as delivered.
       if (live) return;
-      await abortMerge(this.core.places, this.goalOf(subtask).slug, subtask.id);
+      await abortMerge(this.core.places, this.goal.slug, subtask.id);
       // Stopped meanwhile: that stop did it.
       if (!can(SUBTASK_MACHINE, subtask.status, "stop")) return;
     }
@@ -255,7 +253,7 @@ export class Scheduler {
   async retry(subtaskId: string) {
     const subtask = this.subtask(subtaskId);
     if (!subtask || !can(SUBTASK_MACHINE, subtask.status, "retry")) return;
-    await dropDesk(this.core.places, this.goalOf(subtask).slug, subtask.id);
+    await dropDesk(this.core.places, this.goal.slug, subtask.id);
     // Retried meanwhile: that one did it.
     if (!can(SUBTASK_MACHINE, subtask.status, "retry")) return;
     this.move(subtask, "retry");
@@ -335,7 +333,7 @@ export class Scheduler {
         }
       }
     } else if (subtask.status === "merging") {
-      const { slug } = this.goalOf(subtask);
+      const { slug } = this.goal;
       if (pick === "retry") await abortMerge(this.core.places, slug, subtask.id);
       else if (pick === "ours" || pick === "theirs")
         await pickSide(this.core.places, slug, subtask.id, question.decision.files ?? [], pick);
@@ -350,7 +348,7 @@ export class Scheduler {
    * delivered. A pending subtask starts, and one in review is reviewed, when
    * nothing holds it up (waitsIn: its goal active, you not deciding about it,
    * its member or reviewer free); one being merged is merged unless you are
-   * deciding about it, one at a time per goal.
+   * deciding about it, one at a time.
    */
   pump() {
     if (this.closed) return;
@@ -363,9 +361,7 @@ export class Scheduler {
         .filter((s) => this.live.get(s.id)?.kind === "review")
         .map((s) => reviewerOf(work, s)),
     );
-    const merging = new Set(
-      state.subtasks.filter((s) => this.live.get(s.id)?.kind === "merge").map((s) => s.goalId),
-    );
+    let merging = state.subtasks.some((s) => this.live.get(s.id)?.kind === "merge");
     const order = [...state.subtasks].sort(
       (a, b) => Number(Boolean(b.goOn)) - Number(Boolean(a.goOn)) || handedAt(a) - handedAt(b),
     );
@@ -381,8 +377,8 @@ export class Scheduler {
         reviews.add(reviewer);
         void this.startReview(subtask);
       } else if (subtask.status === "merging") {
-        if (waitsIn(work, subtask, busy).length || merging.has(subtask.goalId)) continue;
-        merging.add(subtask.goalId);
+        if (waitsIn(work, subtask, busy).length || merging) continue;
+        merging = true;
         void this.startMerge(subtask);
       }
     }
@@ -411,10 +407,8 @@ export class Scheduler {
     return this.core.state.subtasks.find((s) => s.id === id);
   }
 
-  private goalOf(subtask: Subtask): Goal {
-    const goal = this.core.state.goals.find((g) => g.id === subtask.goalId);
-    if (!goal) throw new Error(`The goal of "${subtask.title}" is gone`);
-    return goal;
+  private get goal(): Goal {
+    return this.core.state.goal;
   }
 
   private taskOf(subtask: Subtask): Task {
@@ -489,7 +483,7 @@ export class Scheduler {
     let outcome: RunOutcome;
     try {
       const member = this.memberOf(subtask.assignee);
-      const goal = this.goalOf(subtask);
+      const { goal } = this;
       const task = this.taskOf(subtask);
       const desk = await openDesk(core.places, goal.slug, subtask.id);
       const recorder = core.recorder(subtask);
@@ -600,15 +594,9 @@ export class Scheduler {
               from,
               subtask,
               question,
-              own: core.state.subtasks.filter(
-                (s) => s.goalId === subtask.goalId && s.assignee === target.name,
-              ),
+              own: core.state.subtasks.filter((s) => s.assignee === target.name),
             }),
-            options: core.options(
-              target,
-              "answer",
-              await openGoal(core.places, this.goalOf(subtask).slug),
-            ),
+            options: core.options(target, "answer", await openGoal(core.places, this.goal.slug)),
             signal,
           }),
       );
@@ -666,7 +654,7 @@ export class Scheduler {
       const reviewer = this.memberOf(reviewerOf(workOf(core), subtask));
       const { delivery } = subtask;
       if (!delivery) throw new Error(`"${subtask.title}" has no delivery to review`);
-      const desk = await openDesk(core.places, this.goalOf(subtask).slug, subtask.id);
+      const desk = await openDesk(core.places, this.goal.slug, subtask.id);
       const reply = await askOnce({
         prompt: reviewPrompt({
           task: this.taskOf(subtask),
@@ -720,7 +708,7 @@ export class Scheduler {
     const { core } = this;
     const { end } = this.begin(subtask, "merge");
     try {
-      const goal = this.goalOf(subtask);
+      const { goal } = this;
       const merged = await mergeDesk(
         core.places,
         goal.slug,
