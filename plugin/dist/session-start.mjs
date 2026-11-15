@@ -1186,8 +1186,8 @@ var require_stringifyString = __commonJS({
             case "u":
               {
                 str += json2.slice(start, i);
-                const code = json2.substr(i + 2, 4);
-                switch (code) {
+                const code2 = json2.substr(i + 2, 4);
+                switch (code2) {
                   case "0000":
                     str += "\\0";
                     break;
@@ -1213,8 +1213,8 @@ var require_stringifyString = __commonJS({
                     str += "\\P";
                     break;
                   default:
-                    if (code.substr(0, 2) === "00")
-                      str += "\\x" + code.substr(2);
+                    if (code2.substr(0, 2) === "00")
+                      str += "\\x" + code2.substr(2);
                     else
                       str += json2.substr(i, 6);
                 }
@@ -3713,22 +3713,22 @@ var require_errors = __commonJS({
   "node_modules/.pnpm/yaml@2.9.1/node_modules/yaml/dist/errors.js"(exports) {
     "use strict";
     var YAMLError = class extends Error {
-      constructor(name, pos, code, message) {
+      constructor(name, pos, code2, message) {
         super();
         this.name = name;
-        this.code = code;
+        this.code = code2;
         this.message = message;
         this.pos = pos;
       }
     };
     var YAMLParseError = class extends YAMLError {
-      constructor(pos, code, message) {
-        super("YAMLParseError", pos, code, message);
+      constructor(pos, code2, message) {
+        super("YAMLParseError", pos, code2, message);
       }
     };
     var YAMLWarning = class extends YAMLError {
-      constructor(pos, code, message) {
-        super("YAMLWarning", pos, code, message);
+      constructor(pos, code2, message) {
+        super("YAMLWarning", pos, code2, message);
       }
     };
     var prettifyError2 = (src, lc) => (error62) => {
@@ -4637,7 +4637,7 @@ var require_resolve_flow_scalar = __commonJS({
       const { offset, type, source, end } = scalar;
       let _type;
       let value;
-      const _onError = (rel, code, msg) => onError(offset + rel, code, msg);
+      const _onError = (rel, code2, msg) => onError(offset + rel, code2, msg);
       switch (type) {
         case "scalar":
           _type = Scalar.Scalar.PLAIN;
@@ -4835,9 +4835,9 @@ var require_resolve_flow_scalar = __commonJS({
     function parseCharCode(source, offset, length, onError) {
       const cc = source.substr(offset, length);
       const ok = cc.length === length && /^[0-9a-fA-F]+$/.test(cc);
-      const code = ok ? parseInt(cc, 16) : NaN;
+      const code2 = ok ? parseInt(cc, 16) : NaN;
       try {
-        return String.fromCodePoint(code);
+        return String.fromCodePoint(code2);
       } catch {
         const raw = source.substr(offset - 2, length + 2);
         onError(offset - 2, "BAD_DQ_ESCAPE", `Invalid escape sequence ${raw}`);
@@ -5159,12 +5159,12 @@ var require_composer = __commonJS({
         this.prelude = [];
         this.errors = [];
         this.warnings = [];
-        this.onError = (source, code, message, warning) => {
+        this.onError = (source, code2, message, warning) => {
           const pos = getErrorPos(source);
           if (warning)
-            this.warnings.push(new errors.YAMLWarning(pos, code, message));
+            this.warnings.push(new errors.YAMLWarning(pos, code2, message));
           else
-            this.errors.push(new errors.YAMLParseError(pos, code, message));
+            this.errors.push(new errors.YAMLParseError(pos, code2, message));
         };
         this.directives = new directives.Directives({ version: options.version || "1.2" });
         this.options = options;
@@ -5326,12 +5326,12 @@ var require_cst_scalar = __commonJS({
     var stringifyString = require_stringifyString();
     function resolveAsScalar(token, strict = true, onError) {
       if (token) {
-        const _onError = (pos, code, message) => {
+        const _onError = (pos, code2, message) => {
           const offset = typeof pos === "number" ? pos : Array.isArray(pos) ? pos[0] : pos.offset;
           if (onError)
-            onError(offset, code, message);
+            onError(offset, code2, message);
           else
-            throw new errors.YAMLParseError([offset, offset + 1], code, message);
+            throw new errors.YAMLParseError([offset, offset + 1], code2, message);
         };
         switch (token.type) {
           case "scalar":
@@ -7372,14 +7372,96 @@ var require_dist = __commonJS({
 // src/plugin/session-start.ts
 import { text } from "node:stream/consumers";
 
+// src/plugin/context.ts
+import path3 from "node:path";
+
 // src/engine/data.ts
 import { createHash } from "node:crypto";
-import { link, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { link, mkdir, readdir as readdir2, readFile as readFile2, rename, rm as rm2, writeFile } from "node:fs/promises";
 import { readFileSync, unlinkSync } from "node:fs";
-import path from "node:path";
+import path2 from "node:path";
 
 // src/engine/core.ts
 var errorText = (error62) => error62 instanceof Error ? error62.message : String(error62);
+
+// src/engine/git.ts
+import { spawn } from "node:child_process";
+import { readdir, readFile, realpath, rm, stat } from "node:fs/promises";
+import path from "node:path";
+
+// src/engine/serial.ts
+function serialBy() {
+  const queues = /* @__PURE__ */ new Map();
+  return function serial2(key, task) {
+    const next = (queues.get(key) ?? Promise.resolve()).then(task, task);
+    const settled = next.catch(() => void 0);
+    queues.set(key, settled);
+    void settled.then(() => {
+      if (queues.get(key) === settled) queues.delete(key);
+    });
+    return next;
+  };
+}
+
+// src/engine/git.ts
+var FLAGS = [
+  "-c",
+  "core.hooksPath=/dev/null",
+  "-c",
+  "core.fsmonitor=false",
+  "-c",
+  "commit.gpgsign=false",
+  "-c",
+  "core.quotepath=false",
+  "-c",
+  "core.longpaths=true"
+];
+var GitError = class extends Error {
+  constructor(args, code2, output2) {
+    super(`git ${args[0] ?? ""}: ${output2}`);
+    this.args = args;
+    this.code = code2;
+    this.output = output2;
+    this.name = "GitError";
+  }
+  args;
+  code;
+  output;
+};
+function git(at, args, options = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn("git", [...FLAGS, ...args], {
+      cwd: at.cwd,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0", ...at.env }
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk) => stdout += chunk);
+    child.stderr.setEncoding("utf8").on("data", (chunk) => stderr += chunk);
+    child.on("error", reject);
+    child.on("close", (code2) => {
+      const exit = code2 ?? -1;
+      if (exit === 0 || options.allow?.includes(exit)) resolve({ code: exit, stdout, stderr });
+      else reject(new GitError(args, exit, (stderr || stdout).trim()));
+    });
+    child.stdin.end(options.input);
+  });
+}
+async function openRepository(folder2) {
+  const at = { cwd: folder2 };
+  const found = await git(at, ["rev-parse", "--show-toplevel", "--git-common-dir"], {
+    allow: [128]
+  });
+  const [top, common] = found.stdout.split("\n");
+  if (found.code !== 0 || !top || !common)
+    throw new GitError(["rev-parse"], found.code, `${folder2} is not in a git repository`);
+  const head = await git(at, ["rev-parse", "--verify", "-q", "HEAD"], { allow: [1] });
+  if (head.code !== 0)
+    throw new GitError(["rev-parse"], head.code, `${top} has no commit to start from yet`);
+  return { top: await realpath(top), common: await realpath(path.resolve(folder2, common)) };
+}
+var goalBranch = (slug) => `openplan/${slug}/main`;
+var serial = serialBy();
 
 // src/engine/running.ts
 function running(pid) {
@@ -7393,26 +7475,23 @@ function running(pid) {
 
 // src/engine/data.ts
 function repoFolder(dataFolder2, repo) {
-  const name = path.basename(repo.top).replace(/[^\w.-]+/g, "-");
+  const name = path2.basename(repo.top).replace(/[^\w.-]+/g, "-");
   const hash2 = createHash("sha256").update(repo.common).digest("hex").slice(0, 12);
-  return path.join(dataFolder2, "repos", `${name}-${hash2}`);
+  return path2.join(dataFolder2, "repos", `${name}-${hash2}`);
 }
-var dataFiles = (folder2) => ({
-  state: path.join(folder2, "state.json"),
-  lock: path.join(folder2, "lock"),
-  members: path.join(folder2, "members.json"),
+var goalsFolder = (repoFolder2) => path2.join(repoFolder2, "goals");
+var goalFiles = (folder2) => ({
+  state: path2.join(folder2, "state.json"),
+  lock: path2.join(folder2, "lock"),
+  members: path2.join(folder2, "members.json"),
+  /** The goal's copy of the team (team.ts copyTeam). */
+  team: path2.join(folder2, "team.json"),
   /** A member's settings file (policy.ts writeSettings). */
-  settings: (member) => path.join(folder2, "settings", `${member}.json`)
+  settings: (member) => path2.join(folder2, "settings", `${member}.json`)
 });
 var STATE_VERSION = 1;
 async function readState(file2) {
-  let text2;
-  try {
-    text2 = await readFile(file2, "utf8");
-  } catch (error62) {
-    if (error62.code !== "ENOENT") throw error62;
-    return { goals: [], tasks: [], subtasks: [], meetings: [], questions: [] };
-  }
+  const text2 = await readFile2(file2, "utf8");
   let saved;
   try {
     saved = JSON.parse(text2);
@@ -7444,91 +7523,36 @@ function holderOf(lock) {
   const holder = readHolder(lock);
   return holder && running(holder.pid) ? holder : void 0;
 }
-
-// src/engine/git.ts
-import { spawn } from "node:child_process";
-import { readdir, readFile as readFile2, realpath, rm as rm2, stat } from "node:fs/promises";
-import path2 from "node:path";
-
-// src/engine/serial.ts
-function serialBy() {
-  const queues = /* @__PURE__ */ new Map();
-  return function serial2(key, task) {
-    const next = (queues.get(key) ?? Promise.resolve()).then(task, task);
-    const settled = next.catch(() => void 0);
-    queues.set(key, settled);
-    void settled.then(() => {
-      if (queues.get(key) === settled) queues.delete(key);
-    });
-    return next;
-  };
-}
-
-// src/engine/git.ts
-var FLAGS = [
-  "-c",
-  "core.hooksPath=/dev/null",
-  "-c",
-  "core.fsmonitor=false",
-  "-c",
-  "commit.gpgsign=false",
-  "-c",
-  "core.quotepath=false",
-  "-c",
-  "core.longpaths=true"
-];
-var GitError = class extends Error {
-  constructor(args, code, output2) {
-    super(`git ${args[0] ?? ""}: ${output2}`);
-    this.args = args;
-    this.code = code;
-    this.output = output2;
-    this.name = "GitError";
+var code = (error62) => error62.code;
+async function listGoals(repoFolder2) {
+  const folder2 = goalsFolder(repoFolder2);
+  let slugs;
+  try {
+    slugs = await readdir2(folder2);
+  } catch (error62) {
+    if (code(error62) === "ENOENT") return [];
+    throw error62;
   }
-  args;
-  code;
-  output;
-};
-function git(at, args, options = {}) {
-  return new Promise((resolve, reject) => {
-    const child = spawn("git", [...FLAGS, ...args], {
-      cwd: at.cwd,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: "0", ...at.env }
-    });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.setEncoding("utf8").on("data", (chunk) => stdout += chunk);
-    child.stderr.setEncoding("utf8").on("data", (chunk) => stderr += chunk);
-    child.on("error", reject);
-    child.on("close", (code) => {
-      const exit = code ?? -1;
-      if (exit === 0 || options.allow?.includes(exit)) resolve({ code: exit, stdout, stderr });
-      else reject(new GitError(args, exit, (stderr || stdout).trim()));
-    });
-    child.stdin.end(options.input);
-  });
+  const found = await Promise.all(
+    slugs.map(async (slug) => {
+      const files = goalFiles(path2.join(folder2, slug));
+      let state;
+      try {
+        state = await readState(files.state);
+      } catch (error62) {
+        if (code(error62) === "ENOENT" || code(error62) === "ENOTDIR") return void 0;
+        throw error62;
+      }
+      const holder = holderOf(files.lock);
+      return { slug, state, ...holder && { holder } };
+    })
+  );
+  return found.filter((entry) => entry !== void 0).sort((a, b) => a.state.goal.createdAt - b.state.goal.createdAt);
 }
-async function openRepository(folder2) {
-  const at = { cwd: folder2 };
-  const found = await git(at, ["rev-parse", "--show-toplevel", "--git-common-dir"], {
-    allow: [128]
-  });
-  const [top, common] = found.stdout.split("\n");
-  if (found.code !== 0 || !top || !common)
-    throw new GitError(["rev-parse"], found.code, `${folder2} is not in a git repository`);
-  const head = await git(at, ["rev-parse", "--verify", "-q", "HEAD"], { allow: [1] });
-  if (head.code !== 0)
-    throw new GitError(["rev-parse"], head.code, `${top} has no commit to start from yet`);
-  return { top: await realpath(top), common: await realpath(path2.resolve(folder2, common)) };
-}
-var goalBranch = (slug) => `openplan/${slug}/main`;
-var serial = serialBy();
 
 // src/engine/team.ts
+import { readdir as readdir3, readFile as readFile3 } from "node:fs/promises";
 var import_yaml = __toESM(require_dist(), 1);
-import { readdir as readdir2, readFile as readFile3 } from "node:fs/promises";
-import { homedir } from "node:os";
-import path3 from "node:path";
 
 // node_modules/.pnpm/zod@4.6.7/node_modules/zod/v4/classic/external.js
 var external_exports = {};
@@ -10631,12 +10655,12 @@ function isIso7064Mod97(iban3) {
   let remainder = 0;
   const len = iban3.length;
   for (let i = 4; i < len; i++) {
-    const code = iban3.charCodeAt(i);
-    remainder = (code >= 65 ? remainder * 100 + (code - 55) : remainder * 10 + (code - 48)) % 97;
+    const code2 = iban3.charCodeAt(i);
+    remainder = (code2 >= 65 ? remainder * 100 + (code2 - 55) : remainder * 10 + (code2 - 48)) % 97;
   }
   for (let i = 0; i < 4; i++) {
-    const code = iban3.charCodeAt(i);
-    remainder = (code >= 65 ? remainder * 100 + (code - 55) : remainder * 10 + (code - 48)) % 97;
+    const code2 = iban3.charCodeAt(i);
+    remainder = (code2 >= 65 ? remainder * 100 + (code2 - 55) : remainder * 10 + (code2 - 48)) % 97;
   }
   return remainder === 1;
 }
@@ -11092,7 +11116,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
     }
     return propValues;
   });
-  const isObject3 = isObject;
+  const isObject2 = isObject;
   const catchall = def.catchall;
   let value;
   const memo2 = globalConfig.memoizer;
@@ -11100,7 +11124,7 @@ var $ZodObject = /* @__PURE__ */ $constructor("$ZodObject", (inst, def) => {
   inst._zod.parse = (payload, ctx) => {
     value ?? (value = _normalized.value);
     const input3 = payload.value;
-    if (!isObject3(input3)) {
+    if (!isObject2(input3)) {
       payload.issues.push({
         expected: "object",
         code: "invalid_type",
@@ -11236,7 +11260,7 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
     return doc.compile();
   };
   let fastpass;
-  const isObject3 = isObject;
+  const isObject2 = isObject;
   const jit = !globalConfig.jitless;
   const allowsEval2 = allowsEval;
   const fastEnabled = jit && allowsEval2.value;
@@ -11245,7 +11269,7 @@ var $ZodObjectJIT = /* @__PURE__ */ $constructor("$ZodObjectJIT", (inst, def) =>
   inst._zod.parse = (payload, ctx) => {
     value ?? (value = _normalized.value);
     const input3 = payload.value;
-    if (!isObject3(input3)) {
+    if (!isObject2(input3)) {
       payload.issues.push({
         expected: "object",
         code: "invalid_type",
@@ -20582,12 +20606,12 @@ function compileFn(schema, options) {
   doc.write(outputAccessor === null ? `return true;` : `return ${outputAccessor};`);
   const constantNames = ["INVALID", ...ctx.constants.keys()];
   const constantValues = [INVALID, ...ctx.constants.values()];
-  const code = doc.content.join("\n");
+  const code2 = doc.content.join("\n");
   const fullCode = options?.debug ? constantNames.length > 0 ? `// Constants: ${constantNames.join(", ")}
-${code}` : code : "";
+${code2}` : code2 : "";
   const F = Function;
   const factoryCode = `return (input) => {
-${code}
+${code2}
 }`;
   let fn;
   try {
@@ -27254,8 +27278,6 @@ var toYou = (question) => question.kind !== "teammate";
 var GOAL_ACTIONS = ["pause", "resume", "archive", "delete"];
 
 // src/engine/team.ts
-var teamFolder = (top) => path3.join(top, ".claude", "openplan");
-var userTeamFolder = (env) => path3.join(env.CLAUDE_CONFIG_DIR ?? path3.join(homedir(), ".claude"), "openplan");
 var EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 var roleSchema = external_exports.object({ title: external_exports.string().trim().min(1) });
 var memberSchema = external_exports.object({
@@ -27270,110 +27292,10 @@ var teamSchema = external_exports.object({
   meetingSize: external_exports.enum(MEETING_SIZES).optional()
 });
 var settingsSchema = external_exports.record(external_exports.string(), external_exports.unknown());
-function parsed(schema, data, file2) {
-  const result = schema.safeParse(data);
-  if (!result.success) throw new Error(`${file2}:
-${external_exports.prettifyError(result.error)}`);
-  return result.data;
-}
-var missing = (error62) => error62.code === "ENOENT";
-async function jsonFile(file2) {
-  let text2;
-  try {
-    text2 = await readFile3(file2, "utf8");
-  } catch (error62) {
-    if (missing(error62)) return void 0;
-    throw error62;
-  }
-  try {
-    return JSON.parse(text2);
-  } catch (error62) {
-    throw new Error(`${file2}: ${errorText(error62)}`, { cause: error62 });
-  }
-}
-async function markdownFiles(folder2) {
-  let names;
-  try {
-    names = (await readdir2(folder2)).filter((name) => name.endsWith(".md")).sort();
-  } catch (error62) {
-    if (missing(error62)) return [];
-    throw error62;
-  }
-  return Promise.all(
-    names.map(async (name) => {
-      const file2 = path3.join(folder2, name);
-      const text2 = await readFile3(file2, "utf8");
-      const front = /^---\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(text2);
-      let data;
-      try {
-        data = (0, import_yaml.parse)(front?.[1] ?? "") ?? {};
-      } catch (error62) {
-        throw new Error(`${file2}: ${errorText(error62)}`, { cause: error62 });
-      }
-      return {
-        name: name.slice(0, -".md".length),
-        file: file2,
-        data,
-        body: text2.slice(front?.[0].length ?? 0)
-      };
-    })
-  );
-}
-function mergeSettings(under, over) {
-  const merged = { ...under };
-  for (const [key, value] of Object.entries(over)) {
-    const was = merged[key];
-    merged[key] = Array.isArray(was) && Array.isArray(value) ? [.../* @__PURE__ */ new Set([...was, ...value])] : isObject2(was) && isObject2(value) ? mergeSettings(was, value) : value;
-  }
-  return merged;
-}
-var isObject2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
-async function loadTeam(folders) {
-  const roles = /* @__PURE__ */ new Map();
-  const written = /* @__PURE__ */ new Map();
-  let own2 = {};
-  let settings = {};
-  for (const folder2 of folders) {
-    for (const { name, file: file2, data, body } of await markdownFiles(path3.join(folder2, "roles")))
-      roles.set(name, {
-        id: name,
-        title: parsed(roleSchema, data, file2).title,
-        duties: body.trim()
-      });
-    for (const { name, file: file2, data } of await markdownFiles(path3.join(folder2, "members")))
-      written.set(name, { file: file2, data });
-    const teamFile = path3.join(folder2, "team.json");
-    own2 = { ...own2, ...parsed(teamSchema, await jsonFile(teamFile) ?? {}, teamFile) };
-    const settingsFile = path3.join(folder2, "settings.json");
-    settings = mergeSettings(
-      settings,
-      parsed(settingsSchema, await jsonFile(settingsFile) ?? {}, settingsFile)
-    );
-  }
-  const byName = [...written].sort(([a], [b]) => a < b ? -1 : 1);
-  const members2 = byName.map(([name, { file: file2, data }]) => {
-    const { role, model, effort, env } = parsed(memberSchema, data, file2);
-    const found = roles.get(role);
-    if (!found) throw new Error(`${file2}: there is no role "${role}" in the team's roles/`);
-    return {
-      name,
-      role: found,
-      ...model !== void 0 && { model },
-      ...effort !== void 0 && { effort },
-      env
-    };
-  });
-  if (!members2.length)
-    throw new Error(
-      `The team has no members: add them in ${folders.map((f) => path3.join(f, "members")).join(" or ")}`
-    );
-  return {
-    team: { members: members2, review: own2.review ?? true },
-    settings,
-    meetingSize: own2.meetingSize ?? "discussion"
-  };
-}
 var writing = serialBy();
+async function readCopy(file2) {
+  return JSON.parse(await readFile3(file2, "utf8"));
+}
 
 // src/engine/machines.ts
 var GOAL_MACHINE = {
@@ -27423,7 +27345,7 @@ function can(machine, state, event) {
 
 // src/engine/derive.ts
 var openQuestions = (state, subtaskId) => state.questions.filter((q) => q.subtaskId === subtaskId && q.status === "open");
-var isActive = (state, goalId) => state.goals.find((p) => p.id === goalId)?.status === "active";
+var isActive = (state) => state.goal.status === "active";
 function reviewerOf(state, subtask) {
   const meetingId = state.tasks.find((t) => t.id === subtask.taskId)?.meetingId;
   const host = state.meetings.find((m) => m.id === meetingId)?.host;
@@ -27435,7 +27357,7 @@ function acceptanceOf(state, taskId) {
     (q) => q.status === "open" && q.kind === "decision" && q.decision.kind === "delivery" && state.subtasks.find((s) => s.id === q.subtaskId)?.taskId === taskId
   );
 }
-var underReview = (state, subtask) => subtask.status === "reviewing" && isActive(state, subtask.goalId) && !openQuestions(state, subtask.id).some((q) => q.kind === "decision");
+var underReview = (state, subtask) => subtask.status === "reviewing" && isActive(state) && !openQuestions(state, subtask.id).some((q) => q.kind === "decision");
 function busyMembers(state) {
   const busy = /* @__PURE__ */ new Set();
   for (const s of state.subtasks) {
@@ -27462,8 +27384,8 @@ function reviewerAway(state, subtask) {
   return working || meeting || earlier ? reviewer : void 0;
 }
 function waitsIn(state, subtask, busy) {
-  const goal = state.goals.find((p) => p.id === subtask.goalId);
-  const held = goal && goal.status !== "active" ? [{ kind: "goal", status: goal.status }] : [];
+  const { goal } = state;
+  const held = goal.status !== "active" ? [{ kind: "goal", status: goal.status }] : [];
   const asked = () => openQuestions(state, subtask.id).map(
     (q) => q.kind === "teammate" ? { kind: "teammate", by: q.to, questionId: q.id } : q.kind === "decision" ? { kind: "you", questionId: q.id, decision: q.decision.kind } : { kind: "you", questionId: q.id }
   );
@@ -27525,7 +27447,7 @@ function goalActions(goal) {
   return GOAL_ACTIONS.filter((event) => can(GOAL_MACHINE, goal.status, event));
 }
 function meetingResumes(state, meeting) {
-  return can(MEETING_MACHINE, meeting.status, "resume") && !meeting.plan && isActive(state, meeting.goalId) && meeting.participants.every((m) => state.members.includes(m));
+  return can(MEETING_MACHINE, meeting.status, "resume") && !meeting.plan && isActive(state) && meeting.participants.every((m) => state.members.includes(m));
 }
 function derive(state) {
   const busy = busyMembers(state);
@@ -27537,7 +27459,7 @@ function derive(state) {
         return [s.id, { waits: waitsIn(state, s, busy), actions, redone }];
       })
     ),
-    goals: Object.fromEntries(state.goals.map((p) => [p.id, goalActions(p)])),
+    goal: goalActions(state.goal),
     busy: [...busy],
     resumable: state.meetings.filter((m) => meetingResumes(state, m)).map((m) => m.id)
   };
@@ -27602,56 +27524,67 @@ function questionLine(question, work) {
 function statusText(work) {
   const derived2 = derive(work);
   const busy = new Set(derived2.busy);
-  const lines = [`Team: ${work.members.map((m) => busy.has(m) ? `${m} (busy)` : m).join(", ")}`];
-  for (const goal of work.goals) {
+  const { goal } = work;
+  const lines = [
+    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)}`,
+    `Team: ${work.members.map((m) => busy.has(m) ? `${m} (busy)` : m).join(", ")}`
+  ];
+  for (const meeting of work.meetings.filter((m) => m.status !== "approved"))
     lines.push(
-      "",
-      `Goal "${goal.name}" [${goal.id}]: ${goal.status}, on branch ${goalBranch(goal.slug)}`
+      `  Meeting [${meeting.id}], hosted by ${meeting.host}${meeting.hostOnly ? ", who only runs it" : ""}: ${MEETING_STATUS[meeting.status]}${meeting.error ? ` (${meeting.error})` : ""}${derived2.resumable.includes(meeting.id) ? "; it can go on" : ""}`
     );
-    for (const meeting of work.meetings.filter(
-      (m) => m.goalId === goal.id && m.status !== "approved"
-    ))
-      lines.push(
-        `  Meeting [${meeting.id}], hosted by ${meeting.host}${meeting.hostOnly ? ", who only runs it" : ""}: ${MEETING_STATUS[meeting.status]}${meeting.error ? ` (${meeting.error})` : ""}${derived2.resumable.includes(meeting.id) ? "; it can go on" : ""}`
-      );
-    for (const task of work.tasks.filter((t) => t.goalId === goal.id)) {
-      lines.push(
-        `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", the user accepts it" : ""}`
-      );
-      for (const subtask of work.subtasks.filter((s) => s.taskId === task.id))
-        lines.push(subtaskLine(subtask, derived2.subtasks[subtask.id]?.waits ?? [], work));
-    }
+  for (const task of work.tasks) {
+    lines.push(
+      `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", the user accepts it" : ""}`
+    );
+    for (const subtask of work.subtasks.filter((s) => s.taskId === task.id))
+      lines.push(subtaskLine(subtask, derived2.subtasks[subtask.id]?.waits ?? [], work));
   }
   const open2 = work.questions.filter(toYou).filter((q) => q.status === "open");
   if (open2.length) lines.push("", "Waiting on you:", ...open2.map((q) => questionLine(q, work)));
   return lines.join("\n");
 }
+var whereOf = (entry) => entry.holder ? "in another session" : entry.state.goal.status === "archived" ? "archived" : "paused";
+function progressOf({ subtasks, meetings }) {
+  const done = subtasks.filter((s) => s.status === "done").length;
+  return subtasks.length ? `${String(done)}/${String(subtasks.length)} subtasks done` : meetings.some((m) => m.status === "review") ? "plan to review" : "no plan yet";
+}
+var othersOf = (others) => others.map((entry) => ({
+  slug: entry.slug,
+  label: `${entry.state.goal.name} \xB7 ${progressOf(entry.state)} \xB7 ${whereOf(entry)}`
+}));
+function othersText(others) {
+  if (!others.length) return void 0;
+  return [
+    "The repository's other goals, which the user takes up here with /openplan resume:",
+    ...othersOf(others).map((o) => `  - ${o.label}`)
+  ].join("\n");
+}
 
 // src/plugin/context.ts
-async function sessionContext(cwd, dataFolder2, userTeam, session) {
+async function sessionContext(cwd, dataFolder2, session) {
   let repo;
-  let team;
   try {
     repo = await openRepository(cwd);
-    ({ team } = await loadTeam([userTeam, teamFolder(repo.top)]));
   } catch {
     return void 0;
   }
-  const files = dataFiles(repoFolder(dataFolder2, repo));
-  const state = await readState(files.state);
-  if (!state.goals.length) return void 0;
-  const status = statusText({ ...state, members: team.members.map((m) => m.name) });
-  const holder = holderOf(files.lock);
-  if (holder && holder.session !== session)
-    return `openplan's team on this repository runs in another Claude Code session (pid ${String(holder.session)}); it moves to this one when the user uses openplan here, or this session does. As it stands:
+  const root = repoFolder(dataFolder2, repo);
+  const goals = await listGoals(root);
+  const mine = goals.find((g) => g.holder?.session === session);
+  const parts = [];
+  if (mine) {
+    const { team } = await readCopy(goalFiles(path3.join(goalsFolder(root), mine.slug)).team);
+    const status = statusText({ ...mine.state, members: team.members.map((m) => m.name) });
+    parts.push(
+      `This session runs openplan's goal "${mine.state.goal.name}", as it stands:
 
-${status}`;
-  const context2 = `openplan's team on this repository, as it stands:
-
-${status}`;
-  return !holder?.open && state.goals.some((g) => g.status === "active") ? `${context2}
-
-The session before ended without closing the team. This session pauses what it left going as it opens the team; nothing goes on until a goal is resumed.` : context2;
+${status}`
+    );
+  }
+  const others = othersText(goals.filter((g) => g !== mine));
+  if (others) parts.push(`openplan: ${others}`);
+  return parts.length ? parts.join("\n\n") : void 0;
 }
 
 // src/plugin/data-folder.ts
@@ -27661,12 +27594,7 @@ var dataFolder = folder;
 
 // src/plugin/session-start.ts
 var input2 = JSON.parse(await text(process.stdin));
-var context = await sessionContext(
-  input2.cwd,
-  dataFolder,
-  userTeamFolder(process.env),
-  process.ppid
-);
+var context = await sessionContext(input2.cwd, dataFolder, process.ppid);
 if (context)
   process.stdout.write(
     JSON.stringify({

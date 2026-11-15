@@ -84,17 +84,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path11) {
-      const ctrl = callVisitor(key, node, visitor, path11);
+    function visit_(key, node, visitor, path12) {
+      const ctrl = callVisitor(key, node, visitor, path12);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path11, ctrl);
-        return visit_(key, ctrl, visitor, path11);
+        replaceNode(key, path12, ctrl);
+        return visit_(key, ctrl, visitor, path12);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path11 = Object.freeze(path11.concat(node));
+          path12 = Object.freeze(path12.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path11);
+            const ci = visit_(i, node.items[i], visitor, path12);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -105,13 +105,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path11 = Object.freeze(path11.concat(node));
-          const ck = visit_("key", node.key, visitor, path11);
+          path12 = Object.freeze(path12.concat(node));
+          const ck = visit_("key", node.key, visitor, path12);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path11);
+          const cv = visit_("value", node.value, visitor, path12);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -132,17 +132,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path11) {
-      const ctrl = await callVisitor(key, node, visitor, path11);
+    async function visitAsync_(key, node, visitor, path12) {
+      const ctrl = await callVisitor(key, node, visitor, path12);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path11, ctrl);
-        return visitAsync_(key, ctrl, visitor, path11);
+        replaceNode(key, path12, ctrl);
+        return visitAsync_(key, ctrl, visitor, path12);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path11 = Object.freeze(path11.concat(node));
+          path12 = Object.freeze(path12.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path11);
+            const ci = await visitAsync_(i, node.items[i], visitor, path12);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -153,13 +153,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path11 = Object.freeze(path11.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path11);
+          path12 = Object.freeze(path12.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path12);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path11);
+          const cv = await visitAsync_("value", node.value, visitor, path12);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -186,23 +186,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path11) {
+    function callVisitor(key, node, visitor, path12) {
       if (typeof visitor === "function")
-        return visitor(key, node, path11);
+        return visitor(key, node, path12);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path11);
+        return visitor.Map?.(key, node, path12);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path11);
+        return visitor.Seq?.(key, node, path12);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path11);
+        return visitor.Pair?.(key, node, path12);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path11);
+        return visitor.Scalar?.(key, node, path12);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path11);
+        return visitor.Alias?.(key, node, path12);
       return void 0;
     }
-    function replaceNode(key, path11, node) {
-      const parent = path11[path11.length - 1];
+    function replaceNode(key, path12, node) {
+      const parent = path12[path12.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -814,10 +814,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path11, value) {
+    function collectionFromPath(schema, path12, value) {
       let v = value;
-      for (let i = path11.length - 1; i >= 0; --i) {
-        const k = path11[i];
+      for (let i = path12.length - 1; i >= 0; --i) {
+        const k = path12[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -836,7 +836,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path11) => path11 == null || typeof path11 === "object" && !!path11[Symbol.iterator]().next().done;
+    var isEmptyPath = (path12) => path12 == null || typeof path12 === "object" && !!path12[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -866,11 +866,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path11, value) {
-        if (isEmptyPath(path11))
+      addIn(path12, value) {
+        if (isEmptyPath(path12))
           this.add(value);
         else {
-          const [key, ...rest] = path11;
+          const [key, ...rest] = path12;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -884,8 +884,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path11) {
-        const [key, ...rest] = path11;
+      deleteIn(path12) {
+        const [key, ...rest] = path12;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -899,8 +899,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path11, keepScalar) {
-        const [key, ...rest] = path11;
+      getIn(path12, keepScalar) {
+        const [key, ...rest] = path12;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -918,8 +918,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path11) {
-        const [key, ...rest] = path11;
+      hasIn(path12) {
+        const [key, ...rest] = path12;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -929,8 +929,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path11, value) {
-        const [key, ...rest] = path11;
+      setIn(path12, value) {
+        const [key, ...rest] = path12;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -3445,9 +3445,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path11, value) {
+      addIn(path12, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path11, value);
+          this.contents.addIn(path12, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3522,14 +3522,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path11) {
-        if (Collection.isEmptyPath(path11)) {
+      deleteIn(path12) {
+        if (Collection.isEmptyPath(path12)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path11) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path12) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3544,10 +3544,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path11, keepScalar) {
-        if (Collection.isEmptyPath(path11))
+      getIn(path12, keepScalar) {
+        if (Collection.isEmptyPath(path12))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path11, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path12, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3558,10 +3558,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path11) {
-        if (Collection.isEmptyPath(path11))
+      hasIn(path12) {
+        if (Collection.isEmptyPath(path12))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path11) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path12) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3578,13 +3578,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path11, value) {
-        if (Collection.isEmptyPath(path11)) {
+      setIn(path12, value) {
+        if (Collection.isEmptyPath(path12)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path11), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path12), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path11, value);
+          this.contents.setIn(path12, value);
         }
       }
       /**
@@ -5545,9 +5545,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path11) => {
+    visit.itemAtPath = (cst, path12) => {
       let item = cst;
-      for (const [field, index] of path11) {
+      for (const [field, index] of path12) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5556,23 +5556,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path11) => {
-      const parent = visit.itemAtPath(cst, path11.slice(0, -1));
-      const field = path11[path11.length - 1][0];
+    visit.parentCollection = (cst, path12) => {
+      const parent = visit.itemAtPath(cst, path12.slice(0, -1));
+      const field = path12[path12.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path11, item, visitor) {
-      let ctrl = visitor(item, path11);
+    function _visit(path12, item, visitor) {
+      let ctrl = visitor(item, path12);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path11.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path12.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -5583,10 +5583,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path11);
+            ctrl = ctrl(item, path12);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path11) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path12) : ctrl;
     }
     exports.visit = visit;
   }
@@ -7362,185 +7362,10 @@ var workOf = (core) => ({
 });
 var errorText = (error) => error instanceof Error ? error.message : String(error);
 
-// src/engine/data.ts
-import { createHash } from "node:crypto";
-import { link, mkdir as mkdir2, readFile, rename as rename2, rm, writeFile as writeFile2 } from "node:fs/promises";
-import { readFileSync, unlinkSync } from "node:fs";
-import { setTimeout as delay } from "node:timers/promises";
-import path2 from "node:path";
-
-// src/engine/files.ts
-import { renameSync, writeFileSync } from "node:fs";
-import { mkdir, rename, writeFile } from "node:fs/promises";
-import path from "node:path";
-var fresh = (file) => `${file}.${String(process.pid)}.new`;
-async function writeWhole(file, text2, mode) {
-  await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(fresh(file), text2, { mode });
-  await rename(fresh(file), file);
-}
-function writeWholeSync(file, text2) {
-  writeFileSync(fresh(file), text2);
-  renameSync(fresh(file), file);
-}
-
-// src/engine/data.ts
-function repoFolder(dataFolder2, repo) {
-  const name = path2.basename(repo.top).replace(/[^\w.-]+/g, "-");
-  const hash = createHash("sha256").update(repo.common).digest("hex").slice(0, 12);
-  return path2.join(dataFolder2, "repos", `${name}-${hash}`);
-}
-var dataFiles = (folder) => ({
-  state: path2.join(folder, "state.json"),
-  lock: path2.join(folder, "lock"),
-  members: path2.join(folder, "members.json"),
-  /** A member's settings file (policy.ts writeSettings). */
-  settings: (member) => path2.join(folder, "settings", `${member}.json`)
-});
-var STATE_VERSION = 1;
-var SAVE_DELAY_MS = 200;
-async function readState(file) {
-  let text2;
-  try {
-    text2 = await readFile(file, "utf8");
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-    return { goals: [], tasks: [], subtasks: [], meetings: [], questions: [] };
-  }
-  let saved;
-  try {
-    saved = JSON.parse(text2);
-  } catch (error) {
-    throw new Error(`${file} can't be read (${errorText(error)}): move it away to start over`, {
-      cause: error
-    });
-  }
-  if (saved.version > STATE_VERSION)
-    throw new Error(`${file} was written by a newer openplan: update openplan to go on`);
-  return saved.state;
-}
-function stateWriter(file, state, failed) {
-  let timer;
-  let writing2 = Promise.resolve();
-  let closed = false;
-  const write = () => {
-    timer = void 0;
-    writing2 = writing2.then(() => writeWhole(file, JSON.stringify({ version: STATE_VERSION, state: state() }))).catch(failed);
-  };
-  return {
-    changed() {
-      if (!closed) timer ??= setTimeout(write, SAVE_DELAY_MS);
-    },
-    async flush() {
-      if (timer) {
-        clearTimeout(timer);
-        write();
-      }
-      await writing2;
-    },
-    async close() {
-      clearTimeout(timer);
-      write();
-      closed = true;
-      await writing2;
-    }
-  };
-}
-function lockText(file) {
-  try {
-    return readFileSync(file, "utf8");
-  } catch {
-    return void 0;
-  }
-}
-function readHolder(file) {
-  const text2 = lockText(file);
-  try {
-    return text2 === void 0 ? void 0 : JSON.parse(text2);
-  } catch {
-    return void 0;
-  }
-}
-function holderOf(lock) {
-  const holder = readHolder(lock);
-  return holder && running(holder.pid) ? holder : void 0;
-}
-var busy = (holder) => new Error(
-  `Another Claude Code session runs this repository's team (pid ${String(holder.session)}). Using openplan here brings it to this session.`
-);
-async function holding(lock, me, open2) {
-  await mkdir2(path2.dirname(lock), { recursive: true });
-  const file = `${lock}.${String(process.pid)}`;
-  const holder = { pid: process.pid, ...me, open: open2 };
-  await writeFile2(file, JSON.stringify(holder));
-  return file;
-}
-var code = (error) => error.code;
-var REPLACING_WAIT_MS = 10;
-async function takeTeam(lock, me, takeOver) {
-  const mine = await holding(lock, me, false);
-  const handed = { goals: [], meetings: [] };
-  try {
-    for (; ; ) {
-      try {
-        await link(mine, lock);
-        return handed;
-      } catch (error) {
-        if (code(error) !== "EEXIST") throw error;
-      }
-      const ended = lockText(lock);
-      if (ended === void 0) continue;
-      const holder = readHolder(lock);
-      if (holder && running(holder.pid)) {
-        if (holder.pid === process.pid) {
-          await rename2(mine, lock);
-          return handed;
-        }
-        if (!takeOver) throw busy(holder);
-        const stopped = await takeOver(holder);
-        handed.goals.push(...stopped.goals);
-        handed.meetings.push(...stopped.meetings);
-        continue;
-      }
-      const claim = `${lock}.ended-${String(holder?.pid ?? "unread")}`;
-      try {
-        await link(mine, claim);
-      } catch (error) {
-        if (code(error) !== "EEXIST") throw error;
-        if (lockText(claim) === void 0) continue;
-        const replacing = readHolder(claim);
-        if (!replacing || !running(replacing.pid))
-          throw new Error(
-            `A session taking this repository's team ended partway: delete ${lock} and ${claim}`,
-            { cause: error }
-          );
-        await delay(REPLACING_WAIT_MS);
-        continue;
-      }
-      try {
-        if (lockText(lock) === ended) {
-          await rename2(mine, lock);
-          return handed;
-        }
-      } finally {
-        await rm(claim, { force: true });
-      }
-    }
-  } finally {
-    await rm(mine, { force: true });
-  }
-}
-async function openedTeam(lock, me) {
-  await rename2(await holding(lock, me, true), lock);
-}
-function releaseTeam(lock) {
-  if (holderOf(lock)?.pid === process.pid) unlinkSync(lock);
-}
-
 // src/engine/git.ts
 import { spawn } from "node:child_process";
-import { readdir, readFile as readFile2, realpath, rm as rm2, stat } from "node:fs/promises";
-import path3 from "node:path";
+import { readdir, readFile, realpath, rm, stat } from "node:fs/promises";
+import path from "node:path";
 
 // src/engine/serial.ts
 function serialBy() {
@@ -7621,10 +7446,10 @@ async function openRepository(folder) {
   const head = await git(at, ["rev-parse", "--verify", "-q", "HEAD"], { allow: [1] });
   if (head.code !== 0)
     throw new GitError(["rev-parse"], head.code, `${top} has no commit to start from yet`);
-  return { top: await realpath(top), common: await realpath(path3.resolve(folder, common)) };
+  return { top: await realpath(top), common: await realpath(path.resolve(folder, common)) };
 }
 var goalBranch = (slug) => `openplan/${slug}/main`;
-var goalFolder = (places, slug) => path3.join(places.root, "goals", slug);
+var goalFolder = (places) => path.join(places.root, "checkout");
 async function takenSlugs(repo) {
   const refs = await git({ cwd: repo.top }, [
     "for-each-ref",
@@ -7662,22 +7487,22 @@ async function checkOut(repo, folder, branch, from) {
 async function openGoal(places, slug) {
   const { repo } = places;
   const branch = goalBranch(slug);
-  const folder = goalFolder(places, slug);
+  const folder = goalFolder(places);
   if (!await hasBranch(repo, branch)) await git({ cwd: repo.top }, ["branch", branch, "HEAD"]);
   if (!await exists(folder)) await checkOut(repo, folder, branch);
   return folder;
 }
 var subtaskBranch = (slug, subtaskId) => `openplan/${slug}/${subtaskId}`;
-var deskFolder = (places, subtaskId) => path3.join(places.root, "desks", subtaskId);
+var deskFolder = (places, subtaskId) => path.join(places.root, "desks", subtaskId);
 var serial = serialBy();
-var perGoal = (places, slug, task) => serial(goalFolder(places, slug), task);
+var perGoal = (places, task) => serial(goalFolder(places), task);
 function openDesk(places, slug, subtaskId) {
-  return perGoal(places, slug, async () => {
+  return perGoal(places, async () => {
     const { repo } = places;
     const desk = deskFolder(places, subtaskId);
     await openGoal(places, slug);
-    if (await exists(path3.join(desk, ".git"))) return desk;
-    await rm2(desk, { recursive: true, force: true });
+    if (await exists(path.join(desk, ".git"))) return desk;
+    await rm(desk, { recursive: true, force: true });
     const branch = subtaskBranch(slug, subtaskId);
     await checkOut(
       repo,
@@ -7689,14 +7514,14 @@ function openDesk(places, slug, subtaskId) {
   });
 }
 async function worktreeAt(repo, tree) {
-  const real = (file) => realpath(file).catch(() => path3.resolve(file));
+  const real = (file) => realpath(file).catch(() => path.resolve(file));
   const here = await real(tree);
-  const entries = path3.join(repo.common, "worktrees");
+  const entries = path.join(repo.common, "worktrees");
   const find = async () => {
     for (const name of await readdir(entries).catch(() => [])) {
-      const gitdir = await readFile2(path3.join(entries, name, "gitdir"), "utf8").catch(() => "");
-      if (gitdir && await real(path3.dirname(gitdir.trim())) === here)
-        return path3.join(entries, name);
+      const gitdir = await readFile(path.join(entries, name, "gitdir"), "utf8").catch(() => "");
+      if (gitdir && await real(path.dirname(gitdir.trim())) === here)
+        return path.join(entries, name);
     }
   };
   const entry = await find() ?? await git({ cwd: repo.top }, ["worktree", "repair", tree], { allow: [128] }).then(find);
@@ -7705,7 +7530,7 @@ async function worktreeAt(repo, tree) {
 }
 var merging = async (at) => (await git(at, ["rev-parse", "-q", "--verify", "MERGE_HEAD"], { allow: [1] })).code === 0;
 function commitDesk(places, slug, subtaskId, by, message) {
-  return perGoal(places, slug, async () => {
+  return perGoal(places, async () => {
     const at = await worktreeAt(places.repo, deskFolder(places, subtaskId));
     const signed = { ...at, env: { ...at.env, ...authorEnv(by) } };
     await git(signed, ["add", "-A"]);
@@ -7719,7 +7544,7 @@ async function unresolved(places, subtaskId, files) {
   const desk = deskFolder(places, subtaskId);
   const marked = await Promise.all(
     files.map(
-      (file) => readFile2(path3.join(desk, file), "utf8").then(
+      (file) => readFile(path.join(desk, file), "utf8").then(
         (text2) => MARKERS.test(text2),
         () => false
       )
@@ -7737,13 +7562,13 @@ async function conflicts(places, subtaskId, at) {
 async function removeDesk(places, slug, subtaskId) {
   const desk = deskFolder(places, subtaskId);
   await unlist(places.repo, desk);
-  await rm2(desk, { recursive: true, force: true });
+  await rm(desk, { recursive: true, force: true });
   await git({ cwd: places.repo.top }, ["branch", "-q", "-D", subtaskBranch(slug, subtaskId)], {
     allow: [1]
   });
 }
 function mergeDesk(places, slug, subtaskId, by) {
-  return perGoal(places, slug, async () => {
+  return perGoal(places, async () => {
     const { repo } = places;
     const folder = deskFolder(places, subtaskId);
     if (!await exists(folder)) {
@@ -7770,15 +7595,15 @@ function mergeDesk(places, slug, subtaskId, by) {
       }
     }
     const head = (await git(desk, ["rev-parse", "HEAD"])).stdout.trim();
-    const goal2 = await worktreeAt(repo, await openGoal(places, slug));
-    await git(goal2, ["merge", "-q", "--ff-only", head]);
+    const goal = await worktreeAt(repo, await openGoal(places, slug));
+    await git(goal, ["merge", "-q", "--ff-only", head]);
     await removeDesk(places, slug, subtaskId);
     return { kind: "merged" };
   });
 }
 var literally = (file) => `:(literal)${file}`;
 function pickSide(places, slug, subtaskId, files, side) {
-  return perGoal(places, slug, async () => {
+  return perGoal(places, async () => {
     const desk = await worktreeAt(places.repo, deskFolder(places, subtaskId));
     const stages = await git(desk, ["ls-files", "-u", "-z", "--", ...files.map(literally)]);
     const wanted = side === "ours" ? "2" : "3";
@@ -7794,16 +7619,16 @@ function pickSide(places, slug, subtaskId, files, side) {
   });
 }
 function abortMerge(places, slug, subtaskId) {
-  return perGoal(places, slug, async () => {
+  return perGoal(places, async () => {
     const desk = await worktreeAt(places.repo, deskFolder(places, subtaskId));
     if (await merging(desk)) await git(desk, ["merge", "--abort"]);
   });
 }
 function dropDesk(places, slug, subtaskId) {
-  return perGoal(places, slug, () => removeDesk(places, slug, subtaskId));
+  return perGoal(places, () => removeDesk(places, slug, subtaskId));
 }
 function removeGoal(places, slug) {
-  return perGoal(places, slug, async () => {
+  return perGoal(places, async () => {
     const { repo } = places;
     const refs = await git({ cwd: repo.top }, [
       "for-each-ref",
@@ -7813,15 +7638,310 @@ function removeGoal(places, slug) {
     for (const id of refs.stdout.split("\n")) {
       if (id && id !== "main") await removeDesk(places, slug, id);
     }
-    const folder = goalFolder(places, slug);
+    const folder = goalFolder(places);
     await unlist(repo, folder);
-    await rm2(folder, { recursive: true, force: true });
+    await rm(folder, { recursive: true, force: true });
   });
 }
 
-// src/engine/goals.ts
-import { randomUUID } from "node:crypto";
-import { rm as rm3 } from "node:fs/promises";
+// src/engine/processes.ts
+import { execFile } from "node:child_process";
+import { readFile as readFile2 } from "node:fs/promises";
+
+// src/engine/files.ts
+import { renameSync, writeFileSync } from "node:fs";
+import { mkdir, rename, writeFile } from "node:fs/promises";
+import path2 from "node:path";
+var fresh = (file) => `${file}.${String(process.pid)}.new`;
+async function writeWhole(file, text2, mode) {
+  await mkdir(path2.dirname(file), { recursive: true });
+  await writeFile(fresh(file), text2, { mode });
+  await rename(fresh(file), file);
+}
+function writeWholeSync(file, text2) {
+  writeFileSync(fresh(file), text2);
+  renameSync(fresh(file), file);
+}
+
+// src/engine/processes.ts
+var running2 = /* @__PURE__ */ new Map();
+var record;
+function save() {
+  if (record === void 0) return;
+  const written2 = [...running2].map(([pid, { settings }]) => ({ pid, settings }));
+  writeWholeSync(record, JSON.stringify(written2));
+}
+function watchMember(child, args) {
+  const { pid } = child;
+  const at = args.indexOf("--settings");
+  const settings = at < 0 ? void 0 : args[at + 1];
+  if (pid === void 0 || settings === void 0) return;
+  running2.set(pid, { child, settings });
+  save();
+  child.once("exit", () => {
+    running2.delete(pid);
+    save();
+  });
+}
+function stopMembers() {
+  for (const { child } of running2.values()) child.kill("SIGTERM");
+}
+var commandLine = (pid) => new Promise((resolve) => {
+  const [command, args] = process.platform === "win32" ? [
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-Command",
+      `(Get-CimInstance Win32_Process -Filter "ProcessId=${String(pid)}").CommandLine`
+    ]
+  ] : ["ps", ["-o", "command=", "-p", String(pid)]];
+  execFile(command, args, (error, stdout) => {
+    resolve(error ? void 0 : stdout);
+  });
+});
+async function written(file) {
+  try {
+    return JSON.parse(await readFile2(file, "utf8"));
+  } catch {
+    return [];
+  }
+}
+async function recordMembersIn(file) {
+  const left = await written(file);
+  await Promise.all(
+    left.map(async ({ pid, settings }) => {
+      if (!(await commandLine(pid))?.includes(settings)) return;
+      try {
+        process.kill(pid, "SIGTERM");
+      } catch {
+      }
+    })
+  );
+  record = file;
+  save();
+}
+function stopRecording() {
+  record = void 0;
+}
+
+// src/engine/team.ts
+var import_yaml = __toESM(require_dist(), 1);
+import { readdir as readdir2, readFile as readFile3 } from "node:fs/promises";
+import { homedir } from "node:os";
+import path3 from "node:path";
+import { z } from "zod";
+
+// src/engine/types.ts
+var isHalted = (status) => status === "failed" || status === "stopped";
+var MEETING_SIZES = ["small", "discussion", "large"];
+var DECISION_OPTIONS = [
+  "rereview",
+  "skip",
+  "sendBack",
+  "ours",
+  "theirs",
+  "retry",
+  "accept",
+  "revise"
+];
+var PERMISSION_OPTIONS = ["once", "always", "deny"];
+var toYou = (question) => question.kind !== "teammate";
+var SUBTASK_ACTIONS = ["stop", "continue", "retry", "redo"];
+var GOAL_ACTIONS = ["pause", "resume", "archive", "delete"];
+
+// src/engine/team.ts
+var teamFolder = (top) => path3.join(top, ".claude", "openplan");
+var userTeamFolder = (env) => path3.join(env.CLAUDE_CONFIG_DIR ?? path3.join(homedir(), ".claude"), "openplan");
+var EFFORTS = ["low", "medium", "high", "xhigh", "max"];
+var roleSchema = z.object({ title: z.string().trim().min(1) });
+var memberSchema = z.object({
+  role: z.string().trim().min(1),
+  model: z.string().trim().min(1).optional(),
+  effort: z.enum(EFFORTS).optional(),
+  // As in `.mcp.json`, though YAML reads `API_TIMEOUT_MS: 3000000` as a number.
+  env: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]).transform(String)).default({})
+});
+var teamSchema = z.object({
+  review: z.boolean().optional(),
+  meetingSize: z.enum(MEETING_SIZES).optional()
+});
+var settingsSchema = z.record(z.string(), z.unknown());
+function parsed(schema, data, file) {
+  const result = schema.safeParse(data);
+  if (!result.success) throw new Error(`${file}:
+${z.prettifyError(result.error)}`);
+  return result.data;
+}
+var missing = (error) => error.code === "ENOENT";
+async function jsonFile(file) {
+  let text2;
+  try {
+    text2 = await readFile3(file, "utf8");
+  } catch (error) {
+    if (missing(error)) return void 0;
+    throw error;
+  }
+  try {
+    return JSON.parse(text2);
+  } catch (error) {
+    throw new Error(`${file}: ${errorText(error)}`, { cause: error });
+  }
+}
+async function markdownFiles(folder) {
+  let names;
+  try {
+    names = (await readdir2(folder)).filter((name) => name.endsWith(".md")).sort();
+  } catch (error) {
+    if (missing(error)) return [];
+    throw error;
+  }
+  return Promise.all(
+    names.map(async (name) => {
+      const file = path3.join(folder, name);
+      const text2 = await readFile3(file, "utf8");
+      const front = /^---\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(text2);
+      let data;
+      try {
+        data = (0, import_yaml.parse)(front?.[1] ?? "") ?? {};
+      } catch (error) {
+        throw new Error(`${file}: ${errorText(error)}`, { cause: error });
+      }
+      return {
+        name: name.slice(0, -".md".length),
+        file,
+        data,
+        body: text2.slice(front?.[0].length ?? 0)
+      };
+    })
+  );
+}
+function mergeSettings(under, over) {
+  const merged = { ...under };
+  for (const [key, value] of Object.entries(over)) {
+    const was = merged[key];
+    merged[key] = Array.isArray(was) && Array.isArray(value) ? [.../* @__PURE__ */ new Set([...was, ...value])] : isObject(was) && isObject(value) ? mergeSettings(was, value) : value;
+  }
+  return merged;
+}
+var isObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+async function loadTeam(folders) {
+  const roles = /* @__PURE__ */ new Map();
+  const written2 = /* @__PURE__ */ new Map();
+  let own = {};
+  let settings = {};
+  for (const folder of folders) {
+    for (const { name, file, data, body } of await markdownFiles(path3.join(folder, "roles")))
+      roles.set(name, {
+        id: name,
+        title: parsed(roleSchema, data, file).title,
+        duties: body.trim()
+      });
+    for (const { name, file, data } of await markdownFiles(path3.join(folder, "members")))
+      written2.set(name, { file, data });
+    const teamFile = path3.join(folder, "team.json");
+    own = { ...own, ...parsed(teamSchema, await jsonFile(teamFile) ?? {}, teamFile) };
+    const settingsFile = path3.join(folder, "settings.json");
+    settings = mergeSettings(
+      settings,
+      parsed(settingsSchema, await jsonFile(settingsFile) ?? {}, settingsFile)
+    );
+  }
+  const byName = [...written2].sort(([a], [b]) => a < b ? -1 : 1);
+  const members = byName.map(([name, { file, data }]) => {
+    const { role, model, effort, env } = parsed(memberSchema, data, file);
+    const found = roles.get(role);
+    if (!found) throw new Error(`${file}: there is no role "${role}" in the team's roles/`);
+    return {
+      name,
+      role: found,
+      ...model !== void 0 && { model },
+      ...effort !== void 0 && { effort },
+      env
+    };
+  });
+  if (!members.length)
+    throw new Error(
+      `The team has no members: add them in ${folders.map((f) => path3.join(f, "members")).join(" or ")}`
+    );
+  return {
+    team: { members, review: own.review ?? true },
+    settings,
+    meetingSize: own.meetingSize ?? "discussion"
+  };
+}
+var writing = serialBy();
+function allowing(settings, rules, file) {
+  const permissions = parsed(
+    z.looseObject({ allow: z.array(z.string()).default([]) }),
+    settings.permissions ?? {},
+    file
+  );
+  const allow = [.../* @__PURE__ */ new Set([...permissions.allow, ...rules])];
+  return { ...settings, permissions: { ...permissions, allow } };
+}
+function allowInTeam(top, rules) {
+  const file = path3.join(teamFolder(top), "settings.json");
+  return writing(file, async () => {
+    const settings = parsed(settingsSchema, await jsonFile(file) ?? {}, file);
+    await writeWhole(file, `${JSON.stringify(allowing(settings, rules, file), null, 2)}
+`);
+  });
+}
+var copyTeam = (file, team) => writeWhole(file, JSON.stringify(team));
+async function readCopy(file) {
+  return JSON.parse(await readFile3(file, "utf8"));
+}
+function allowInCopy(file, rules) {
+  return writing(file, async () => {
+    const copy = await readCopy(file);
+    const settings = allowing(copy.settings, rules, file);
+    const now = { ...copy, settings };
+    await copyTeam(file, now);
+    return now;
+  });
+}
+
+// src/plugin/claude.ts
+import { execFile as execFile2 } from "node:child_process";
+import { readlink } from "node:fs/promises";
+import { promisify } from "node:util";
+var run = async (command, args) => (await promisify(execFile2)(command, args)).stdout;
+async function executableOf(pid) {
+  const id = String(pid);
+  let found;
+  switch (process.platform) {
+    case "linux":
+      found = await readlink(`/proc/${id}/exe`);
+      break;
+    case "win32":
+      found = (await run("powershell.exe", [
+        "-NoProfile",
+        "-Command",
+        `(Get-CimInstance Win32_Process -Filter "ProcessId=${id}").ExecutablePath`
+      ])).trim();
+      break;
+    default:
+      found = (await run("lsof", ["-a", "-p", id, "-d", "txt", "-Fn"])).split("\n").find((line) => line.startsWith("n"))?.slice(1);
+  }
+  if (!found) throw new Error(`Can't tell which executable process ${id} runs`);
+  return found;
+}
+
+// src/plugin/plugin-id.ts
+import path4 from "node:path";
+var PLUGIN = "openplan";
+function pluginId(dataFolder2) {
+  return `${PLUGIN}@${path4.basename(dataFolder2).slice(PLUGIN.length + 1)}`;
+}
+
+// src/plugin/pane-server.ts
+import { randomBytes } from "node:crypto";
+import { mkdtempSync, rmSync } from "node:fs";
+import { createServer, request } from "node:http";
+import { tmpdir } from "node:os";
+import path5 from "node:path";
+import { text } from "node:stream/consumers";
+import { z as z2 } from "zod";
 
 // src/engine/machines.ts
 var GOAL_MACHINE = {
@@ -7878,323 +7998,9 @@ function step(machine, state, event) {
   return move.to;
 }
 
-// src/engine/records.ts
-import { appendFile, mkdir as mkdir3, open } from "node:fs/promises";
-import path4 from "node:path";
-var OUTPUT_MAX = 4e3;
-var recordFile = (places, subtaskId) => path4.join(places.root, "records", `${subtaskId}.jsonl`);
-var Records = class {
-  constructor(places, failed) {
-    this.places = places;
-    this.failed = failed;
-  }
-  places;
-  failed;
-  /** What each subtask's run is doing now, by subtask id: its last run's, once it ends. */
-  live = /* @__PURE__ */ new Map();
-  spoken = /* @__PURE__ */ new Map();
-  /** Entries are appended one at a time, in the order they came. */
-  writing = Promise.resolve();
-  /** Where a run of `subtaskId` tells what it does: its record, and what goes on now. */
-  recorder(subtaskId) {
-    const now = { running: /* @__PURE__ */ new Map() };
-    this.live.set(subtaskId, now);
-    const file = recordFile(this.places, subtaskId);
-    const write = (entry) => {
-      this.writing = this.writing.then(async () => {
-        await mkdir3(path4.dirname(file), { recursive: true });
-        await appendFile(file, `${JSON.stringify(entry)}
-`);
-      }).catch(this.failed);
-    };
-    return {
-      session: (session, model) => {
-        write({ at: Date.now(), kind: "run", session, model });
-      },
-      thinking: (delta) => {
-        now.streaming = delta === "" || now.streaming?.kind !== "thinking" ? { kind: "thinking", text: delta } : { kind: "thinking", text: now.streaming.text + delta };
-      },
-      text: (delta, fresh2) => {
-        now.streaming = fresh2 || now.streaming?.kind !== "text" ? { kind: "text", text: delta } : { kind: "text", text: now.streaming.text + delta };
-      },
-      toolStarting: (name) => {
-        now.starting = name;
-      },
-      block: (block) => {
-        if (block.kind === "tool") {
-          now.starting = void 0;
-          now.running.set(block.id, block);
-          return;
-        }
-        if (now.streaming?.kind === block.kind) now.streaming = void 0;
-        write({ at: Date.now(), kind: block.kind, text: block.text });
-      },
-      toolDone: (call) => {
-        now.running.delete(call.id);
-        write({
-          at: Date.now(),
-          kind: "tool",
-          name: call.name,
-          input: call.input,
-          state: call.state === "error" ? "error" : "done",
-          output: (call.output ?? "").slice(0, OUTPUT_MAX)
-        });
-      },
-      steps: (steps) => {
-        write({ at: Date.now(), kind: "steps", steps });
-      },
-      notice: (notice) => {
-        write({ at: Date.now(), kind: "notice", notice });
-      }
-    };
-  }
-  /**
-   * A subtask's record from byte `from` of its file on: the whole entries
-   * written since, where the next read starts, and what its run is doing now.
-   */
-  async read(subtaskId, from = 0) {
-    const now = this.live.get(subtaskId);
-    const live = now && {
-      ...now.streaming && { streaming: now.streaming },
-      ...now.starting && { starting: now.starting },
-      running: [...now.running.values()]
-    };
-    let handle;
-    try {
-      handle = await open(recordFile(this.places, subtaskId));
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
-      return { entries: [], next: 0, ...live && { live } };
-    }
-    try {
-      const { size } = await handle.stat();
-      const buffer = Buffer.alloc(Math.max(0, size - from));
-      await handle.read(buffer, 0, buffer.length, from);
-      const whole = buffer.lastIndexOf("\n") + 1;
-      const entries = buffer.subarray(0, whole).toString("utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line));
-      return { entries, next: from + whole, ...live && { live } };
-    } finally {
-      await handle.close();
-    }
-  }
-  /** Where a meeting turn tells its words as they are said. */
-  speech(meeting2, speaker) {
-    const spoken = { speaker, text: "", turn: meeting2.turns.length };
-    this.spoken.set(meeting2.id, spoken);
-    return {
-      // What a turn says before it looks something up isn't what it ends up saying.
-      text: (delta, fresh2) => {
-        spoken.text = fresh2 ? delta : spoken.text + delta;
-      }
-    };
-  }
-  /** The turn being spoken at `meeting` now, if one is. */
-  speaking(meeting2) {
-    const spoken = this.spoken.get(meeting2.id);
-    return meeting2.status === "running" && spoken?.turn === meeting2.turns.length ? spoken : void 0;
-  }
-  /** Every entry written so far is in its file. */
-  flush() {
-    return this.writing;
-  }
-};
-
-// src/engine/goals.ts
-var ACTIVATING = "activate";
-var Goals = class {
-  constructor(core, scheduler, meetings) {
-    this.core = core;
-    this.scheduler = scheduler;
-    this.meetings = meetings;
-  }
-  core;
-  scheduler;
-  meetings;
-  life = serialBy();
-  /** Starts a goal: its branch cut from your HEAD, checked out in its own worktree. */
-  start(name) {
-    return this.life(ACTIVATING, async () => {
-      const { core } = this;
-      this.onlyOne();
-      const taken = await takenSlugs(core.places.repo);
-      for (const goal3 of core.state.goals) taken.add(goal3.slug);
-      const goal2 = {
-        id: randomUUID(),
-        name,
-        slug: slugFor(name, taken),
-        status: "active",
-        createdAt: Date.now()
-      };
-      await openGoal(core.places, goal2.slug);
-      core.state.goals.push(goal2);
-      core.changed();
-      return goal2;
-    });
-  }
-  /**
-   * Pauses a goal: its runs stop, to go on in their sessions when it is
-   * resumed, and a meeting under way is cancelled; a plan in review stays,
-   * to approve once it goes on.
-   */
-  pause(id) {
-    return this.life(id, () => {
-      const goal2 = this.goal(id);
-      if (goal2.status === "paused") return;
-      if (goal2.status === "archived")
-        throw new Error(`The goal "${goal2.name}" is archived: resume it first`);
-      goal2.status = step(GOAL_MACHINE, goal2.status, "pause");
-      this.hold(goal2, false);
-    });
-  }
-  /** Archives a goal as it stands: its work held as when paused, and its plans in review dropped. */
-  archive(id) {
-    return this.life(id, () => {
-      const goal2 = this.goal(id);
-      if (goal2.status === "archived") return;
-      goal2.status = step(GOAL_MACHINE, goal2.status, "archive");
-      goal2.archivedAt = Date.now();
-      this.hold(goal2, true);
-    });
-  }
-  /** Puts a paused or archived goal back to work, from where it was. */
-  resume(id) {
-    return this.life(
-      id,
-      () => this.life(ACTIVATING, () => {
-        if (!this.wake(this.goal(id))) return;
-        this.core.changed();
-        this.scheduler.pump();
-      })
-    );
-  }
-  /**
-   * Puts back what a session stopped as it handed the team over (§3.2): its
-   * goals, then their meetings, and only then other work, so a meeting's
-   * members go back to it before anything else takes them.
-   */
-  async carryOn({ goals, meetings }) {
-    for (const id of goals)
-      await this.life(id, () => this.life(ACTIVATING, () => this.wake(this.goal(id))));
-    for (const id of meetings) this.meetings.resume(id);
-    this.core.changed();
-    this.scheduler.pump();
-  }
-  /**
-   * Deletes an archived goal for good: its subtasks' worktrees, branches and
-   * records, its own worktree and its plans' documents, then its tasks, subtasks,
-   * meetings and their questions. Its branch stays, yours to merge or delete.
-   */
-  delete(id) {
-    return this.life(id, async () => {
-      const { core } = this;
-      const goal2 = core.state.goals.find((g) => g.id === id);
-      if (!goal2) return;
-      if (!can(GOAL_MACHINE, goal2.status, "delete"))
-        throw new Error(`The goal "${goal2.name}" isn't archived: archive it before deleting it`);
-      const subtasks = core.state.subtasks.filter((s) => s.goalId === id);
-      await this.scheduler.release(subtasks.map((s) => s.id));
-      await this.meetings.settled(id);
-      await removeGoal(core.places, goal2.slug);
-      await Promise.all([
-        ...core.state.meetings.flatMap(
-          (m) => m.goalId === id && m.planFile ? [rm3(m.planFile, { force: true })] : []
-        ),
-        ...subtasks.map((s) => rm3(recordFile(core.places, s.id), { force: true }))
-      ]);
-      const gone = new Set(subtasks.map((s) => s.id));
-      const { state } = core;
-      state.questions = state.questions.filter((q) => !q.subtaskId || !gone.has(q.subtaskId));
-      state.subtasks = state.subtasks.filter((s) => s.goalId !== id);
-      state.tasks = state.tasks.filter((t) => t.goalId !== id);
-      state.meetings = state.meetings.filter((m) => m.goalId !== id);
-      state.goals = state.goals.filter((g) => g.id !== id);
-      core.changed();
-    });
-  }
-  /**
-   * Gives a member a subtask directly, as a task of its own. It starts once
-   * they are free; a paused goal's waits for the goal to go on.
-   */
-  assign(goalId, work) {
-    const goal2 = this.goal(goalId);
-    if (goal2.status === "archived")
-      throw new Error(`The goal "${goal2.name}" is archived: resume it first`);
-    if (!this.core.team.members.some((m) => m.name === work.assignee))
-      throw new Error(`There is no member called "${work.assignee}"`);
-    return this.scheduler.assign(goal2.id, [
-      // Work you assign is done once merged: it isn't yours to accept (§7.1).
-      {
-        title: work.title,
-        outcome: "",
-        ownerAccepts: false,
-        subtasks: [{ ...work, key: "", dependsOn: [] }]
-      }
-    ]);
-  }
-  /** Makes a goal active again; false when it was already. */
-  wake(goal2) {
-    if (goal2.status === "active") return false;
-    this.onlyOne();
-    goal2.status = step(GOAL_MACHINE, goal2.status, "resume");
-    goal2.archivedAt = void 0;
-    return true;
-  }
-  /** One goal is active at a time (§4.1): one under way refuses another. */
-  onlyOne() {
-    const active = this.core.state.goals.find((g) => g.status === "active");
-    if (active)
-      throw new Error(
-        `The goal "${active.name}" [${active.id}] is under way, and one goal runs at a time: pause it first if the user wants`
-      );
-  }
-  goal(id) {
-    const goal2 = this.core.state.goals.find((g) => g.id === id);
-    if (!goal2) throw new Error("There is no such goal");
-    return goal2;
-  }
-  /** Holds a goal's work, cancels its meeting under way and, `plansToo`, its plans in review. */
-  hold(goal2, plansToo) {
-    this.scheduler.hold(goal2.id);
-    for (const meeting2 of this.core.state.meetings) {
-      if (meeting2.goalId !== goal2.id) continue;
-      if (meeting2.status === "running" || plansToo && meeting2.status === "review")
-        void this.meetings.cancel(meeting2.id);
-    }
-    this.core.changed();
-  }
-};
-
-// src/engine/meetings.ts
-import { randomUUID as randomUUID2 } from "node:crypto";
-import { mkdir as mkdir4, writeFile as writeFile3 } from "node:fs/promises";
-import path5 from "node:path";
-import {
-  createSdkMcpServer,
-  tool
-} from "@anthropic-ai/claude-agent-sdk";
-import { z as z3 } from "zod";
-
-// src/engine/types.ts
-var isHalted = (status) => status === "failed" || status === "stopped";
-var MEETING_SIZES = ["small", "discussion", "large"];
-var DECISION_OPTIONS = [
-  "rereview",
-  "skip",
-  "sendBack",
-  "ours",
-  "theirs",
-  "retry",
-  "accept",
-  "revise"
-];
-var PERMISSION_OPTIONS = ["once", "always", "deny"];
-var toYou = (question) => question.kind !== "teammate";
-var SUBTASK_ACTIONS = ["stop", "continue", "retry", "redo"];
-var GOAL_ACTIONS = ["pause", "resume", "archive", "delete"];
-
 // src/engine/derive.ts
 var openQuestions = (state, subtaskId) => state.questions.filter((q) => q.subtaskId === subtaskId && q.status === "open");
-var isActive = (state, goalId) => state.goals.find((p) => p.id === goalId)?.status === "active";
+var isActive = (state) => state.goal.status === "active";
 function reviewerOf(state, subtask2) {
   const meetingId = state.tasks.find((t) => t.id === subtask2.taskId)?.meetingId;
   const host = state.meetings.find((m) => m.id === meetingId)?.host;
@@ -8206,16 +8012,16 @@ function acceptanceOf(state, taskId) {
     (q) => q.status === "open" && q.kind === "decision" && q.decision.kind === "delivery" && state.subtasks.find((s) => s.id === q.subtaskId)?.taskId === taskId
   );
 }
-var underReview = (state, subtask2) => subtask2.status === "reviewing" && isActive(state, subtask2.goalId) && !openQuestions(state, subtask2.id).some((q) => q.kind === "decision");
+var underReview = (state, subtask2) => subtask2.status === "reviewing" && isActive(state) && !openQuestions(state, subtask2.id).some((q) => q.kind === "decision");
 function busyMembers(state) {
-  const busy2 = /* @__PURE__ */ new Set();
+  const busy = /* @__PURE__ */ new Set();
   for (const s of state.subtasks) {
-    if (s.status === "running") busy2.add(s.assignee);
-    if (underReview(state, s)) busy2.add(s.assignee).add(reviewerOf(state, s));
+    if (s.status === "running") busy.add(s.assignee);
+    if (underReview(state, s)) busy.add(s.assignee).add(reviewerOf(state, s));
   }
   for (const m of state.meetings)
-    if (m.status === "running") for (const id of m.participants) busy2.add(id);
-  return busy2;
+    if (m.status === "running") for (const id of m.participants) busy.add(id);
+  return busy;
 }
 function reviewerAway(state, subtask2) {
   const reviewer = reviewerOf(state, subtask2);
@@ -8232,10 +8038,10 @@ function reviewerAway(state, subtask2) {
   });
   return working || meeting2 || earlier ? reviewer : void 0;
 }
-function waitsIn(state, subtask2, busy2) {
-  const goal2 = state.goals.find((p) => p.id === subtask2.goalId);
-  const held = goal2 && goal2.status !== "active" ? [{ kind: "goal", status: goal2.status }] : [];
-  const asked = () => openQuestions(state, subtask2.id).map(
+function waitsIn(state, subtask2, busy) {
+  const { goal } = state;
+  const held = goal.status !== "active" ? [{ kind: "goal", status: goal.status }] : [];
+  const asked2 = () => openQuestions(state, subtask2.id).map(
     (q) => q.kind === "teammate" ? { kind: "teammate", by: q.to, questionId: q.id } : q.kind === "decision" ? { kind: "you", questionId: q.id, decision: q.decision.kind } : { kind: "you", questionId: q.id }
   );
   switch (subtask2.status) {
@@ -8260,18 +8066,18 @@ function waitsIn(state, subtask2, busy2) {
       });
       if (upstream.length)
         return [...new Map(upstream.map((w) => [JSON.stringify(w), w])).values()];
-      return busy2.has(subtask2.assignee) ? [{ kind: "busy", by: subtask2.assignee }] : [];
+      return busy.has(subtask2.assignee) ? [{ kind: "busy", by: subtask2.assignee }] : [];
     }
     // A done subtask, the last of its task, carries the task's acceptance waiting on you.
     case "running":
     case "done":
-      return asked();
+      return asked2();
     // A merge under way finishes (§3.2); one yet to start waits for its goal.
     case "merging":
-      return [...held, ...asked()];
+      return [...held, ...asked2()];
     case "reviewing": {
       const reviewer = underReview(state, subtask2) ? reviewerAway(state, subtask2) : void 0;
-      return [...held, ...asked(), ...reviewer ? [{ kind: "busy", by: reviewer }] : []];
+      return [...held, ...asked2(), ...reviewer ? [{ kind: "busy", by: reviewer }] : []];
     }
     case "failed":
     case "stopped":
@@ -8292,56 +8098,799 @@ function subtaskActions(subtask2, redone, deciding) {
   );
   return redone && can(SUBTASK_MACHINE, subtask2.status, "redo") ? [...moves, "redo"] : moves;
 }
-function goalActions(goal2) {
-  return GOAL_ACTIONS.filter((event) => can(GOAL_MACHINE, goal2.status, event));
+function goalActions(goal) {
+  return GOAL_ACTIONS.filter((event) => can(GOAL_MACHINE, goal.status, event));
 }
 function meetingResumes(state, meeting2) {
-  return can(MEETING_MACHINE, meeting2.status, "resume") && !meeting2.plan && isActive(state, meeting2.goalId) && meeting2.participants.every((m) => state.members.includes(m));
+  return can(MEETING_MACHINE, meeting2.status, "resume") && !meeting2.plan && isActive(state) && meeting2.participants.every((m) => state.members.includes(m));
 }
 function derive(state) {
-  const busy2 = busyMembers(state);
+  const busy = busyMembers(state);
   return {
     subtasks: Object.fromEntries(
       state.subtasks.map((s) => {
         const redone = redoneUpstream(state, s).map((d) => d.id);
         const actions = subtaskActions(s, redone.length > 0, openQuestions(state, s.id).length > 0);
-        return [s.id, { waits: waitsIn(state, s, busy2), actions, redone }];
+        return [s.id, { waits: waitsIn(state, s, busy), actions, redone }];
       })
     ),
-    goals: Object.fromEntries(state.goals.map((p) => [p.id, goalActions(p)])),
-    busy: [...busy2],
+    goal: goalActions(state.goal),
+    busy: [...busy],
     resumable: state.meetings.filter((m) => meetingResumes(state, m)).map((m) => m.id)
   };
 }
 
+// src/plugin/status.ts
+var MEETING_STATUS = {
+  running: "under way",
+  review: "its plan waits for you: approve it, change it, or cancel it",
+  approved: "plan approved",
+  cancelled: "cancelled",
+  failed: "failed"
+};
+function waitText(wait, work) {
+  switch (wait.kind) {
+    case "goal":
+      return `its goal is ${wait.status}`;
+    case "upstream": {
+      const upstream = work.subtasks.find((s) => s.id === wait.subtaskId);
+      return `waits on "${upstream?.title ?? ""}" by ${wait.by}${wait.halted ? ", which has stopped" : ""}`;
+    }
+    case "busy":
+      return `waits until ${wait.by} is free`;
+    case "teammate":
+      return `asked ${wait.by}`;
+    case "you":
+      return wait.decision ? "waits on your decision" : "waits on your answer";
+    case "acceptance":
+      return "waits until you accept the task it builds on";
+  }
+}
+function stepText({ done, total, current }) {
+  if (!total) return void 0;
+  const step2 = `step ${String(Math.min(done + 1, total))} of ${String(total)}`;
+  return current ? `${step2}: ${current}` : step2;
+}
+function subtaskLine(subtask2, waits, work) {
+  const parts = [subtask2.status];
+  const step2 = subtask2.status === "running" && stepText(subtask2.progress);
+  if (step2) parts.push(step2);
+  parts.push(...waits.map((w) => waitText(w, work)));
+  if (subtask2.error) parts.push(`error: ${subtask2.error}`);
+  return `    - ${subtask2.title} [${subtask2.id}], ${subtask2.assignee}: ${parts.join(", ")}`;
+}
+function questionLine(question, work) {
+  const about = work.subtasks.find((s) => s.id === question.subtaskId);
+  const head = `  - [${question.id}] `;
+  if (question.kind === "permission")
+    return `${head}${question.from} asks to use ${question.permission.tool}${question.permission.title ? `: ${question.permission.title}` : ""}. Answer it in /openplan.`;
+  if (question.kind === "choices")
+    return `${head}${question.from} asks: ${question.choices.map((c) => c.question).join(" ")} Answer it in /openplan.`;
+  const options = question.decision.options.join(", ");
+  switch (question.decision.kind) {
+    case "delivery":
+      return `${head}The task "${question.text}" is done: ${options}.`;
+    case "review":
+      return `${head}The review of "${about?.title ?? ""}" is stuck (${question.text}): ${options}.`;
+    case "merge":
+      return `${head}Merging "${about?.title ?? ""}" needs you (${question.text.split("\n").join(", ")}): ${options}.`;
+  }
+}
+function statusText(work) {
+  const derived = derive(work);
+  const busy = new Set(derived.busy);
+  const { goal } = work;
+  const lines = [
+    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)}`,
+    `Team: ${work.members.map((m) => busy.has(m) ? `${m} (busy)` : m).join(", ")}`
+  ];
+  for (const meeting2 of work.meetings.filter((m) => m.status !== "approved"))
+    lines.push(
+      `  Meeting [${meeting2.id}], hosted by ${meeting2.host}${meeting2.hostOnly ? ", who only runs it" : ""}: ${MEETING_STATUS[meeting2.status]}${meeting2.error ? ` (${meeting2.error})` : ""}${derived.resumable.includes(meeting2.id) ? "; it can go on" : ""}`
+    );
+  for (const task of work.tasks) {
+    lines.push(
+      `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", the user accepts it" : ""}`
+    );
+    for (const subtask2 of work.subtasks.filter((s) => s.taskId === task.id))
+      lines.push(subtaskLine(subtask2, derived.subtasks[subtask2.id]?.waits ?? [], work));
+  }
+  const open2 = work.questions.filter(toYou).filter((q) => q.status === "open");
+  if (open2.length) lines.push("", "Waiting on you:", ...open2.map((q) => questionLine(q, work)));
+  return lines.join("\n");
+}
+var whereOf = (entry) => entry.holder ? "in another session" : entry.state.goal.status === "archived" ? "archived" : "paused";
+function progressOf({ subtasks, meetings }) {
+  const done = subtasks.filter((s) => s.status === "done").length;
+  return subtasks.length ? `${String(done)}/${String(subtasks.length)} subtasks done` : meetings.some((m) => m.status === "review") ? "plan to review" : "no plan yet";
+}
+var othersOf = (others) => others.map((entry) => ({
+  slug: entry.slug,
+  label: `${entry.state.goal.name} \xB7 ${progressOf(entry.state)} \xB7 ${whereOf(entry)}`
+}));
+function othersText(others) {
+  if (!others.length) return void 0;
+  return [
+    "The repository's other goals, which the user takes up here with /openplan resume:",
+    ...othersOf(others).map((o) => `  - ${o.label}`)
+  ].join("\n");
+}
+
+// src/plugin/pane.ts
+var plural = (n, one, many) => `${String(n)} ${n === 1 ? one : many}`;
+function shownMeeting(work) {
+  const latest = (status) => work.meetings.filter((m) => !status || m.status === status).at(-1);
+  return latest("running") ?? latest("review") ?? latest();
+}
+function meetingStatus(meeting2) {
+  switch (meeting2.status) {
+    case "running":
+      return meeting2.planning ? `${meeting2.host} writes the plan` : meeting2.speaking ? `${meeting2.speaking} speaks` : meeting2.drafting ? "the members form their first judgments" : meeting2.weighing ? "deciding who speaks next" : "under way";
+    case "review":
+      return "its plan waits for you";
+    case "approved":
+      return "plan approved";
+    case "cancelled":
+      return "cancelled";
+    case "failed":
+      return `failed${meeting2.error ? `: ${meeting2.error}` : ""}`;
+  }
+}
+var meetingOf = (meeting2, work) => ({
+  id: meeting2.id,
+  // Its agenda is the brief your session wrote for it, too long for a line.
+  about: work.goal.name,
+  agenda: meeting2.agenda,
+  status: meetingStatus(meeting2),
+  participants: meeting2.participants,
+  turns: meeting2.turns.map((t) => ({
+    speaker: t.speaker,
+    text: t.text,
+    ...t.calls && { to: t.calls }
+  })),
+  hands: (meeting2.hands ?? []).map((h) => ({ member: h.member, point: h.point })),
+  ...meeting2.plan && { plan: meeting2.plan.summary }
+});
+function memberOf(member, work, derived) {
+  const own = work.subtasks.filter((s) => s.assignee === member.name);
+  const at = (status) => own.find((s) => s.status === status);
+  const reviewing = work.subtasks.find(
+    (s) => s.status === "reviewing" && s.assignee !== member.name && reviewerOf(work, s) === member.name && derived.busy.includes(member.name)
+  );
+  const meeting2 = work.meetings.find(
+    (m) => m.status === "running" && m.participants.includes(member.name)
+  );
+  const next = at("pending");
+  const running3 = at("running");
+  let doing;
+  if (running3) {
+    const step2 = stepText(running3.progress);
+    doing = `works on "${running3.title}"${step2 ? `, ${step2}` : ""}`;
+  } else if (meeting2) doing = `at the meeting on "${work.goal.name}"`;
+  else if (reviewing) doing = `reviews "${reviewing.title}" by ${reviewing.assignee}`;
+  else if (at("reviewing")) doing = `"${at("reviewing")?.title ?? ""}" is in review`;
+  else if (at("merging")) doing = `"${at("merging")?.title ?? ""}" is being merged`;
+  else if (next) {
+    const waits = derived.subtasks[next.id]?.waits ?? [];
+    doing = `next: "${next.title}"${waits.length ? `, ${waits.map((w) => waitText(w, work)).join(", ")}` : ""}`;
+  } else doing = "free";
+  const followed = running3 ?? own.filter((s) => s.startedAt).sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0))[0];
+  const spoken = work.meetings.flatMap((m) => m.turns).filter((t) => t.speaker === member.name).reduce((sum, t) => sum + t.tokens, 0);
+  return {
+    name: member.name,
+    role: member.role.title,
+    ...member.model && { model: member.model },
+    doing,
+    ...followed && { subtask: followed.id },
+    tokens: own.reduce((sum, s) => sum + s.tokens, 0) + spoken
+  };
+}
+function callText(permission) {
+  if (permission.title) return permission.title;
+  const { input } = permission;
+  const main = ["command", "file_path", "path", "pattern", "url", "description"].map((key) => input[key]).find((value) => typeof value === "string");
+  return main ? `${permission.tool}: ${main}` : permission.tool;
+}
+function needOf(question, work) {
+  const subtask2 = work.subtasks.find((s) => s.id === question.subtaskId);
+  const head = {
+    id: question.id,
+    from: question.from,
+    about: subtask2?.title ?? "",
+    text: question.text
+  };
+  switch (question.kind) {
+    case "permission":
+      return {
+        ...head,
+        kind: "permission",
+        call: callText(question.permission),
+        options: question.permission.options
+      };
+    case "choices":
+      return {
+        ...head,
+        kind: "choices",
+        choices: question.choices.map((c) => ({
+          question: c.question,
+          header: c.header,
+          options: c.options.map((o) => o.label),
+          multiSelect: c.multiSelect
+        }))
+      };
+    case "decision": {
+      const done = work.subtasks.filter((s) => s.taskId === subtask2?.taskId && s.status === "done");
+      return {
+        ...head,
+        kind: "decision",
+        of: question.decision.kind,
+        options: question.decision.options,
+        ...question.decision.kind === "delivery" && {
+          sendBack: done.map((s) => ({ id: s.id, title: s.title }))
+        }
+      };
+    }
+  }
+}
+function milestones(work) {
+  const said = [];
+  for (const meeting2 of work.meetings)
+    if (meeting2.status === "approved")
+      said.push({ key: `plan:${meeting2.id}`, text: `Plan approved: "${work.goal.name}"` });
+  for (const s of work.subtasks) {
+    if (s.review?.rounds)
+      said.push({
+        key: `back:${s.id}:${String(s.review.rounds)}`,
+        text: `"${s.title}" went back to ${s.assignee}${s.review.notes ? `: ${s.review.notes}` : ""}`
+      });
+    if (s.status === "done")
+      said.push({ key: `done:${s.id}`, text: `"${s.title}" by ${s.assignee} is merged` });
+    if (s.status === "failed")
+      said.push({
+        key: `failed:${s.id}:${String(s.startedAt ?? 0)}`,
+        text: `"${s.title}" by ${s.assignee} failed${s.error ? `: ${s.error}` : ""}`
+      });
+  }
+  for (const task of work.tasks)
+    if (work.subtasks.every((s) => s.taskId !== task.id || s.status === "done"))
+      said.push({ key: `task:${task.id}`, text: `The task "${task.title}" is done` });
+  return said;
+}
+function prompts(work) {
+  const asked2 = [];
+  for (const meeting2 of work.meetings)
+    if (meeting2.status === "review" && meeting2.plan)
+      asked2.push({
+        key: `review:${meeting2.id}`,
+        text: `The meeting [${meeting2.id}] on "${work.goal.name}" has a plan: ${meeting2.plan.summary}. Get it with show_plan and show it to the user in full: its document as it is written, then its tasks, each with its subtasks, who does them and what each waits on. Then ask whether to approve it, change it, or cancel it, and which tasks, if any, they want to accept themselves once done: none is unless they say, since reviews and checks confirm the work; it is worth it for a result only looking at it or trying it can judge.`
+      });
+  for (const question of work.questions) {
+    if (question.kind !== "decision" || question.decision.kind !== "delivery") continue;
+    const subtask2 = work.subtasks.find((s) => s.id === question.subtaskId);
+    const delivered = work.subtasks.filter((s) => s.taskId === subtask2?.taskId && s.delivery).map((s) => `- ${s.title}, by ${s.assignee}: ${s.delivery?.summary ?? ""}`);
+    asked2.push({
+      key: `accept:${question.id}`,
+      text: [
+        `The task "${question.text}" is done [${question.id}], merged into its goal's branch:`,
+        ...delivered,
+        "Tell the user what was done, and ask whether to accept it or send it back with what to change (decide)."
+      ].join("\n")
+    });
+  }
+  return asked2;
+}
+var BAND_TASKS = 5;
+function taskWhere(work, derived, subtasks) {
+  const at = subtasks.find(
+    (s) => s.status === "running" || s.status === "reviewing" || s.status === "merging"
+  ) ?? subtasks.find((s) => s.status !== "done");
+  if (!at) return void 0;
+  switch (at.status) {
+    case "running":
+      return `${at.assignee} works on "${at.title}"`;
+    case "reviewing":
+      return `"${at.title}" in review`;
+    case "merging":
+      return `"${at.title}" merging`;
+    case "pending": {
+      const [wait] = derived.subtasks[at.id]?.waits ?? [];
+      return `"${at.title}" ${wait ? waitText(wait, work) : "starts next"}`;
+    }
+    default:
+      return `"${at.title}" ${at.status}`;
+  }
+}
+function taskLines(work, derived) {
+  const lines = [];
+  if (work.goal.status === "archived") return lines;
+  for (const task of work.tasks) {
+    const subtasks = work.subtasks.filter((s) => s.taskId === task.id);
+    const accepting = work.questions.some(
+      (q) => q.kind === "decision" && q.decision.kind === "delivery" && q.status === "open" && subtasks.some((s) => s.id === q.subtaskId)
+    );
+    const where = accepting ? "waits for you to accept it" : taskWhere(work, derived, subtasks);
+    if (where) lines.push(`${task.title} \xB7 ${where}`);
+  }
+  return lines.length > BAND_TASKS ? [
+    ...lines.slice(0, BAND_TASKS),
+    `and ${plural(lines.length - BAND_TASKS, "more task", "more tasks")}`
+  ] : lines;
+}
+function bandText(work, needs) {
+  const parts = [];
+  if (work.meetings.some((m) => m.status === "running")) parts.push("meeting");
+  if (work.meetings.some((m) => m.status === "review")) parts.push("plan to review");
+  const working = work.subtasks.filter((s) => s.status === "running").length;
+  if (working) parts.push(`${String(working)} working`);
+  if (needs) parts.push(`${plural(needs, "needs", "need")} you`);
+  const { status } = work.goal;
+  if (!parts.length) parts.push(status === "active" ? "idle" : status);
+  return parts.join(" \xB7 ");
+}
+function othersBand(others) {
+  const paused = others.filter((e) => whereOf(e) === "paused").length;
+  const elsewhere = others.filter((e) => whereOf(e) === "in another session").length;
+  const parts = [
+    ...paused ? [plural(paused, "goal paused", "goals paused")] : [],
+    ...elsewhere ? [`${plural(elsewhere, "goal", "goals")} in another session`] : []
+  ];
+  return parts.length ? parts.join(" \xB7 ") : void 0;
+}
+function paneTeam(mine, others) {
+  if (!mine) {
+    const band = othersBand(others);
+    return {
+      ...band && { band },
+      tasks: [],
+      members: [],
+      needs: [],
+      milestones: [],
+      prompts: [],
+      resumable: othersOf(others)
+    };
+  }
+  const { work, members } = mine;
+  const derived = derive(work);
+  const needs = work.questions.filter(toYou).filter((q) => q.status === "open").map((q) => needOf(q, work));
+  const meeting2 = shownMeeting(work);
+  const { goal } = work;
+  const here = goal.status === "active" ? [] : [
+    {
+      slug: goal.slug,
+      label: `${goal.name} \xB7 ${progressOf(work)} \xB7 ${goal.status}, in this session`
+    }
+  ];
+  return {
+    goal: { name: goal.name, slug: goal.slug, active: goal.status === "active" },
+    band: bandText(work, needs.length),
+    tasks: taskLines(work, derived),
+    ...meeting2 && { meeting: meetingOf(meeting2, work) },
+    members: members.map((m) => memberOf(m, work, derived)),
+    needs,
+    milestones: milestones(work),
+    prompts: prompts(work),
+    resumable: [...here, ...othersOf(others)]
+  };
+}
+
+// src/plugin/pane-server.ts
+var viewSchema = z2.object({
+  /** The revision the pane has. */
+  revision: z2.number().int().optional(),
+  /** The subtask whose record the pane follows, and the byte it read up to. */
+  record: z2.object({ subtask: z2.string(), from: z2.number().int().min(0) }).optional()
+});
+var releaseSchema = z2.object({ goal: z2.string() });
+var GOALS_MS = 2e3;
+function viewer(session2) {
+  let revision = 0;
+  let shown = "";
+  let goals;
+  return async (asked2) => {
+    if (!goals || asked2.revision === void 0 || Date.now() - goals.at >= GOALS_MS)
+      goals = { at: Date.now(), entries: session2().goals() };
+    const all = await goals.entries.catch((error) => {
+      goals = void 0;
+      throw error;
+    });
+    const entries = session2().othersOf(all);
+    const engine = session2().current;
+    const mine = engine && { work: workOf(engine), members: engine.team.members };
+    const team = paneTeam(mine, entries);
+    const text2 = JSON.stringify(team);
+    if (text2 !== shown) {
+      shown = text2;
+      revision++;
+    }
+    const meeting2 = mine && shownMeeting(mine.work);
+    const spoken = meeting2 && engine.records.speaking(meeting2);
+    const { record: record2 } = asked2;
+    return {
+      revision,
+      ...asked2.revision !== revision && { team },
+      ...spoken && { speaking: { speaker: spoken.speaker, text: spoken.text } },
+      ...record2 && engine && {
+        record: {
+          subtask: record2.subtask,
+          ...await engine.records.read(record2.subtask, record2.from)
+        }
+      }
+    };
+  };
+}
+function socketAddress() {
+  if (process.platform === "win32")
+    return { address: `\\\\.\\pipe\\openplan-${randomBytes(12).toString("hex")}` };
+  const folder = mkdtempSync(path5.join(tmpdir(), "openplan-"));
+  return { address: path5.join(folder, "pane.sock"), folder };
+}
+var asked = async (schema, request2) => schema.parse(JSON.parse(await text(request2) || "{}"));
+async function servePane(session2) {
+  const { address, folder } = socketAddress();
+  const view = viewer(session2);
+  const server2 = createServer((request2, response) => {
+    const routes = {
+      "/view": async () => view(await asked(viewSchema, request2)),
+      "/release": async () => session2().letGo((await asked(releaseSchema, request2)).goal)
+    };
+    const route = request2.method === "POST" && routes[request2.url ?? ""];
+    if (!route) {
+      response.writeHead(404).end();
+      return;
+    }
+    route().then(
+      (answer) => {
+        response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(answer));
+      },
+      (error) => {
+        response.writeHead(409, { "content-type": "text/plain" }).end(errorText(error));
+      }
+    );
+  });
+  await new Promise((resolve, reject) => {
+    server2.once("error", reject).listen(address, resolve);
+  });
+  return {
+    address,
+    close() {
+      server2.close();
+      if (folder) rmSync(folder, { recursive: true, force: true });
+    }
+  };
+}
+function askToLetGo(address, slug) {
+  return new Promise((resolve, reject) => {
+    const asking = request({ socketPath: address, path: "/release", method: "POST" }, (answer) => {
+      text(answer).then((body) => {
+        if (answer.statusCode === 200) resolve(JSON.parse(body));
+        else reject(new Error(body));
+      }, reject);
+    });
+    asking.once("error", reject).end(JSON.stringify({ goal: slug }));
+  });
+}
+
+// src/plugin/session-mode.ts
+import { readFileSync } from "node:fs";
+import path6 from "node:path";
+var folderOf = (dataFolder2) => path6.join(dataFolder2, "sessions");
+var fileOf = (dataFolder2, session2) => path6.join(folderOf(dataFolder2), `${String(session2)}.mode`);
+function modeOf(dataFolder2, session2) {
+  try {
+    return readFileSync(fileOf(dataFolder2, session2), "utf8");
+  } catch {
+    return void 0;
+  }
+}
+
+// src/plugin/pane-tools.ts
+import { z as z6 } from "zod";
+
+// src/engine/turns.ts
+import { spawn as spawn2 } from "node:child_process";
+import {
+  query
+} from "@anthropic-ai/claude-agent-sdk";
+import { z as z3 } from "zod";
+var TURN_SERVER = "openplan";
+var turnToolName = (name) => `mcp__${TURN_SERVER}__${name}`;
+var toolText = (text2) => ({ content: [{ type: "text", text: text2 }] });
+var tokensOf = (usage) => usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens + usage.output_tokens;
+function resultOutcome(message, subagentTokens = 0) {
+  const tokens = tokensOf(message.usage) + subagentTokens;
+  if (message.subtype === "success" && !message.is_error)
+    return {
+      ok: true,
+      text: message.result,
+      structured: message.structured_output,
+      tokens
+    };
+  const error = message.subtype === "success" ? message.result : message.subtype === "error_max_turns" ? `Stopped after ${String(message.num_turns)} turns, the most it may take` : message.subtype === "error_max_budget_usd" ? "Stopped at its spending limit" : message.subtype === "error_max_structured_output_retries" ? "The model didn't hand back a result in the shape asked for" : message.errors.join("\n");
+  return { ok: false, error: error || "The turn failed without saying why", tokens };
+}
+function outputText(content) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content.map(
+    (part) => part.type === "text" && typeof part.text === "string" ? part.text : `[${String(part.type)}]`
+  ).join("\n");
+}
+function turnDecoder(listener) {
+  const calls = /* @__PURE__ */ new Map();
+  const tasks = /* @__PURE__ */ new Map();
+  let subagentTokens = 0;
+  let fresh2 = true;
+  let blockOpen = false;
+  const held = [];
+  const notify = (notice) => {
+    if (blockOpen) held.push(notice);
+    else listener.notice?.(notice);
+  };
+  const flush = () => {
+    for (const notice of held.splice(0)) listener.notice?.(notice);
+  };
+  return (message) => {
+    switch (message.type) {
+      case "system":
+        switch (message.subtype) {
+          case "init":
+            listener.session?.(message.session_id, message.model);
+            return;
+          case "api_retry":
+            notify({
+              kind: "retry",
+              attempt: message.attempt,
+              max: message.max_retries,
+              delayMs: message.retry_delay_ms
+            });
+            return;
+          case "compact_boundary":
+            notify({
+              kind: "compacted",
+              before: message.compact_metadata.pre_tokens,
+              ...message.compact_metadata.post_tokens !== void 0 && {
+                after: message.compact_metadata.post_tokens
+              }
+            });
+            return;
+          case "status":
+            if (message.compact_result === "failed")
+              notify({
+                kind: "compaction-failed",
+                ...message.compact_error && { error: message.compact_error }
+              });
+            return;
+          case "model_refusal_fallback":
+            notify({ kind: "fallback", from: message.original_model, to: message.fallback_model });
+            return;
+          case "model_refusal_no_fallback":
+            notify({ kind: "refusal", model: message.original_model });
+            return;
+          case "task_started":
+            tasks.set(message.task_id, message.description);
+            if (message.skip_transcript || message.ambient) return;
+            notify({ kind: "task", state: "started", title: message.description });
+            return;
+          case "task_notification":
+            subagentTokens += message.usage?.total_tokens ?? 0;
+            if (message.skip_transcript || message.ambient) return;
+            notify({
+              kind: "task",
+              state: message.status === "completed" ? "done" : message.status === "stopped" ? "stopped" : "failed",
+              title: tasks.get(message.task_id) ?? message.summary
+            });
+            return;
+          default:
+            return;
+        }
+      case "result":
+        flush();
+        return resultOutcome(message, subagentTokens);
+      case "rate_limit_event":
+        if (message.rate_limit_info.status !== "allowed")
+          notify({
+            kind: "rate-limit",
+            status: message.rate_limit_info.status === "rejected" ? "rejected" : "warning",
+            ...message.rate_limit_info.resetsAt !== void 0 && {
+              resetsAt: message.rate_limit_info.resetsAt
+            }
+          });
+        return;
+      case "tool_progress":
+        if (message.subagent_retry)
+          notify({
+            kind: "subagent-retry",
+            attempt: message.subagent_retry.attempt,
+            max: message.subagent_retry.max_retries,
+            delayMs: message.subagent_retry.retry_delay_ms
+          });
+        return;
+      case "stream_event": {
+        if (message.parent_tool_use_id) return;
+        const { event } = message;
+        if (event.type === "message_start") {
+          fresh2 = true;
+          blockOpen = false;
+          flush();
+        } else if (event.type === "content_block_start") {
+          blockOpen = event.content_block.type === "thinking" || event.content_block.type === "text";
+          if (event.content_block.type === "thinking") listener.thinking?.("");
+          else if (event.content_block.type === "tool_use")
+            listener.toolStarting?.(event.content_block.name);
+        } else if (event.type === "content_block_delta") {
+          if (event.delta.type === "thinking_delta") listener.thinking?.(event.delta.thinking);
+          else if (event.delta.type === "text_delta") {
+            listener.text?.(event.delta.text, fresh2);
+            fresh2 = false;
+          }
+        }
+        return;
+      }
+      case "assistant":
+        if (message.parent_tool_use_id) return;
+        for (const block of message.message.content) {
+          if (block.type === "thinking")
+            listener.block?.({ kind: "thinking", text: block.thinking });
+          else if (block.type === "text") listener.block?.({ kind: "text", text: block.text });
+          else if (block.type === "tool_use") {
+            const call = {
+              kind: "tool",
+              id: block.id,
+              name: block.name,
+              input: block.input,
+              state: "running"
+            };
+            calls.set(call.id, call);
+            listener.block?.(call);
+            if (block.name === "TodoWrite")
+              listener.steps?.(
+                block.input.todos.map(({ content, status }) => ({
+                  content,
+                  status
+                }))
+              );
+          }
+        }
+        blockOpen = false;
+        flush();
+        return;
+      case "user": {
+        if ("isReplay" in message || message.parent_tool_use_id) return;
+        const { content } = message.message;
+        if (typeof content === "string") return;
+        for (const block of content) {
+          const call = block.type === "tool_result" ? calls.get(block.tool_use_id) : void 0;
+          if (block.type !== "tool_result" || !call) continue;
+          calls.delete(call.id);
+          listener.toolDone?.({
+            ...call,
+            output: outputText(block.content),
+            state: block.is_error ? "error" : "done"
+          });
+        }
+        return;
+      }
+      default:
+        return;
+    }
+  };
+}
+var STDERR_TAIL = 2e3;
+function claudeProcess() {
+  let exited = Promise.resolve();
+  let stderr = "";
+  return {
+    spawn: ({ command, args, cwd: cwd2, env, signal }) => {
+      const child = spawn2(command, args, { cwd: cwd2, env, signal, stdio: "pipe", windowsHide: true });
+      watchMember(child, args);
+      exited = new Promise((resolve) => {
+        child.once("close", () => {
+          resolve();
+        });
+        child.once("error", () => {
+          resolve();
+        });
+      });
+      child.stderr.setEncoding("utf8").on("data", (chunk) => {
+        stderr = (stderr + chunk).slice(-STDERR_TAIL);
+      });
+      return child;
+    },
+    gone: () => exited,
+    /** A turn's error in words, with the end of Claude Code's stderr. */
+    failure: (error) => {
+      const words = errorText(error);
+      const tail = stderr.trim();
+      return tail ? `${words}. stderr: ${tail}` : words;
+    }
+  };
+}
+async function runTurn(prompt, options, signal, decode) {
+  signal.throwIfAborted();
+  const abortController = new AbortController();
+  const stop = () => {
+    abortController.abort();
+  };
+  signal.addEventListener("abort", stop, { once: true });
+  const claude2 = claudeProcess();
+  const run2 = query({
+    prompt,
+    options: { ...options, abortController, spawnClaudeCodeProcess: claude2.spawn }
+  });
+  try {
+    for await (const message of run2) {
+      const outcome = decode(message);
+      if (outcome) return outcome;
+    }
+    return { ok: false, error: "The session ended without a result", tokens: 0 };
+  } catch (error) {
+    throw new Error(claude2.failure(error), { cause: error });
+  } finally {
+    signal.removeEventListener("abort", stop);
+    run2.close();
+    await claude2.gone();
+  }
+}
+async function askOnce(params) {
+  const { prompt, options, schema, signal, listener = {} } = params;
+  let session2 = "";
+  const outcome = await runTurn(
+    prompt,
+    {
+      ...options,
+      ...schema && {
+        outputFormat: {
+          type: "json_schema",
+          schema: z3.toJSONSchema(schema, { target: "draft-7" })
+        }
+      }
+    },
+    signal,
+    turnDecoder({
+      ...listener,
+      session: (id, model) => {
+        session2 = id;
+        listener.session?.(id, model);
+      }
+    })
+  );
+  if (!outcome.ok) throw new Error(outcome.error);
+  if (schema && outcome.structured === void 0)
+    throw new Error("The model answered in words instead of the result asked for");
+  return { text: outcome.text, structured: outcome.structured, session: session2, tokens: outcome.tokens };
+}
+
+// src/plugin/tools.ts
+import { z as z5 } from "zod";
+
 // src/engine/plan.ts
-import { z } from "zod";
+import { z as z4 } from "zod";
 var taskShape = (assignee) => ({
-  title: z.string().trim(),
-  outcome: z.string().trim().describe("What the task delivers"),
-  subtasks: z.array(
-    z.object({
-      key: z.string().trim().describe("A short id, unique within this plan, such as api-1"),
-      title: z.string().trim(),
-      description: z.string().trim(),
+  title: z4.string().trim(),
+  outcome: z4.string().trim().describe("What the task delivers"),
+  subtasks: z4.array(
+    z4.object({
+      key: z4.string().trim().describe("A short id, unique within this plan, such as api-1"),
+      title: z4.string().trim(),
+      description: z4.string().trim(),
       assignee,
-      depends_on: z.array(z.string()).describe("The keys of the subtasks it waits for"),
-      acceptance: z.string().trim()
+      depends_on: z4.array(z4.string()).describe("The keys of the subtasks it waits for"),
+      acceptance: z4.string().trim()
     })
   )
 });
-var planShape = (task) => z.object({
-  summary: z.string().trim().describe("The outcome in one sentence"),
-  plan_markdown: z.string().trim().describe("The plan document"),
-  tasks: z.array(task)
+var planShape = (task) => z4.object({
+  summary: z4.string().trim().describe("The outcome in one sentence"),
+  plan_markdown: z4.string().trim().describe("The plan document"),
+  tasks: z4.array(task)
 });
 var planSchema = (assignee) => planShape(
-  z.object({
+  z4.object({
     ...taskShape(assignee),
-    owner_accepts: z.boolean().default(false).describe("Whether the user accepts this task themselves once it is done")
+    owner_accepts: z4.boolean().default(false).describe("Whether the user accepts this task themselves once it is done")
   })
 );
-var hostPlanSchema = (members) => planShape(z.object(taskShape(z.enum(members).describe("The name of the member it goes to"))));
+var hostPlanSchema = (members) => planShape(z4.object(taskShape(z4.enum(members).describe("The name of the member it goes to"))));
 var hostWritten = (plan) => ({
   ...plan,
   tasks: plan.tasks.map((task) => ({ ...task, owner_accepts: false }))
@@ -8412,8 +8961,8 @@ var TASK_WAYS = `# How you work on a subtask
 - When you need information or a decision from a teammate (an interface, a design detail), ask them with ask_teammate. It waits for their answer.
 - When you need the user to decide something or give you what only they have, ask with AskUserQuestion, offering options, and wait for the answer. Don't just write that you are waiting: the user may not be watching.
 - When you are done, call deliver with a summary of a few sentences (what you did, anything to watch out for) and the files that are the result. Your subtask isn't done until you deliver; then end your turn.`;
-function systemPrompt(kind, member, team2) {
-  const others = team2.filter((m) => m.name !== member.name).map(called);
+function systemPrompt(kind, member, team) {
+  const others = team.filter((m) => m.name !== member.name).map(called);
   const who = `# Who you are
 You are ${member.name}, the ${member.role.title} on a team of Claude Code sessions working on this repository. Each member is a session of its own, often on another model. The user directs the team from their own Claude Code session.
 ${others.length ? `Your teammates: ${others.join(", ")}.` : "You are the only member."}
@@ -8425,9 +8974,9 @@ ${member.role.duties.trim()}`;
 ${TASK_WAYS}` : who;
 }
 function taskBrief(input) {
-  const { goal: goal2, task, subtask: subtask2 } = input;
+  const { goal, task, subtask: subtask2 } = input;
   const lines = [
-    `Goal: ${goal2.name}`,
+    `Goal: ${goal.name}`,
     `Task: ${task.title}${task.outcome && task.outcome !== task.title ? `. ${task.outcome}` : ""}`,
     "",
     `Your subtask: ${subtask2.title}`,
@@ -8625,346 +9174,603 @@ Requirements:
 - summary states the outcome in one sentence.`;
 }
 
-// src/engine/turns.ts
-import { spawn as spawn2 } from "node:child_process";
-import {
-  query
-} from "@anthropic-ai/claude-agent-sdk";
-import { z as z2 } from "zod";
-
-// src/engine/processes.ts
-import { execFile } from "node:child_process";
-import { readFile as readFile3 } from "node:fs/promises";
-var running2 = /* @__PURE__ */ new Map();
-var record;
-function save() {
-  if (record === void 0) return;
-  const written2 = [...running2].map(([pid, { settings }]) => ({ pid, settings }));
-  writeWholeSync(record, JSON.stringify(written2));
-}
-function watchMember(child, args) {
-  const { pid } = child;
-  const at = args.indexOf("--settings");
-  const settings = at < 0 ? void 0 : args[at + 1];
-  if (pid === void 0 || settings === void 0) return;
-  running2.set(pid, { child, settings });
-  save();
-  child.once("exit", () => {
-    running2.delete(pid);
-    save();
-  });
-}
-function stopMembers() {
-  for (const { child } of running2.values()) child.kill("SIGTERM");
-}
-var commandLine = (pid) => new Promise((resolve) => {
-  const [command, args] = process.platform === "win32" ? [
-    "powershell.exe",
-    [
-      "-NoProfile",
-      "-Command",
-      `(Get-CimInstance Win32_Process -Filter "ProcessId=${String(pid)}").CommandLine`
-    ]
-  ] : ["ps", ["-o", "command=", "-p", String(pid)]];
-  execFile(command, args, (error, stdout) => {
-    resolve(error ? void 0 : stdout);
-  });
+// src/plugin/tools.ts
+var decisionOf = (decision, note, sentBack) => ({
+  decision,
+  ...note && { note },
+  ...sentBack !== void 0 && { sentBack }
 });
-async function written(file) {
-  try {
-    return JSON.parse(await readFile3(file, "utf8"));
-  } catch {
-    return [];
-  }
+var writtenPlan = (plan) => ({
+  summary: plan.summary,
+  plan_markdown: plan.markdown,
+  tasks: plan.tasks.map((task) => ({
+    title: task.title,
+    outcome: task.outcome,
+    owner_accepts: task.ownerAccepts,
+    subtasks: task.subtasks.map(({ dependsOn, ...subtask2 }) => ({
+      ...subtask2,
+      depends_on: dependsOn
+    }))
+  }))
+});
+var meeting = z5.string().describe("The meeting's id");
+var subtask = z5.string().describe("The subtask's id");
+function memberName(members) {
+  if (!members) return z5.string().describe("A member's name");
+  const names = members.map((m) => m.name);
+  const roster = members.map((m) => `${m.name} (${m.role.title})`).join(", ");
+  return z5.enum(names).describe(`One of the team: ${roster}`);
 }
-async function recordMembersIn(file) {
-  const left = await written(file);
-  await Promise.all(
-    left.map(async ({ pid, settings }) => {
-      if (!(await commandLine(pid))?.includes(settings)) return;
-      try {
-        process.kill(pid, "SIGTERM");
-      } catch {
-      }
-    })
+var meetingInput = (member) => ({
+  agenda: z5.string().trim().min(1).describe("What to plan, with everything the user said about it"),
+  size: z5.enum(MEETING_SIZES).optional().describe("How long the discussion runs; the team's default when left out"),
+  attendees: z5.array(member).default([]).describe("The host first; everyone when empty"),
+  host_only: z5.boolean().default(false).describe(
+    "True when the host only runs the meeting: no view of their own and no work in the plan. Leave it out for a host who also takes part from their role, the usual"
+  )
+});
+var changePlanInput = (member) => ({ meeting, plan: planSchema(member) });
+var assignInput = (member) => ({
+  assignee: member,
+  title: z5.string().trim().min(1),
+  description: z5.string().trim().describe("Everything the user said about it"),
+  acceptance: z5.string().trim().default("").describe("When it counts as done")
+});
+function addTools(server2, session2) {
+  server2.registerTool(
+    "status",
+    {
+      description: "Where this session's goal stands: its meetings, tasks and subtasks, who is busy, and what waits on the user; and the repository's other goals. Ids are in brackets.",
+      annotations: { readOnlyHint: true }
+    },
+    async () => {
+      const engine = session2.current;
+      const others = othersText(await session2.others());
+      return toolText(
+        [engine ? statusText(workOf(engine)) : session2.none, ...others ? [others] : []].join(
+          "\n\n"
+        )
+      );
+    }
   );
-  record = file;
-  save();
-}
-function stopRecording() {
-  record = void 0;
+  server2.registerTool(
+    "start_goal",
+    {
+      description: "Start a goal in this session: something the user wants done. It gets its own branch, cut from the repository's HEAD, and its own copy of the team. A session runs one goal: refused while its goal is under way. Then hold a meeting to plan it, or assign work directly.",
+      inputSchema: { name: z5.string().trim().min(1).describe("A few words for what is wanted") }
+    },
+    async ({ name }) => {
+      const { goal } = (await session2.start(name)).state;
+      return toolText(`Started the goal "${goal.name}" on branch ${goalBranch(goal.slug)}.`);
+    }
+  );
+  const meetingTool = server2.registerTool(
+    "hold_meeting",
+    {
+      description: "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and the session is told when its plan waits for the user. Hold one only once the user has agreed who attends.",
+      inputSchema: meetingInput(memberName())
+    },
+    ({ agenda, size, attendees, host_only }) => {
+      const engine = session2.goal;
+      const held = engine.meetings.start({
+        agenda,
+        size: size ?? engine.meetingSize,
+        attendees,
+        hostOnly: host_only
+      });
+      return toolText(
+        `The meeting [${held.id}] has begun: ${listOf(held.participants)}, hosted by ${held.host}${held.hostOnly ? ", who only runs it" : ""}.`
+      );
+    }
+  );
+  server2.registerTool(
+    "show_plan",
+    {
+      description: "A meeting's plan in full: its document and its tasks and subtasks, in the shape change_plan takes.",
+      inputSchema: { meeting },
+      annotations: { readOnlyHint: true }
+    },
+    ({ meeting: id }) => {
+      const found = session2.goal.state.meetings.find((m) => m.id === id);
+      if (!found?.plan) throw new Error("That meeting has no plan");
+      return toolText(JSON.stringify(writtenPlan(found.plan), null, 2));
+    }
+  );
+  const changePlanTool = server2.registerTool(
+    "change_plan",
+    {
+      description: "Replace a plan under review with the user's changes: the whole plan, as show_plan gives it, changed. Any member can be given work. owner_accepts marks a task the user accepts themselves once done; none is, unless they say.",
+      inputSchema: changePlanInput(memberName())
+    },
+    ({ meeting: id, plan }) => {
+      session2.goal.meetings.change(id, plan);
+      return toolText("The plan is changed. It waits for the user's approval.");
+    }
+  );
+  server2.registerTool(
+    "approve_plan",
+    {
+      description: "Approve a plan under review, as the user said: its tasks and subtasks go to work, each starting once what it builds on is merged and its member is free.",
+      inputSchema: { meeting }
+    },
+    async ({ meeting: id }) => {
+      const added = await session2.goal.meetings.approve(id);
+      return toolText(
+        `Approved: ${String(added.length)} ${added.length === 1 ? "subtask goes" : "subtasks go"} to work.`
+      );
+    }
+  );
+  server2.registerTool(
+    "cancel_meeting",
+    {
+      description: "Stop a meeting under way, or drop a plan the user doesn't want.",
+      inputSchema: { meeting }
+    },
+    async ({ meeting: id }) => {
+      await session2.goal.meetings.cancel(id);
+      return toolText("Cancelled.");
+    }
+  );
+  server2.registerTool(
+    "resume_meeting",
+    {
+      description: "Go on with a meeting that failed or was cancelled before its plan, from where it stopped.",
+      inputSchema: { meeting }
+    },
+    ({ meeting: id }) => {
+      session2.goal.meetings.resume(id);
+      return toolText("The meeting goes on.");
+    }
+  );
+  const assignTool = server2.registerTool(
+    "assign",
+    {
+      description: "Give a member one subtask directly, without a meeting. It starts once they are free. Assign only once the user has agreed who takes it.",
+      inputSchema: assignInput(memberName())
+    },
+    (work) => {
+      const [added] = session2.goal.goals.assign(work);
+      return toolText(`Assigned "${work.title}" [${added?.id ?? ""}] to ${work.assignee}.`);
+    }
+  );
+  server2.registerTool(
+    "goal_action",
+    {
+      description: "Pause this session's goal (its runs stop, to go on later in their sessions), resume it, archive it, or delete it once archived: its folder, worktrees and subtask branches go, its own branch stays. Delete only when the user has confirmed it.",
+      inputSchema: { action: z5.enum(GOAL_ACTIONS) },
+      annotations: { destructiveHint: true }
+    },
+    async ({ action }) => {
+      const engine = session2.goal;
+      const { name } = engine.state.goal;
+      if (action === "delete") await session2.delete();
+      else await engine.goals[action]();
+      return toolText(`The goal "${name}": ${action} done.`);
+    }
+  );
+  server2.registerTool(
+    "subtask_action",
+    {
+      description: "Stop a subtask; continue a stopped or failed one in its session and worktree; retry one from the start; or redo a done one whose upstream was redone.",
+      inputSchema: { subtask, action: z5.enum(SUBTASK_ACTIONS) }
+    },
+    async ({ subtask: id, action }) => {
+      const engine = session2.goal;
+      const found = engine.state.subtasks.find((s) => s.id === id);
+      if (!found) throw new Error("There is no such subtask");
+      if (!derive(workOf(engine)).subtasks[id]?.actions.includes(action))
+        throw new Error(`"${found.title}" can't ${action} while ${found.status}`);
+      await engine.scheduler[action](id);
+      return toolText(`"${found.title}" is ${found.status} now.`);
+    }
+  );
+  server2.registerTool(
+    "message",
+    {
+      description: "Pass the user's words to the member working on a subtask: a running one takes them at once, in its session; one not started reads them first.",
+      inputSchema: { subtask, text: z5.string().trim().min(1) }
+    },
+    ({ subtask: id, text: text2 }) => {
+      const went = session2.goal.scheduler.carry(id, text2);
+      return toolText(
+        went === "goes" ? "Passed on." : went === "handedOver" ? "Not passed on: it is delivered and in review or being merged. Send its task back once it is done." : "Not passed on: its goal is paused or archived."
+      );
+    }
+  );
+  server2.registerTool(
+    "decide",
+    {
+      description: "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask), a stuck review (rereview, skip, sendBack), or a merge (ours, theirs, retry).",
+      inputSchema: {
+        question: z5.string().describe("The id of what waits on the user"),
+        decision: z5.enum(DECISION_OPTIONS),
+        note: z5.string().trim().optional().describe("What to change, in the user's words"),
+        sent_back: z5.string().optional().describe("The subtask a revised task goes back to")
+      }
+    },
+    async ({ question, decision, note, sent_back }) => {
+      await session2.goal.answer(question, decisionOf(decision, note, sent_back));
+      return toolText("Done.");
+    }
+  );
+  return ({ members }) => {
+    const member = memberName(members);
+    meetingTool.update({ paramsSchema: meetingInput(member) });
+    changePlanTool.update({ paramsSchema: changePlanInput(member) });
+    assignTool.update({ paramsSchema: assignInput(member) });
+  };
 }
 
-// src/engine/turns.ts
-var TURN_SERVER = "openplan";
-var turnToolName = (name) => `mcp__${TURN_SERVER}__${name}`;
-var toolText = (text2) => ({ content: [{ type: "text", text: text2 }] });
-var tokensOf = (usage) => usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens + usage.output_tokens;
-function resultOutcome(message, subagentTokens = 0) {
-  const tokens = tokensOf(message.usage) + subagentTokens;
-  if (message.subtype === "success" && !message.is_error)
-    return {
-      ok: true,
-      text: message.result,
-      structured: message.structured_output,
-      tokens
-    };
-  const error = message.subtype === "success" ? message.result : message.subtype === "error_max_turns" ? `Stopped after ${String(message.num_turns)} turns, the most it may take` : message.subtype === "error_max_budget_usd" ? "Stopped at its spending limit" : message.subtype === "error_max_structured_output_retries" ? "The model didn't hand back a result in the shape asked for" : message.errors.join("\n");
-  return { ok: false, error: error || "The turn failed without saying why", tokens };
-}
-function outputText(content) {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content.map(
-    (part) => part.type === "text" && typeof part.text === "string" ? part.text : `[${String(part.type)}]`
-  ).join("\n");
-}
-function turnDecoder(listener) {
-  const calls = /* @__PURE__ */ new Map();
-  const tasks = /* @__PURE__ */ new Map();
-  let subagentTokens = 0;
-  let fresh2 = true;
-  let blockOpen = false;
-  const held = [];
-  const notify = (notice) => {
-    if (blockOpen) held.push(notice);
-    else listener.notice?.(notice);
-  };
-  const flush = () => {
-    for (const notice of held.splice(0)) listener.notice?.(notice);
-  };
-  return (message) => {
-    switch (message.type) {
-      case "system":
-        switch (message.subtype) {
-          case "init":
-            listener.session?.(message.session_id, message.model);
-            return;
-          case "api_retry":
-            notify({
-              kind: "retry",
-              attempt: message.attempt,
-              max: message.max_retries,
-              delayMs: message.retry_delay_ms
-            });
-            return;
-          case "compact_boundary":
-            notify({
-              kind: "compacted",
-              before: message.compact_metadata.pre_tokens,
-              ...message.compact_metadata.post_tokens !== void 0 && {
-                after: message.compact_metadata.post_tokens
-              }
-            });
-            return;
-          case "status":
-            if (message.compact_result === "failed")
-              notify({
-                kind: "compaction-failed",
-                ...message.compact_error && { error: message.compact_error }
-              });
-            return;
-          case "model_refusal_fallback":
-            notify({ kind: "fallback", from: message.original_model, to: message.fallback_model });
-            return;
-          case "model_refusal_no_fallback":
-            notify({ kind: "refusal", model: message.original_model });
-            return;
-          case "task_started":
-            tasks.set(message.task_id, message.description);
-            if (message.skip_transcript || message.ambient) return;
-            notify({ kind: "task", state: "started", title: message.description });
-            return;
-          case "task_notification":
-            subagentTokens += message.usage?.total_tokens ?? 0;
-            if (message.skip_transcript || message.ambient) return;
-            notify({
-              kind: "task",
-              state: message.status === "completed" ? "done" : message.status === "stopped" ? "stopped" : "failed",
-              title: tasks.get(message.task_id) ?? message.summary
-            });
-            return;
-          default:
-            return;
-        }
-      case "result":
-        flush();
-        return resultOutcome(message, subagentTokens);
-      case "rate_limit_event":
-        if (message.rate_limit_info.status !== "allowed")
-          notify({
-            kind: "rate-limit",
-            status: message.rate_limit_info.status === "rejected" ? "rejected" : "warning",
-            ...message.rate_limit_info.resetsAt !== void 0 && {
-              resetsAt: message.rate_limit_info.resetsAt
-            }
-          });
-        return;
-      case "tool_progress":
-        if (message.subagent_retry)
-          notify({
-            kind: "subagent-retry",
-            attempt: message.subagent_retry.attempt,
-            max: message.subagent_retry.max_retries,
-            delayMs: message.subagent_retry.retry_delay_ms
-          });
-        return;
-      case "stream_event": {
-        if (message.parent_tool_use_id) return;
-        const { event } = message;
-        if (event.type === "message_start") {
-          fresh2 = true;
-          blockOpen = false;
-          flush();
-        } else if (event.type === "content_block_start") {
-          blockOpen = event.content_block.type === "thinking" || event.content_block.type === "text";
-          if (event.content_block.type === "thinking") listener.thinking?.("");
-          else if (event.content_block.type === "tool_use")
-            listener.toolStarting?.(event.content_block.name);
-        } else if (event.type === "content_block_delta") {
-          if (event.delta.type === "thinking_delta") listener.thinking?.(event.delta.thinking);
-          else if (event.delta.type === "text_delta") {
-            listener.text?.(event.delta.text, fresh2);
-            fresh2 = false;
-          }
-        }
-        return;
-      }
-      case "assistant":
-        if (message.parent_tool_use_id) return;
-        for (const block of message.message.content) {
-          if (block.type === "thinking")
-            listener.block?.({ kind: "thinking", text: block.thinking });
-          else if (block.type === "text") listener.block?.({ kind: "text", text: block.text });
-          else if (block.type === "tool_use") {
-            const call = {
-              kind: "tool",
-              id: block.id,
-              name: block.name,
-              input: block.input,
-              state: "running"
-            };
-            calls.set(call.id, call);
-            listener.block?.(call);
-            if (block.name === "TodoWrite")
-              listener.steps?.(
-                block.input.todos.map(({ content, status }) => ({
-                  content,
-                  status
-                }))
-              );
-          }
-        }
-        blockOpen = false;
-        flush();
-        return;
-      case "user": {
-        if ("isReplay" in message || message.parent_tool_use_id) return;
-        const { content } = message.message;
-        if (typeof content === "string") return;
-        for (const block of content) {
-          const call = block.type === "tool_result" ? calls.get(block.tool_use_id) : void 0;
-          if (block.type !== "tool_result" || !call) continue;
-          calls.delete(call.id);
-          listener.toolDone?.({
-            ...call,
-            output: outputText(block.content),
-            state: block.is_error ? "error" : "done"
-          });
-        }
-        return;
-      }
-      default:
-        return;
-    }
-  };
-}
-var STDERR_TAIL = 2e3;
-function claudeProcess() {
-  let exited = Promise.resolve();
-  let stderr = "";
-  return {
-    spawn: ({ command, args, cwd, env, signal }) => {
-      const child = spawn2(command, args, { cwd, env, signal, stdio: "pipe", windowsHide: true });
-      watchMember(child, args);
-      exited = new Promise((resolve) => {
-        child.once("close", () => {
-          resolve();
-        });
-        child.once("error", () => {
-          resolve();
-        });
-      });
-      child.stderr.setEncoding("utf8").on("data", (chunk) => {
-        stderr = (stderr + chunk).slice(-STDERR_TAIL);
-      });
-      return child;
+// src/plugin/pane-tools.ts
+var PANE_ONLY = "For openplan's pane only: your session never calls it.";
+function addPaneTools(server2, session2, pane2) {
+  server2.registerTool(
+    "pane",
+    {
+      description: `${PANE_ONLY} The socket the pane reads the team from.`,
+      annotations: { readOnlyHint: true }
     },
-    gone: () => exited,
-    /** A turn's error in words, with the end of Claude Code's stderr. */
-    failure: (error) => {
-      const words = errorText(error);
-      const tail = stderr.trim();
-      return tail ? `${words}. stderr: ${tail}` : words;
+    () => toolText(pane2.address)
+  );
+  server2.registerTool(
+    "answer",
+    {
+      description: `${PANE_ONLY} Answers what waits on the user, as they pressed it.`,
+      inputSchema: {
+        question: z6.string(),
+        option: z6.enum(PERMISSION_OPTIONS).optional().describe("A permission's answer"),
+        picks: z6.array(z6.string()).optional().describe("One pick per question with choices"),
+        decision: z6.enum(DECISION_OPTIONS).optional(),
+        note: z6.string().trim().optional().describe("Why it is denied, or what to change"),
+        sent_back: z6.string().optional().describe("The subtask a revised task goes back to")
+      }
+    },
+    async ({ question, option, picks, decision, note, sent_back }) => {
+      const answer = option ? { option, ...note && { note } } : decision ? decisionOf(decision, note, sent_back) : { picks: picks ?? [] };
+      await session2.goal.answer(question, answer);
+      return toolText(`Answered ${question}.`);
+    }
+  );
+  server2.registerTool(
+    "pause_goal",
+    {
+      description: `${PANE_ONLY} Pauses the session's goal, as /openplan pause.`,
+      inputSchema: {}
+    },
+    async () => {
+      const engine = session2.current;
+      if (!engine) return toolText(session2.none);
+      const { goal } = engine.state;
+      if (goal.status !== "active") return toolText(`"${goal.name}" is ${goal.status} already.`);
+      await engine.goals.pause();
+      return toolText(`Paused "${goal.name}".`);
+    }
+  );
+  server2.registerTool(
+    "resume_goal",
+    {
+      description: `${PANE_ONLY} Takes up the goal you picked in this session and resumes it, as /openplan resume.`,
+      inputSchema: { goal: z6.string().describe("The goal's slug") }
+    },
+    async ({ goal: slug }) => {
+      const { goal } = (await session2.takeUp(slug)).state;
+      return toolText(`Resumed "${goal.name}".`);
+    }
+  );
+}
+
+// src/engine/data.ts
+import { createHash } from "node:crypto";
+import { link, mkdir as mkdir2, readdir as readdir3, readFile as readFile4, rename as rename2, rm as rm2, writeFile as writeFile2 } from "node:fs/promises";
+import { readFileSync as readFileSync2, unlinkSync } from "node:fs";
+import { setTimeout as delay } from "node:timers/promises";
+import path7 from "node:path";
+function repoFolder(dataFolder2, repo) {
+  const name = path7.basename(repo.top).replace(/[^\w.-]+/g, "-");
+  const hash = createHash("sha256").update(repo.common).digest("hex").slice(0, 12);
+  return path7.join(dataFolder2, "repos", `${name}-${hash}`);
+}
+var goalsFolder = (repoFolder2) => path7.join(repoFolder2, "goals");
+var goalFiles = (folder) => ({
+  state: path7.join(folder, "state.json"),
+  lock: path7.join(folder, "lock"),
+  members: path7.join(folder, "members.json"),
+  /** The goal's copy of the team (team.ts copyTeam). */
+  team: path7.join(folder, "team.json"),
+  /** A member's settings file (policy.ts writeSettings). */
+  settings: (member) => path7.join(folder, "settings", `${member}.json`)
+});
+var STATE_VERSION = 1;
+var SAVE_DELAY_MS = 200;
+async function readState(file) {
+  const text2 = await readFile4(file, "utf8");
+  let saved;
+  try {
+    saved = JSON.parse(text2);
+  } catch (error) {
+    throw new Error(`${file} can't be read (${errorText(error)}): move it away to start over`, {
+      cause: error
+    });
+  }
+  if (saved.version > STATE_VERSION)
+    throw new Error(`${file} was written by a newer openplan: update openplan to go on`);
+  return saved.state;
+}
+function stateWriter(file, state, failed) {
+  let timer;
+  let writing2 = Promise.resolve();
+  let closed = false;
+  const write = () => {
+    timer = void 0;
+    writing2 = writing2.then(() => writeWhole(file, JSON.stringify({ version: STATE_VERSION, state: state() }))).catch(failed);
+  };
+  return {
+    changed() {
+      if (!closed) timer ??= setTimeout(write, SAVE_DELAY_MS);
+    },
+    async flush() {
+      if (timer) {
+        clearTimeout(timer);
+        write();
+      }
+      await writing2;
+    },
+    async close() {
+      clearTimeout(timer);
+      write();
+      closed = true;
+      await writing2;
     }
   };
 }
-async function runTurn(prompt, options, signal, decode) {
-  signal.throwIfAborted();
-  const abortController = new AbortController();
-  const stop = () => {
-    abortController.abort();
-  };
-  signal.addEventListener("abort", stop, { once: true });
-  const claude2 = claudeProcess();
-  const run2 = query({
-    prompt,
-    options: { ...options, abortController, spawnClaudeCodeProcess: claude2.spawn }
-  });
+function lockText(file) {
   try {
-    for await (const message of run2) {
-      const outcome = decode(message);
-      if (outcome) return outcome;
-    }
-    return { ok: false, error: "The session ended without a result", tokens: 0 };
-  } catch (error) {
-    throw new Error(claude2.failure(error), { cause: error });
-  } finally {
-    signal.removeEventListener("abort", stop);
-    run2.close();
-    await claude2.gone();
+    return readFileSync2(file, "utf8");
+  } catch {
+    return void 0;
   }
 }
-async function askOnce(params) {
-  const { prompt, options, schema, signal, listener = {} } = params;
-  let session = "";
-  const outcome = await runTurn(
-    prompt,
-    {
-      ...options,
-      ...schema && {
-        outputFormat: {
-          type: "json_schema",
-          schema: z2.toJSONSchema(schema, { target: "draft-7" })
+function readHolder(file) {
+  const text2 = lockText(file);
+  try {
+    return text2 === void 0 ? void 0 : JSON.parse(text2);
+  } catch {
+    return void 0;
+  }
+}
+function holderOf(lock) {
+  const holder = readHolder(lock);
+  return holder && running(holder.pid) ? holder : void 0;
+}
+async function holding(lock, me, open2) {
+  await mkdir2(path7.dirname(lock), { recursive: true });
+  const file = `${lock}.${String(process.pid)}`;
+  const holder = { pid: process.pid, ...me, open: open2 };
+  await writeFile2(file, JSON.stringify(holder));
+  return file;
+}
+var code = (error) => error.code;
+var REPLACING_WAIT_MS = 10;
+async function takeGoal(lock, me, takeOver) {
+  const mine = await holding(lock, me, false);
+  const handed = { meetings: [] };
+  try {
+    for (; ; ) {
+      try {
+        await link(mine, lock);
+        return handed;
+      } catch (error) {
+        if (code(error) !== "EEXIST") throw error;
+      }
+      const ended = lockText(lock);
+      if (ended === void 0) continue;
+      const holder = readHolder(lock);
+      if (holder && running(holder.pid)) {
+        if (holder.pid === process.pid) {
+          await rename2(mine, lock);
+          return handed;
         }
+        const stopped = await takeOver(holder);
+        handed.meetings.push(...stopped.meetings);
+        continue;
       }
-    },
-    signal,
-    turnDecoder({
-      ...listener,
-      session: (id, model) => {
-        session = id;
-        listener.session?.(id, model);
+      const claim = `${lock}.ended-${String(holder?.pid ?? "unread")}`;
+      try {
+        await link(mine, claim);
+      } catch (error) {
+        if (code(error) !== "EEXIST") throw error;
+        if (lockText(claim) === void 0) continue;
+        const replacing = readHolder(claim);
+        if (!replacing || !running(replacing.pid))
+          throw new Error(`A session taking this goal ended partway: delete ${lock} and ${claim}`, {
+            cause: error
+          });
+        await delay(REPLACING_WAIT_MS);
+        continue;
       }
+      try {
+        if (lockText(lock) === ended) {
+          await rename2(mine, lock);
+          return handed;
+        }
+      } finally {
+        await rm2(claim, { force: true });
+      }
+    }
+  } finally {
+    await rm2(mine, { force: true });
+  }
+}
+async function openedGoal(lock, me) {
+  await rename2(await holding(lock, me, true), lock);
+}
+function releaseGoal(lock) {
+  if (holderOf(lock)?.pid === process.pid) unlinkSync(lock);
+}
+async function newGoalFolder(repoFolder2, name, taken) {
+  const goals = goalsFolder(repoFolder2);
+  await mkdir2(goals, { recursive: true });
+  for (const slug of await readdir3(goals)) taken.add(slug);
+  for (; ; ) {
+    const slug = slugFor(name, taken);
+    const folder = path7.join(goals, slug);
+    try {
+      await mkdir2(folder);
+      return { slug, folder };
+    } catch (error) {
+      if (code(error) !== "EEXIST") throw error;
+      taken.add(slug);
+    }
+  }
+}
+async function listGoals(repoFolder2) {
+  const folder = goalsFolder(repoFolder2);
+  let slugs;
+  try {
+    slugs = await readdir3(folder);
+  } catch (error) {
+    if (code(error) === "ENOENT") return [];
+    throw error;
+  }
+  const found = await Promise.all(
+    slugs.map(async (slug) => {
+      const files = goalFiles(path7.join(folder, slug));
+      let state;
+      try {
+        state = await readState(files.state);
+      } catch (error) {
+        if (code(error) === "ENOENT" || code(error) === "ENOTDIR") return void 0;
+        throw error;
+      }
+      const holder = holderOf(files.lock);
+      return { slug, state, ...holder && { holder } };
     })
   );
-  if (!outcome.ok) throw new Error(outcome.error);
-  if (schema && outcome.structured === void 0)
-    throw new Error("The model answered in words instead of the result asked for");
-  return { text: outcome.text, structured: outcome.structured, session, tokens: outcome.tokens };
+  return found.filter((entry) => entry !== void 0).sort((a, b) => a.state.goal.createdAt - b.state.goal.createdAt);
 }
+
+// src/engine/engine.ts
+import { randomUUID as randomUUID4 } from "node:crypto";
+import { existsSync } from "node:fs";
+import { rm as rm3 } from "node:fs/promises";
+import path11 from "node:path";
+
+// src/engine/goals.ts
+var LIFE = "life";
+var Goals = class {
+  constructor(core, scheduler, meetings) {
+    this.core = core;
+    this.scheduler = scheduler;
+    this.meetings = meetings;
+  }
+  core;
+  scheduler;
+  meetings;
+  life = serialBy();
+  /**
+   * Pauses the goal: its runs stop, to go on in their sessions when it is
+   * resumed, and a meeting under way is cancelled; a plan in review stays,
+   * to approve once it goes on.
+   */
+  pause() {
+    return this.life(LIFE, () => {
+      const { goal } = this;
+      if (goal.status === "paused") return;
+      if (goal.status === "archived")
+        throw new Error(`The goal "${goal.name}" is archived: resume it first`);
+      goal.status = step(GOAL_MACHINE, goal.status, "pause");
+      this.hold(false);
+    });
+  }
+  /** Archives the goal as it stands: its work held as when paused, and its plans in review dropped. */
+  archive() {
+    return this.life(LIFE, () => {
+      const { goal } = this;
+      if (goal.status === "archived") return;
+      goal.status = step(GOAL_MACHINE, goal.status, "archive");
+      goal.archivedAt = Date.now();
+      this.hold(true);
+    });
+  }
+  /**
+   * Puts a paused or archived goal back to work, from where it was; then the
+   * meetings a session stopped as it let the goal go (§3.2), and only then
+   * other work, so a meeting's members go back to it before anything else
+   * takes them.
+   */
+  resume(meetings = []) {
+    return this.life(LIFE, () => {
+      if (!this.wake()) return;
+      for (const id of meetings) this.meetings.resume(id);
+      this.core.changed();
+      this.scheduler.pump();
+    });
+  }
+  /**
+   * Takes an archived goal out of the repository for good: its subtasks'
+   * worktrees and branches, and its own worktree. Its branch stays, yours to
+   * merge or delete. The engine removes the goal's folder after (Engine.delete).
+   */
+  delete() {
+    return this.life(LIFE, async () => {
+      const { core, goal } = this;
+      if (!can(GOAL_MACHINE, goal.status, "delete"))
+        throw new Error(`The goal "${goal.name}" isn't archived: archive it before deleting it`);
+      await this.scheduler.release(core.state.subtasks.map((s) => s.id));
+      await this.meetings.settled();
+      await removeGoal(core.places, goal.slug);
+    });
+  }
+  /**
+   * Gives a member a subtask directly, as a task of its own. It starts once
+   * they are free; a paused goal's waits for the goal to go on.
+   */
+  assign(work) {
+    const { goal } = this;
+    if (goal.status === "archived")
+      throw new Error(`The goal "${goal.name}" is archived: resume it first`);
+    if (!this.core.team.members.some((m) => m.name === work.assignee))
+      throw new Error(`There is no member called "${work.assignee}"`);
+    return this.scheduler.assign([
+      // Work you assign is done once merged: it isn't yours to accept (§7.1).
+      {
+        title: work.title,
+        outcome: "",
+        ownerAccepts: false,
+        subtasks: [{ ...work, key: "", dependsOn: [] }]
+      }
+    ]);
+  }
+  /** Makes the goal active again; false when it was already. */
+  wake() {
+    const { goal } = this;
+    if (goal.status === "active") return false;
+    goal.status = step(GOAL_MACHINE, goal.status, "resume");
+    goal.archivedAt = void 0;
+    return true;
+  }
+  get goal() {
+    return this.core.state.goal;
+  }
+  /** Holds the goal's work, cancels its meeting under way and, `plansToo`, its plans in review. */
+  hold(plansToo) {
+    this.scheduler.hold();
+    for (const meeting2 of this.core.state.meetings)
+      if (meeting2.status === "running" || plansToo && meeting2.status === "review")
+        void this.meetings.cancel(meeting2.id);
+    this.core.changed();
+  }
+};
 
 // src/engine/meetings.ts
+import { randomUUID } from "node:crypto";
+import { mkdir as mkdir3, writeFile as writeFile3 } from "node:fs/promises";
+import path8 from "node:path";
+import {
+  createSdkMcpServer,
+  tool
+} from "@anthropic-ai/claude-agent-sdk";
+import { z as z7 } from "zod";
 var MEETING_TURNS_EACH = {
   small: 1,
   discussion: 2,
@@ -8979,8 +9785,8 @@ var handTool = (raise) => turnTool(
     "raise_hand",
     MEETING_TOOLS.raiseHand.what,
     {
-      point: z3.string().trim().min(1).describe(MEETING_TOOLS.raiseHand.point),
-      to: z3.string().trim().optional().describe(MEETING_TOOLS.raiseHand.to)
+      point: z7.string().trim().min(1).describe(MEETING_TOOLS.raiseHand.point),
+      to: z7.string().trim().optional().describe(MEETING_TOOLS.raiseHand.to)
     },
     ({ point, to }) => {
       raise({ point, ...to && { to } });
@@ -8993,8 +9799,8 @@ var floorTool = (others, give) => turnTool(
     "give_floor",
     MEETING_TOOLS.giveFloor.what,
     {
-      member: z3.enum(others.map((m) => m.name)).describe(MEETING_TOOLS.giveFloor.member),
-      quiet: z3.boolean().optional().describe(MEETING_TOOLS.giveFloor.quiet)
+      member: z7.enum(others.map((m) => m.name)).describe(MEETING_TOOLS.giveFloor.member),
+      quiet: z7.boolean().optional().describe(MEETING_TOOLS.giveFloor.quiet)
     },
     (floor) => {
       give(floor);
@@ -9044,12 +9850,11 @@ var Meetings = class {
     const { core } = this;
     const named = [...new Set(call.attendees.map((name) => name.trim()))];
     const attendees = named.length ? named : core.team.members.map((m) => m.name).sort((a, b) => a.localeCompare(b));
-    const host = this.admit(call.goalId, attendees);
+    const host = this.admit(attendees);
     if (call.hostOnly && attendees.length < 2)
       throw new Error(`${host} can't only run a meeting with nobody else at it`);
     const meeting2 = {
-      id: randomUUID2(),
-      goalId: call.goalId,
+      id: randomUUID(),
       agenda: call.agenda,
       size: call.size,
       participants: attendees,
@@ -9071,7 +9876,7 @@ var Meetings = class {
     const meeting2 = core.state.meetings.find((m) => m.id === id);
     if (!meeting2 || !meetingResumes(workOf(core), meeting2))
       throw new Error("That meeting can't go on: its plan is out, or its goal isn't active");
-    this.admit(meeting2.goalId, meeting2.participants);
+    this.admit(meeting2.participants);
     meeting2.status = step(MEETING_MACHINE, meeting2.status, "resume");
     meeting2.error = void 0;
     core.changed();
@@ -9100,32 +9905,31 @@ var Meetings = class {
     const { core } = this;
     const { meeting: meeting2 } = this.underReview(id, "change");
     const names = core.team.members.map((m) => m.name);
-    meeting2.plan = soundPlan(planSchema(z3.enum(names)).parse(raw), "refuse");
+    meeting2.plan = soundPlan(planSchema(z7.enum(names)).parse(raw), "refuse");
     core.changed();
   }
   /**
-   * Approves a plan under review: its document is saved in the data folder,
+   * Approves a plan under review: its document is saved in the goal's folder,
    * and its tasks and subtasks go to the scheduler, pending until they can
    * start. Returns the subtasks.
    */
   async approve(id) {
     const { core } = this;
     const { meeting: meeting2, plan } = this.underReview(id, "approve");
-    const goal2 = this.activeGoal(meeting2.goalId);
-    const file = path5.join(core.places.root, "plans", `${goal2.slug}-${meeting2.id}.md`);
-    await mkdir4(path5.dirname(file), { recursive: true });
+    this.activeGoal();
+    const file = path8.join(core.places.root, "plans", `${meeting2.id}.md`);
+    await mkdir3(path8.dirname(file), { recursive: true });
     await writeFile3(file, plan.markdown);
     if (meeting2.plan !== plan || !can(MEETING_MACHINE, meeting2.status, "approve"))
       throw new Error("The plan changed while it was being approved");
-    this.activeGoal(goal2.id);
+    this.activeGoal();
     meeting2.status = step(MEETING_MACHINE, meeting2.status, "approve");
     meeting2.planFile = file;
-    return this.scheduler.assign(goal2.id, plan.tasks, meeting2.id);
+    return this.scheduler.assign(plan.tasks, meeting2.id);
   }
-  /** Settles once no meeting of a goal is under way: one being cancelled has ended. */
-  async settled(goalId) {
-    const ids = this.core.state.meetings.filter((m) => m.goalId === goalId).map((m) => m.id);
-    await Promise.all(ids.flatMap((id) => this.ongoing.get(id) ?? []));
+  /** Settles once no meeting is under way: one being cancelled has ended. */
+  async settled() {
+    await Promise.all(this.ongoing.values());
   }
   /** Stops every meeting under way, as cancelled; settles once they have ended. */
   async close() {
@@ -9141,31 +9945,29 @@ var Meetings = class {
     }
   }
   /**
-   * Whether these members can sit down together now for this goal: the goal
+   * Whether these members can sit down together now: the goal
    * is active, each is on the team and free. Throws why not; gives the first,
    * who hosts. Nothing is
    * awaited here or before the meeting is under way, so two meetings can't
    * both take the same member.
    */
-  admit(goalId, attendees) {
+  admit(attendees) {
     const { core } = this;
-    this.activeGoal(goalId);
+    this.activeGoal();
     const [host] = attendees;
     if (host === void 0) throw new Error("The team has no members");
     const names = new Set(core.team.members.map((m) => m.name));
     const stranger = attendees.find((name) => !names.has(name));
     if (stranger) throw new Error(`There is no member called "${stranger}"`);
-    const busy2 = busyMembers(workOf(core));
-    const taken = attendees.find((name) => busy2.has(name));
+    const busy = busyMembers(workOf(core));
+    const taken = attendees.find((name) => busy.has(name));
     if (taken) throw new Error(`${taken} is busy: working, reviewing, or at another meeting`);
     return host;
   }
-  /** A goal that is active, or throws why it isn't. */
-  activeGoal(goalId) {
-    const goal2 = this.core.state.goals.find((g) => g.id === goalId);
-    if (!goal2) throw new Error("There is no such goal");
-    if (goal2.status !== "active") throw new Error(`The goal "${goal2.name}" is ${goal2.status}`);
-    return goal2;
+  /** Throws why the goal isn't active, if it isn't. */
+  activeGoal() {
+    const { goal } = this.core.state;
+    if (goal.status !== "active") throw new Error(`The goal "${goal.name}" is ${goal.status}`);
   }
   /** A meeting whose plan is under review and can take `event`, or throws. */
   underReview(id, event) {
@@ -9189,11 +9991,11 @@ var Meetings = class {
     const named = (names) => names.flatMap((name) => core.team.members.filter((m) => m.name === name));
     const [host, ...others] = named(meeting2.participants);
     const [member, ...more] = named(meetingMembers(meeting2));
-    const goal2 = core.state.goals.find((g) => g.id === meeting2.goalId);
-    if (!host || !member || !goal2) return;
+    const { goal } = core.state;
+    if (!host || !member) return;
     let ctx = {
       meeting: meeting2,
-      goal: goal2,
+      goal,
       attendees: [host, ...others],
       members: [member, ...more],
       cwd: ""
@@ -9221,7 +10023,7 @@ var Meetings = class {
       return reply;
     };
     const speak = async (member2, prompt, turn = {}) => {
-      const { saying, ...asked } = turn;
+      const { saying, ...asked2 } = turn;
       meeting2.speaking = member2.name;
       meeting2.planning = turn.schema !== void 0;
       core.changed();
@@ -9229,7 +10031,7 @@ var Meetings = class {
       let words = "";
       try {
         return await ask(member2, prompt, {
-          ...asked,
+          ...asked2,
           listener: {
             ...speech,
             text: (delta, fresh2) => {
@@ -9261,7 +10063,7 @@ var Meetings = class {
       return found;
     };
     try {
-      ctx = { ...ctx, cwd: await openGoal(core.places, goal2.slug) };
+      ctx = { ...ctx, cwd: await openGoal(core.places, goal.slug) };
       const answer = async (name) => {
         const member2 = attendee(name);
         const point = meeting2.hands?.find((hand) => hand.member === name)?.point;
@@ -9274,7 +10076,7 @@ var Meetings = class {
         core.changed();
         const stop = new AbortController();
         const weighing = AbortSignal.any([signal, stop.signal]);
-        const asked = await Promise.allSettled(
+        const asked2 = await Promise.allSettled(
           who.map(
             (member2) => ask(member2, meetingHand(ctx, member2), {
               signal: weighing,
@@ -9293,7 +10095,7 @@ var Meetings = class {
         );
         meeting2.weighing = void 0;
         core.changed();
-        const failed = asked.find((r) => r.status === "rejected");
+        const failed = asked2.find((r) => r.status === "rejected");
         if (failed) throw failed.reason;
       };
       const round = async (who) => {
@@ -9413,15 +10215,15 @@ function expandEnv(env, from) {
   if (missing2.size) throw new Error(`Not set in the environment: ${[...missing2].join(", ")}`);
   return filled;
 }
-function memberSettings(team2, member, from, plugin) {
+function memberSettings(team, member, from, plugin) {
   return {
-    ...team2,
-    env: { ...team2.env, ...expandEnv(member.env, from) },
-    enabledPlugins: { ...team2.enabledPlugins, [plugin]: false },
+    ...team,
+    env: { ...team.env, ...expandEnv(member.env, from) },
+    enabledPlugins: { ...team.enabledPlugins, [plugin]: false },
     crossSessionInbound: "refuse",
     permissions: {
-      ...team2.permissions,
-      deny: [...team2.permissions?.deny ?? [], "SendMessage", "ListAgents"]
+      ...team.permissions,
+      deny: [...team.permissions?.deny ?? [], "SendMessage", "ListAgents"]
     }
   };
 }
@@ -9462,7 +10264,7 @@ function readOnlyOptions(seat, from) {
 }
 
 // src/engine/questions.ts
-import { randomUUID as randomUUID3 } from "node:crypto";
+import { randomUUID as randomUUID2 } from "node:crypto";
 var ASK_TOOL = "AskUserQuestion";
 var CALLED_OFF = "Stopped.";
 var ruleText = ({ toolName, ruleContent }) => ruleContent === void 0 ? toolName : `${toolName}(${ruleContent})`;
@@ -9645,7 +10447,7 @@ var Questions = class {
   /** Puts a question: to a teammate, or to you. */
   open(asker, ask) {
     const question = {
-      id: randomUUID3(),
+      id: randomUUID2(),
       ...asker.subtaskId !== void 0 && { subtaskId: asker.subtaskId },
       from: asker.from,
       status: "open",
@@ -9671,18 +10473,139 @@ var Questions = class {
   }
 };
 
+// src/engine/records.ts
+import { appendFile, mkdir as mkdir4, open } from "node:fs/promises";
+import path9 from "node:path";
+var OUTPUT_MAX = 4e3;
+var recordFile = (places, subtaskId) => path9.join(places.root, "records", `${subtaskId}.jsonl`);
+var Records = class {
+  constructor(places, failed) {
+    this.places = places;
+    this.failed = failed;
+  }
+  places;
+  failed;
+  /** What each subtask's run is doing now, by subtask id: its last run's, once it ends. */
+  live = /* @__PURE__ */ new Map();
+  spoken = /* @__PURE__ */ new Map();
+  /** Entries are appended one at a time, in the order they came. */
+  writing = Promise.resolve();
+  /** Where a run of `subtaskId` tells what it does: its record, and what goes on now. */
+  recorder(subtaskId) {
+    const now = { running: /* @__PURE__ */ new Map() };
+    this.live.set(subtaskId, now);
+    const file = recordFile(this.places, subtaskId);
+    const write = (entry) => {
+      this.writing = this.writing.then(async () => {
+        await mkdir4(path9.dirname(file), { recursive: true });
+        await appendFile(file, `${JSON.stringify(entry)}
+`);
+      }).catch(this.failed);
+    };
+    return {
+      session: (session2, model) => {
+        write({ at: Date.now(), kind: "run", session: session2, model });
+      },
+      thinking: (delta) => {
+        now.streaming = delta === "" || now.streaming?.kind !== "thinking" ? { kind: "thinking", text: delta } : { kind: "thinking", text: now.streaming.text + delta };
+      },
+      text: (delta, fresh2) => {
+        now.streaming = fresh2 || now.streaming?.kind !== "text" ? { kind: "text", text: delta } : { kind: "text", text: now.streaming.text + delta };
+      },
+      toolStarting: (name) => {
+        now.starting = name;
+      },
+      block: (block) => {
+        if (block.kind === "tool") {
+          now.starting = void 0;
+          now.running.set(block.id, block);
+          return;
+        }
+        if (now.streaming?.kind === block.kind) now.streaming = void 0;
+        write({ at: Date.now(), kind: block.kind, text: block.text });
+      },
+      toolDone: (call) => {
+        now.running.delete(call.id);
+        write({
+          at: Date.now(),
+          kind: "tool",
+          name: call.name,
+          input: call.input,
+          state: call.state === "error" ? "error" : "done",
+          output: (call.output ?? "").slice(0, OUTPUT_MAX)
+        });
+      },
+      steps: (steps) => {
+        write({ at: Date.now(), kind: "steps", steps });
+      },
+      notice: (notice) => {
+        write({ at: Date.now(), kind: "notice", notice });
+      }
+    };
+  }
+  /**
+   * A subtask's record from byte `from` of its file on: the whole entries
+   * written since, where the next read starts, and what its run is doing now.
+   */
+  async read(subtaskId, from = 0) {
+    const now = this.live.get(subtaskId);
+    const live = now && {
+      ...now.streaming && { streaming: now.streaming },
+      ...now.starting && { starting: now.starting },
+      running: [...now.running.values()]
+    };
+    let handle;
+    try {
+      handle = await open(recordFile(this.places, subtaskId));
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+      return { entries: [], next: 0, ...live && { live } };
+    }
+    try {
+      const { size } = await handle.stat();
+      const buffer = Buffer.alloc(Math.max(0, size - from));
+      await handle.read(buffer, 0, buffer.length, from);
+      const whole = buffer.lastIndexOf("\n") + 1;
+      const entries = buffer.subarray(0, whole).toString("utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line));
+      return { entries, next: from + whole, ...live && { live } };
+    } finally {
+      await handle.close();
+    }
+  }
+  /** Where a meeting turn tells its words as they are said. */
+  speech(meeting2, speaker) {
+    const spoken = { speaker, text: "", turn: meeting2.turns.length };
+    this.spoken.set(meeting2.id, spoken);
+    return {
+      // What a turn says before it looks something up isn't what it ends up saying.
+      text: (delta, fresh2) => {
+        spoken.text = fresh2 ? delta : spoken.text + delta;
+      }
+    };
+  }
+  /** The turn being spoken at `meeting` now, if one is. */
+  speaking(meeting2) {
+    const spoken = this.spoken.get(meeting2.id);
+    return meeting2.status === "running" && spoken?.turn === meeting2.turns.length ? spoken : void 0;
+  }
+  /** Every entry written so far is in its file. */
+  flush() {
+    return this.writing;
+  }
+};
+
 // src/engine/scheduler.ts
-import { randomUUID as randomUUID4 } from "node:crypto";
+import { randomUUID as randomUUID3 } from "node:crypto";
 import { stat as stat2 } from "node:fs/promises";
-import path6 from "node:path";
-import { z as z5 } from "zod";
+import path10 from "node:path";
+import { z as z9 } from "zod";
 
 // src/engine/run.ts
 import {
   createSdkMcpServer as createSdkMcpServer2,
   tool as tool2
 } from "@anthropic-ai/claude-agent-sdk";
-import { z as z4 } from "zod";
+import { z as z8 } from "zod";
 var OWN_TOOLS = /* @__PURE__ */ new Set([turnToolName("ask_teammate"), turnToolName("deliver")]);
 function teamServer(collaboration, delivered) {
   return createSdkMcpServer2({
@@ -9692,8 +10615,8 @@ function teamServer(collaboration, delivered) {
         "ask_teammate",
         "Asks a teammate a question and waits for the answer. Use it only when you need their information or decision.",
         {
-          teammate: z4.string().describe("The teammate's name"),
-          question: z4.string().describe("The question, with the context they need")
+          teammate: z8.string().describe("The teammate's name"),
+          question: z8.string().describe("The question, with the context they need")
         },
         async ({ teammate, question }) => toolText(await collaboration.askTeammate(teammate, question))
       ),
@@ -9701,8 +10624,8 @@ function teamServer(collaboration, delivered) {
         "deliver",
         "Hands over your finished work: your subtask is done only once you call it. Then end your turn. If you deliver again, the last delivery counts.",
         {
-          summary: z4.string().trim().min(1).describe("A few sentences: what you did, and anything to watch out for"),
-          files: z4.array(z4.string()).describe(
+          summary: z8.string().trim().min(1).describe("A few sentences: what you did, and anything to watch out for"),
+          files: z8.array(z8.string()).describe(
             "The files that are the result, as paths in your worktree (not scratch files); empty when the result is the summary itself"
           )
         },
@@ -9719,11 +10642,11 @@ function teamServer(collaboration, delivered) {
 async function runSubtask(params) {
   const { options, gate, signal } = params;
   let handover;
-  let session = params.resume;
+  let session2 = params.resume;
   const decode = turnDecoder({
     ...params.listener,
     session: (id, model) => {
-      session = id;
+      session2 = id;
       params.listener.session?.(id, model);
     }
   });
@@ -9737,7 +10660,7 @@ async function runSubtask(params) {
     prompt,
     {
       ...options,
-      ...session !== void 0 && { resume: session },
+      ...session2 !== void 0 && { resume: session2 },
       mcpServers: {
         ...options.mcpServers,
         [TURN_SERVER]: teamServer(params.collaboration, (given) => handover = given)
@@ -9770,7 +10693,7 @@ async function runSubtask(params) {
 }
 
 // src/engine/scheduler.ts
-var verdictSchema = z5.object({ pass: z5.boolean(), notes: z5.string().trim() });
+var verdictSchema = z9.object({ pass: z9.boolean(), notes: z9.string().trim() });
 var REVIEW_ROUNDS = 3;
 var REVIEW_CALLS = ["rereview", "skip", "sendBack"];
 var SIDE_CALLS = ["ours", "theirs", "retry"];
@@ -9778,7 +10701,7 @@ var DELIVERY_CALLS = ["accept", "revise"];
 function goOnWith(subtask2, reason) {
   subtask2.goOn = [...subtask2.goOn ?? [], reason];
 }
-var progressOf = (steps) => {
+var progressOf2 = (steps) => {
   const current = steps.find((s) => s.status === "in_progress")?.content;
   return {
     done: steps.filter((s) => s.status === "completed").length,
@@ -9822,18 +10745,17 @@ var Scheduler = class {
     }
   }
   /**
-   * Gives a goal new work: tasks, each with its subtasks, their dependencies
+   * Gives the goal new work: tasks, each with its subtasks, their dependencies
    * by the keys they have in `tasks`. They wait as pending until they can
    * start. `meetingId`: the meeting whose plan they come from.
    */
-  assign(goalId, tasks, meetingId) {
+  assign(tasks, meetingId) {
     const { state } = this.core;
     const now = Date.now();
     const ids = /* @__PURE__ */ new Map();
     const added = tasks.flatMap(({ title, outcome, ownerAccepts, subtasks }) => {
       const task = {
-        id: randomUUID4(),
-        goalId,
+        id: randomUUID3(),
         title,
         outcome,
         ownerAccepts,
@@ -9842,13 +10764,12 @@ var Scheduler = class {
       };
       state.tasks.push(task);
       return subtasks.map(({ key, ...planned }) => {
-        const id = randomUUID4();
+        const id = randomUUID3();
         ids.set(key, id);
         return {
           ...planned,
           id,
           taskId: task.id,
-          goalId,
           status: "pending",
           createdAt: now,
           progress: { done: 0, total: 0 },
@@ -9864,14 +10785,14 @@ var Scheduler = class {
     return added;
   }
   /**
-   * Puts a goal's work on hold (it was paused or archived): its runs stop, to
+   * Puts the goal's work on hold (it was paused or archived): its runs stop, to
    * go on in their sessions when it is resumed; its reviews stop, to be done
    * again then. Nothing of it starts meanwhile; a merge under way finishes.
    */
-  hold(goalId) {
+  hold() {
     for (const subtask2 of this.core.state.subtasks) {
       const live = this.live.get(subtask2.id);
-      if (subtask2.goalId !== goalId || !live || live.kind === "merge") continue;
+      if (!live || live.kind === "merge") continue;
       if (live.kind === "run") this.keepOn(subtask2.id, { why: "held" });
       live.abort.abort();
     }
@@ -9880,13 +10801,13 @@ var Scheduler = class {
    * You add to a subtask (a message to its member): it goes on in its
    * session, from where it stopped, with `note`; a running one stops first,
    * one not started yet hears it in its brief. One being reviewed or merged
-   * is handed over already, and a paused or archived goal's work waits for
+   * is handed over already, and the work of a paused or archived goal waits for
    * the goal to be resumed. Throws when there is no such subtask.
    */
   carry(subtaskId, note) {
     const subtask2 = this.subtask(subtaskId);
     if (!subtask2) throw new Error("There is no such subtask");
-    if (this.goalOf(subtask2).status !== "active") return "onHold";
+    if (this.goal.status !== "active") return "onHold";
     if (subtask2.status === "reviewing" || subtask2.status === "merging") return "handedOver";
     const live = this.live.get(subtaskId);
     if (live) {
@@ -9933,7 +10854,7 @@ var Scheduler = class {
     if (!subtask2 || !can(SUBTASK_MACHINE, subtask2.status, "stop")) return;
     if (subtask2.status === "merging") {
       if (live) return;
-      await abortMerge(this.core.places, this.goalOf(subtask2).slug, subtask2.id);
+      await abortMerge(this.core.places, this.goal.slug, subtask2.id);
       if (!can(SUBTASK_MACHINE, subtask2.status, "stop")) return;
     }
     live?.abort.abort();
@@ -9948,7 +10869,7 @@ var Scheduler = class {
   async retry(subtaskId) {
     const subtask2 = this.subtask(subtaskId);
     if (!subtask2 || !can(SUBTASK_MACHINE, subtask2.status, "retry")) return;
-    await dropDesk(this.core.places, this.goalOf(subtask2).slug, subtask2.id);
+    await dropDesk(this.core.places, this.goal.slug, subtask2.id);
     if (!can(SUBTASK_MACHINE, subtask2.status, "retry")) return;
     this.move(subtask2, "retry");
     Object.assign(subtask2, {
@@ -10020,7 +10941,7 @@ var Scheduler = class {
         }
       }
     } else if (subtask2.status === "merging") {
-      const { slug } = this.goalOf(subtask2);
+      const { slug } = this.goal;
       if (pick === "retry") await abortMerge(this.core.places, slug, subtask2.id);
       else if (pick === "ours" || pick === "theirs")
         await pickSide(this.core.places, slug, subtask2.id, question.decision.files ?? [], pick);
@@ -10034,36 +10955,34 @@ var Scheduler = class {
    * delivered. A pending subtask starts, and one in review is reviewed, when
    * nothing holds it up (waitsIn: its goal active, you not deciding about it,
    * its member or reviewer free); one being merged is merged unless you are
-   * deciding about it, one at a time per goal.
+   * deciding about it, one at a time.
    */
   pump() {
     if (this.closed) return;
     const { state } = this.core;
     const work = workOf(this.core);
-    const busy2 = busyMembers(work);
+    const busy = busyMembers(work);
     const reviews = new Set(
       state.subtasks.filter((s) => this.live.get(s.id)?.kind === "review").map((s) => reviewerOf(work, s))
     );
-    const merging2 = new Set(
-      state.subtasks.filter((s) => this.live.get(s.id)?.kind === "merge").map((s) => s.goalId)
-    );
+    let merging2 = state.subtasks.some((s) => this.live.get(s.id)?.kind === "merge");
     const order = [...state.subtasks].sort(
       (a, b) => Number(Boolean(b.goOn)) - Number(Boolean(a.goOn)) || handedAt(a) - handedAt(b)
     );
     for (const subtask2 of order) {
       if (this.live.has(subtask2.id)) continue;
       if (subtask2.status === "pending") {
-        if (waitsIn(work, subtask2, busy2).length) continue;
-        busy2.add(subtask2.assignee);
+        if (waitsIn(work, subtask2, busy).length) continue;
+        busy.add(subtask2.assignee);
         void this.startRun(subtask2);
       } else if (subtask2.status === "reviewing") {
         const reviewer = reviewerOf(work, subtask2);
-        if (reviews.has(reviewer) || waitsIn(work, subtask2, busy2).length) continue;
+        if (reviews.has(reviewer) || waitsIn(work, subtask2, busy).length) continue;
         reviews.add(reviewer);
         void this.startReview(subtask2);
       } else if (subtask2.status === "merging") {
-        if (waitsIn(work, subtask2, busy2).length || merging2.has(subtask2.goalId)) continue;
-        merging2.add(subtask2.goalId);
+        if (waitsIn(work, subtask2, busy).length || merging2) continue;
+        merging2 = true;
         void this.startMerge(subtask2);
       }
     }
@@ -10088,10 +11007,8 @@ var Scheduler = class {
   subtask(id) {
     return this.core.state.subtasks.find((s) => s.id === id);
   }
-  goalOf(subtask2) {
-    const goal2 = this.core.state.goals.find((g) => g.id === subtask2.goalId);
-    if (!goal2) throw new Error(`The goal of "${subtask2.title}" is gone`);
-    return goal2;
+  get goal() {
+    return this.core.state.goal;
   }
   taskOf(subtask2) {
     const task = this.core.state.tasks.find((t) => t.id === subtask2.taskId);
@@ -10158,18 +11075,18 @@ var Scheduler = class {
     let outcome;
     try {
       const member = this.memberOf(subtask2.assignee);
-      const goal2 = this.goalOf(subtask2);
+      const { goal } = this;
       const task = this.taskOf(subtask2);
-      const desk = await openDesk(core.places, goal2.slug, subtask2.id);
+      const desk = await openDesk(core.places, goal.slug, subtask2.id);
       const recorder = core.recorder(subtask2);
       outcome = await runSubtask({
         options: core.options(member, "task", desk),
         opening: goOn ? goOnMessage(goOn, subtask2) : taskBrief({
-          goal: goal2,
+          goal,
           task,
           subtask: subtask2,
           cwd: desk,
-          branch: subtaskBranch(goal2.slug, subtask2.id),
+          branch: subtaskBranch(goal.slug, subtask2.id),
           plan: this.planOf(task),
           upstream: this.upstreamOf(subtask2),
           notes
@@ -10192,7 +11109,7 @@ var Scheduler = class {
             recorder.session?.(id, model);
           },
           steps: (steps) => {
-            subtask2.progress = progressOf(steps);
+            subtask2.progress = progressOf2(steps);
             core.changed();
             recorder.steps?.(steps);
           }
@@ -10202,7 +11119,7 @@ var Scheduler = class {
       if (outcome.status === "delivered")
         await commitDesk(
           core.places,
-          goal2.slug,
+          goal.slug,
           subtask2.id,
           memberSigner(member.name),
           `${subtask2.title}
@@ -10253,15 +11170,9 @@ ${outcome.handover.summary}`
             from,
             subtask: subtask2,
             question,
-            own: core.state.subtasks.filter(
-              (s) => s.goalId === subtask2.goalId && s.assignee === target.name
-            )
+            own: core.state.subtasks.filter((s) => s.assignee === target.name)
           }),
-          options: core.options(
-            target,
-            "answer",
-            await openGoal(core.places, this.goalOf(subtask2).slug)
-          ),
+          options: core.options(target, "answer", await openGoal(core.places, this.goal.slug)),
           signal
         })
       );
@@ -10280,13 +11191,13 @@ ${outcome.handover.summary}`
     const kept = [];
     const missing2 = [];
     for (const file of files) {
-      const relative = path6.relative(desk, path6.resolve(desk, file));
-      const inside = relative !== "" && !relative.startsWith("..") && !path6.isAbsolute(relative);
-      const there = inside && await stat2(path6.join(desk, relative)).then(
+      const relative = path10.relative(desk, path10.resolve(desk, file));
+      const inside = relative !== "" && !relative.startsWith("..") && !path10.isAbsolute(relative);
+      const there = inside && await stat2(path10.join(desk, relative)).then(
         (found) => found.isFile(),
         () => false
       );
-      if (there) kept.push(relative.split(path6.sep).join("/"));
+      if (there) kept.push(relative.split(path10.sep).join("/"));
       else missing2.push(file);
     }
     if (missing2.length)
@@ -10313,7 +11224,7 @@ ${outcome.handover.summary}`
       const reviewer = this.memberOf(reviewerOf(workOf(core), subtask2));
       const { delivery } = subtask2;
       if (!delivery) throw new Error(`"${subtask2.title}" has no delivery to review`);
-      const desk = await openDesk(core.places, this.goalOf(subtask2).slug, subtask2.id);
+      const desk = await openDesk(core.places, this.goal.slug, subtask2.id);
       const reply = await askOnce({
         prompt: reviewPrompt({
           task: this.taskOf(subtask2),
@@ -10366,10 +11277,10 @@ ${outcome.handover.summary}`
     const { core } = this;
     const { end: end2 } = this.begin(subtask2, "merge");
     try {
-      const goal2 = this.goalOf(subtask2);
+      const { goal } = this;
       const merged = await mergeDesk(
         core.places,
-        goal2.slug,
+        goal.slug,
         subtask2.id,
         memberSigner(subtask2.assignee)
       );
@@ -10416,159 +11327,24 @@ ${outcome.handover.summary}`
   }
 };
 
-// src/engine/team.ts
-var import_yaml = __toESM(require_dist(), 1);
-import { readdir as readdir2, readFile as readFile4 } from "node:fs/promises";
-import { homedir } from "node:os";
-import path7 from "node:path";
-import { z as z6 } from "zod";
-var teamFolder = (top) => path7.join(top, ".claude", "openplan");
-var userTeamFolder = (env) => path7.join(env.CLAUDE_CONFIG_DIR ?? path7.join(homedir(), ".claude"), "openplan");
-var EFFORTS = ["low", "medium", "high", "xhigh", "max"];
-var roleSchema = z6.object({ title: z6.string().trim().min(1) });
-var memberSchema = z6.object({
-  role: z6.string().trim().min(1),
-  model: z6.string().trim().min(1).optional(),
-  effort: z6.enum(EFFORTS).optional(),
-  // As in `.mcp.json`, though YAML reads `API_TIMEOUT_MS: 3000000` as a number.
-  env: z6.record(z6.string(), z6.union([z6.string(), z6.number(), z6.boolean()]).transform(String)).default({})
-});
-var teamSchema = z6.object({
-  review: z6.boolean().optional(),
-  meetingSize: z6.enum(MEETING_SIZES).optional()
-});
-var settingsSchema = z6.record(z6.string(), z6.unknown());
-function parsed(schema, data, file) {
-  const result = schema.safeParse(data);
-  if (!result.success) throw new Error(`${file}:
-${z6.prettifyError(result.error)}`);
-  return result.data;
-}
-var missing = (error) => error.code === "ENOENT";
-async function jsonFile(file) {
-  let text2;
-  try {
-    text2 = await readFile4(file, "utf8");
-  } catch (error) {
-    if (missing(error)) return void 0;
-    throw error;
-  }
-  try {
-    return JSON.parse(text2);
-  } catch (error) {
-    throw new Error(`${file}: ${errorText(error)}`, { cause: error });
-  }
-}
-async function markdownFiles(folder) {
-  let names;
-  try {
-    names = (await readdir2(folder)).filter((name) => name.endsWith(".md")).sort();
-  } catch (error) {
-    if (missing(error)) return [];
-    throw error;
-  }
-  return Promise.all(
-    names.map(async (name) => {
-      const file = path7.join(folder, name);
-      const text2 = await readFile4(file, "utf8");
-      const front = /^---\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(text2);
-      let data;
-      try {
-        data = (0, import_yaml.parse)(front?.[1] ?? "") ?? {};
-      } catch (error) {
-        throw new Error(`${file}: ${errorText(error)}`, { cause: error });
-      }
-      return {
-        name: name.slice(0, -".md".length),
-        file,
-        data,
-        body: text2.slice(front?.[0].length ?? 0)
-      };
-    })
-  );
-}
-function mergeSettings(under, over) {
-  const merged = { ...under };
-  for (const [key, value] of Object.entries(over)) {
-    const was = merged[key];
-    merged[key] = Array.isArray(was) && Array.isArray(value) ? [.../* @__PURE__ */ new Set([...was, ...value])] : isObject(was) && isObject(value) ? mergeSettings(was, value) : value;
-  }
-  return merged;
-}
-var isObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
-async function loadTeam(folders) {
-  const roles = /* @__PURE__ */ new Map();
-  const written2 = /* @__PURE__ */ new Map();
-  let own = {};
-  let settings = {};
-  for (const folder of folders) {
-    for (const { name, file, data, body } of await markdownFiles(path7.join(folder, "roles")))
-      roles.set(name, {
-        id: name,
-        title: parsed(roleSchema, data, file).title,
-        duties: body.trim()
-      });
-    for (const { name, file, data } of await markdownFiles(path7.join(folder, "members")))
-      written2.set(name, { file, data });
-    const teamFile = path7.join(folder, "team.json");
-    own = { ...own, ...parsed(teamSchema, await jsonFile(teamFile) ?? {}, teamFile) };
-    const settingsFile = path7.join(folder, "settings.json");
-    settings = mergeSettings(
-      settings,
-      parsed(settingsSchema, await jsonFile(settingsFile) ?? {}, settingsFile)
-    );
-  }
-  const byName = [...written2].sort(([a], [b]) => a < b ? -1 : 1);
-  const members = byName.map(([name, { file, data }]) => {
-    const { role, model, effort, env } = parsed(memberSchema, data, file);
-    const found = roles.get(role);
-    if (!found) throw new Error(`${file}: there is no role "${role}" in the team's roles/`);
-    return {
-      name,
-      role: found,
-      ...model !== void 0 && { model },
-      ...effort !== void 0 && { effort },
-      env
-    };
-  });
-  if (!members.length)
-    throw new Error(
-      `The team has no members: add them in ${folders.map((f) => path7.join(f, "members")).join(" or ")}`
-    );
-  return {
-    team: { members, review: own.review ?? true },
-    settings,
-    meetingSize: own.meetingSize ?? "discussion"
-  };
-}
-var writing = serialBy();
-function allowInTeam(top, rules) {
-  const file = path7.join(teamFolder(top), "settings.json");
-  return writing(file, async () => {
-    const settings = parsed(settingsSchema, await jsonFile(file) ?? {}, file);
-    const permissions = parsed(
-      z6.looseObject({ allow: z6.array(z6.string()).default([]) }),
-      settings.permissions ?? {},
-      file
-    );
-    const allow = [.../* @__PURE__ */ new Set([...permissions.allow, ...rules])];
-    await writeWhole(
-      file,
-      `${JSON.stringify({ ...settings, permissions: { ...permissions, allow } }, null, 2)}
-`
-    );
-  });
-}
-
 // src/engine/engine.ts
+function filledSettings({ team, settings }, options) {
+  return team.members.map((member) => {
+    try {
+      return [member.name, memberSettings(settings, member, options.env, options.plugin)];
+    } catch (error) {
+      throw new Error(`${member.name}: ${errorText(error)}`, { cause: error });
+    }
+  });
+}
 var Engine = class _Engine {
-  constructor(core, records, files, writer, options, size) {
+  constructor(core, records, files, writer, options, copy) {
     this.core = core;
     this.records = records;
     this.files = files;
     this.writer = writer;
     this.options = options;
-    this.size = size;
+    this.copy = copy;
     this.questions = new Questions(core);
     this.scheduler = new Scheduler(core, this.questions);
     this.meetings = new Meetings(core, this.scheduler);
@@ -10579,96 +11355,118 @@ var Engine = class _Engine {
   files;
   writer;
   options;
-  size;
+  copy;
   questions;
   scheduler;
   meetings;
   goals;
-  /** How many times the state has changed since the team opened. */
-  changes = 0;
   /** The team's settings set the members' permission mode, over your session's. */
   teamMode = false;
   /**
-   * Opens the team of the repository `cwd` is in, for this session alone:
-   * what a server before left running is stopped, and the goals it left
-   * active are paused, as when a session closes (§3.2). What a session
-   * handed over as it let the team go is resumed.
+   * Starts a goal for this session: a folder of its own, the team copied
+   * into it as its files have it now (§6), and its branch cut from your
+   * HEAD, checked out in its own worktree.
    */
-  static async open(options) {
+  static async start(options, name) {
     const repo = await openRepository(options.cwd);
-    const root = repoFolder(options.dataFolder, repo);
-    const files = dataFiles(root);
-    const { team: team2, settings, meetingSize } = await loadTeam([
-      options.userTeam,
-      teamFolder(repo.top)
-    ]);
+    const copy = await loadTeam([options.userTeam, teamFolder(repo.top)]);
+    filledSettings(copy, options);
+    const { slug, folder } = await newGoalFolder(
+      repoFolder(options.dataFolder, repo),
+      name,
+      await takenSlugs(repo)
+    );
+    const files = goalFiles(folder);
     const me = { session: options.session, address: options.address };
-    const handed = await takeTeam(files.lock, me, options.takeOver);
     try {
-      await recordMembersIn(files.members);
-      const state = await readState(files.state);
-      const writer = stateWriter(files.state, () => state, options.failed);
-      const places = { repo, root };
-      const records = new Records(places, options.failed);
-      const core = {
-        state,
-        team: team2,
-        places,
-        changed: () => {
-          engine2.changes++;
-          writer.changed();
-        },
-        allowAlways: (rules) => engine2.allow(rules),
-        options: (member, kind, cwd) => engine2.turnOptions(member, kind, cwd),
-        recorder: (subtask2) => records.recorder(subtask2.id),
-        speech: (meeting2, speaker) => records.speech(meeting2, speaker)
+      await takeGoal(files.lock, me, (holder) => options.takeOver(holder, slug));
+      await copyTeam(files.team, copy);
+      const places = { repo, root: folder };
+      await openGoal(places, slug);
+      const state = {
+        goal: { id: randomUUID4(), name, slug, status: "active", createdAt: Date.now() },
+        tasks: [],
+        subtasks: [],
+        meetings: [],
+        questions: []
       };
-      const engine2 = new _Engine(core, records, files, writer, options, meetingSize);
-      await engine2.writeMemberSettings(team2, settings);
-      options.teamRead(team2);
-      engine2.questions.recover();
-      engine2.scheduler.recover();
-      engine2.meetings.recover();
-      for (const goal2 of state.goals)
-        if (goal2.status === "active") await engine2.goals.pause(goal2.id);
-      await engine2.goals.carryOn(handed);
-      await writer.flush();
-      await openedTeam(files.lock, me);
-      return engine2;
+      const engine = await _Engine.ready(options, places, files, copy, state);
+      engine.core.changed();
+      await engine.writer.flush();
+      await openedGoal(files.lock, me);
+      return engine;
     } catch (error) {
-      releaseTeam(files.lock);
+      releaseGoal(files.lock);
+      await rm3(folder, { recursive: true, force: true });
       throw error;
     }
+  }
+  /**
+   * Takes a goal of the repository `cwd` is in up in this session, by its
+   * slug, and resumes it (§3.2): a session that runs it is asked to let it
+   * go, and what it stopped goes on here; what a session killed outright
+   * left running is stopped first.
+   */
+  static async takeUp(options, slug) {
+    const repo = await openRepository(options.cwd);
+    const folder = path11.join(goalsFolder(repoFolder(options.dataFolder, repo)), slug);
+    const files = goalFiles(folder);
+    if (!existsSync(files.state)) throw new Error(`There is no goal "${slug}" in this repository`);
+    const me = { session: options.session, address: options.address };
+    const handed = await takeGoal(files.lock, me, (holder) => options.takeOver(holder, slug));
+    try {
+      const state = await readState(files.state);
+      const engine = await _Engine.ready(
+        options,
+        { repo, root: folder },
+        files,
+        await readCopy(files.team),
+        state
+      );
+      if (state.goal.status === "active") await engine.goals.pause();
+      await engine.goals.resume(handed.meetings);
+      await engine.writer.flush();
+      await openedGoal(files.lock, me);
+      return engine;
+    } catch (error) {
+      releaseGoal(files.lock);
+      throw error;
+    }
+  }
+  /** The engine of a goal whose lock this process holds, put together; what a server before left running is stopped. */
+  static async ready(options, places, files, copy, state) {
+    await recordMembersIn(files.members);
+    const writer = stateWriter(files.state, () => state, options.failed);
+    const records = new Records(places, options.failed);
+    const core = {
+      state,
+      team: copy.team,
+      places,
+      changed: () => {
+        writer.changed();
+      },
+      allowAlways: (rules) => engine.allow(rules),
+      options: (member, kind, cwd2) => engine.turnOptions(member, kind, cwd2),
+      recorder: (subtask2) => records.recorder(subtask2.id),
+      speech: (meeting2, speaker) => records.speech(meeting2, speaker)
+    };
+    const engine = new _Engine(core, records, files, writer, options, copy);
+    await engine.writeMemberSettings(copy);
+    engine.questions.recover();
+    engine.scheduler.recover();
+    engine.meetings.recover();
+    return engine;
   }
   get state() {
     return this.core.state;
   }
+  /** The goal's copy of the team. */
   get team() {
     return this.core.team;
   }
-  /** Changes as the state does: the same number, the same state. */
-  get revision() {
-    return this.changes;
-  }
   /** The size a meeting has unless you say. */
   get meetingSize() {
-    return this.size;
-  }
-  /**
-   * Reads the team's files again: roles, members, their settings, openplan's
-   * own. When they can't be read, the team stays as it was.
-   */
-  async reloadTeam() {
-    const { team: team2, settings, meetingSize } = await loadTeam([
-      this.options.userTeam,
-      teamFolder(this.core.places.repo.top)
-    ]);
-    await this.writeMemberSettings(team2, settings);
-    this.core.team = team2;
-    this.size = meetingSize;
-    this.options.teamRead(team2);
-    this.core.changed();
-    this.scheduler.pump();
+    return this.copy.meetingSize;
   }
   /**
    * Answers a question put to you, and carries out a decision (a stuck
@@ -10682,60 +11480,65 @@ var Engine = class _Engine {
     return question;
   }
   /**
-   * Closes the team as the session ends or hands it over (§3.2): every
-   * active goal is paused, a merge under way finishes, the state is written
-   * for the last time, and the team is let go. Gives what it stopped: the
-   * goals, and the meetings under way, which their pausing cancels.
+   * Closes the goal as the session ends or lets it go (§3.2): an active goal
+   * is paused, a merge under way finishes, the state is written for the last
+   * time, and the goal is let go. Gives what it stopped: the meetings under
+   * way, which pausing cancels.
    */
   async close() {
-    const { goals, meetings } = this.state;
+    const { goal, meetings } = this.state;
     const stopped = {
-      goals: goals.filter((g) => g.status === "active").map((g) => g.id),
       meetings: meetings.filter((m) => m.status === "running").map((m) => m.id)
     };
-    for (const id of stopped.goals) await this.goals.pause(id);
-    await Promise.all([this.scheduler.close(), this.meetings.close()]);
-    await Promise.all([this.writer.close(), this.records.flush()]);
-    stopRecording();
-    releaseTeam(this.files.lock);
+    if (goal.status === "active") await this.goals.pause();
+    await this.shut();
     return stopped;
   }
   /**
-   * Lets the team go at once, as the process dies of an error: its members
+   * Deletes an archived goal for good (§4.1): its worktrees and subtask
+   * branches, then its folder. Its branch stays, yours to merge or delete.
+   */
+  async delete() {
+    await this.goals.delete();
+    await this.shut();
+    await rm3(this.core.places.root, { recursive: true, force: true });
+  }
+  /**
+   * Lets the goal go at once, as the process dies of an error: its members
    * are stopped and the lock released. The state stays as last written, and
-   * the next session pauses what it left active.
+   * the next session to take the goal up pauses what it left active.
    */
   abandon() {
     stopMembers();
-    releaseTeam(this.files.lock);
+    releaseGoal(this.files.lock);
   }
-  /** Adds allow rules to the team's settings (Questions: allow always), for every member's next turns. */
-  async allow(rules) {
-    await allowInTeam(this.core.places.repo.top, rules);
-    await this.reloadTeam();
+  /** Stops what runs, writes the state for the last time, and lets the goal go. */
+  async shut() {
+    await Promise.all([this.scheduler.close(), this.meetings.close()]);
+    await Promise.all([this.writer.close(), this.records.flush()]);
+    stopRecording();
+    releaseGoal(this.files.lock);
   }
   /**
-   * Writes each member's settings file: the team's settings, their
-   * environment filled in, and the guards. Throws before writing any when a
-   * member's environment names a variable that isn't set.
+   * Allows rules always (Questions): in the repository's team settings, for
+   * goals started after, and in the goal's copy, for its members' next turns.
    */
-  async writeMemberSettings(team2, settings) {
-    const { plugin } = this.options;
-    const each = team2.members.map((member) => {
-      try {
-        return [member.name, memberSettings(settings, member, this.options.env, plugin)];
-      } catch (error) {
-        throw new Error(`${member.name}: ${errorText(error)}`, { cause: error });
-      }
-    });
-    for (const [name, filled] of each) await writeSettings(this.files.settings(name), filled);
-    this.teamMode = settings.permissions?.defaultMode !== void 0;
+  async allow(rules) {
+    await allowInTeam(this.core.places.repo.top, rules);
+    this.copy = await allowInCopy(this.files.team, rules);
+    await this.writeMemberSettings(this.copy);
   }
-  turnOptions(...[member, kind, cwd]) {
+  /** Writes each member's settings file (filledSettings); throws before writing any when one can't be filled in. */
+  async writeMemberSettings(copy) {
+    for (const [name, filled] of filledSettings(copy, this.options))
+      await writeSettings(this.files.settings(name), filled);
+    this.teamMode = copy.settings.permissions?.defaultMode !== void 0;
+  }
+  turnOptions(...[member, kind, cwd2]) {
     const seat = {
       member,
       claude: this.options.claude,
-      cwd,
+      cwd: cwd2,
       settings: this.files.settings(member.name),
       system: systemPrompt(kind, member, this.core.team.members)
     };
@@ -10745,838 +11548,176 @@ var Engine = class _Engine {
   }
 };
 
-// src/plugin/claude.ts
-import { execFile as execFile2 } from "node:child_process";
-import { readlink } from "node:fs/promises";
-import { promisify } from "node:util";
-var run = async (command, args) => (await promisify(execFile2)(command, args)).stdout;
-async function executableOf(pid) {
-  const id = String(pid);
-  let found;
-  switch (process.platform) {
-    case "linux":
-      found = await readlink(`/proc/${id}/exe`);
-      break;
-    case "win32":
-      found = (await run("powershell.exe", [
-        "-NoProfile",
-        "-Command",
-        `(Get-CimInstance Win32_Process -Filter "ProcessId=${id}").ExecutablePath`
-      ])).trim();
-      break;
-    default:
-      found = (await run("lsof", ["-a", "-p", id, "-d", "txt", "-Fn"])).split("\n").find((line) => line.startsWith("n"))?.slice(1);
+// src/plugin/session.ts
+var TURN = "goal";
+var Session = class {
+  /**
+   * `options`: what an engine runs with, and `claude`, the Claude Code its
+   * members run, found as a goal first opens. `changed`: the session's goal
+   * is another now, or it has none.
+   */
+  constructor(options, claude2, changed) {
+    this.options = options;
+    this.claude = claude2;
+    this.changed = changed;
   }
-  if (!found) throw new Error(`Can't tell which executable process ${id} runs`);
-  return found;
-}
-
-// src/plugin/plugin-id.ts
-import path8 from "node:path";
-var PLUGIN = "openplan";
-function pluginId(dataFolder2) {
-  return `${PLUGIN}@${path8.basename(dataFolder2).slice(PLUGIN.length + 1)}`;
-}
-
-// src/plugin/pane-server.ts
-import { randomBytes } from "node:crypto";
-import { mkdtempSync, rmSync } from "node:fs";
-import { createServer, request } from "node:http";
-import { tmpdir } from "node:os";
-import path9 from "node:path";
-import { text } from "node:stream/consumers";
-import { z as z7 } from "zod";
-
-// src/plugin/status.ts
-var MEETING_STATUS = {
-  running: "under way",
-  review: "its plan waits for you: approve it, change it, or cancel it",
-  approved: "plan approved",
-  cancelled: "cancelled",
-  failed: "failed"
-};
-function waitText(wait, work) {
-  switch (wait.kind) {
-    case "goal":
-      return `its goal is ${wait.status}`;
-    case "upstream": {
-      const upstream = work.subtasks.find((s) => s.id === wait.subtaskId);
-      return `waits on "${upstream?.title ?? ""}" by ${wait.by}${wait.halted ? ", which has stopped" : ""}`;
-    }
-    case "busy":
-      return `waits until ${wait.by} is free`;
-    case "teammate":
-      return `asked ${wait.by}`;
-    case "you":
-      return wait.decision ? "waits on your decision" : "waits on your answer";
-    case "acceptance":
-      return "waits until you accept the task it builds on";
+  options;
+  claude;
+  changed;
+  engine;
+  /** The folder of the session's repository in the data folder, once found. */
+  repo;
+  /** The goal that moved to another session, by name, until this one runs another. */
+  moved;
+  turn = serialBy();
+  /** The session's goal, while it runs one. */
+  get current() {
+    return this.engine;
   }
-}
-function stepText({ done, total, current }) {
-  if (!total) return void 0;
-  const step2 = `step ${String(Math.min(done + 1, total))} of ${String(total)}`;
-  return current ? `${step2}: ${current}` : step2;
-}
-function subtaskLine(subtask2, waits, work) {
-  const parts = [subtask2.status];
-  const step2 = subtask2.status === "running" && stepText(subtask2.progress);
-  if (step2) parts.push(step2);
-  parts.push(...waits.map((w) => waitText(w, work)));
-  if (subtask2.error) parts.push(`error: ${subtask2.error}`);
-  return `    - ${subtask2.title} [${subtask2.id}], ${subtask2.assignee}: ${parts.join(", ")}`;
-}
-function questionLine(question, work) {
-  const about = work.subtasks.find((s) => s.id === question.subtaskId);
-  const head = `  - [${question.id}] `;
-  if (question.kind === "permission")
-    return `${head}${question.from} asks to use ${question.permission.tool}${question.permission.title ? `: ${question.permission.title}` : ""}. Answer it in /openplan.`;
-  if (question.kind === "choices")
-    return `${head}${question.from} asks: ${question.choices.map((c) => c.question).join(" ")} Answer it in /openplan.`;
-  const options = question.decision.options.join(", ");
-  switch (question.decision.kind) {
-    case "delivery":
-      return `${head}The task "${question.text}" is done: ${options}.`;
-    case "review":
-      return `${head}The review of "${about?.title ?? ""}" is stuck (${question.text}): ${options}.`;
-    case "merge":
-      return `${head}Merging "${about?.title ?? ""}" needs you (${question.text.split("\n").join(", ")}): ${options}.`;
+  /** The session's goal; throws why there is none, and what to do, when it runs none. */
+  get goal() {
+    if (this.engine) return this.engine;
+    throw new Error(this.none);
   }
-}
-function statusText(work) {
-  const derived = derive(work);
-  const busy2 = new Set(derived.busy);
-  const lines = [`Team: ${work.members.map((m) => busy2.has(m) ? `${m} (busy)` : m).join(", ")}`];
-  for (const goal2 of work.goals) {
-    lines.push(
-      "",
-      `Goal "${goal2.name}" [${goal2.id}]: ${goal2.status}, on branch ${goalBranch(goal2.slug)}`
-    );
-    for (const meeting2 of work.meetings.filter(
-      (m) => m.goalId === goal2.id && m.status !== "approved"
-    ))
-      lines.push(
-        `  Meeting [${meeting2.id}], hosted by ${meeting2.host}${meeting2.hostOnly ? ", who only runs it" : ""}: ${MEETING_STATUS[meeting2.status]}${meeting2.error ? ` (${meeting2.error})` : ""}${derived.resumable.includes(meeting2.id) ? "; it can go on" : ""}`
-      );
-    for (const task of work.tasks.filter((t) => t.goalId === goal2.id)) {
-      lines.push(
-        `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", the user accepts it" : ""}`
-      );
-      for (const subtask2 of work.subtasks.filter((s) => s.taskId === task.id))
-        lines.push(subtaskLine(subtask2, derived.subtasks[subtask2.id]?.waits ?? [], work));
-    }
+  /** Why the session runs no goal, and what to do. */
+  get none() {
+    return this.moved ? `The goal "${this.moved}" moved to another Claude Code session. The user brings it back with /openplan resume.` : "This session runs no goal: start one (start_goal), or the user takes one up with /openplan resume.";
   }
-  const open2 = work.questions.filter(toYou).filter((q) => q.status === "open");
-  if (open2.length) lines.push("", "Waiting on you:", ...open2.map((q) => questionLine(q, work)));
-  return lines.join("\n");
-}
-
-// src/plugin/pane.ts
-function aboutOf(work, meeting2) {
-  const goal2 = work.goals.find((g) => g.id === meeting2.goalId);
-  if (!goal2) throw new Error(`The goal of the meeting [${meeting2.id}] is gone`);
-  return goal2.name;
-}
-var plural = (n, one, many) => `${String(n)} ${n === 1 ? one : many}`;
-function shownMeeting(work) {
-  const latest = (status) => work.meetings.filter((m) => !status || m.status === status).at(-1);
-  return latest("running") ?? latest("review") ?? latest();
-}
-function meetingStatus(meeting2) {
-  switch (meeting2.status) {
-    case "running":
-      return meeting2.planning ? `${meeting2.host} writes the plan` : meeting2.speaking ? `${meeting2.speaking} speaks` : meeting2.drafting ? "the members form their first judgments" : meeting2.weighing ? "deciding who speaks next" : "under way";
-    case "review":
-      return "its plan waits for you";
-    case "approved":
-      return "plan approved";
-    case "cancelled":
-      return "cancelled";
-    case "failed":
-      return `failed${meeting2.error ? `: ${meeting2.error}` : ""}`;
-  }
-}
-var meetingOf = (meeting2, work) => ({
-  id: meeting2.id,
-  about: aboutOf(work, meeting2),
-  agenda: meeting2.agenda,
-  status: meetingStatus(meeting2),
-  participants: meeting2.participants,
-  turns: meeting2.turns.map((t) => ({
-    speaker: t.speaker,
-    text: t.text,
-    ...t.calls && { to: t.calls }
-  })),
-  hands: (meeting2.hands ?? []).map((h) => ({ member: h.member, point: h.point })),
-  ...meeting2.plan && { plan: meeting2.plan.summary }
-});
-function memberOf(member, work, derived) {
-  const own = work.subtasks.filter((s) => s.assignee === member.name);
-  const at = (status) => own.find((s) => s.status === status);
-  const reviewing = work.subtasks.find(
-    (s) => s.status === "reviewing" && s.assignee !== member.name && reviewerOf(work, s) === member.name && derived.busy.includes(member.name)
-  );
-  const meeting2 = work.meetings.find(
-    (m) => m.status === "running" && m.participants.includes(member.name)
-  );
-  const next = at("pending");
-  const running3 = at("running");
-  let doing;
-  if (running3) {
-    const step2 = stepText(running3.progress);
-    doing = `works on "${running3.title}"${step2 ? `, ${step2}` : ""}`;
-  } else if (meeting2) doing = `at the meeting on "${aboutOf(work, meeting2)}"`;
-  else if (reviewing) doing = `reviews "${reviewing.title}" by ${reviewing.assignee}`;
-  else if (at("reviewing")) doing = `"${at("reviewing")?.title ?? ""}" is in review`;
-  else if (at("merging")) doing = `"${at("merging")?.title ?? ""}" is being merged`;
-  else if (next) {
-    const waits = derived.subtasks[next.id]?.waits ?? [];
-    doing = `next: "${next.title}"${waits.length ? `, ${waits.map((w) => waitText(w, work)).join(", ")}` : ""}`;
-  } else doing = "free";
-  const followed = running3 ?? own.filter((s) => s.startedAt).sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0))[0];
-  const spoken = work.meetings.flatMap((m) => m.turns).filter((t) => t.speaker === member.name).reduce((sum, t) => sum + t.tokens, 0);
-  return {
-    name: member.name,
-    role: member.role.title,
-    ...member.model && { model: member.model },
-    doing,
-    ...followed && { subtask: followed.id },
-    tokens: own.reduce((sum, s) => sum + s.tokens, 0) + spoken
-  };
-}
-function callText(permission) {
-  if (permission.title) return permission.title;
-  const { input } = permission;
-  const main = ["command", "file_path", "path", "pattern", "url", "description"].map((key) => input[key]).find((value) => typeof value === "string");
-  return main ? `${permission.tool}: ${main}` : permission.tool;
-}
-function needOf(question, work) {
-  const subtask2 = work.subtasks.find((s) => s.id === question.subtaskId);
-  const head = {
-    id: question.id,
-    from: question.from,
-    about: subtask2?.title ?? "",
-    text: question.text
-  };
-  switch (question.kind) {
-    case "permission":
-      return {
-        ...head,
-        kind: "permission",
-        call: callText(question.permission),
-        options: question.permission.options
-      };
-    case "choices":
-      return {
-        ...head,
-        kind: "choices",
-        choices: question.choices.map((c) => ({
-          question: c.question,
-          header: c.header,
-          options: c.options.map((o) => o.label),
-          multiSelect: c.multiSelect
-        }))
-      };
-    case "decision": {
-      const done = work.subtasks.filter((s) => s.taskId === subtask2?.taskId && s.status === "done");
-      return {
-        ...head,
-        kind: "decision",
-        of: question.decision.kind,
-        options: question.decision.options,
-        ...question.decision.kind === "delivery" && {
-          sendBack: done.map((s) => ({ id: s.id, title: s.title }))
-        }
-      };
-    }
-  }
-}
-function milestones(work) {
-  const said = [];
-  for (const meeting2 of work.meetings)
-    if (meeting2.status === "approved")
-      said.push({ key: `plan:${meeting2.id}`, text: `Plan approved: "${aboutOf(work, meeting2)}"` });
-  for (const s of work.subtasks) {
-    if (s.review?.rounds)
-      said.push({
-        key: `back:${s.id}:${String(s.review.rounds)}`,
-        text: `"${s.title}" went back to ${s.assignee}${s.review.notes ? `: ${s.review.notes}` : ""}`
-      });
-    if (s.status === "done")
-      said.push({ key: `done:${s.id}`, text: `"${s.title}" by ${s.assignee} is merged` });
-    if (s.status === "failed")
-      said.push({
-        key: `failed:${s.id}:${String(s.startedAt ?? 0)}`,
-        text: `"${s.title}" by ${s.assignee} failed${s.error ? `: ${s.error}` : ""}`
-      });
-  }
-  for (const task of work.tasks)
-    if (work.subtasks.every((s) => s.taskId !== task.id || s.status === "done"))
-      said.push({ key: `task:${task.id}`, text: `The task "${task.title}" is done` });
-  return said;
-}
-function prompts(work) {
-  const asked = [];
-  for (const meeting2 of work.meetings)
-    if (meeting2.status === "review" && meeting2.plan)
-      asked.push({
-        key: `review:${meeting2.id}`,
-        text: `The meeting [${meeting2.id}] on "${aboutOf(work, meeting2)}" has a plan: ${meeting2.plan.summary}. Get it with show_plan and show it to the user in full: its document as it is written, then its tasks, each with its subtasks, who does them and what each waits on. Then ask whether to approve it, change it, or cancel it, and which tasks, if any, they want to accept themselves once done: none is unless they say, since reviews and checks confirm the work; it is worth it for a result only looking at it or trying it can judge.`
-      });
-  for (const question of work.questions) {
-    if (question.kind !== "decision" || question.decision.kind !== "delivery") continue;
-    const subtask2 = work.subtasks.find((s) => s.id === question.subtaskId);
-    const delivered = work.subtasks.filter((s) => s.taskId === subtask2?.taskId && s.delivery).map((s) => `- ${s.title}, by ${s.assignee}: ${s.delivery?.summary ?? ""}`);
-    asked.push({
-      key: `accept:${question.id}`,
-      text: [
-        `The task "${question.text}" is done [${question.id}], merged into its goal's branch:`,
-        ...delivered,
-        "Tell the user what was done, and ask whether to accept it or send it back with what to change (decide)."
-      ].join("\n")
+  /** Starts a goal here: refused while this session's goal is active; a paused or archived one is let go. */
+  start(name) {
+    return this.turn(TURN, async () => {
+      await this.leave();
+      return this.run(await Engine.start(await this.engineOptions(), name));
     });
   }
-  return asked;
-}
-var BAND_TASKS = 5;
-function taskWhere(work, derived, subtasks) {
-  const at = subtasks.find(
-    (s) => s.status === "running" || s.status === "reviewing" || s.status === "merging"
-  ) ?? subtasks.find((s) => s.status !== "done");
-  if (!at) return void 0;
-  switch (at.status) {
-    case "running":
-      return `${at.assignee} works on "${at.title}"`;
-    case "reviewing":
-      return `"${at.title}" in review`;
-    case "merging":
-      return `"${at.title}" merging`;
-    case "pending": {
-      const [wait] = derived.subtasks[at.id]?.waits ?? [];
-      return `"${at.title}" ${wait ? waitText(wait, work) : "starts next"}`;
-    }
-    default:
-      return `"${at.title}" ${at.status}`;
-  }
-}
-function taskLines(work, derived) {
-  const lines = [];
-  for (const task of work.tasks) {
-    const goal2 = work.goals.find((g) => g.id === task.goalId);
-    if (!goal2 || goal2.status === "archived") continue;
-    const subtasks = work.subtasks.filter((s) => s.taskId === task.id);
-    const accepting = work.questions.some(
-      (q) => q.kind === "decision" && q.decision.kind === "delivery" && q.status === "open" && subtasks.some((s) => s.id === q.subtaskId)
-    );
-    const where = accepting ? "waits for you to accept it" : taskWhere(work, derived, subtasks);
-    if (where) lines.push(`${task.title} \xB7 ${where}`);
-  }
-  return lines.length > BAND_TASKS ? [
-    ...lines.slice(0, BAND_TASKS),
-    `and ${plural(lines.length - BAND_TASKS, "more task", "more tasks")}`
-  ] : lines;
-}
-function bandText(work, needs) {
-  if (!work.goals.length) return void 0;
-  const parts = [];
-  if (work.meetings.some((m) => m.status === "running")) parts.push("meeting");
-  if (work.meetings.some((m) => m.status === "review")) parts.push("plan to review");
-  const working = work.subtasks.filter((s) => s.status === "running").length;
-  if (working) parts.push(`${String(working)} working`);
-  if (needs) parts.push(`${plural(needs, "needs", "need")} you`);
-  if (!parts.length) {
-    const paused = work.goals.filter((g) => g.status === "paused").length;
-    parts.push(paused ? plural(paused, "goal paused", "goals paused") : "idle");
-  }
-  return parts.join(" \xB7 ");
-}
-function pausedGoals(work) {
-  return work.goals.filter((g) => g.status === "paused").map((goal2) => {
-    const subtasks = work.subtasks.filter((s) => s.goalId === goal2.id);
-    const done = subtasks.filter((s) => s.status === "done").length;
-    const where = subtasks.length ? `${String(done)}/${String(subtasks.length)} subtasks done` : work.meetings.some((m) => m.goalId === goal2.id && m.status === "review") ? "plan to review" : "no plan yet";
-    return { id: goal2.id, label: `${goal2.name} \xB7 ${where}` };
-  });
-}
-function paneTeam(work, members) {
-  const derived = derive(work);
-  const needs = work.questions.filter(toYou).filter((q) => q.status === "open").map((q) => needOf(q, work));
-  const meeting2 = shownMeeting(work);
-  const band = bandText(work, needs.length);
-  return {
-    ...band && { band },
-    tasks: taskLines(work, derived),
-    ...meeting2 && { meeting: meetingOf(meeting2, work) },
-    members: members.map((m) => memberOf(m, work, derived)),
-    needs,
-    milestones: milestones(work),
-    prompts: prompts(work),
-    paused: pausedGoals(work)
-  };
-}
-
-// src/plugin/pane-server.ts
-var viewSchema = z7.object({
-  /** The revision the pane has. */
-  revision: z7.number().int().optional(),
-  /** The subtask whose record the pane follows, and the byte it read up to. */
-  record: z7.object({ subtask: z7.string(), from: z7.number().int().min(0) }).optional(),
-  /** You turned to openplan in this session: the team is taken over from another that holds it. */
-  take: z7.boolean().optional()
-});
-async function paneView(engine2, { revision, record: record2 }) {
-  const work = workOf(engine2);
-  const meeting2 = shownMeeting(work);
-  const spoken = meeting2 && engine2.records.speaking(meeting2);
-  return {
-    revision: engine2.revision,
-    ...revision !== engine2.revision && { team: paneTeam(work, engine2.team.members) },
-    ...spoken && { speaking: { speaker: spoken.speaker, text: spoken.text } },
-    ...record2 && {
-      record: {
-        subtask: record2.subtask,
-        ...await engine2.records.read(record2.subtask, record2.from)
+  /**
+   * Takes up the repository's goal `slug` and resumes it: this session's own
+   * goal goes on; another, while this session's goal is active, is refused.
+   */
+  takeUp(slug) {
+    return this.turn(TURN, async () => {
+      if (this.engine?.state.goal.slug === slug) {
+        await this.engine.goals.resume();
+        return this.engine;
       }
-    }
-  };
-}
-function socketAddress() {
-  if (process.platform === "win32")
-    return { address: `\\\\.\\pipe\\openplan-${randomBytes(12).toString("hex")}` };
-  const folder = mkdtempSync(path9.join(tmpdir(), "openplan-"));
-  return { address: path9.join(folder, "pane.sock"), folder };
-}
-async function viewOf(team2, request2) {
-  const asked = viewSchema.parse(JSON.parse(await text(request2) || "{}"));
-  return paneView(await team2(asked.take ?? false), asked);
-}
-async function servePane(team2, letGo2) {
-  const { address, folder } = socketAddress();
-  const server2 = createServer((request2, response) => {
-    const route = request2.method === "POST" && { "/view": () => viewOf(team2, request2), "/release": letGo2 }[request2.url ?? ""];
-    if (!route) {
-      response.writeHead(404).end();
-      return;
-    }
-    route().then(
-      (view) => {
-        response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(view));
-      },
+      await this.leave();
+      return this.run(await Engine.takeUp(await this.engineOptions(), slug));
+    });
+  }
+  /** Lets the goal `slug` go to another session taking it up: what it stopped, nothing when it isn't this session's. */
+  letGo(slug) {
+    return this.turn(TURN, async () => {
+      const was = this.engine;
+      if (was?.state.goal.slug !== slug) return { meetings: [] };
+      this.engine = void 0;
+      this.moved = was.state.goal.name;
+      this.changed(void 0);
+      return was.close();
+    });
+  }
+  /** Deletes this session's goal, archived, for good (Engine.delete). */
+  delete() {
+    return this.turn(TURN, async () => {
+      await this.goal.delete();
+      this.engine = void 0;
+      this.changed(void 0);
+    });
+  }
+  /** Closes the session's goal as the session ends (Engine.close). */
+  close() {
+    return this.turn(TURN, async () => {
+      await this.engine?.close();
+      this.engine = void 0;
+    });
+  }
+  /** The repository's goals, oldest first. */
+  async goals() {
+    this.repo ??= openRepository(this.options.cwd).then(
+      (repo) => repoFolder(this.options.dataFolder, repo),
       (error) => {
-        response.writeHead(409, { "content-type": "text/plain" }).end(errorText(error));
+        this.repo = void 0;
+        throw error;
       }
     );
-  });
-  await new Promise((resolve, reject) => {
-    server2.once("error", reject).listen(address, resolve);
-  });
-  return {
-    address,
-    close() {
-      server2.close();
-      if (folder) rmSync(folder, { recursive: true, force: true });
-    }
-  };
-}
-function askToLetGo(address) {
-  return new Promise((resolve, reject) => {
-    const asking = request({ socketPath: address, path: "/release", method: "POST" }, (answer) => {
-      text(answer).then((body) => {
-        if (answer.statusCode === 200) resolve(JSON.parse(body));
-        else reject(new Error(body));
-      }, reject);
-    });
-    asking.once("error", reject).end();
-  });
-}
-
-// src/plugin/session-mode.ts
-import { readFileSync as readFileSync2 } from "node:fs";
-import path10 from "node:path";
-var folderOf = (dataFolder2) => path10.join(dataFolder2, "sessions");
-var fileOf = (dataFolder2, session) => path10.join(folderOf(dataFolder2), `${String(session)}.mode`);
-function modeOf(dataFolder2, session) {
-  try {
-    return readFileSync2(fileOf(dataFolder2, session), "utf8");
-  } catch {
-    return void 0;
+    return listGoals(await this.repo);
   }
-}
-
-// src/plugin/pane-tools.ts
-import { z as z9 } from "zod";
-
-// src/plugin/tools.ts
-import { z as z8 } from "zod";
-var decisionOf = (decision, note, sentBack) => ({
-  decision,
-  ...note && { note },
-  ...sentBack !== void 0 && { sentBack }
-});
-function goalOf(engine2, ref) {
-  const { goals } = engine2.state;
-  const byId = goals.find((g) => g.id === ref);
-  if (byId) return byId;
-  const named = goals.filter((g) => g.name.toLowerCase() === ref.trim().toLowerCase());
-  if (named.length === 1 && named[0]) return named[0];
-  throw new Error(
-    named.length ? `More than one goal is called "${ref}": give its id` : `There is no goal "${ref}"`
-  );
-}
-var writtenPlan = (plan) => ({
-  summary: plan.summary,
-  plan_markdown: plan.markdown,
-  tasks: plan.tasks.map((task) => ({
-    title: task.title,
-    outcome: task.outcome,
-    owner_accepts: task.ownerAccepts,
-    subtasks: task.subtasks.map(({ dependsOn, ...subtask2 }) => ({
-      ...subtask2,
-      depends_on: dependsOn
-    }))
-  }))
-});
-var goal = z8.string().describe("The goal's id, or its name");
-var meeting = z8.string().describe("The meeting's id");
-var subtask = z8.string().describe("The subtask's id");
-function memberName(members) {
-  if (!members) return z8.string().describe("A member's name");
-  const names = members.map((m) => m.name);
-  const roster = members.map((m) => `${m.name} (${m.role.title})`).join(", ");
-  return z8.enum(names).describe(`One of the team: ${roster}`);
-}
-var meetingInput = (member) => ({
-  goal,
-  agenda: z8.string().trim().min(1).describe("What to plan, with everything the user said about it"),
-  size: z8.enum(MEETING_SIZES).optional().describe("How long the discussion runs; the team's default when left out"),
-  attendees: z8.array(member).default([]).describe("The host first; everyone when empty"),
-  host_only: z8.boolean().default(false).describe(
-    "True when the host only runs the meeting: no view of their own and no work in the plan. Leave it out for a host who also takes part from their role, the usual"
-  )
-});
-var changePlanInput = (member) => ({ meeting, plan: planSchema(member) });
-var assignInput = (member) => ({
-  goal,
-  assignee: member,
-  title: z8.string().trim().min(1),
-  description: z8.string().trim().describe("Everything the user said about it"),
-  acceptance: z8.string().trim().default("").describe("When it counts as done")
-});
-function addTools(server2, team2) {
-  server2.registerTool(
-    "status",
-    {
-      description: "Where the team stands: each goal with its meetings, tasks and subtasks, who is busy, and what waits on the user. Ids are in brackets.",
-      annotations: { readOnlyHint: true }
-    },
-    async () => {
-      const engine2 = await team2();
-      return toolText(statusText(workOf(engine2)));
-    }
-  );
-  server2.registerTool(
-    "start_goal",
-    {
-      description: "Start a goal: something the user wants done. It gets its own branch, cut from the repository's HEAD. Then hold a meeting to plan it, or assign work directly.",
-      inputSchema: { name: z8.string().trim().min(1).describe("A few words for what is wanted") }
-    },
-    async ({ name }) => {
-      const started = await (await team2()).goals.start(name);
-      return toolText(
-        `Started the goal "${started.name}" [${started.id}] on branch ${goalBranch(started.slug)}.`
+  /** Of the repository's goals (`goals`), those this session doesn't run. */
+  othersOf(goals) {
+    const mine = this.engine?.state.goal.slug;
+    return goals.filter((entry) => entry.slug !== mine);
+  }
+  /** The repository's goals this session doesn't run, oldest first. */
+  async others() {
+    return this.othersOf(await this.goals());
+  }
+  /** Lets go of this session's goal before it runs another: refused while it is active. */
+  async leave() {
+    const was = this.engine;
+    if (!was) return;
+    const { goal } = was.state;
+    if (goal.status === "active")
+      throw new Error(
+        `This session's goal "${goal.name}" is under way, and a session runs one goal: ask the user whether to pause it first (goal_action pause), or to run the other in another session`
       );
-    }
-  );
-  const meetingTool = server2.registerTool(
-    "hold_meeting",
-    {
-      description: "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and the session is told when its plan waits for the user. Hold one only once the user has agreed who attends.",
-      inputSchema: meetingInput(memberName())
-    },
-    async ({ goal: ref, agenda, size, attendees, host_only }) => {
-      const engine2 = await team2();
-      const held = engine2.meetings.start({
-        goalId: goalOf(engine2, ref).id,
-        agenda,
-        size: size ?? engine2.meetingSize,
-        attendees,
-        hostOnly: host_only
-      });
-      return toolText(
-        `The meeting [${held.id}] has begun: ${listOf(held.participants)}, hosted by ${held.host}${held.hostOnly ? ", who only runs it" : ""}.`
-      );
-    }
-  );
-  server2.registerTool(
-    "show_plan",
-    {
-      description: "A meeting's plan in full: its document and its tasks and subtasks, in the shape change_plan takes.",
-      inputSchema: { meeting },
-      annotations: { readOnlyHint: true }
-    },
-    async ({ meeting: id }) => {
-      const found = (await team2()).state.meetings.find((m) => m.id === id);
-      if (!found?.plan) throw new Error("That meeting has no plan");
-      return toolText(JSON.stringify(writtenPlan(found.plan), null, 2));
-    }
-  );
-  const changePlanTool = server2.registerTool(
-    "change_plan",
-    {
-      description: "Replace a plan under review with the user's changes: the whole plan, as show_plan gives it, changed. Any member can be given work. owner_accepts marks a task the user accepts themselves once done; none is, unless they say.",
-      inputSchema: changePlanInput(memberName())
-    },
-    async ({ meeting: id, plan }) => {
-      (await team2()).meetings.change(id, plan);
-      return toolText("The plan is changed. It waits for the user's approval.");
-    }
-  );
-  server2.registerTool(
-    "approve_plan",
-    {
-      description: "Approve a plan under review, as the user said: its tasks and subtasks go to work, each starting once what it builds on is merged and its member is free.",
-      inputSchema: { meeting }
-    },
-    async ({ meeting: id }) => {
-      const added = await (await team2()).meetings.approve(id);
-      return toolText(
-        `Approved: ${String(added.length)} ${added.length === 1 ? "subtask goes" : "subtasks go"} to work.`
-      );
-    }
-  );
-  server2.registerTool(
-    "cancel_meeting",
-    {
-      description: "Stop a meeting under way, or drop a plan the user doesn't want.",
-      inputSchema: { meeting }
-    },
-    async ({ meeting: id }) => {
-      await (await team2()).meetings.cancel(id);
-      return toolText("Cancelled.");
-    }
-  );
-  server2.registerTool(
-    "resume_meeting",
-    {
-      description: "Go on with a meeting that failed or was cancelled before its plan, from where it stopped.",
-      inputSchema: { meeting }
-    },
-    async ({ meeting: id }) => {
-      (await team2()).meetings.resume(id);
-      return toolText("The meeting goes on.");
-    }
-  );
-  const assignTool = server2.registerTool(
-    "assign",
-    {
-      description: "Give a member one subtask directly, without a meeting. It starts once they are free. Assign only once the user has agreed who takes it.",
-      inputSchema: assignInput(memberName())
-    },
-    async ({ goal: ref, ...work }) => {
-      const engine2 = await team2();
-      const [added] = engine2.goals.assign(goalOf(engine2, ref).id, work);
-      return toolText(`Assigned "${work.title}" [${added?.id ?? ""}] to ${work.assignee}.`);
-    }
-  );
-  server2.registerTool(
-    "goal_action",
-    {
-      description: "Pause a goal (its runs stop, to go on later in their sessions), resume it, archive it, or delete an archived one: its worktrees and subtask branches go, its own branch stays. Delete only when the user has confirmed it.",
-      inputSchema: { goal, action: z8.enum(GOAL_ACTIONS) },
-      annotations: { destructiveHint: true }
-    },
-    async ({ goal: ref, action }) => {
-      const engine2 = await team2();
-      const { id, name } = goalOf(engine2, ref);
-      await engine2.goals[action](id);
-      return toolText(`The goal "${name}": ${action} done.`);
-    }
-  );
-  server2.registerTool(
-    "subtask_action",
-    {
-      description: "Stop a subtask; continue a stopped or failed one in its session and worktree; retry one from the start; or redo a done one whose upstream was redone.",
-      inputSchema: { subtask, action: z8.enum(SUBTASK_ACTIONS) }
-    },
-    async ({ subtask: id, action }) => {
-      const engine2 = await team2();
-      const found = engine2.state.subtasks.find((s) => s.id === id);
-      if (!found) throw new Error("There is no such subtask");
-      if (!derive(workOf(engine2)).subtasks[id]?.actions.includes(action))
-        throw new Error(`"${found.title}" can't ${action} while ${found.status}`);
-      await engine2.scheduler[action](id);
-      return toolText(`"${found.title}" is ${found.status} now.`);
-    }
-  );
-  server2.registerTool(
-    "message",
-    {
-      description: "Pass the user's words to the member working on a subtask: a running one takes them at once, in its session; one not started reads them first.",
-      inputSchema: { subtask, text: z8.string().trim().min(1) }
-    },
-    async ({ subtask: id, text: text2 }) => {
-      const went = (await team2()).scheduler.carry(id, text2);
-      return toolText(
-        went === "goes" ? "Passed on." : went === "handedOver" ? "Not passed on: it is delivered and in review or being merged. Send its task back once it is done." : "Not passed on: its goal is paused or archived."
-      );
-    }
-  );
-  server2.registerTool(
-    "decide",
-    {
-      description: "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask), a stuck review (rereview, skip, sendBack), or a merge (ours, theirs, retry).",
-      inputSchema: {
-        question: z8.string().describe("The id of what waits on the user"),
-        decision: z8.enum(DECISION_OPTIONS),
-        note: z8.string().trim().optional().describe("What to change, in the user's words"),
-        sent_back: z8.string().optional().describe("The subtask a revised task goes back to")
-      }
-    },
-    async ({ question, decision, note, sent_back }) => {
-      await (await team2()).answer(question, decisionOf(decision, note, sent_back));
-      return toolText("Done.");
-    }
-  );
-  return ({ members }) => {
-    const member = memberName(members);
-    meetingTool.update({ paramsSchema: meetingInput(member) });
-    changePlanTool.update({ paramsSchema: changePlanInput(member) });
-    assignTool.update({ paramsSchema: assignInput(member) });
-  };
-}
-
-// src/plugin/pane-tools.ts
-var PANE_ONLY = "For openplan's pane only: your session never calls it.";
-function addPaneTools(server2, team2, pane2) {
-  server2.registerTool(
-    "pane",
-    {
-      description: `${PANE_ONLY} The socket the pane reads the team from.`,
-      annotations: { readOnlyHint: true }
-    },
-    () => toolText(pane2.address)
-  );
-  server2.registerTool(
-    "answer",
-    {
-      description: `${PANE_ONLY} Answers what waits on the user, as they pressed it.`,
-      inputSchema: {
-        question: z9.string(),
-        option: z9.enum(PERMISSION_OPTIONS).optional().describe("A permission's answer"),
-        picks: z9.array(z9.string()).optional().describe("One pick per question with choices"),
-        decision: z9.enum(DECISION_OPTIONS).optional(),
-        note: z9.string().trim().optional().describe("Why it is denied, or what to change"),
-        sent_back: z9.string().optional().describe("The subtask a revised task goes back to")
-      }
-    },
-    async ({ question, option, picks, decision, note, sent_back }) => {
-      const answer = option ? { option, ...note && { note } } : decision ? decisionOf(decision, note, sent_back) : { picks: picks ?? [] };
-      await (await team2()).answer(question, answer);
-      return toolText(`Answered ${question}.`);
-    }
-  );
-  server2.registerTool(
-    "pause_goal",
-    {
-      description: `${PANE_ONLY} Pauses the active goal, as /openplan pause.`,
-      inputSchema: {}
-    },
-    async () => {
-      const engine2 = await team2();
-      const goal2 = engine2.state.goals.find((g) => g.status === "active");
-      if (!goal2) return toolText("No goal is active.");
-      await engine2.goals.pause(goal2.id);
-      return toolText(`Paused "${goal2.name}".`);
-    }
-  );
-  server2.registerTool(
-    "resume_goal",
-    {
-      description: `${PANE_ONLY} Resumes the paused goal you picked, as /openplan resume.`,
-      inputSchema: { goal: z9.string().describe("The goal's id") }
-    },
-    async ({ goal: goal2 }) => {
-      await (await team2()).goals.resume(goal2);
-      return toolText("Resumed.");
-    }
-  );
-}
+    this.engine = void 0;
+    this.changed(void 0);
+    await was.close();
+  }
+  async engineOptions() {
+    return { ...this.options, claude: await this.claude() };
+  }
+  run(engine) {
+    this.engine = engine;
+    this.moved = void 0;
+    this.changed(engine);
+    return engine;
+  }
+};
 
 // src/plugin/server.ts
 var say = (text2) => {
   console.error(`openplan: ${text2}`);
 };
-var engine;
-var opening;
+var cwd = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
+var userTeam = userTeamFolder(process.env);
+var pane = await servePane(() => session);
 var claude;
-var openTeam = async (take) => Engine.open({
-  cwd: process.env.CLAUDE_PROJECT_DIR ?? process.cwd(),
-  dataFolder,
-  claude: await (claude ??= executableOf(process.ppid)),
-  session: process.ppid,
-  address: pane.address,
-  ...take && {
-    takeOver: (holder) => askToLetGo(holder.address).catch((error) => {
+var session = new Session(
+  {
+    cwd,
+    dataFolder,
+    session: process.ppid,
+    address: pane.address,
+    takeOver: (holder, slug) => askToLetGo(holder.address, slug).catch((error) => {
       throw new Error(
-        `The Claude Code session that runs this repository's team (pid ${String(holder.session)}) couldn't be asked to let it go: ${errorText(error)}`,
+        `The Claude Code session that runs this goal (pid ${String(holder.session)}) couldn't be asked to let it go: ${errorText(error)}`,
         { cause: error }
       );
-    })
-  },
-  sessionMode: () => modeOf(dataFolder, process.ppid),
-  plugin: pluginId(dataFolder),
-  userTeam: userTeamFolder(process.env),
-  env: process.env,
-  teamRead: listMembers,
-  failed(error) {
-    say(`the team's state or a record couldn't be written: ${errorText(error)}`);
-  }
-});
-async function team(take) {
-  const was = opening ??= {
-    engine: openTeam(take).then(
-      (opened) => engine = opened,
-      (error) => {
-        opening = void 0;
-        throw error;
-      }
-    ),
-    take
-  };
-  try {
-    return await was.engine;
-  } catch (error) {
-    if (take && !was.take) {
-      if (opening === was) opening = void 0;
-      return team(take);
+    }),
+    sessionMode: () => modeOf(dataFolder, process.ppid),
+    plugin: pluginId(dataFolder),
+    userTeam,
+    env: process.env,
+    failed(error) {
+      say(`the goal's state or a record couldn't be written: ${errorText(error)}`);
     }
+  },
+  () => claude ??= executableOf(process.ppid).catch((error) => {
+    claude = void 0;
     throw error;
+  }),
+  (engine) => {
+    if (engine) listMembers(engine.team);
+    else void listTeamFiles();
   }
-}
-async function letGo() {
-  const held = await opening?.engine.catch(() => void 0);
-  engine = void 0;
-  if (!held) {
-    opening = void 0;
-    return { goals: [], meetings: [] };
-  }
-  const closing = held.close();
-  const moved = closing.then(() => {
-    throw new Error(
-      "openplan's team moved to another Claude Code session. Using openplan here brings it back."
-    );
-  });
-  moved.catch(() => void 0);
-  opening = { engine: moved, take: false };
-  return closing;
-}
+);
 var ending;
 function end() {
   ending ??= (async () => {
     try {
-      await (await opening?.engine.catch(() => void 0))?.close();
+      await session.close();
     } catch (error) {
-      say(`the team didn't close cleanly: ${errorText(error)}`);
+      say(`the goal didn't close cleanly: ${errorText(error)}`);
     } finally {
       process.exit(0);
     }
@@ -11586,11 +11727,10 @@ process.stdin.once("end", end).once("close", end);
 for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"]) process.once(signal, end);
 process.on("uncaughtException", (error) => {
   say(`stopped by an error: ${error.stack ?? error.message}`);
-  engine?.abandon();
+  session.current?.abandon();
   process.exit(1);
 });
 process.once("exit", stopMembers);
-var pane = await servePane(team, letGo);
 process.once("exit", () => {
   pane.close();
 });
@@ -11600,7 +11740,14 @@ var server = new McpServer(
     instructions: "Talk to the user in the language they write to you in, whatever language openplan's messages and tool results are in."
   }
 );
-var use = () => team(true);
-var listMembers = addTools(server, use);
-addPaneTools(server, use, pane);
+var listMembers = addTools(server, session);
+addPaneTools(server, session, pane);
+async function listTeamFiles() {
+  try {
+    const repo = await openRepository(cwd);
+    listMembers((await loadTeam([userTeam, teamFolder(repo.top)])).team);
+  } catch {
+  }
+}
+await listTeamFiles();
 await server.connect(new StdioServerTransport());
