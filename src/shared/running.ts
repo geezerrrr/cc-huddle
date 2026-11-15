@@ -1,0 +1,23 @@
+/** Processes by pid: a leaf, for the MCP server's bootstrap too, before its dependencies are in. */
+
+/** Whether process `pid` runs. */
+export function running(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    // There, but not ours to signal.
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+/** The command that prints a field of process `pid` on Windows (`CommandLine`, `ExecutablePath`). */
+export const windowsProcessField = (pid: number, field: "CommandLine" | "ExecutablePath") =>
+  [
+    "powershell.exe",
+    [
+      "-NoProfile",
+      "-Command",
+      `(Get-CimInstance Win32_Process -Filter "ProcessId=${String(pid)}").${field}`,
+    ],
+  ] as const;

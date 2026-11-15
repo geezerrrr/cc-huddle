@@ -9,7 +9,7 @@ import { removeGoal } from "./git.ts";
 import { can, GOAL_MACHINE, step } from "./machines.ts";
 import type { Meetings } from "./meetings.ts";
 import type { Scheduler } from "./scheduler.ts";
-import { serialBy } from "./serial.ts";
+import { serialBy } from "../shared/serial.ts";
 import type { Goal, PlanSubtask, Subtask } from "./types.ts";
 
 /** The key the goal's changes take turns on. */
@@ -81,7 +81,7 @@ export class Goals {
       // A merge under way finishes first, and so does a meeting being cancelled.
       await this.scheduler.release(core.state.subtasks.map((s) => s.id));
       await this.meetings.settled();
-      await removeGoal(core.places, goal.slug);
+      await removeGoal(core.places);
     });
   }
 

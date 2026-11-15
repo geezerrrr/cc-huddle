@@ -5,9 +5,8 @@
  * turned into `-`; a marketplace's name may have a `.`, which doesn't read
  * back, so every openplan id your settings files enable is turned off too.
  */
-import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { errorCode } from "../engine/core.ts";
+import { jsonIfThere } from "../shared/files.ts";
 
 const PLUGIN = "openplan";
 
@@ -17,14 +16,14 @@ const pluginId = (dataFolder: string) =>
 
 /** The openplan ids a settings file enables or disables; none when it is missing or doesn't parse, as Claude Code skips it then. */
 async function idsIn(file: string): Promise<string[]> {
-  let settings: { enabledPlugins?: Record<string, unknown> };
+  let settings: { enabledPlugins?: Record<string, unknown> } | undefined;
   try {
-    settings = JSON.parse(await readFile(file, "utf8")) as typeof settings;
+    settings = (await jsonIfThere(file)) as typeof settings;
   } catch (error) {
-    if (error instanceof SyntaxError || errorCode(error) === "ENOENT") return [];
+    if (error instanceof SyntaxError) return [];
     throw error;
   }
-  return Object.keys(settings.enabledPlugins ?? {}).filter((id) => id.startsWith(`${PLUGIN}@`));
+  return Object.keys(settings?.enabledPlugins ?? {}).filter((id) => id.startsWith(`${PLUGIN}@`));
 }
 
 /**

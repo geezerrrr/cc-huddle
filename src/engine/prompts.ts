@@ -2,6 +2,7 @@
  * Every prompt the engine sends (docs/design.md §3.1), in one module. Only
  * models read them, so they are in English.
  */
+import { listOf } from "../shared/text.ts";
 import type { Delivery, Goal, GoOn, Meeting, MeetingSize, Member, Subtask, Task } from "./types.ts";
 
 /**
@@ -9,10 +10,6 @@ import type { Delivery, Goal, GoOn, Meeting, MeetingSize, Member, Subtask, Task 
  * (a meeting, an answer to a teammate, a review).
  */
 export type SessionKind = "work" | "readOnly";
-
-/** Names in a sentence: "a, b and c". */
-export const listOf = (items: readonly string[]) =>
-  new Intl.ListFormat("en", { type: "conjunction" }).format(items);
 
 /** A member by name and role, as their teammates know them. */
 const called = (member: Member) => `${member.name} (${member.role.title})`;

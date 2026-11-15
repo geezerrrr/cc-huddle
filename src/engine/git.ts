@@ -7,9 +7,9 @@
 import { spawn } from "node:child_process";
 import { readdir, readFile, realpath, rm } from "node:fs/promises";
 import path from "node:path";
-import { exists } from "./files.ts";
-import { goalFiles } from "./goal-files.ts";
-import { serialBy } from "./serial.ts";
+import { exists } from "../shared/files.ts";
+import { goalFiles } from "../shared/layout.ts";
+import { serialBy } from "../shared/serial.ts";
 
 /** Every command: nothing from the repository's config runs, and paths come out as they are. */
 const FLAGS = [
@@ -121,9 +121,10 @@ export async function openRepository(folder: string): Promise<Repository> {
   return { top: await realpath(top), common: await realpath(path.resolve(folder, common)) };
 }
 
-/** A repository and a goal's folder in the data folder, which holds the goal's worktree and its subtasks'. */
+/** A goal's places: its repository, its slug, and its folder in the data folder, which holds its worktree and its subtasks'. */
 export interface Places {
   repo: Repository;
+  slug: string;
   root: string;
 }
 
@@ -201,8 +202,8 @@ const perGoal = <T>(places: Places, task: () => Promise<T>) =>
  * your HEAD, checked out in its own worktree (again, if the folder was
  * deleted by hand). Inside a goal's git operation (perGoal).
  */
-async function setUpGoal(places: Places, slug: string): Promise<string> {
-  const { repo } = places;
+async function setUpGoal(places: Places): Promise<string> {
+  const { repo, slug } = places;
   const branch = goalBranch(slug);
   const folder = goalFiles(places.root).checkout;
   if (!(await hasBranch(repo, branch))) await git({ cwd: repo.top }, ["branch", branch, "HEAD"]);
@@ -211,19 +212,18 @@ async function setUpGoal(places: Places, slug: string): Promise<string> {
 }
 
 /** The goal's worktree, set up again first where it needs it (setUpGoal), as one of the goal's git operations. */
-export const openGoal = (places: Places, slug: string) =>
-  perGoal(places, () => setUpGoal(places, slug));
+export const openGoal = (places: Places) => perGoal(places, () => setUpGoal(places));
 
 /**
  * A subtask's worktree: its own if there (a run going on keeps it), its
  * branch checked out again if only that is (the folder deleted by hand), else
  * a new branch cut from the goal's branch as it stands now.
  */
-export function openDesk(places: Places, slug: string, subtaskId: string): Promise<string> {
+export function openDesk(places: Places, subtaskId: string): Promise<string> {
   return perGoal(places, async () => {
-    const { repo } = places;
+    const { repo, slug } = places;
     const desk = goalFiles(places.root).desk(subtaskId);
-    await setUpGoal(places, slug);
+    await setUpGoal(places);
     if (await exists(path.join(desk, ".git"))) return desk;
     await rm(desk, { recursive: true, force: true });
     const branch = subtaskBranch(slug, subtaskId);
@@ -274,7 +274,6 @@ const merging = async (at: At) =>
  */
 export function commitDesk(
   places: Places,
-  slug: string,
   subtaskId: string,
   by: Signer,
   message: string,
@@ -330,13 +329,17 @@ async function conflicts(
 }
 
 /** Takes a subtask's worktree and its branch away. */
-async function removeDesk(places: Places, slug: string, subtaskId: string) {
+async function removeDesk(places: Places, subtaskId: string) {
   const desk = goalFiles(places.root).desk(subtaskId);
   await unlist(places.repo, desk);
   await rm(desk, { recursive: true, force: true });
-  await git({ cwd: places.repo.top }, ["branch", "-q", "-D", subtaskBranch(slug, subtaskId)], {
-    allow: [1],
-  });
+  await git(
+    { cwd: places.repo.top },
+    ["branch", "-q", "-D", subtaskBranch(places.slug, subtaskId)],
+    {
+      allow: [1],
+    },
+  );
 }
 
 /**
@@ -346,14 +349,9 @@ async function removeDesk(places: Places, slug: string, subtaskId: string) {
  * worktree, the merge half done. Safe to run again: a subtask merged already
  * is gone with its branch.
  */
-export function mergeDesk(
-  places: Places,
-  slug: string,
-  subtaskId: string,
-  by: Signer,
-): Promise<MergeOutcome> {
+export function mergeDesk(places: Places, subtaskId: string, by: Signer): Promise<MergeOutcome> {
   return perGoal(places, async () => {
-    const { repo } = places;
+    const { repo, slug } = places;
     const folder = goalFiles(places.root).desk(subtaskId);
     if (!(await exists(folder))) {
       const branch = subtaskBranch(slug, subtaskId);
@@ -380,9 +378,9 @@ export function mergeDesk(
       }
     }
     const head = (await git(desk, ["rev-parse", "HEAD"])).stdout.trim();
-    const goal = await worktreeAt(repo, await setUpGoal(places, slug));
+    const goal = await worktreeAt(repo, await setUpGoal(places));
     await git(goal, ["merge", "-q", "--ff-only", head]);
-    await removeDesk(places, slug, subtaskId);
+    await removeDesk(places, subtaskId);
     return { kind: "merged" };
   });
 }
@@ -431,24 +429,24 @@ export function abortMerge(places: Places, subtaskId: string): Promise<void> {
 }
 
 /** Throws a subtask's worktree away with its branch: it starts over, or its goal is deleted. */
-export function dropDesk(places: Places, slug: string, subtaskId: string): Promise<void> {
-  return perGoal(places, () => removeDesk(places, slug, subtaskId));
+export function dropDesk(places: Places, subtaskId: string): Promise<void> {
+  return perGoal(places, () => removeDesk(places, subtaskId));
 }
 
 /**
  * Takes a deleted goal out of the repository: its subtasks' worktrees and
  * branches and its own worktree. Its branch stays, yours to merge or delete.
  */
-export function removeGoal(places: Places, slug: string): Promise<void> {
+export function removeGoal(places: Places): Promise<void> {
   return perGoal(places, async () => {
-    const { repo } = places;
+    const { repo, slug } = places;
     const refs = await git({ cwd: repo.top }, [
       "for-each-ref",
       "--format=%(refname:lstrip=4)",
       `refs/heads/${goalBranches(slug)}`,
     ]);
     for (const id of refs.stdout.split("\n")) {
-      if (id && id !== "main") await removeDesk(places, slug, id);
+      if (id && id !== "main") await removeDesk(places, id);
     }
     const folder = goalFiles(places.root).checkout;
     await unlist(repo, folder);

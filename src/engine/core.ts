@@ -43,10 +43,3 @@ export const workOf = (core: Pick<Core, "state" | "team" | "underWay">): Work =>
 export function spend(state: GoalState, member: string, tokens: number) {
   state.tokens[member] = (state.tokens[member] ?? 0) + tokens;
 }
-
-/** An error in words. */
-export const errorText = (error: unknown) =>
-  error instanceof Error ? error.message : String(error);
-
-/** A system error's code: `ENOENT`, `EEXIST`…; undefined for any other error. */
-export const errorCode = (error: unknown) => (error as NodeJS.ErrnoException).code;

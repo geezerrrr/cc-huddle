@@ -6,7 +6,7 @@ import type { Places } from "./git.ts";
 import { Records } from "./records.ts";
 import type { ToolCall } from "./turns.ts";
 import type { Meeting } from "./types.ts";
-import { goalFiles } from "./goal-files.ts";
+import { goalFiles } from "../shared/layout.ts";
 
 let dir: string;
 let places: Places;
@@ -15,7 +15,7 @@ const failed = vi.fn();
 
 beforeEach(async () => {
   dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-records-")));
-  places = { repo: { top: dir, common: dir }, root: dir };
+  places = { repo: { top: dir, common: dir }, slug: "dice", root: dir };
   records = new Records(places, failed);
 });
 

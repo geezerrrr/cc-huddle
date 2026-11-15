@@ -6,12 +6,12 @@
  * killed outright stops what it left.
  */
 import { execFile, type ChildProcess } from "node:child_process";
-import { readFile } from "node:fs/promises";
+
 import { setTimeout as delay } from "node:timers/promises";
-import { errorCode } from "./core.ts";
-import { writeWhole } from "./files.ts";
-import { running as runs } from "./running.ts";
-import { inOrder } from "./serial.ts";
+
+import { writeWhole, jsonIfThere } from "../shared/files.ts";
+import { running, windowsProcessField } from "../shared/running.ts";
+import { inOrder } from "../shared/serial.ts";
 
 /** A member process as written down: its settings file tells it from another that got its pid. */
 interface Written {
@@ -20,7 +20,7 @@ interface Written {
 }
 
 /** The member processes running, by pid. */
-const running = new Map<number, { child: ChildProcess; settings: string }>();
+const members = new Map<number, { child: ChildProcess; settings: string }>();
 
 /** The file they are written down in, and where a write that fails is told (recordMembersIn). */
 let record: { file: string; writes: ReturnType<typeof inOrder> } | undefined;
@@ -29,7 +29,7 @@ let record: { file: string; writes: ReturnType<typeof inOrder> } | undefined;
 function save() {
   if (!record) return;
   const { file, writes } = record;
-  const written: Written[] = [...running].map(([pid, { settings }]) => ({ pid, settings }));
+  const written: Written[] = [...members].map(([pid, { settings }]) => ({ pid, settings }));
   writes.run(() => writeWhole(file, JSON.stringify(written)));
 }
 
@@ -38,17 +38,17 @@ export function watchMember(child: ChildProcess, settings: string) {
   const { pid } = child;
   // It didn't start: there is nothing to stop.
   if (pid === undefined) return;
-  running.set(pid, { child, settings });
+  members.set(pid, { child, settings });
   save();
   child.once("exit", () => {
-    running.delete(pid);
+    members.delete(pid);
     save();
   });
 }
 
 /** Stops every member process still running, as this process exits. */
 export function stopMembers() {
-  for (const { child } of running.values()) child.kill("SIGTERM");
+  for (const { child } of members.values()) child.kill("SIGTERM");
 }
 
 /** A process's command line; undefined when there is no such process. */
@@ -56,15 +56,8 @@ const commandLine = (pid: number) =>
   new Promise<string | undefined>((resolve) => {
     const [command, args] =
       process.platform === "win32"
-        ? [
-            "powershell.exe",
-            [
-              "-NoProfile",
-              "-Command",
-              `(Get-CimInstance Win32_Process -Filter "ProcessId=${String(pid)}").CommandLine`,
-            ],
-          ]
-        : ["ps", ["-o", "command=", "-p", String(pid)]];
+        ? windowsProcessField(pid, "CommandLine")
+        : (["ps", ["-o", "command=", "-p", String(pid)]] as const);
     execFile(command, args, (error, stdout) => {
       resolve(error ? undefined : stdout);
     });
@@ -72,12 +65,7 @@ const commandLine = (pid: number) =>
 
 /** What a file written down before holds: nothing when there is none. */
 async function written(file: string): Promise<Written[]> {
-  try {
-    return JSON.parse(await readFile(file, "utf8")) as Written[];
-  } catch (error) {
-    if (errorCode(error) === "ENOENT") return [];
-    throw error;
-  }
+  return ((await jsonIfThere(file)) as Written[] | undefined) ?? [];
 }
 
 /** How long a member a server before left is given to exit once asked, before it is killed. */
@@ -86,7 +74,7 @@ const LEFT_EXIT_MS = 5000;
 /** Whether process `pid` exits within `ms`. */
 async function exits(pid: number, ms: number): Promise<boolean> {
   const until = Date.now() + ms;
-  while (runs(pid)) {
+  while (running(pid)) {
     if (Date.now() > until) return false;
     await delay(50);
   }

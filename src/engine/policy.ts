@@ -5,7 +5,7 @@
  * runs under flag settings on top, which outrank both.
  */
 import type { Options, PermissionMode, Settings } from "@anthropic-ai/claude-agent-sdk";
-import { writeWhole } from "./files.ts";
+import { writeWhole } from "../shared/files.ts";
 import { authorEnv, memberSigner } from "./git.ts";
 import type { SessionKind } from "./prompts.ts";
 import type { Member } from "./types.ts";

@@ -5,7 +5,7 @@
  */
 import { tool, type CanUseTool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
-import { errorText } from "./core.ts";
+import { errorText } from "../shared/errors.ts";
 import type { MemberOptions } from "./policy.ts";
 import { DELIVER_REMINDER, SESSION_ONLY } from "./prompts.ts";
 import {

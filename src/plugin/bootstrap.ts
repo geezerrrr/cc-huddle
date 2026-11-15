@@ -13,9 +13,10 @@ import * as nodeModule from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
-import { exists, renameOver } from "../engine/files.ts";
-import { running } from "../engine/running.ts";
+import { exists, renameOver } from "../shared/files.ts";
+import { running } from "../shared/running.ts";
 import { dataFolder } from "./data-folder.ts";
+import { depsFolder } from "../shared/layout.ts";
 
 if (!("registerHooks" in nodeModule))
   throw new Error(`openplan needs Node.js 22.15 or later; this is ${process.version}`);
@@ -31,7 +32,7 @@ const manifests = await Promise.all(
     async (file) => [file, await readFile(path.join(here, file), "utf8")] as const,
   ),
 );
-const deps = path.join(dataFolder, "deps");
+const deps = depsFolder(dataFolder);
 /** The dependencies of this version, by what it locks. */
 const home = path.join(
   deps,

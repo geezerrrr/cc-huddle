@@ -10,7 +10,8 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import { actionsOf, busyMembers, redoneUpstream, reviewerOf, taskDone, waitsIn } from "./derive.ts";
-import { errorText, spend, workOf, type Core } from "./core.ts";
+import { spend, workOf, type Core } from "./core.ts";
+import { errorText } from "../shared/errors.ts";
 import {
   abortMerge,
   commitDesk,
@@ -264,7 +265,7 @@ export class Scheduler {
 
   /** You retry a failed or stopped subtask from the start: its session, delivery, review and worktree go. */
   private async retry(subtask: Subtask) {
-    await dropDesk(this.core.places, this.goal.slug, subtask.id);
+    await dropDesk(this.core.places, subtask.id);
     // Retried meanwhile: that one did it.
     if (!can(SUBTASK_MACHINE, subtask.status, "retry")) return;
     this.move(subtask, "retry");
@@ -478,7 +479,7 @@ export class Scheduler {
       const member = this.memberOf(subtask.assignee);
       const { goal } = this;
       const task = this.taskOf(subtask);
-      const desk = await openDesk(core.places, goal.slug, subtask.id);
+      const desk = await openDesk(core.places, subtask.id);
       const recorder = core.recorder(subtask);
       outcome = await runSubtask({
         options: core.options(member, "work", desk),
@@ -524,7 +525,6 @@ export class Scheduler {
       if (outcome.status === "delivered")
         await commitDesk(
           core.places,
-          goal.slug,
           subtask.id,
           memberSigner(member.name),
           `${subtask.title}\n\n${outcome.handover.summary}`,
@@ -588,7 +588,7 @@ export class Scheduler {
               question,
               own: core.state.subtasks.filter((s) => s.assignee === target.name),
             }),
-            options: core.options(target, "readOnly", await openGoal(core.places, this.goal.slug)),
+            options: core.options(target, "readOnly", await openGoal(core.places)),
             signal,
             spent: (tokens) => {
               spend(core.state, target.name, tokens);
@@ -648,7 +648,7 @@ export class Scheduler {
       const reviewer = this.memberOf(reviewerOf(workOf(core), subtask));
       const { delivery } = subtask;
       if (!delivery) throw new Error(`"${subtask.title}" has no delivery to review`);
-      const desk = await openDesk(core.places, this.goal.slug, subtask.id);
+      const desk = await openDesk(core.places, subtask.id);
       const reply = await askOnce({
         prompt: reviewPrompt({
           task: this.taskOf(subtask),
@@ -696,13 +696,7 @@ export class Scheduler {
     const { core } = this;
     const { end } = this.begin(subtask, "merge");
     try {
-      const { goal } = this;
-      const merged = await mergeDesk(
-        core.places,
-        goal.slug,
-        subtask.id,
-        memberSigner(subtask.assignee),
-      );
+      const merged = await mergeDesk(core.places, subtask.id, memberSigner(subtask.assignee));
       if (merged.kind === "merged") {
         this.move(subtask, "merged");
         subtask.conflict = undefined;

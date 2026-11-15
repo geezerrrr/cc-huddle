@@ -4,15 +4,16 @@
  * `.claude/openplan/`: roles and members as Markdown files with front matter,
  * the Claude Code settings every member works under, and openplan's own.
  */
-import { readdir, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { EffortLevel, Settings } from "@anthropic-ai/claude-agent-sdk";
 import { parse } from "yaml";
 import { z } from "zod";
-import { errorCode, errorText, type Team } from "./core.ts";
-import { writeWhole } from "./files.ts";
-import { serialBy } from "./serial.ts";
+import { type Team } from "./core.ts";
+import { errorText } from "../shared/errors.ts";
+import { writeWhole, jsonIfThere, namesIfThere } from "../shared/files.ts";
+import { serialBy } from "../shared/serial.ts";
 import { MEETING_SIZES, type MeetingSize, type Member, type Role } from "./types.ts";
 
 /** The team's folder in a repository. */
@@ -61,31 +62,9 @@ function parsed<T>(schema: z.ZodType<T>, data: unknown, file: string): T {
   return result.data;
 }
 
-/** A JSON file's contents; undefined when there is no such file. */
-async function jsonFile(file: string): Promise<unknown> {
-  let text: string;
-  try {
-    text = await readFile(file, "utf8");
-  } catch (error) {
-    if (errorCode(error) === "ENOENT") return undefined;
-    throw error;
-  }
-  try {
-    return JSON.parse(text);
-  } catch (error) {
-    throw new Error(`${file}: ${errorText(error)}`, { cause: error });
-  }
-}
-
 /** The Markdown files in a folder, by name: their front matter and the text after it. */
 async function markdownFiles(folder: string) {
-  let names: string[];
-  try {
-    names = (await readdir(folder)).filter((name) => name.endsWith(".md")).sort();
-  } catch (error) {
-    if (errorCode(error) === "ENOENT") return [];
-    throw error;
-  }
+  const names = (await namesIfThere(folder)).filter((name) => name.endsWith(".md")).sort();
   return Promise.all(
     names.map(async (name) => {
       const file = path.join(folder, name);
@@ -154,11 +133,11 @@ export async function loadTeam(userTeam: string, top: string): Promise<TeamFiles
     for (const { name, file, data } of await markdownFiles(path.join(folder, "members")))
       written.set(name, { file, data });
     const teamFile = path.join(folder, "team.json");
-    own = { ...own, ...parsed(teamSchema, (await jsonFile(teamFile)) ?? {}, teamFile) };
+    own = { ...own, ...parsed(teamSchema, (await jsonIfThere(teamFile)) ?? {}, teamFile) };
     const settingsFile = path.join(folder, "settings.json");
     settings = mergeSettings(
       settings,
-      parsed(settingsSchema, (await jsonFile(settingsFile)) ?? {}, settingsFile),
+      parsed(settingsSchema, (await jsonIfThere(settingsFile)) ?? {}, settingsFile),
     );
   }
   const byName = [...written].sort(([a], [b]) => (a < b ? -1 : 1));
@@ -203,7 +182,7 @@ function allowing(settings: Record<string, unknown>, rules: readonly string[], f
 export function allowInTeam(top: string, rules: readonly string[]): Promise<void> {
   const file = path.join(teamFolder(top), "settings.json");
   return writing(file, async () => {
-    const settings = parsed(settingsSchema, (await jsonFile(file)) ?? {}, file);
+    const settings = parsed(settingsSchema, (await jsonIfThere(file)) ?? {}, file);
     await writeWhole(file, `${JSON.stringify(allowing(settings, rules, file), null, 2)}\n`);
   });
 }

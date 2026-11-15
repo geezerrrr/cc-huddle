@@ -5,7 +5,7 @@
  */
 import type { GoalEntry } from "../engine/data.ts";
 import type { Work } from "../engine/derive.ts";
-import { listOf } from "../engine/prompts.ts";
+import { listOf } from "../shared/text.ts";
 import type { Notice } from "../engine/turns.ts";
 import type {
   DecisionOption,

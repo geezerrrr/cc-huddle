@@ -15,7 +15,7 @@ import path from "node:path";
 import { text } from "node:stream/consumers";
 import { z } from "zod";
 import type { OpenplanTeam, OpenplanView } from "../../plugin/types/index.d.ts";
-import { errorCode, errorText } from "../engine/core.ts";
+import { errorCode, errorText } from "../shared/errors.ts";
 import type { GoalEntry, HandedOver } from "../engine/data.ts";
 import { GitError } from "../engine/git.ts";
 import { paneTeam, shownMeeting, viewEntries, viewLive } from "./pane.ts";

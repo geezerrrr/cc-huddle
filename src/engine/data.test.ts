@@ -4,15 +4,13 @@ import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { goalFiles } from "./goal-files.ts";
+import { goalFiles, goalsFolder, repoFolder } from "../shared/layout.ts";
 import {
-  goalsFolder,
   holderOf,
   listGoals,
   newGoalFolder,
   readState,
   releaseGoal,
-  repoFolder,
   stateWriter,
   takeGoal,
   type Holder,

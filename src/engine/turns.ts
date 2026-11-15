@@ -13,7 +13,7 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 import type { TodoWriteInput } from "@anthropic-ai/claude-agent-sdk/sdk-tools";
 import { z } from "zod";
-import { errorText } from "./core.ts";
+import { errorText } from "../shared/errors.ts";
 import type { MemberOptions } from "./policy.ts";
 import { watchMember } from "./processes.ts";
 

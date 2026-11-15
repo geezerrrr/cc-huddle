@@ -16,10 +16,11 @@ import {
   type SdkMcpToolDefinition,
 } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
-import { errorText, spend, workOf, type Core } from "./core.ts";
+import { spend, workOf, type Core } from "./core.ts";
+import { errorText } from "../shared/errors.ts";
 import { busyMembers, meetingResumes } from "./derive.ts";
 import { openGoal } from "./git.ts";
-import { goalFiles } from "./goal-files.ts";
+import { goalFiles } from "../shared/layout.ts";
 import { can, MEETING_MACHINE, step } from "./machines.ts";
 import { hostPlanSchema, hostWritten, soundPlan, type WrittenPlan } from "./plan.ts";
 import {
@@ -446,7 +447,7 @@ export class Meetings {
         return found;
       };
 
-      ctx = { ...ctx, cwd: await openGoal(core.places, goal.slug) };
+      ctx = { ...ctx, cwd: await openGoal(core.places) };
       /** Whoever has the floor speaks: about what they raised their hand for, if they did. */
       const answer = async (name: string) => {
         const member = attendee(name);

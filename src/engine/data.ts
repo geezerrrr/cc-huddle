@@ -3,31 +3,17 @@
  * §3.2, §3.4): a folder for each goal, with its state, the lock that gives
  * the goal to one session, and where everything else of the goal goes.
  */
-import { createHash } from "node:crypto";
 import { link, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { unlinkSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 import path from "node:path";
-import { errorCode, errorText } from "./core.ts";
-import { renameOver, textIfThere, writeWhole } from "./files.ts";
-import { goalFiles } from "./goal-files.ts";
-import { inOrder } from "./serial.ts";
-import { slugFor, type Repository } from "./git.ts";
-import { running } from "./running.ts";
+import { errorCode, errorText } from "../shared/errors.ts";
+import { renameOver, textIfThere, writeWhole, namesIfThere } from "../shared/files.ts";
+import { goalFiles, goalsFolder, goalFolder } from "../shared/layout.ts";
+import { inOrder } from "../shared/serial.ts";
+import { slugFor } from "./git.ts";
+import { running } from "../shared/running.ts";
 import type { GoalState } from "./types.ts";
-
-/**
- * A repository's folder in the data folder: its name, and a hash of its git
- * folder, which its own worktrees share, so they all have the same goals.
- */
-export function repoFolder(dataFolder: string, repo: Repository): string {
-  const name = path.basename(repo.top).replace(/[^\w.-]+/g, "-");
-  const hash = createHash("sha256").update(repo.common).digest("hex").slice(0, 12);
-  return path.join(dataFolder, "repos", `${name}-${hash}`);
-}
-
-/** The folder of a repository's goals, each in a folder named by its slug. */
-export const goalsFolder = (repoFolder: string) => path.join(repoFolder, "goals");
 
 /** The version of `state.json` this openplan writes. */
 const STATE_VERSION = 2;
@@ -125,8 +111,9 @@ function readHolder(file: string): Holder | undefined {
   const text = textIfThere(file);
   try {
     return text === undefined ? undefined : (JSON.parse(text) as Holder);
-  } catch {
-    return undefined;
+  } catch (error) {
+    if (error instanceof SyntaxError) return undefined;
+    throw error;
   }
 }
 
@@ -238,7 +225,7 @@ export async function newGoalFolder(
   for (const slug of await readdir(goals)) taken.add(slug);
   for (;;) {
     const slug = slugFor(name, taken);
-    const folder = path.join(goals, slug);
+    const folder = goalFolder(repoFolder, slug);
     try {
       await mkdir(folder);
       return { slug, folder };
@@ -266,13 +253,7 @@ const startedAt = (entry: GoalEntry) =>
  */
 export async function listGoals(repoFolder: string): Promise<GoalEntry[]> {
   const folder = goalsFolder(repoFolder);
-  let slugs: string[];
-  try {
-    slugs = await readdir(folder);
-  } catch (error) {
-    if (errorCode(error) === "ENOENT") return [];
-    throw error;
-  }
+  const slugs = await namesIfThere(folder);
   const found = await Promise.all(
     slugs.map(async (slug): Promise<GoalEntry | undefined> => {
       const files = goalFiles(path.join(folder, slug));

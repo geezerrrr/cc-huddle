@@ -9,7 +9,7 @@ import { runSubtask, type RunOutcome } from "./run.ts";
 import { Scheduler } from "./scheduler.ts";
 import { askOnce } from "./turns.ts";
 import type { DecisionOption, Member, Subtask } from "./types.ts";
-import { goalFiles } from "./goal-files.ts";
+import { goalFiles } from "../shared/layout.ts";
 
 vi.mock("./run.ts", () => ({ runSubtask: vi.fn() }));
 vi.mock("./turns.ts", async (original) => ({
@@ -65,7 +65,7 @@ beforeEach(async () => {
       tokens: {},
     },
     team: { members: [member("glm"), member("sonnet")], review: false },
-    places: { repo: await openRepository(repo), root: path.join(dir, "data") },
+    places: { repo: await openRepository(repo), slug: "dice", root: path.join(dir, "data") },
     changed: vi.fn(),
     allowAlways: vi.fn(),
     options: (m, kind, cwd) => ({ cwd, model: kind, settings: `${m.name}.json` }),

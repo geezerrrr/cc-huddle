@@ -7,7 +7,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import plugin from "../../plugin/.claude-plugin/plugin.json" with { type: "json" };
-import { errorText } from "../engine/core.ts";
+import { errorText } from "../shared/errors.ts";
 import { GitError, openRepository } from "../engine/git.ts";
 import { stopMembers } from "../engine/processes.ts";
 import { claudeFolder, loadTeam, userTeamFolder } from "../engine/team.ts";

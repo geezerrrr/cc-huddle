@@ -7,10 +7,10 @@
  */
 import { appendFile, mkdir, open } from "node:fs/promises";
 import path from "node:path";
-import { errorCode } from "./core.ts";
+import { errorCode } from "../shared/errors.ts";
 import type { Places } from "./git.ts";
-import { goalFiles } from "./goal-files.ts";
-import { inOrder } from "./serial.ts";
+import { goalFiles } from "../shared/layout.ts";
+import { inOrder } from "../shared/serial.ts";
 import type { Notice, Step, ToolCall, TurnListener } from "./turns.ts";
 import type { Meeting } from "./types.ts";
 

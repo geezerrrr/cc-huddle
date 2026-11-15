@@ -4,10 +4,9 @@
  * can take up, read from their folders, as context. A repository with no
  * goals adds nothing.
  */
-import path from "node:path";
 import { workOf } from "../engine/core.ts";
-import { goalsFolder, listGoals, repoFolder } from "../engine/data.ts";
-import { goalFiles } from "../engine/goal-files.ts";
+import { listGoals } from "../engine/data.ts";
+import { goalFiles, repoFolder, goalFolder } from "../shared/layout.ts";
 import { GitError, openRepository } from "../engine/git.ts";
 import { readCopy } from "../engine/team.ts";
 import { othersText, statusText } from "./status.ts";
@@ -32,7 +31,7 @@ export async function sessionContext(
   const parts: string[] = [];
   // A goal this session runs was read as it was taken up.
   if (mine && "state" in mine) {
-    const { team } = await readCopy(goalFiles(path.join(goalsFolder(root), mine.slug)).team);
+    const { team } = await readCopy(goalFiles(goalFolder(root, mine.slug)).team);
     // Read from the goal's file: what is under way is the server's, not known here.
     const status = statusText(workOf({ state: mine.state, team, underWay: () => [] }));
     parts.push(

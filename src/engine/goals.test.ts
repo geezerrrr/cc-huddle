@@ -8,7 +8,7 @@ import { Goals } from "./goals.ts";
 import type { Meetings } from "./meetings.ts";
 import type { Scheduler } from "./scheduler.ts";
 import type { Meeting, Member } from "./types.ts";
-import { goalFiles } from "./goal-files.ts";
+import { goalFiles } from "../shared/layout.ts";
 
 const ME = {
   GIT_AUTHOR_NAME: "you",
@@ -65,7 +65,7 @@ beforeEach(async () => {
       tokens: {},
     },
     team: { members: [member("glm")], review: false },
-    places: { repo: await openRepository(repo), root: path.join(dir, "data") },
+    places: { repo: await openRepository(repo), slug: "dice", root: path.join(dir, "data") },
     changed: vi.fn(),
     allowAlways: vi.fn(),
     options: () => ({ settings: "glm.json" }),
@@ -129,8 +129,8 @@ describe("Goals", () => {
   });
 
   it("are deleted once archived: worktrees and subtask branches go, the goal's branch stays", async () => {
-    await openGoal(core.places, "dice");
-    await openDesk(core.places, "dice", "s1");
+    await openGoal(core.places);
+    await openDesk(core.places, "s1");
     expect(await branches()).toContain(subtaskBranch("dice", "s1"));
     core.state.subtasks.push({
       id: "s1",

@@ -1,13 +1,13 @@
 /**
- * Writing a file whole: a new file beside it, renamed over it, so a reader
- * or a crash never finds it half written. Renaming over, as all of openplan
- * does it.
+ * Files as all of openplan reads and writes them: read when they are there,
+ * and written whole (a new file beside, renamed over it), so a reader or a
+ * crash never finds one half written. A leaf, for the bootstrap too.
  */
 import { readFileSync } from "node:fs";
-import { mkdir, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { errorCode } from "./core.ts";
+import { errorCode } from "./errors.ts";
 
 /** Whether `file` is there; anything but its absence is thrown. */
 export async function exists(file: string): Promise<boolean> {
@@ -26,6 +26,35 @@ export function textIfThere(file: string): string | undefined {
     return readFileSync(file, "utf8");
   } catch (error) {
     if (errorCode(error) === "ENOENT") return undefined;
+    throw error;
+  }
+}
+
+/**
+ * A JSON file's contents; undefined when it isn't there. Text that isn't JSON
+ * is a SyntaxError naming the file.
+ */
+export async function jsonIfThere(file: string): Promise<unknown> {
+  let text: string;
+  try {
+    text = await readFile(file, "utf8");
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return undefined;
+    throw error;
+  }
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new SyntaxError(`${file}: ${(error as SyntaxError).message}`, { cause: error });
+  }
+}
+
+/** The names in a folder; none when it isn't there. */
+export async function namesIfThere(folder: string): Promise<string[]> {
+  try {
+    return await readdir(folder);
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return [];
     throw error;
   }
 }

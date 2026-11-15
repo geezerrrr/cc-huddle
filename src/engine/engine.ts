@@ -5,16 +5,14 @@
  */
 import { existsSync } from "node:fs";
 import { rm } from "node:fs/promises";
-import path from "node:path";
 import type { PermissionMode } from "@anthropic-ai/claude-agent-sdk";
-import { errorText, workOf, type Core, type Team } from "./core.ts";
+import { workOf, type Core, type Team } from "./core.ts";
+import { errorText } from "../shared/errors.ts";
 import type { Work } from "./derive.ts";
 import {
-  goalsFolder,
   newGoalFolder,
   readState,
   releaseGoal,
-  repoFolder,
   stateWriter,
   takeGoal,
   type HandedOver,
@@ -22,7 +20,7 @@ import {
   type Runner,
   type StateWriter,
 } from "./data.ts";
-import { goalFiles } from "./goal-files.ts";
+import { goalFiles, repoFolder, goalFolder } from "../shared/layout.ts";
 import { openGoal, openRepository, takenSlugs, type Places } from "./git.ts";
 import { Goals } from "./goals.ts";
 import { Meetings } from "./meetings.ts";
@@ -32,7 +30,7 @@ import { systemPrompt } from "./prompts.ts";
 import { Questions, type Answer } from "./questions.ts";
 import { Records } from "./records.ts";
 import { Scheduler } from "./scheduler.ts";
-import { serialBy } from "./serial.ts";
+import { serialBy } from "../shared/serial.ts";
 import { allowInCopy, allowInTeam, copyTeam, loadTeam, readCopy, type TeamFiles } from "./team.ts";
 import type { GoalState, MeetingSize, Question } from "./types.ts";
 
@@ -123,8 +121,8 @@ export class Engine {
       // A new folder: nobody else holds it.
       await takeGoal(files.lock, me, (holder) => options.takeOver(holder, slug));
       await copyTeam(files.team, copy);
-      const places: Places = { repo, root: folder };
-      await openGoal(places, slug);
+      const places: Places = { repo, slug, root: folder };
+      await openGoal(places);
       const state: GoalState = {
         goal: { name, slug, status: "active", createdAt: Date.now() },
         tasks: [],
@@ -152,7 +150,7 @@ export class Engine {
    */
   static async takeUp(options: EngineOptions, slug: string): Promise<Engine> {
     const repo = await openRepository(options.cwd);
-    const folder = path.join(goalsFolder(repoFolder(options.dataFolder, repo)), slug);
+    const folder = goalFolder(repoFolder(options.dataFolder, repo), slug);
     const files = goalFiles(folder);
     if (!existsSync(files.state)) throw new Error(`There is no goal "${slug}" in this repository`);
     // What this openplan can't read, or a member's environment lacks, is said before the goal is taken from where it runs.
@@ -165,7 +163,7 @@ export class Engine {
       // Both again, as the session that let it go left them: it may have allowed a rule since.
       const state = await readState(files.state);
       const copy = await readCopy(files.team);
-      engine = await Engine.ready(options, { repo, root: folder }, files, copy, state);
+      engine = await Engine.ready(options, { repo, slug, root: folder }, files, copy, state);
       // A session killed outright couldn't pause it: it is paused first, as if it had.
       if (state.goal.status === "active") await engine.goals.pause();
       await engine.goals.resume(handed.meetings);

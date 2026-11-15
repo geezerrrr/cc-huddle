@@ -7,8 +7,9 @@
 import { execFile } from "node:child_process";
 import { readlink } from "node:fs/promises";
 import { promisify } from "node:util";
+import { windowsProcessField } from "../shared/running.ts";
 
-const run = async (command: string, args: string[]) =>
+const run = async (command: string, args: readonly string[]) =>
   (await promisify(execFile)(command, args)).stdout;
 
 /** The executable process `pid` runs. */
@@ -20,13 +21,7 @@ export async function executableOf(pid: number): Promise<string> {
       found = await readlink(`/proc/${id}/exe`);
       break;
     case "win32":
-      found = (
-        await run("powershell.exe", [
-          "-NoProfile",
-          "-Command",
-          `(Get-CimInstance Win32_Process -Filter "ProcessId=${id}").ExecutablePath`,
-        ])
-      ).trim();
+      found = (await run(...windowsProcessField(pid, "ExecutablePath"))).trim();
       break;
     default:
       // The first text file lsof lists for a process is its executable.

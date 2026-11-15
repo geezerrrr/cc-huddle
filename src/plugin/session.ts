@@ -5,11 +5,12 @@
  * Each change to which goal it runs waits for the one before.
  */
 import type { HandedOver, GoalEntry } from "../engine/data.ts";
-import { listGoals, repoFolder } from "../engine/data.ts";
+import { listGoals } from "../engine/data.ts";
 import { Engine, type EngineOptions } from "../engine/engine.ts";
 import { openRepository } from "../engine/git.ts";
-import { serialBy } from "../engine/serial.ts";
+import { serialBy } from "../shared/serial.ts";
 import { noGoalForModel } from "./words.ts";
+import { repoFolder } from "../shared/layout.ts";
 
 /** The key the session's changes of goal take turns on. */
 const TURN = "goal";

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Core } from "./core.ts";
-import { goalFiles } from "./goal-files.ts";
+import { goalFiles } from "../shared/layout.ts";
 import { git, openRepository } from "./git.ts";
 import { z } from "zod";
 import { Meetings, nextMove } from "./meetings.ts";
@@ -57,7 +57,7 @@ beforeEach(async () => {
       tokens: {},
     },
     team: { members: [member("sonnet", "Programmer"), member("glm", "UI designer")], review: true },
-    places: { repo: await openRepository(repo), root: path.join(dir, "data") },
+    places: { repo: await openRepository(repo), slug: "dice", root: path.join(dir, "data") },
     changed: vi.fn(),
     allowAlways: vi.fn(),
     options: (m, kind, cwd) => ({ cwd, model: `${m.name}/${kind}`, settings: `${m.name}.json` }),
