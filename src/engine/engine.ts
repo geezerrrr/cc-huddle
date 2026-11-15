@@ -32,6 +32,7 @@ import { systemPrompt } from "./prompts.ts";
 import { Questions, type Answer } from "./questions.ts";
 import { Records } from "./records.ts";
 import { Scheduler } from "./scheduler.ts";
+import { serialBy } from "./serial.ts";
 import { allowInCopy, allowInTeam, copyTeam, loadTeam, readCopy, type TeamFiles } from "./team.ts";
 import type { GoalState, MeetingSize, Question } from "./types.ts";
 
@@ -306,12 +307,17 @@ export class Engine {
   /**
    * Allows rules always (Questions): in the repository's team settings, for
    * goals started after, and in the goal's copy, for its members' next turns.
+   * One at a time, so members' settings files end as the copy does.
    */
-  private async allow(rules: string[]) {
-    await allowInTeam(this.core.places.repo.top, rules);
-    this.copy = await allowInCopy(this.files.team, rules);
-    await this.writeMemberSettings(this.copy);
+  private allow(rules: string[]) {
+    return this.allowing("allow", async () => {
+      await allowInTeam(this.core.places.repo.top, rules);
+      this.copy = await allowInCopy(this.files.team, rules);
+      await this.writeMemberSettings(this.copy);
+    });
   }
+
+  private readonly allowing = serialBy();
 
   /** Writes each member's settings file (filledSettings); throws before writing any when one can't be filled in. */
   private async writeMemberSettings(copy: TeamFiles) {
