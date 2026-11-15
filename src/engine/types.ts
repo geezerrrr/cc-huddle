@@ -182,15 +182,22 @@ export interface Meeting {
   /** What the meeting is to plan. */
   agenda: string;
   size: MeetingSize;
-  /** The host first. */
+  /** Everyone at it, the host first. */
   participants: string[];
   host: string;
+  /**
+   * The host only runs it: not one of its members, so no first judgment of
+   * their own and no work in the plan (§4.2). Else they host and take part.
+   */
+  hostOnly?: boolean;
   status: MeetingStatus;
   turns: MeetingTurn[];
   /** Who is speaking now. */
   speaking?: string;
   /** The host is writing the plan. */
   planning?: boolean;
+  /** The members are each forming their first judgment, all at once. */
+  drafting?: boolean;
   /** The participants are deciding whether to speak next. */
   weighing?: boolean;
   hands?: MeetingHand[];

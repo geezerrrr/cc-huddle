@@ -122,10 +122,11 @@ function scripted(script: Partial<Record<"hand" | "steer", (ask: Ask) => Promise
     });
     const { prompt } = ask;
     if (prompt.includes("Open the meeting")) return reply("What do we build it with?");
+    // The host's steer goes first: it speaks of the first judgments too.
+    if (prompt.includes("give_floor"))
+      return reply(await (script.steer?.(ask) ?? Promise.resolve("Settled.")));
     if (prompt.includes("first judgment")) return reply("Canvas.");
     if (prompt.includes("Would you speak next?")) return reply(await (script.hand?.(ask) ?? ""));
-    if (prompt.includes("Call give_floor first"))
-      return reply(await (script.steer?.(ask) ?? Promise.resolve("Settled.")));
     if (prompt.includes("You have the floor")) return reply("WebGL is overkill.");
     if (prompt.includes("final plan")) return reply("", plan);
     throw new Error(`Unscripted: ${prompt.slice(0, 40)}`);
@@ -154,20 +155,30 @@ describe("nextMove", () => {
     tokens: 0,
     ...(calls && { calls }),
   });
-  const at = (turns: MeetingTurn[]) =>
-    nextMove({ turns, participants: ["host", "a", "b"], size: "small" });
+  const at = (turns: MeetingTurn[], hostOnly?: boolean) =>
+    nextMove({ turns, participants: ["host", "a", "b"], size: "small", hostOnly });
 
-  it("walks from the opening through everyone's first judgment to the discussion", () => {
+  it("walks from the opening through every member's first judgment, all at once, to the discussion", () => {
     expect(at([])).toEqual({ kind: "open" });
+    expect(at([turn("opening", "host")])).toEqual({ kind: "round", members: ["host", "a", "b"] });
     expect(at([turn("opening", "host"), turn("round", "a")])).toEqual({
       kind: "round",
-      member: "b",
+      members: ["host", "b"],
     });
+    expect(at([turn("opening", "host")], true)).toEqual({ kind: "round", members: ["a", "b"] });
     const rounds = [turn("opening", "host"), turn("round", "a"), turn("round", "b")];
-    expect(at(rounds)).toEqual({ kind: "discuss", left: 2 });
-    expect(at([...rounds, turn("steer", "host", "b")])).toEqual({ kind: "answer", member: "b" });
-    expect(at([...rounds, turn("steer", "host")])).toEqual({ kind: "close" });
-    expect(at([...rounds, turn("answer", "a"), turn("answer", "b")])).toEqual({ kind: "close" });
+    expect(at(rounds)).toEqual({ kind: "round", members: ["host"] });
+    expect(at(rounds, true)).toEqual({ kind: "discuss", left: 2 });
+    // Once the talk is on, nobody gives a first judgment.
+    expect(at([...rounds, turn("steer", "host", "a"), turn("answer", "a")])).toEqual({
+      kind: "discuss",
+      left: 1,
+    });
+    const all = [...rounds, turn("round", "host")];
+    expect(at(all)).toEqual({ kind: "discuss", left: 2 });
+    expect(at([...all, turn("steer", "host", "b")])).toEqual({ kind: "answer", member: "b" });
+    expect(at([...all, turn("steer", "host")])).toEqual({ kind: "close" });
+    expect(at([...all, turn("answer", "a"), turn("answer", "b")])).toEqual({ kind: "close" });
   });
 });
 
@@ -194,8 +205,9 @@ describe("Meetings", () => {
     expect(meeting.status).toBe("review");
     expect(phases(meeting)).toEqual([
       "opening:glm",
+      "round:glm",
       "round:sonnet",
-      "steer:glm",
+      // Given quietly, the floor goes over with no words of the host's.
       "answer:sonnet",
       "summary:glm",
     ]);
@@ -212,7 +224,7 @@ describe("Meetings", () => {
     });
     const hand = asks.find((a) => a.prompt.includes("Would you speak next?"));
     expect(hand?.options).toMatchObject({
-      resume: "sonnet/meeting#2",
+      resume: "sonnet/meeting#3",
       allowedTools: ["mcp__openplan__raise_hand"],
     });
     const answer = asks.find((a) => a.prompt.includes("You have the floor"));
@@ -233,10 +245,90 @@ describe("Meetings", () => {
     expect(meeting.host).toBe("sonnet");
     expect(phases(meeting)).toEqual([
       "opening:sonnet",
+      "round:sonnet",
       "round:glm",
       "steer:sonnet",
       "summary:sonnet",
     ]);
+  });
+
+  it("close when the host gives the floor to nobody, hands up or not", async () => {
+    scripted({
+      hand: async (ask) => {
+        await call(ask, { point: "What the score file holds" });
+        return "";
+      },
+    });
+    const meeting = meetings.start({ goalId: "g1", agenda: "x", size: "small", attendees: [] });
+    await ended(meeting);
+    expect(phases(meeting)).toEqual([
+      "opening:glm",
+      "round:glm",
+      "round:sonnet",
+      "steer:glm",
+      "summary:glm",
+    ]);
+  });
+
+  it("say to the room what the host said before handing the floor over, and after", async () => {
+    scripted({
+      steer: async (ask) => {
+        ask.listener?.text?.("Two views on the renderer.", true);
+        await call(ask, { member: "sonnet" });
+        ask.listener?.text?.("Sonnet, which?", true);
+        return "Sonnet, which?";
+      },
+    });
+    const meeting = meetings.start({ goalId: "g1", agenda: "x", size: "small", attendees: [] });
+    await ended(meeting);
+    expect(meeting.turns.find((t) => t.phase === "steer")).toMatchObject({
+      text: "Two views on the renderer.\n\nSonnet, which?",
+      calls: "sonnet",
+    });
+  });
+
+  it("with a host who only runs it, hear only the members' judgments and give them all the work", async () => {
+    scripted();
+    const original = vi.mocked(askOnce).getMockImplementation();
+    const drafting: (boolean | undefined)[] = [];
+    const sonnets = {
+      ...plan,
+      tasks: plan.tasks.map((t) => ({
+        ...t,
+        subtasks: t.subtasks.map((sub) => ({ ...sub, assignee: "sonnet" })),
+      })),
+    };
+    vi.mocked(askOnce).mockImplementation((ask) => {
+      if (ask.prompt.includes("Everyone now gives a first judgment"))
+        drafting.push(core.state.meetings[0]?.drafting);
+      if (ask.prompt.includes("final plan"))
+        return Promise.resolve({ text: "", structured: sonnets, session: "glm#9", tokens: 1 });
+      return original?.(ask) ?? Promise.reject(new Error("no script"));
+    });
+    const meeting = meetings.start({
+      goalId: "g1",
+      agenda: "x",
+      size: "small",
+      attendees: ["glm", "sonnet"],
+      hostOnly: true,
+    });
+    expect(meeting.hostOnly).toBe(true);
+    await ended(meeting);
+    expect(drafting).toEqual([true]);
+    expect(phases(meeting)).toEqual(["opening:glm", "round:sonnet", "steer:glm", "summary:glm"]);
+    const closing = vi.mocked(askOnce).mock.calls.at(-1)?.[0];
+    expect(closing?.schema?.safeParse(plan).success).toBe(false);
+    expect(closing?.schema?.safeParse(sonnets).success).toBe(true);
+    expect(meeting.status).toBe("review");
+    expect(() =>
+      meetings.start({
+        goalId: "g1",
+        agenda: "x",
+        size: "small",
+        attendees: ["sonnet"],
+        hostOnly: true,
+      }),
+    ).toThrow("can't only run a meeting with nobody else");
   });
 
   it("fail with the error, and go on from where they stopped in the same sessions", async () => {
@@ -253,9 +345,20 @@ describe("Meetings", () => {
     scripted();
     meetings.resume(meeting.id);
     await ended(meeting);
-    expect(phases(meeting)).toEqual(["opening:glm", "round:sonnet", "steer:glm", "summary:glm"]);
-    const steer = vi.mocked(askOnce).mock.calls.find(([a]) => a.prompt.includes("give_floor"));
-    expect(steer?.[0].options.resume).toBe("glm/meeting#1");
+    expect(phases(meeting)).toEqual([
+      "opening:glm",
+      "round:glm",
+      "round:sonnet",
+      "steer:glm",
+      "summary:glm",
+    ]);
+    // The host's first judgment goes on in the session they opened in.
+    const round = vi
+      .mocked(askOnce)
+      .mock.calls.findLast(
+        ([a]) => a.prompt.includes("Everyone now gives") && a.options.model === "glm/meeting",
+      );
+    expect(round?.[0].options.resume).toBe("glm/meeting#1");
   });
 
   it("are cancelled when stopped, and after a restart", async () => {

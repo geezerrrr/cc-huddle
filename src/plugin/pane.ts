@@ -47,9 +47,11 @@ function meetingStatus(meeting: Meeting): string {
         ? `${meeting.host} writes the plan`
         : meeting.speaking
           ? `${meeting.speaking} speaks`
-          : meeting.weighing
-            ? "deciding who speaks next"
-            : "under way";
+          : meeting.drafting
+            ? "the members form their first judgments"
+            : meeting.weighing
+              ? "deciding who speaks next"
+              : "under way";
     case "review":
       return "its plan waits for you";
     case "approved":

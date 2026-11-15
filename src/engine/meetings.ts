@@ -1,10 +1,10 @@
 /**
  * Planning meetings (docs/design.md §4.2): the meetings' state machine
- * (MEETING_MACHINE) and their turns. The host opens; everyone else gives a
- * first judgment without hearing the others; then hands go up and the host
- * gives the floor, until it is settled or the size's turns are spent; then
- * the host writes the plan. Each attendee keeps one read-only session for
- * the whole meeting, in the goal's worktree.
+ * (MEETING_MACHINE) and their turns. The host opens; every member gives a
+ * first judgment, all at once and without hearing the others; then hands go
+ * up and the host gives the floor, until it is settled or the size's turns
+ * are spent; then the host writes the plan. Each attendee keeps one
+ * read-only session for the whole meeting, in the goal's worktree.
  */
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -109,18 +109,25 @@ const floorTool = (
     ),
   );
 
-/** A meeting no longer under way: nobody speaks, writes the plan, weighs it or has a hand up. */
+/** A meeting no longer under way: nobody speaks, writes the plan, forms a judgment, weighs it or has a hand up. */
 const quiet = (meeting: Meeting) =>
   Object.assign(meeting, {
     speaking: undefined,
     planning: undefined,
+    drafting: undefined,
     weighing: undefined,
     hands: undefined,
   });
 
+/** Who takes part as a member (§4.2): everyone at it, but a host who only runs it. */
+export const meetingMembers = ({
+  participants,
+  hostOnly,
+}: Pick<Meeting, "participants" | "hostOnly">) => (hostOnly ? participants.slice(1) : participants);
+
 type Move =
   | { kind: "open" }
-  | { kind: "round"; member: string }
+  | { kind: "round"; members: string[] }
   | { kind: "discuss"; left: number }
   | { kind: "answer"; member: string }
   | { kind: "close" };
@@ -130,16 +137,19 @@ type Move =
  * new meeting and one going on from where it stopped are the same walk.
  * However the talk goes, it ends in the closing.
  */
-export function nextMove({
-  turns,
-  participants,
-  size,
-}: Pick<Meeting, "turns" | "participants" | "size">): Move {
+export function nextMove(
+  meeting: Pick<Meeting, "turns" | "participants" | "hostOnly" | "size">,
+): Move {
+  const { turns, participants, size } = meeting;
   const last = turns.at(-1);
   if (!last) return { kind: "open" };
   const others = participants.slice(1);
-  const waiting = others.find((m) => !turns.some((t) => t.phase === "round" && t.speaker === m));
-  if (waiting) return { kind: "round", member: waiting };
+  // The first judgments come before any talk: once it is on, nobody gives one.
+  const talking = turns.some((t) => t.phase === "steer" || t.phase === "answer");
+  const waiting = meetingMembers(meeting).filter(
+    (m) => !turns.some((t) => t.phase === "round" && t.speaker === m),
+  );
+  if (!talking && waiting.length) return { kind: "round", members: waiting };
   if (last.phase === "steer")
     return last.calls ? { kind: "answer", member: last.calls } : { kind: "close" };
   const left =
@@ -147,13 +157,17 @@ export function nextMove({
   return left > 0 ? { kind: "discuss", left } : { kind: "close" };
 }
 
-/** What calling a meeting takes: its goal, what to plan, its size, and who attends, the host first. */
+/**
+ * What calling a meeting takes: its goal, what to plan, its size, who
+ * attends, the host first, and whether the host only runs it.
+ */
 export interface MeetingCall {
   goalId: string;
   agenda: string;
   size: MeetingSize;
   /** Everyone, when empty. */
   attendees: string[];
+  hostOnly?: boolean;
 }
 
 export class Meetings {
@@ -175,6 +189,8 @@ export class Meetings {
       ? named
       : core.team.members.map((m) => m.name).sort((a, b) => a.localeCompare(b));
     const host = this.admit(call.goalId, attendees);
+    if (call.hostOnly && attendees.length < 2)
+      throw new Error(`${host} can't only run a meeting with nobody else at it`);
     const meeting: Meeting = {
       id: randomUUID(),
       goalId: call.goalId,
@@ -182,6 +198,7 @@ export class Meetings {
       size: call.size,
       participants: attendees,
       host,
+      ...(call.hostOnly && { hostOnly: true }),
       status: "running",
       turns: [],
       tokens: 0,
@@ -328,12 +345,20 @@ export class Meetings {
   private async run(meeting: Meeting, signal: AbortSignal) {
     const { core } = this;
     // All there: admit() has just checked, and nothing was awaited since.
-    const [host, ...others] = meeting.participants.flatMap((name) =>
-      core.team.members.filter((m) => m.name === name),
-    );
+    const named = (names: readonly string[]) =>
+      names.flatMap((name) => core.team.members.filter((m) => m.name === name));
+    const [host, ...others] = named(meeting.participants);
+    // A host who only runs it has someone else at it (start), so there are members.
+    const [member, ...more] = named(meetingMembers(meeting));
     const goal = core.state.goals.find((g) => g.id === meeting.goalId);
-    if (!host || !goal) return;
-    let ctx: MeetingBrief = { meeting, goal, attendees: [host, ...others], cwd: "" };
+    if (!host || !member || !goal) return;
+    let ctx: MeetingBrief = {
+      meeting,
+      goal,
+      attendees: [host, ...others],
+      members: [member, ...more],
+      cwd: "",
+    };
 
     /**
      * One exchange in this member's session for the meeting, which goes on
@@ -372,17 +397,44 @@ export class Meetings {
       meeting.tokens += reply.tokens;
       return reply;
     };
-    /** A turn said aloud: it streams as it is said, and becomes the meeting's next turn once done. */
-    const speak = (
+    /**
+     * A turn said aloud: it streams as it is said, and becomes the meeting's
+     * next turn once done; nobody is speaking then. `saying`: the message
+     * under way, each time it grows.
+     */
+    const speak = async (
       member: Member,
       prompt: string,
-      turn: { heard?: number; tool?: TurnTool; schema?: z.ZodType } = {},
+      turn: {
+        heard?: number;
+        tool?: TurnTool;
+        schema?: z.ZodType;
+        saying?: (words: string) => void;
+      } = {},
     ) => {
+      const { saying, ...asked } = turn;
       meeting.speaking = member.name;
       // The closing turn hands the plan back in its shape, with no words to stream.
       meeting.planning = turn.schema !== undefined;
       core.changed();
-      return ask(member, prompt, { ...turn, listener: core.speech(meeting, member.name) });
+      const speech = core.speech(meeting, member.name);
+      let words = "";
+      try {
+        return await ask(member, prompt, {
+          ...asked,
+          listener: {
+            ...speech,
+            text: (delta, fresh) => {
+              speech.text?.(delta, fresh);
+              words = fresh ? delta : words + delta;
+              saying?.(words);
+            },
+          },
+        });
+      } finally {
+        meeting.speaking = undefined;
+        meeting.planning = undefined;
+      }
     };
     const said = (
       speaker: Member,
@@ -401,7 +453,7 @@ export class Meetings {
       core.changed();
     };
     const attendee = (name: string) => {
-      const found = others.find((m) => m.name === name);
+      const found = ctx.attendees.find((m) => m.name === name);
       if (!found) throw new Error(`${name} isn't at this meeting`);
       return found;
     };
@@ -444,18 +496,56 @@ export class Meetings {
         const failed = asked.find((r) => r.status === "rejected");
         if (failed) throw failed.reason;
       };
+      /**
+       * The first judgments, all at once: none hears the others, so none
+       * waits for them. Each becomes a turn once given; one failing stops the
+       * others.
+       */
+      const round = async (who: Member[]) => {
+        meeting.drafting = true;
+        core.changed();
+        const stop = new AbortController();
+        const drafting = AbortSignal.any([signal, stop.signal]);
+        const judged = await Promise.allSettled(
+          who.map((member) =>
+            // What they heard is the opening alone: the others' first judgments reach them after.
+            ask(member, meetingRound(ctx, member), { heard: 1, signal: drafting }).then(
+              (reply) => {
+                said(member, reply, "round");
+              },
+              (error: unknown) => {
+                stop.abort();
+                throw error;
+              },
+            ),
+          ),
+        );
+        meeting.drafting = undefined;
+        core.changed();
+        const failed = judged.find((r) => r.status === "rejected");
+        if (failed) throw failed.reason;
+      };
       /** A step of the discussion: hands go up, the host gives the floor or ends it. False once it is over. */
       const discuss = async (left: number) => {
         const last = meeting.turns.at(-1);
         // After the first judgments nobody has heard anyone yet, so even the last to speak may answer.
         await weigh(others.filter((m) => last?.phase === "round" || m.name !== last?.speaker));
         let floor: { member: string; quiet?: boolean } | undefined;
+        let saying = "";
+        // What the host says before handing the floor over is said to the room, as what follows is.
+        let before = "";
         const steer = await speak(host, meetingSteer(ctx, left), {
-          tool: floorTool(others, (given) => (floor = given)),
+          tool: floorTool(others, (given) => {
+            floor = given;
+            before = saying.trim();
+          }),
+          saying: (words) => (saying = words),
         });
-        // With hands up the talk goes on: if the host names nobody, the floor is the first hand's.
-        const called = floor?.member ?? meeting.hands?.[0]?.member;
-        const text = steer.text.trim();
+        // The host naming nobody closes the talk, hands up or not: which hands are worth the floor is theirs to judge.
+        const called = floor?.member;
+        const after = steer.text.trim();
+        const text =
+          before && before !== after ? [before, after].filter(Boolean).join("\n\n") : after;
         if (text && !floor?.quiet) said(host, { text, tokens: steer.tokens }, "steer", called);
         else if (called) await answer(called);
         else return false;
@@ -471,12 +561,9 @@ export class Meetings {
           case "open":
             said(host, await speak(host, meetingOpening(ctx)), "opening");
             break;
-          case "round": {
-            // What they heard is the opening alone: the others' first judgments reach them after.
-            const member = attendee(move.member);
-            said(member, await speak(member, meetingRound(ctx, member), { heard: 1 }), "round");
+          case "round":
+            await round(move.members.map(attendee));
             break;
-          }
           case "answer":
             await answer(move.member);
             break;
@@ -485,7 +572,8 @@ export class Meetings {
         }
       }
       meeting.hands = undefined;
-      const names = ctx.attendees.map((m) => m.name) as [string, ...string[]];
+      // Who gets work in the plan: a host who only runs the meeting gets none.
+      const names = ctx.members.map((m) => m.name) as [string, ...string[]];
       const schema = hostPlanSchema(names);
       const closing = await speak(host, meetingClosing(ctx), { schema });
       // Stopped as the plan came in: there is no plan, and it ends as any stop does.

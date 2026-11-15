@@ -209,6 +209,8 @@ Tell the user what was done, and ask whether to accept it or send it back with w
       'at the meeting on "Dice"',
       'at the meeting on "Dice"',
     ]);
+    now.meetings = [{ ...meeting, status: "running", drafting: true }];
+    expect(paneTeam(now, members).meeting?.status).toBe("the members form their first judgments");
     expect(paneTeam({ ...now, goals: [], meetings: [] }, members).band).toBeUndefined();
     now.meetings = [{ ...meeting, status: "review" }];
     const review = paneTeam(now, members);

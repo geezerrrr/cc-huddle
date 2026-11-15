@@ -130,7 +130,7 @@ function handOff(task: string, now: OpenplanTeam | null): string {
     "",
     task,
     "",
-    "Propose who takes it, keeping to anyone the user named: a meeting when it needs planning among several members (who attends, the host first, and what each brings to it), or one member when it doesn't (what they will do). Ask the user with AskUserQuestion to start with that or say what to change, and propose again until they start. Then start a goal (start_goal) and hold the meeting (hold_meeting) or assign the work (assign).",
+    "Propose who takes it, keeping to anyone the user named: a meeting when it needs planning among several members (who attends, the host first and whether they only run it, and what each brings to it), or one member when it doesn't (what they will do). Ask the user with AskUserQuestion to start with that or say what to change, and propose again until they start. Then start a goal (start_goal) and hold the meeting (hold_meeting) or assign the work (assign).",
   ].join("\n");
 }
 

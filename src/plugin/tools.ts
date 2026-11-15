@@ -84,6 +84,12 @@ const meetingInput = (member: z.ZodType<string>) => ({
     .optional()
     .describe("How long the discussion runs; the team's default when left out"),
   attendees: z.array(member).default([]).describe("The host first; everyone when empty"),
+  host_only: z
+    .boolean()
+    .default(false)
+    .describe(
+      "True when the host only runs the meeting: no view of their own and no work in the plan. Leave it out for a host who also takes part from their role, the usual",
+    ),
 });
 
 const changePlanInput = (member: z.ZodType<string>) => ({ meeting, plan: planSchema(member) });
@@ -137,16 +143,17 @@ export function addTools(server: McpServer, team: () => Promise<Engine>) {
         "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and the session is told when its plan waits for the user. Hold one only once the user has agreed who attends.",
       inputSchema: meetingInput(memberName()),
     },
-    async ({ goal: ref, agenda, size, attendees }) => {
+    async ({ goal: ref, agenda, size, attendees, host_only }) => {
       const engine = await team();
       const held = engine.meetings.start({
         goalId: goalOf(engine, ref).id,
         agenda,
         size: size ?? engine.meetingSize,
         attendees,
+        hostOnly: host_only,
       });
       return toolText(
-        `The meeting [${held.id}] has begun: ${listOf(held.participants)}, hosted by ${held.host}.`,
+        `The meeting [${held.id}] has begun: ${listOf(held.participants)}, hosted by ${held.host}${held.hostOnly ? ", who only runs it" : ""}.`,
       );
     },
   );

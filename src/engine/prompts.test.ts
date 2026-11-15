@@ -5,6 +5,7 @@ import {
   meetingClosing,
   meetingHand,
   meetingOpening,
+  meetingRound,
   meetingSteer,
   systemPrompt,
   taskBrief,
@@ -162,6 +163,7 @@ describe("meeting prompts", () => {
     meeting: meeting(fields),
     goal: { id: "g1", name: "Dice", slug: "dice", status: "active", createdAt: 0 },
     attendees: [sonnet, glm],
+    members: fields.hostOnly ? [glm] : [sonnet, glm],
     cwd: "/goals/dice",
   });
   const turn = (speaker: string, text: string, phase: MeetingTurn["phase"]): MeetingTurn => ({
@@ -174,7 +176,10 @@ describe("meeting prompts", () => {
 
   it("brief an attendee the first time only", () => {
     const opening = meetingOpening(brief());
-    expect(opening).toMatch(/^You're hosting a planning meeting\.\nGoal: Dice\nTo plan: A two/);
+    expect(opening).toMatch(
+      /^You're hosting this, and you also take part in it from your role, as one of its members; as the host you run the planning meeting\.\nGoal: Dice\nTo plan: A two/,
+    );
+    expect(opening).toContain("A meeting is for lining up, not for working out details.");
     expect(opening).toContain("Attending: sonnet (Programmer) and glm (UI designer)");
     const seated = brief({ seats: { glm: { session: "s", heard: 1 } } });
     expect(meetingHand(seated, glm)).toMatch(/^Said since you last took it in:/);
@@ -209,7 +214,25 @@ describe("meeting prompts", () => {
     expect(steer).toContain("You can give the floor 1 more time at most.");
   });
 
-  it("have the host write the plan for the attendees", () => {
+  it("tell a host who takes part to judge and answer as a member, and one who only runs it not to", () => {
+    const ctx = (hostOnly: boolean) =>
+      brief({ turns: [turn("sonnet", "?", "opening"), turn("glm", "x", "round")], hostOnly });
+    expect(meetingRound(brief({ turns: [turn("sonnet", "?", "opening")] }), sonnet)).toMatch(
+      /You opened with:\n\?/,
+    );
+    expect(meetingSteer(ctx(false), 1)).toContain("yours among them");
+    expect(meetingSteer(ctx(false), 1)).toContain("You're also a member");
+    expect(meetingSteer(ctx(true), 1)).toContain("without taking a side");
+    expect(meetingSteer(ctx(true), 1)).not.toContain("You're also a member");
+    expect(meetingOpening(brief({ hostOnly: true }))).toMatch(
+      /^You're only running this; you're not one of its members and take no work in the planning meeting\./,
+    );
+  });
+
+  it("have the host write the plan for the members", () => {
     expect(meetingClosing(brief())).toContain('whose name goes in assignee: "sonnet" and "glm"');
+    const only = meetingClosing(brief({ hostOnly: true }));
+    expect(only).toContain('whose name goes in assignee: "glm"');
+    expect(only).toContain("You only ran the meeting: you take no work in it.");
   });
 });
