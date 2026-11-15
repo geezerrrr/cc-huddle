@@ -195,7 +195,7 @@ test("a member's record shows in place of the team as it grows, and Back shows t
     ]),
   );
   expect(texts).not.toContain("     four");
-  expect((await pane.find({ key: "streaming-md" }))?.text).toBe("Reading it");
+  expect((await pane.find({ key: "record-streaming-md" }))?.text).toBe("Reading it");
   expect(texts.at(-1)).toMatch(/^b back to the team · 1 meeting/);
   await pane.press({ key: "back" });
   expect(opened()).toEqual(["openplan · glm", "openplan"]);
@@ -203,7 +203,7 @@ test("a member's record shows in place of the team as it grows, and Back shows t
   await pane.unmount();
 });
 
-test("the meeting shows, and your scrolling it reaches the window as you moved it", async ($, on) => {
+test("the meeting shows the turn being spoken as a record, and your scrolling reaches the window as you moved it", async ($, on) => {
   const clock = mock.clock(on);
   serve(on, [
     {
@@ -220,6 +220,20 @@ test("the meeting shows, and your scrolling it reaches the window as you moved i
           hands: [],
         },
       },
+      speaking: {
+        speaker: "sonnet",
+        entries: [
+          {
+            at: 0,
+            kind: "tool",
+            name: "Grep",
+            input: { pattern: "board" },
+            state: "done",
+            output: "src/board.ts",
+          },
+        ],
+        live: { running: [], streaming: { kind: "thinking", text: "Hex or\ngrid" } },
+      },
     },
   ]);
   const moved: number[] = [];
@@ -232,6 +246,11 @@ test("the meeting shows, and your scrolling it reaches the window as you moved i
   const pane = await $.ui.mount({ ...PANE, surface: "terminal" });
   await pane.press({ key: "tab-meeting" });
   expect((await pane.find({ key: "said-0" }))?.text).toBe("A grid board");
+  // The turn being spoken shows what it looks up and thinks, as a member's record does.
+  const texts = (await pane.findAll({ type: "Text" })).map((t) => t.text);
+  expect(texts).toEqual(
+    expect.arrayContaining(["sonnet", "⏺ Grep(board)", "  ⎿  src/board.ts", "Hex or grid"]),
+  );
   // Away from the end, then back at it, where the meeting is kept in sight again.
   for (const offset of [30, 60])
     await $.ui.scroll({

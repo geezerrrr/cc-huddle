@@ -63,7 +63,7 @@ function viewer(session: () => Session) {
     return {
       revision,
       ...(asked.revision !== revision && { team }),
-      ...(spoken && { speaking: { speaker: spoken.speaker, text: spoken.text } }),
+      ...(spoken && { speaking: spoken }),
       ...(record &&
         engine && {
           record: {

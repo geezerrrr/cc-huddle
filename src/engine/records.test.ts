@@ -89,22 +89,45 @@ describe("Records", () => {
     ]);
   });
 
-  it("tell a meeting turn as it is spoken, until it is the meeting's", () => {
+  it("follow a meeting turn as a run is followed, kept until it is the meeting's", () => {
     const meeting = {
       id: "m1",
       status: "running",
       turns: [] as Meeting["turns"],
     } as Meeting;
+    vi.useFakeTimers({ now: 5 });
     const speech = records.speech(meeting, "glm");
+    const read = {
+      kind: "tool",
+      id: "t1",
+      name: "Read",
+      input: { file_path: "rules.md" },
+    } as const;
+    speech.session?.("s1", "glm-5");
     speech.text?.("Let me look.", true);
+    speech.block?.({ kind: "text", text: "Let me look." });
+    speech.block?.({ ...read, state: "running" });
+    expect(records.speaking(meeting)?.live.running).toEqual([{ ...read, state: "running" }]);
+    speech.toolDone?.({ ...read, state: "done", output: "Two dice" });
     speech.text?.("Two dice", true);
     speech.text?.(", one reroll.", false);
     expect(records.speaking(meeting)).toEqual({
       speaker: "glm",
-      text: "Two dice, one reroll.",
-      turn: 0,
+      entries: [
+        { at: 5, kind: "text", text: "Let me look." },
+        {
+          at: 5,
+          kind: "tool",
+          name: "Read",
+          input: { file_path: "rules.md" },
+          state: "done",
+          output: "Two dice",
+        },
+      ],
+      live: { streaming: { kind: "text", text: "Two dice, one reroll." }, running: [] },
     });
     meeting.turns.push({ speaker: "glm", text: "", at: 0, phase: "opening", tokens: 0 });
     expect(records.speaking(meeting)).toBeUndefined();
+    vi.useRealTimers();
   });
 });

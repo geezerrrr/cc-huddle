@@ -11,6 +11,7 @@ import type { Elements, EngineInterface, Register, Timer } from "claude-code";
 
 import type {
   OpenplanEntry,
+  OpenplanLive,
   OpenplanMeeting,
   OpenplanNeed,
   OpenplanRecord,
@@ -43,7 +44,9 @@ const KEYS =
   "1 meeting · 2 team · 3 needs you · tab or ↑/↓ to select · enter to press · esc to the prompt";
 
 const team = atom({ plugin: "openplan", key: "team" } as const, null, { shape: "team-2" });
-const speaking = atom({ plugin: "openplan", key: "speaking" } as const, null);
+const speaking = atom({ plugin: "openplan", key: "speaking" } as const, null, {
+  shape: "speaking-1",
+});
 const record = atom({ plugin: "openplan", key: "record" } as const, null, { shape: "record-1" });
 const problem = atom({ plugin: "openplan", key: "problem" } as const, null);
 const tab = atom({ plugin: "openplan", key: "tab" } as const, "team");
@@ -441,7 +444,7 @@ async function meetingTab($: $, ui: Ui, meeting: OpenplanMeeting | undefined) {
       {live && (
         <Box flexDirection="column">
           <Text bold>{live.speaker}</Text>
-          <Markdown key="speaking" text={live.text || "…"} dimColor />
+          {runRows(ui, "speaking", live.entries, live.live)}
         </Box>
       )}
       {meeting.hands.length > 0 && (
@@ -503,9 +506,8 @@ function saidRow(ui: Ui, key: string, text: string, dimColor = false) {
   );
 }
 
-function entryRow(ui: Ui, entry: OpenplanEntry, i: number) {
+function entryRow(ui: Ui, entry: OpenplanEntry, key: string) {
   const { Text } = ui;
-  const key = `e-${i}`;
   switch (entry.kind) {
     case "run":
       return (
@@ -543,11 +545,43 @@ function entryRow(ui: Ui, entry: OpenplanEntry, i: number) {
   }
 }
 
+/**
+ * What a run did and does, as a transcript shows it: a member's record and a
+ * meeting turn being spoken alike. `key` keeps one's rows apart from another's.
+ */
+function runRows(ui: Ui, key: string, entries: OpenplanEntry[], live: OpenplanLive | undefined) {
+  const { Box, Text } = ui;
+  const quiet = !entries.length && !live?.streaming && !live?.starting && !live?.running.length;
+  return (
+    <Box key={key} flexDirection="column">
+      {quiet && <Text dimColor>…</Text>}
+      {entries.map((entry, i) => entryRow(ui, entry, `${key}-e${i}`))}
+      {live?.running.map((call, i) => toolRow(ui, `${key}-run${i}`, call))}
+      {live?.starting && (
+        <Text dimColor>
+          <Text bold>⏺ {live.starting}</Text> …
+        </Text>
+      )}
+      {live?.streaming?.kind === "text" &&
+        saidRow(ui, `${key}-streaming`, live.streaming.text, true)}
+      {live?.streaming?.kind === "thinking" && (
+        <Box flexDirection="row">
+          <Text dimColor italic>
+            ∴{" "}
+          </Text>
+          <Text dimColor italic wrap="truncate-start">
+            {oneLine(live.streaming.text)}
+          </Text>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 /** A member's record in place of the team: what their runs did, then what goes on now. */
 function recordPage($: $, ui: Ui, now: OpenplanTeam, shown: OpenplanRecord) {
   const { Box, Button, Text } = ui;
   const member = now.members.find((m) => m.name === shown.member);
-  const { live } = shown;
   return (
     <Box flexDirection="column" gap={1}>
       <Box flexDirection="column">
@@ -558,26 +592,7 @@ function recordPage($: $, ui: Ui, now: OpenplanTeam, shown: OpenplanRecord) {
         </Box>
         {member && <Text>{member.doing}</Text>}
       </Box>
-      <Box flexDirection="column">
-        {shown.entries.map((entry, i) => entryRow(ui, entry, i))}
-        {live?.running.map((call, i) => toolRow(ui, `run-${i}`, call))}
-        {live?.starting && (
-          <Text dimColor>
-            <Text bold>⏺ {live.starting}</Text> …
-          </Text>
-        )}
-        {live?.streaming?.kind === "text" && saidRow(ui, "streaming", live.streaming.text, true)}
-        {live?.streaming?.kind === "thinking" && (
-          <Box flexDirection="row">
-            <Text dimColor italic>
-              ∴{" "}
-            </Text>
-            <Text dimColor italic wrap="truncate-start">
-              {oneLine(live.streaming.text)}
-            </Text>
-          </Box>
-        )}
-      </Box>
+      {runRows(ui, "record", shown.entries, shown.live)}
     </Box>
   );
 }

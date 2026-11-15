@@ -91,6 +91,13 @@ export type OpenplanEntry = { at: number } & (
   | { kind: "notice"; notice: { kind: string } & Record<string, unknown> }
 );
 
+/** What a run does now, not in its entries yet. */
+export type OpenplanLive = {
+  streaming?: { kind: "thinking" | "text"; text: string };
+  starting?: string;
+  running: { name: string; input: unknown }[];
+};
+
 /** A member's record as the pane follows it. */
 export type OpenplanRecord = {
   member: string;
@@ -99,13 +106,11 @@ export type OpenplanRecord = {
   entries: OpenplanEntry[];
   /** Where the next read starts. */
   next: number;
-  /** What streams now. */
-  live?: {
-    streaming?: { kind: "thinking" | "text"; text: string };
-    starting?: string;
-    running: { name: string; input: unknown }[];
-  };
+  live?: OpenplanLive;
 };
+
+/** The meeting turn being spoken: who, what it did so far, and what it does now. */
+export type OpenplanSpeaking = { speaker: string; entries: OpenplanEntry[]; live: OpenplanLive };
 
 /** What `view` gives the pane. */
 export type OpenplanView = {
@@ -113,7 +118,7 @@ export type OpenplanView = {
   /** Only when it isn't the revision the pane has. */
   team?: OpenplanTeam;
   /** The turn being spoken at the meeting shown, as it is said. */
-  speaking?: { speaker: string; text: string };
+  speaking?: OpenplanSpeaking;
   record?: Omit<OpenplanRecord, "member">;
 };
 
@@ -123,7 +128,7 @@ declare module "claude-code" {
   interface PluginState {
     openplan: {
       team: Shaped<OpenplanTeam | null>;
-      speaking: { speaker: string; text: string } | null;
+      speaking: Shaped<OpenplanSpeaking | null>;
       record: Shaped<OpenplanRecord | null>;
       /** Why there is no team to show. */
       problem: string | null;

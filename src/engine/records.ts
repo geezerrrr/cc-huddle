@@ -2,7 +2,8 @@
  * Records (docs/design.md §7.2): what each subtask's runs did, kept as a file
  * of whole entries in the data folder, and what is being said or done right
  * now, kept in memory for the pane: the words still streaming, the tool calls
- * not back yet, the meeting turn being spoken.
+ * not back yet. A meeting turn being spoken is followed the same way, its
+ * entries kept in memory until it is the meeting's.
  */
 import { appendFile, mkdir, open } from "node:fs/promises";
 import path from "node:path";
@@ -32,11 +33,11 @@ export interface LiveRun {
   running: ToolCall[];
 }
 
-/** A meeting turn as it is spoken: who, what so far, and which turn it becomes. */
+/** A meeting turn as it is spoken: who, what it did so far, and what it does now. */
 export interface Spoken {
   speaker: string;
-  text: string;
-  turn: number;
+  entries: RecordEntry[];
+  live: LiveRun;
 }
 
 /** A run's doing as kept while it goes on: its calls by id. */
@@ -46,6 +47,74 @@ interface Now {
   running: Map<string, ToolCall>;
 }
 
+/** What a run does now, as the pane reads it. */
+const liveOf = (now: Now): LiveRun => ({
+  ...(now.streaming && { streaming: now.streaming }),
+  ...(now.starting && { starting: now.starting }),
+  running: [...now.running.values()],
+});
+
+/**
+ * Where a run tells what it does, for a subtask's record and a meeting turn
+ * alike: each whole thing it did goes to `keep`, what it does now to `now`.
+ */
+function tracking(now: Now, keep: (entry: RecordEntry) => void): TurnListener {
+  return {
+    session: (session, model) => {
+      keep({ at: Date.now(), kind: "run", session, model });
+    },
+    thinking: (delta) => {
+      now.streaming =
+        delta === "" || now.streaming?.kind !== "thinking"
+          ? { kind: "thinking", text: delta }
+          : { kind: "thinking", text: now.streaming.text + delta };
+    },
+    text: (delta, fresh) => {
+      now.streaming =
+        fresh || now.streaming?.kind !== "text"
+          ? { kind: "text", text: delta }
+          : { kind: "text", text: now.streaming.text + delta };
+    },
+    toolStarting: (name) => {
+      now.starting = name;
+    },
+    block: (block) => {
+      if (block.kind === "tool") {
+        now.starting = undefined;
+        now.running.set(block.id, block);
+        return;
+      }
+      if (now.streaming?.kind === block.kind) now.streaming = undefined;
+      keep({ at: Date.now(), kind: block.kind, text: block.text });
+    },
+    toolDone: (call) => {
+      now.running.delete(call.id);
+      keep({
+        at: Date.now(),
+        kind: "tool",
+        name: call.name,
+        input: call.input,
+        state: call.state === "error" ? "error" : "done",
+        output: (call.output ?? "").slice(0, OUTPUT_MAX),
+      });
+    },
+    steps: (steps) => {
+      keep({ at: Date.now(), kind: "steps", steps });
+    },
+    notice: (notice) => {
+      keep({ at: Date.now(), kind: "notice", notice });
+    },
+  };
+}
+
+/** A meeting turn being spoken: the turn it becomes, and what it did and does. */
+interface Speaking {
+  speaker: string;
+  turn: number;
+  entries: RecordEntry[];
+  now: Now;
+}
+
 /** A subtask's record file. */
 export const recordFile = (places: Places, subtaskId: string) =>
   path.join(places.root, "records", `${subtaskId}.jsonl`);
@@ -53,7 +122,7 @@ export const recordFile = (places: Places, subtaskId: string) =>
 export class Records {
   /** What each subtask's run is doing now, by subtask id: its last run's, once it ends. */
   private readonly live = new Map<string, Now>();
-  private readonly spoken = new Map<string, Spoken>();
+  private readonly spoken = new Map<string, Speaking>();
   /** Entries are appended one at a time, in the order they came. */
   private writing = Promise.resolve();
 
@@ -76,52 +145,7 @@ export class Records {
         })
         .catch(this.failed);
     };
-    return {
-      session: (session, model) => {
-        write({ at: Date.now(), kind: "run", session, model });
-      },
-      thinking: (delta) => {
-        now.streaming =
-          delta === "" || now.streaming?.kind !== "thinking"
-            ? { kind: "thinking", text: delta }
-            : { kind: "thinking", text: now.streaming.text + delta };
-      },
-      text: (delta, fresh) => {
-        now.streaming =
-          fresh || now.streaming?.kind !== "text"
-            ? { kind: "text", text: delta }
-            : { kind: "text", text: now.streaming.text + delta };
-      },
-      toolStarting: (name) => {
-        now.starting = name;
-      },
-      block: (block) => {
-        if (block.kind === "tool") {
-          now.starting = undefined;
-          now.running.set(block.id, block);
-          return;
-        }
-        if (now.streaming?.kind === block.kind) now.streaming = undefined;
-        write({ at: Date.now(), kind: block.kind, text: block.text });
-      },
-      toolDone: (call) => {
-        now.running.delete(call.id);
-        write({
-          at: Date.now(),
-          kind: "tool",
-          name: call.name,
-          input: call.input,
-          state: call.state === "error" ? "error" : "done",
-          output: (call.output ?? "").slice(0, OUTPUT_MAX),
-        });
-      },
-      steps: (steps) => {
-        write({ at: Date.now(), kind: "steps", steps });
-      },
-      notice: (notice) => {
-        write({ at: Date.now(), kind: "notice", notice });
-      },
-    };
+    return tracking(now, write);
   }
 
   /**
@@ -133,11 +157,7 @@ export class Records {
     from = 0,
   ): Promise<{ entries: RecordEntry[]; next: number; live?: LiveRun }> {
     const now = this.live.get(subtaskId);
-    const live = now && {
-      ...(now.streaming && { streaming: now.streaming }),
-      ...(now.starting && { starting: now.starting }),
-      running: [...now.running.values()],
-    };
+    const live = now && liveOf(now);
     let handle;
     try {
       handle = await open(recordFile(this.places, subtaskId));
@@ -163,24 +183,29 @@ export class Records {
     }
   }
 
-  /** Where a meeting turn tells its words as they are said. */
+  /**
+   * Where a meeting turn tells what it does as it is spoken, as a run tells
+   * its record; kept until it is the meeting's. A turn's start isn't kept:
+   * the meeting says who speaks.
+   */
   speech(meeting: Meeting, speaker: string): TurnListener {
-    const spoken: Spoken = { speaker, text: "", turn: meeting.turns.length };
-    this.spoken.set(meeting.id, spoken);
-    return {
-      // What a turn says before it looks something up isn't what it ends up saying.
-      text: (delta, fresh) => {
-        spoken.text = fresh ? delta : spoken.text + delta;
-      },
+    const speaking: Speaking = {
+      speaker,
+      turn: meeting.turns.length,
+      entries: [],
+      now: { running: new Map() },
     };
+    this.spoken.set(meeting.id, speaking);
+    return tracking(speaking.now, (entry) => {
+      if (entry.kind !== "run") speaking.entries.push(entry);
+    });
   }
 
   /** The turn being spoken at `meeting` now, if one is. */
   speaking(meeting: Meeting): Spoken | undefined {
-    const spoken = this.spoken.get(meeting.id);
-    return meeting.status === "running" && spoken?.turn === meeting.turns.length
-      ? spoken
-      : undefined;
+    const speaking = this.spoken.get(meeting.id);
+    if (meeting.status !== "running" || speaking?.turn !== meeting.turns.length) return undefined;
+    return { speaker: speaking.speaker, entries: speaking.entries, live: liveOf(speaking.now) };
   }
 
   /** Every entry written so far is in its file. */
