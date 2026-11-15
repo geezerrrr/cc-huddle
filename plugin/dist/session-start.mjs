@@ -27643,7 +27643,7 @@ async function sessionContext(cwd, dataFolder2, userTeam, session) {
   const status = statusText({ ...state, members: team.members.map((m) => m.name) });
   const holder = holderOf(files.lock);
   if (holder && holder.session !== session)
-    return `openplan's team on this repository runs in another Claude Code session (pid ${String(holder.session)}); this one can't run it while that one does. As it stands:
+    return `openplan's team on this repository runs in another Claude Code session (pid ${String(holder.session)}); it moves to this one when the user uses openplan here, or this session does. As it stands:
 
 ${status}`;
   const context2 = `openplan's team on this repository, as it stands:

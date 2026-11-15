@@ -7422,19 +7422,26 @@ async function readState(file) {
 function stateWriter(file, state, failed) {
   let timer;
   let writing2 = Promise.resolve();
+  let closed = false;
   const write = () => {
     timer = void 0;
     writing2 = writing2.then(() => writeWhole(file, JSON.stringify({ version: STATE_VERSION, state: state() }))).catch(failed);
   };
   return {
     changed() {
-      timer ??= setTimeout(write, SAVE_DELAY_MS);
+      if (!closed) timer ??= setTimeout(write, SAVE_DELAY_MS);
     },
     async flush() {
       if (timer) {
         clearTimeout(timer);
         write();
       }
+      await writing2;
+    },
+    async close() {
+      clearTimeout(timer);
+      write();
+      closed = true;
       await writing2;
     }
   };
@@ -7458,25 +7465,26 @@ function holderOf(lock) {
   const holder = readHolder(lock);
   return holder && running(holder.pid) ? holder : void 0;
 }
-var busy = (lock, holder) => new Error(
-  `Another Claude Code session runs this repository's team (pid ${String(holder.session)}). If it has ended, delete ${lock}`
+var busy = (holder) => new Error(
+  `Another Claude Code session runs this repository's team (pid ${String(holder.session)}). Using openplan here brings it to this session.`
 );
-async function holding(lock, session, open2) {
+async function holding(lock, me, open2) {
   await mkdir2(path2.dirname(lock), { recursive: true });
   const file = `${lock}.${String(process.pid)}`;
-  const holder = { pid: process.pid, session, open: open2 };
+  const holder = { pid: process.pid, ...me, open: open2 };
   await writeFile2(file, JSON.stringify(holder));
   return file;
 }
 var code = (error) => error.code;
 var REPLACING_WAIT_MS = 10;
-async function takeTeam(lock, session) {
-  const mine = await holding(lock, session, false);
+async function takeTeam(lock, me, takeOver) {
+  const mine = await holding(lock, me, false);
+  const handed = { goals: [], meetings: [] };
   try {
     for (; ; ) {
       try {
         await link(mine, lock);
-        return;
+        return handed;
       } catch (error) {
         if (code(error) !== "EEXIST") throw error;
       }
@@ -7484,9 +7492,15 @@ async function takeTeam(lock, session) {
       if (ended === void 0) continue;
       const holder = readHolder(lock);
       if (holder && running(holder.pid)) {
-        if (holder.pid !== process.pid) throw busy(lock, holder);
-        await rename2(mine, lock);
-        return;
+        if (holder.pid === process.pid) {
+          await rename2(mine, lock);
+          return handed;
+        }
+        if (!takeOver) throw busy(holder);
+        const stopped = await takeOver(holder);
+        handed.goals.push(...stopped.goals);
+        handed.meetings.push(...stopped.meetings);
+        continue;
       }
       const claim = `${lock}.ended-${String(holder?.pid ?? "unread")}`;
       try {
@@ -7506,7 +7520,7 @@ async function takeTeam(lock, session) {
       try {
         if (lockText(lock) === ended) {
           await rename2(mine, lock);
-          return;
+          return handed;
         }
       } finally {
         await rm(claim, { force: true });
@@ -7516,8 +7530,8 @@ async function takeTeam(lock, session) {
     await rm(mine, { force: true });
   }
 }
-async function openedTeam(lock, session) {
-  await rename2(await holding(lock, session, true), lock);
+async function openedTeam(lock, me) {
+  await rename2(await holding(lock, me, true), lock);
 }
 function releaseTeam(lock) {
   if (holderOf(lock)?.pid === process.pid) unlinkSync(lock);
@@ -8044,13 +8058,21 @@ var Goals = class {
   /** Puts a paused or archived goal back to work, from where it was. */
   resume(id) {
     return this.life(id, () => {
-      const goal2 = this.goal(id);
-      if (goal2.status === "active") return;
-      goal2.status = step(GOAL_MACHINE, goal2.status, "resume");
-      goal2.archivedAt = void 0;
+      if (!this.wake(this.goal(id))) return;
       this.core.changed();
       this.scheduler.pump();
     });
+  }
+  /**
+   * Puts back what a session stopped as it handed the team over (§3.2): its
+   * goals, then their meetings, and only then other work, so a meeting's
+   * members go back to it before anything else takes them.
+   */
+  async carryOn({ goals, meetings }) {
+    for (const id of goals) await this.life(id, () => this.wake(this.goal(id)));
+    for (const id of meetings) this.meetings.resume(id);
+    this.core.changed();
+    this.scheduler.pump();
   }
   /**
    * Deletes an archived goal for good: its subtasks' worktrees, branches and
@@ -8103,6 +8125,13 @@ var Goals = class {
         subtasks: [{ ...work, key: "", dependsOn: [] }]
       }
     ]);
+  }
+  /** Makes a goal active again; false when it was already. */
+  wake(goal2) {
+    if (goal2.status === "active") return false;
+    goal2.status = step(GOAL_MACHINE, goal2.status, "resume");
+    goal2.archivedAt = void 0;
+    return true;
   }
   goal(id) {
     const goal2 = this.core.state.goals.find((g) => g.id === id);
@@ -8647,6 +8676,9 @@ async function recordMembersIn(file) {
   );
   record = file;
   save();
+}
+function stopRecording() {
+  record = void 0;
 }
 
 // src/engine/turns.ts
@@ -9417,7 +9449,7 @@ import { randomUUID as randomUUID3 } from "node:crypto";
 var ASK_TOOL = "AskUserQuestion";
 var CALLED_OFF = "Stopped.";
 var ruleText = ({ toolName, ruleContent }) => ruleContent === void 0 ? toolName : `${toolName}(${ruleContent})`;
-var alwaysRules = (request) => request.matchedAskRule || request.suppressAlwaysAllowRule ? [] : (request.suggestions ?? []).flatMap(
+var alwaysRules = (request2) => request2.matchedAskRule || request2.suppressAlwaysAllowRule ? [] : (request2.suggestions ?? []).flatMap(
   (update) => update.type === "addRules" && update.behavior === "allow" ? update.rules : []
 );
 var Questions = class {
@@ -9433,9 +9465,9 @@ var Questions = class {
    * its run ends (`asker.signal`) or the SDK withdraws the request.
    */
   gate(asker) {
-    return (tool3, input, request) => {
-      const who = { ...asker, signal: AbortSignal.any([asker.signal, request.signal]) };
-      return tool3 === ASK_TOOL ? this.ask(who, input) : this.permit(who, tool3, input, request);
+    return (tool3, input, request2) => {
+      const who = { ...asker, signal: AbortSignal.any([asker.signal, request2.signal]) };
+      return tool3 === ASK_TOOL ? this.ask(who, input) : this.permit(who, tool3, input, request2);
     };
   }
   /**
@@ -9499,16 +9531,16 @@ var Questions = class {
     );
   }
   /** A call the member's rules don't cover: allowed once, always, or denied. */
-  async permit(asker, tool3, input, request) {
-    const rules = alwaysRules(request);
+  async permit(asker, tool3, input, request2) {
+    const rules = alwaysRules(request2);
     const answer = await this.wait(asker, {
       // A command comes with the member's own words for what it does.
-      text: request.description ?? "",
+      text: request2.description ?? "",
       kind: "permission",
       permission: {
         tool: tool3,
         input,
-        ...request.title !== void 0 && { title: request.title },
+        ...request2.title !== void 0 && { title: request2.title },
         options: rules.length ? ["once", "always", "deny"] : ["once", "deny"]
       }
     });
@@ -9678,10 +9710,10 @@ async function runSubtask(params) {
       params.listener.session?.(id, model);
     }
   });
-  const canUseTool = (name, input, request) => {
-    if (!OWN_TOOLS.has(name)) return gate(name, input, request);
+  const canUseTool = (name, input, request2) => {
+    if (!OWN_TOOLS.has(name)) return gate(name, input, request2);
     return Promise.resolve(
-      request.agentID ? { behavior: "deny", message: SESSION_ONLY } : { behavior: "allow", updatedInput: input }
+      request2.agentID ? { behavior: "deny", message: SESSION_ONLY } : { behavior: "allow", updatedInput: input }
     );
   };
   const turn = (prompt) => runTurn(
@@ -10540,7 +10572,8 @@ var Engine = class _Engine {
   /**
    * Opens the team of the repository `cwd` is in, for this session alone:
    * what a server before left running is stopped, and the goals it left
-   * active are paused, as when a session closes (§3.2).
+   * active are paused, as when a session closes (§3.2). What a session
+   * handed over as it let the team go is resumed.
    */
   static async open(options) {
     const repo = await openRepository(options.cwd);
@@ -10550,7 +10583,8 @@ var Engine = class _Engine {
       options.userTeam,
       teamFolder(repo.top)
     ]);
-    await takeTeam(files.lock, options.session);
+    const me = { session: options.session, address: options.address };
+    const handed = await takeTeam(files.lock, me, options.takeOver);
     try {
       await recordMembersIn(files.members);
       const state = await readState(files.state);
@@ -10578,8 +10612,9 @@ var Engine = class _Engine {
       engine2.meetings.recover();
       for (const goal2 of state.goals)
         if (goal2.status === "active") await engine2.goals.pause(goal2.id);
+      await engine2.goals.carryOn(handed);
       await writer.flush();
-      await openedTeam(files.lock, options.session);
+      await openedTeam(files.lock, me);
       return engine2;
     } catch (error) {
       releaseTeam(files.lock);
@@ -10628,16 +10663,23 @@ var Engine = class _Engine {
     return question;
   }
   /**
-   * Closes the team as the session ends (§3.2): every active goal is paused,
-   * a merge under way finishes, and the state is written.
+   * Closes the team as the session ends or hands it over (§3.2): every
+   * active goal is paused, a merge under way finishes, the state is written
+   * for the last time, and the team is let go. Gives what it stopped: the
+   * goals, and the meetings under way, which their pausing cancels.
    */
   async close() {
-    for (const goal2 of this.state.goals)
-      if (goal2.status === "active") await this.goals.pause(goal2.id);
+    const { goals, meetings } = this.state;
+    const stopped = {
+      goals: goals.filter((g) => g.status === "active").map((g) => g.id),
+      meetings: meetings.filter((m) => m.status === "running").map((m) => m.id)
+    };
+    for (const id of stopped.goals) await this.goals.pause(id);
     await Promise.all([this.scheduler.close(), this.meetings.close()]);
-    this.writer.changed();
-    await Promise.all([this.writer.flush(), this.records.flush()]);
+    await Promise.all([this.writer.close(), this.records.flush()]);
+    stopRecording();
     releaseTeam(this.files.lock);
+    return stopped;
   }
   /**
    * Lets the team go at once, as the process dies of an error: its members
@@ -10717,7 +10759,7 @@ function pluginId(dataFolder2) {
 // src/plugin/pane-server.ts
 import { randomBytes } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
-import { createServer } from "node:http";
+import { createServer, request } from "node:http";
 import { tmpdir } from "node:os";
 import path9 from "node:path";
 import { text } from "node:stream/consumers";
@@ -11007,7 +11049,9 @@ var viewSchema = z7.object({
   /** The revision the pane has. */
   revision: z7.number().int().optional(),
   /** The subtask whose record the pane follows, and the byte it read up to. */
-  record: z7.object({ subtask: z7.string(), from: z7.number().int().min(0) }).optional()
+  record: z7.object({ subtask: z7.string(), from: z7.number().int().min(0) }).optional(),
+  /** You turned to openplan in this session: the team is taken over from another that holds it. */
+  take: z7.boolean().optional()
 });
 async function paneView(engine2, { revision, record: record2 }) {
   const work = workOf(engine2);
@@ -11031,18 +11075,19 @@ function socketAddress() {
   const folder = mkdtempSync(path9.join(tmpdir(), "openplan-"));
   return { address: path9.join(folder, "pane.sock"), folder };
 }
-async function viewOf(team2, request) {
-  const asked = viewSchema.parse(JSON.parse(await text(request) || "{}"));
-  return paneView(await team2(), asked);
+async function viewOf(team2, request2) {
+  const asked = viewSchema.parse(JSON.parse(await text(request2) || "{}"));
+  return paneView(await team2(asked.take ?? false), asked);
 }
-async function servePane(team2) {
+async function servePane(team2, letGo2) {
   const { address, folder } = socketAddress();
-  const server2 = createServer((request, response) => {
-    if (request.method !== "POST" || request.url !== "/view") {
+  const server2 = createServer((request2, response) => {
+    const route = request2.method === "POST" && { "/view": () => viewOf(team2, request2), "/release": letGo2 }[request2.url ?? ""];
+    if (!route) {
       response.writeHead(404).end();
       return;
     }
-    viewOf(team2, request).then(
+    route().then(
       (view) => {
         response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(view));
       },
@@ -11061,6 +11106,17 @@ async function servePane(team2) {
       if (folder) rmSync(folder, { recursive: true, force: true });
     }
   };
+}
+function askToLetGo(address) {
+  return new Promise((resolve, reject) => {
+    const asking = request({ socketPath: address, path: "/release", method: "POST" }, (answer) => {
+      text(answer).then((body) => {
+        if (answer.statusCode === 200) resolve(JSON.parse(body));
+        else reject(new Error(body));
+      }, reject);
+    });
+    asking.once("error", reject).end();
+  });
 }
 
 // src/plugin/pane-tools.ts
@@ -11344,11 +11400,20 @@ var say = (text2) => {
 var engine;
 var opening;
 var claude;
-var openTeam = async () => Engine.open({
+var openTeam = async (take) => Engine.open({
   cwd: process.env.CLAUDE_PROJECT_DIR ?? process.cwd(),
   dataFolder,
   claude: await (claude ??= executableOf(process.ppid)),
   session: process.ppid,
+  address: pane.address,
+  ...take && {
+    takeOver: (holder) => askToLetGo(holder.address).catch((error) => {
+      throw new Error(
+        `The Claude Code session that runs this repository's team (pid ${String(holder.session)}) couldn't be asked to let it go: ${errorText(error)}`,
+        { cause: error }
+      );
+    })
+  },
   plugin: pluginId(dataFolder),
   userTeam: userTeamFolder(process.env),
   env: process.env,
@@ -11357,21 +11422,49 @@ var openTeam = async () => Engine.open({
     say(`the team's state or a record couldn't be written: ${errorText(error)}`);
   }
 });
-var team = () => {
-  opening ??= openTeam().then(
-    (opened) => engine = opened,
-    (error) => {
-      opening = void 0;
-      throw error;
+async function team(take) {
+  const was = opening ??= {
+    engine: openTeam(take).then(
+      (opened) => engine = opened,
+      (error) => {
+        opening = void 0;
+        throw error;
+      }
+    ),
+    take
+  };
+  try {
+    return await was.engine;
+  } catch (error) {
+    if (take && !was.take) {
+      if (opening === was) opening = void 0;
+      return team(take);
     }
-  );
-  return opening;
-};
+    throw error;
+  }
+}
+async function letGo() {
+  const held = await opening?.engine.catch(() => void 0);
+  engine = void 0;
+  if (!held) {
+    opening = void 0;
+    return { goals: [], meetings: [] };
+  }
+  const closing = held.close();
+  const moved = closing.then(() => {
+    throw new Error(
+      "openplan's team moved to another Claude Code session. Using openplan here brings it back."
+    );
+  });
+  moved.catch(() => void 0);
+  opening = { engine: moved, take: false };
+  return closing;
+}
 var ending;
 function end() {
   ending ??= (async () => {
     try {
-      await (await opening?.catch(() => void 0))?.close();
+      await (await opening?.engine.catch(() => void 0))?.close();
     } catch (error) {
       say(`the team didn't close cleanly: ${errorText(error)}`);
     } finally {
@@ -11387,14 +11480,12 @@ process.on("uncaughtException", (error) => {
   process.exit(1);
 });
 process.once("exit", stopMembers);
-var pane = await servePane(team);
+var pane = await servePane(team, letGo);
 process.once("exit", () => {
   pane.close();
 });
 var server = new McpServer({ name: "openplan", version: plugin_default.version });
-var listMembers = addTools(server, team);
-addPaneTools(server, team, pane);
+var use = () => team(true);
+var listMembers = addTools(server, use);
+addPaneTools(server, use, pane);
 await server.connect(new StdioServerTransport());
-team().catch((error) => {
-  say(errorText(error));
-});
