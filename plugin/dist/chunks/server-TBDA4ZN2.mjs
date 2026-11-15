@@ -7692,11 +7692,9 @@ function save() {
   const written2 = [...running2].map(([pid, { settings }]) => ({ pid, settings }));
   writeWholeSync(record, JSON.stringify(written2));
 }
-function watchMember(child, args) {
+function watchMember(child, settings) {
   const { pid } = child;
-  const at = args.indexOf("--settings");
-  const settings = at < 0 ? void 0 : args[at + 1];
-  if (pid === void 0 || settings === void 0) return;
+  if (pid === void 0) return;
   running2.set(pid, { child, settings });
   save();
   child.once("exit", () => {
@@ -8926,13 +8924,13 @@ function turnDecoder(listener) {
   };
 }
 var STDERR_TAIL = 2e3;
-function claudeProcess() {
+function claudeProcess(settings) {
   let exited = Promise.resolve();
   let stderr = "";
   return {
     spawn: ({ command, args, cwd: cwd2, env, signal }) => {
       const child = spawn2(command, args, { cwd: cwd2, env, signal, stdio: "pipe", windowsHide: true });
-      watchMember(child, args);
+      watchMember(child, settings);
       exited = new Promise((resolve) => {
         child.once("close", () => {
           resolve();
@@ -8962,7 +8960,7 @@ async function runTurn(prompt, options, signal, decode) {
     abortController.abort();
   };
   signal.addEventListener("abort", stop, { once: true });
-  const claude2 = claudeProcess();
+  const claude2 = claudeProcess(options.settings);
   const run2 = query({
     prompt,
     options: { ...options, abortController, spawnClaudeCodeProcess: claude2.spawn }
@@ -9107,7 +9105,7 @@ var listOf = (items) => new Intl.ListFormat("en", { type: "conjunction" }).forma
 var called = (member) => `${member.name} (${member.role.title})`;
 var TASK_WAYS = `# How you work on a subtask
 - You work in a git worktree of your own, on a branch cut from the goal's branch, which is merged into the goal's branch once you deliver. Teammates working at the same time each have theirs, so you never get in each other's way. Stay in yours.
-- Don't commit: delivering commits your work for you, and a git command that writes waits for the user's approval.
+- You needn't commit: delivering commits whatever you leave uncommitted, under your name.
 - When you need information or a decision from a teammate (an interface, a design detail), ask them with ask_teammate. It waits for their answer.
 - When you need the user to decide something or give you what only they have, ask with AskUserQuestion, offering options, and wait for the answer. Don't just write that you are waiting: the user may not be watching.
 - When you are done, call deliver with a summary of a few sentences (what you did, anything to watch out for) and the files that are the result. Your subtask isn't done until you deliver; then end your turn.`;
@@ -10016,17 +10014,21 @@ var Meetings = class {
   }
   /**
    * Cancels a plan in review at once, or stops a meeting under way: it is
-   * cancelled as its run ends, which the promise returned waits for.
+   * cancelled as its run ends, which this waits for. Throws when there is no
+   * such meeting, or it is over.
    */
-  cancel(id) {
+  async cancel(id) {
     const meeting2 = this.core.state.meetings.find((m) => m.id === id);
-    if (meeting2?.status === "review") {
+    if (!meeting2) throw new Error("There is no such meeting");
+    if (!can(MEETING_MACHINE, meeting2.status, "cancel"))
+      throw new Error(`The meeting is ${meeting2.status}: there is nothing to cancel`);
+    if (meeting2.status === "review") {
       meeting2.status = step(MEETING_MACHINE, meeting2.status, "cancel");
       this.core.changed();
       return;
     }
     this.aborts.get(id)?.abort();
-    return this.ongoing.get(id);
+    await this.ongoing.get(id);
   }
   /**
    * Your changes to a plan under review: `plan` is the whole plan, which may
@@ -10737,10 +10739,7 @@ import path11 from "node:path";
 import { z as z9 } from "zod";
 
 // src/engine/run.ts
-import {
-  createSdkMcpServer as createSdkMcpServer2,
-  tool as tool2
-} from "@anthropic-ai/claude-agent-sdk";
+import { createSdkMcpServer as createSdkMcpServer2, tool as tool2 } from "@anthropic-ai/claude-agent-sdk";
 import { z as z8 } from "zod";
 var OWN_TOOLS = /* @__PURE__ */ new Set([turnToolName("ask_teammate"), turnToolName("deliver")]);
 function teamServer(collaboration, delivered) {
@@ -10987,15 +10986,17 @@ var Scheduler = class {
     );
   }
   /**
-   * You stop a subtask: one not started, a run (it ends as stopped), a
-   * review, a merge waiting on your decision (its half-done merge undone). One
-   * handed over keeps its delivery and the stage it stopped in, to go on from.
+   * You stop a subtask: one not started, a run (this waits until it has ended
+   * as stopped), a review, a merge waiting on your decision (its half-done
+   * merge undone). One handed over keeps its delivery and the stage it
+   * stopped in, to go on from.
    */
   async stop(subtask2) {
     const live = this.live.get(subtask2.id);
     if (live?.kind === "run") {
       this.held.delete(subtask2.id);
       live.abort.abort();
+      await live.ended;
       return;
     }
     if (!can(SUBTASK_MACHINE, subtask2.status, "stop")) return;
