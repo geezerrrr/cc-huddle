@@ -13,6 +13,7 @@ import {
   type Derived,
   type Meeting,
   type MeetingNow,
+  type Question,
   type Subtask,
   type SubtaskAction,
   type GoalState,
@@ -41,6 +42,38 @@ export type InProgress = Subtask & { status: "running" | "reviewing" | "merging"
 
 export const inProgress = (subtask: Subtask): subtask is InProgress =>
   subtask.status === "running" || subtask.status === "reviewing" || subtask.status === "merging";
+
+/** Handed over: in review or being merged, or stopped there, its delivery standing. */
+const HANDED_OVER: readonly Subtask["status"][] = [
+  "reviewing",
+  "merging",
+  "stoppedInReview",
+  "stoppedInMerge",
+];
+
+/**
+ * What a message to a subtask does (§7.3): it goes on with it; one handed
+ * over is past hearing it; in a goal paused or archived, it waits for the goal.
+ */
+export function messageReach(
+  state: Pick<GoalState, "goal">,
+  subtask: Subtask,
+): "goes" | "handedOver" | "onHold" {
+  if (state.goal.status !== "active") return "onHold";
+  return HANDED_OVER.includes(subtask.status) ? "handedOver" : "goes";
+}
+
+/** Whether a task done may be sent back by way of `sentBack`: one of its subtasks that is done, or none named. */
+export function canSendBack(
+  state: Pick<GoalState, "subtasks">,
+  question: Question,
+  sentBack: string | undefined,
+): boolean {
+  if (sentBack === undefined) return true;
+  const taskId = state.subtasks.find((s) => s.id === question.subtaskId)?.taskId;
+  const target = state.subtasks.find((s) => s.id === sentBack);
+  return target !== undefined && target.taskId === taskId && target.status === "done";
+}
 
 /** Whether a task is done: every subtask of it merged, whether or not you accept it yet (§7.1). */
 export const taskDone = (state: Pick<GoalState, "subtasks">, taskId: string) =>

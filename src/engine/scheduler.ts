@@ -9,6 +9,8 @@ import { randomUUID } from "node:crypto";
 import {
   actionsOf,
   busyMembers,
+  canSendBack,
+  messageReach,
   redoneUpstream,
   reviewerOf,
   taskDone,
@@ -29,12 +31,7 @@ import {
 } from "./git.ts";
 import { actionEvent, can, step, SUBTASK_MACHINE, type SubtaskEvent } from "./machines.ts";
 import { goOnMessage, taskBrief } from "./prompts.ts";
-import {
-  DOESNT_FIT,
-  type DecisionAnswer,
-  type DecisionQuestion,
-  type Questions,
-} from "./questions.ts";
+import { DOESNT_FIT, type DecisionAnswer, type Questions } from "./questions.ts";
 import { runSubtask, type RunOutcome } from "./run.ts";
 import { type Step } from "./turns.ts";
 import {
@@ -72,14 +69,6 @@ const progressOf = (steps: Step[]): Progress => {
     ...(current !== undefined && { current }),
   };
 };
-
-/** Handed over: in review or being merged, or stopped there, its delivery standing. */
-const HANDED_OVER: readonly Subtask["status"][] = [
-  "reviewing",
-  "merging",
-  "stoppedInReview",
-  "stoppedInMerge",
-];
 
 /** The stages a subtask is taken up in: run, reviewed, merged. */
 const TAKEN_UP: readonly Subtask["status"][] = ["pending", "reviewing", "merging"];
@@ -212,8 +201,8 @@ export class Scheduler {
   carry(subtaskId: string, note: string): "goes" | "handedOver" | "onHold" {
     const subtask = this.subtask(subtaskId);
     if (!subtask) throw new Error("There is no such subtask");
-    if (this.goal.status !== "active") return "onHold";
-    if (HANDED_OVER.includes(subtask.status)) return "handedOver";
+    const reach = messageReach(this.core.state, subtask);
+    if (reach !== "goes") return reach;
     const live = this.live.get(subtaskId);
     if (live) {
       this.keepOn(subtaskId, { why: "carried", note });
@@ -350,7 +339,7 @@ export class Scheduler {
    */
   async decide(id: string, answer: DecisionAnswer) {
     const question = this.questions.find(id);
-    if (question.kind !== "decision" || !this.revisable(question, answer))
+    if (question.kind !== "decision" || !canSendBack(this.core.state, question, answer.sentBack))
       throw new Error(DOESNT_FIT);
     this.questions.answer(id, answer);
     const subtask = this.subtask(question.subtaskId);
@@ -420,14 +409,6 @@ export class Scheduler {
       this.questions.cancelDelivery(
         this.core.state.subtasks.filter((s) => s.taskId === subtask.taskId).map((s) => s.id),
       );
-  }
-
-  /** Sending a task back sends back only one of its subtasks that is done. */
-  private revisable(question: DecisionQuestion, { sentBack }: DecisionAnswer) {
-    if (sentBack === undefined) return true;
-    const taskId = this.subtask(question.subtaskId)?.taskId;
-    const target = this.subtask(sentBack);
-    return target !== undefined && target.taskId === taskId && target.status === "done";
   }
 
   /** A run about to be stopped goes on in its session, with `reason` too. */
