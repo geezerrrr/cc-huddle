@@ -8000,7 +8000,7 @@ var Records = class {
 };
 
 // src/engine/goals.ts
-var STARTING = "start";
+var ACTIVATING = "activate";
 var Goals = class {
   constructor(core, scheduler, meetings) {
     this.core = core;
@@ -8013,8 +8013,9 @@ var Goals = class {
   life = serialBy();
   /** Starts a goal: its branch cut from your HEAD, checked out in its own worktree. */
   start(name) {
-    return this.life(STARTING, async () => {
+    return this.life(ACTIVATING, async () => {
       const { core } = this;
+      this.onlyOne();
       const taken = await takenSlugs(core.places.repo);
       for (const goal3 of core.state.goals) taken.add(goal3.slug);
       const goal2 = {
@@ -8057,11 +8058,14 @@ var Goals = class {
   }
   /** Puts a paused or archived goal back to work, from where it was. */
   resume(id) {
-    return this.life(id, () => {
-      if (!this.wake(this.goal(id))) return;
-      this.core.changed();
-      this.scheduler.pump();
-    });
+    return this.life(
+      id,
+      () => this.life(ACTIVATING, () => {
+        if (!this.wake(this.goal(id))) return;
+        this.core.changed();
+        this.scheduler.pump();
+      })
+    );
   }
   /**
    * Puts back what a session stopped as it handed the team over (§3.2): its
@@ -8069,7 +8073,8 @@ var Goals = class {
    * members go back to it before anything else takes them.
    */
   async carryOn({ goals, meetings }) {
-    for (const id of goals) await this.life(id, () => this.wake(this.goal(id)));
+    for (const id of goals)
+      await this.life(id, () => this.life(ACTIVATING, () => this.wake(this.goal(id))));
     for (const id of meetings) this.meetings.resume(id);
     this.core.changed();
     this.scheduler.pump();
@@ -8129,9 +8134,18 @@ var Goals = class {
   /** Makes a goal active again; false when it was already. */
   wake(goal2) {
     if (goal2.status === "active") return false;
+    this.onlyOne();
     goal2.status = step(GOAL_MACHINE, goal2.status, "resume");
     goal2.archivedAt = void 0;
     return true;
+  }
+  /** One goal is active at a time (§4.1): one under way refuses another. */
+  onlyOne() {
+    const active = this.core.state.goals.find((g) => g.status === "active");
+    if (active)
+      throw new Error(
+        `The goal "${active.name}" [${active.id}] is under way, and one goal runs at a time: pause it first if the user wants`
+      );
   }
   goal(id) {
     const goal2 = this.core.state.goals.find((g) => g.id === id);
@@ -11076,6 +11090,14 @@ function bandText(work, needs) {
   }
   return parts.join(" \xB7 ");
 }
+function pausedGoals(work) {
+  return work.goals.filter((g) => g.status === "paused").map((goal2) => {
+    const subtasks = work.subtasks.filter((s) => s.goalId === goal2.id);
+    const done = subtasks.filter((s) => s.status === "done").length;
+    const where = subtasks.length ? `${String(done)}/${String(subtasks.length)} subtasks done` : work.meetings.some((m) => m.goalId === goal2.id && m.status === "review") ? "plan to review" : "no plan yet";
+    return { id: goal2.id, label: `${goal2.name} \xB7 ${where}` };
+  });
+}
 function paneTeam(work, members) {
   const derived = derive(work);
   const needs = work.questions.filter(toYou).filter((q) => q.status === "open").map((q) => needOf(q, work));
@@ -11088,7 +11110,8 @@ function paneTeam(work, members) {
     members: members.map((m) => memberOf(m, work, derived)),
     needs,
     milestones: milestones(work),
-    prompts: prompts(work)
+    prompts: prompts(work),
+    paused: pausedGoals(work)
   };
 }
 
@@ -11453,20 +11476,28 @@ function addPaneTools(server2, team2, pane2) {
     }
   );
   server2.registerTool(
-    "every_goal",
+    "pause_goal",
     {
-      description: `${PANE_ONLY} Pauses every active goal, or resumes every paused one, as /openplan pause or resume.`,
-      inputSchema: { action: z9.enum(["pause", "resume"]) }
+      description: `${PANE_ONLY} Pauses the active goal, as /openplan pause.`,
+      inputSchema: {}
     },
-    async ({ action }) => {
+    async () => {
       const engine2 = await team2();
-      const from = action === "pause" ? "active" : "paused";
-      const goals = engine2.state.goals.filter((g) => g.status === from);
-      for (const goal2 of goals) await engine2.goals[action](goal2.id);
-      const done = action === "pause" ? "Paused" : "Resumed";
-      return toolText(
-        goals.length ? `${done} ${goals.map((g) => `"${g.name}"`).join(", ")}.` : `No goal is ${from}.`
-      );
+      const goal2 = engine2.state.goals.find((g) => g.status === "active");
+      if (!goal2) return toolText("No goal is active.");
+      await engine2.goals.pause(goal2.id);
+      return toolText(`Paused "${goal2.name}".`);
+    }
+  );
+  server2.registerTool(
+    "resume_goal",
+    {
+      description: `${PANE_ONLY} Resumes the paused goal you picked, as /openplan resume.`,
+      inputSchema: { goal: z9.string().describe("The goal's id") }
+    },
+    async ({ goal: goal2 }) => {
+      await (await team2()).goals.resume(goal2);
+      return toolText("Resumed.");
     }
   );
 }
