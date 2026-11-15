@@ -17,7 +17,6 @@ import {
   hostText,
   meetingStatus,
   needWords,
-  redoneText,
   resumableOf,
   stepText,
   waitText,
@@ -88,3 +87,7 @@ export function othersText(others: readonly GoalEntry[]): string | undefined {
     ...resumableOf(others).map((o) => `  - ${o.label}`),
   ].join("\n");
 }
+
+/** That a done subtask is built on work redone since, `titles` that work. */
+const redoneText = (titles: readonly string[]) =>
+  `built on ${titles.map((t) => `"${t}"`).join(", ")}, redone since: redo it to take that in`;

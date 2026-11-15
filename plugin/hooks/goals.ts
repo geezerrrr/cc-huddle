@@ -1,6 +1,6 @@
 /**
- * `/openplan pause` and `/openplan resume` (§7.3): what they do, and what
- * they say when they do nothing, as the view words it.
+ * `/openplan pause` and `/openplan resume` (§7.3): what they do; why they
+ * do nothing is the view's, the resume dialog and its list the mod's own.
  */
 import type { EngineInterface } from "claude-code";
 import { call, view } from "./server";
@@ -37,7 +37,6 @@ export async function resumeGoal($: EngineInterface, number?: number): Promise<s
     slug: goal.slug,
     label: `${String(i + 1)}. ${goal.label}`,
   }));
-  if (!listed.length) return "No goal to resume.";
   if (number === undefined && listed.length > ASK_OPTIONS)
     return [
       "Goals; resume one with /openplan resume <number>:",

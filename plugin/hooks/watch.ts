@@ -10,6 +10,7 @@ import { NoRepository, call, view } from "./server";
 import {
   changeFollowed,
   changePicks,
+  changeSentBack,
   changeProblem,
   changeSpeaking,
   keepTeam,
@@ -56,11 +57,10 @@ export async function answer($: EngineInterface, need: OpenplanNeed, given: Open
     $.ui.toast(`openplan: ${words(error)}`);
     return;
   }
-  await changePicks($, (all) =>
-    Object.fromEntries(
-      Object.entries(all).filter(([id]) => id !== need.id && id !== `${need.id}:back`),
-    ),
-  );
+  const left = <T>(all: Record<string, T>) =>
+    Object.fromEntries(Object.entries(all).filter(([id]) => id !== need.id));
+  await changePicks($, left);
+  await changeSentBack($, left);
   await poll($);
 }
 

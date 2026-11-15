@@ -19,6 +19,7 @@ import {
   writtenPlan,
 } from "../engine/index.ts";
 
+import type { OpenplanCalls } from "../../plugin/types/index.d.ts";
 import type { Session } from "./session.ts";
 import { othersText, statusText } from "./status.ts";
 import { attendanceText, plural, rosterOf, STATUS_WORDS } from "./words.ts";
@@ -26,6 +27,10 @@ import { toolText } from "../shared/text.ts";
 
 const meeting = z.string().describe("The meeting's id");
 const subtask = z.string().describe("The subtask's id");
+
+const goalActionInput = z.object({ action: z.enum(GOAL_ACTIONS) }) satisfies z.ZodType<
+  OpenplanCalls["goal_action"]
+>;
 
 /** A member's name: any, until the team is read; then one of its members, each with their role (§7.3). */
 function memberName(members?: readonly Member[]): z.ZodType<string> {
@@ -198,7 +203,7 @@ export function addTools(server: McpServer, session: Session) {
     {
       description:
         "Pause this session's goal (its runs stop, to go on later in their sessions), resume it, archive it, or delete it once archived: its folder, worktrees and subtask branches go, its own branch stays. Delete only when the user has confirmed it.",
-      inputSchema: { action: z.enum(GOAL_ACTIONS) },
+      inputSchema: goalActionInput.shape,
       annotations: { destructiveHint: true },
     },
     async ({ action }) => {

@@ -2,12 +2,12 @@
  * What the mod keeps for the session, as atoms the drawings read: the team
  * as the server last served it, the speech at the meeting and the followed
  * member's record as read so far, why there is no team, the tab shown, and
- * picks made on a need not answered yet. Each is read and changed here only:
+ * what you picked on a need not answered yet. Each is read and changed here only:
  * the state scan reads an atom where it is declared.
  */
 import { atom, read, update } from "claude-code";
 import type { EngineInterface } from "claude-code";
-import type { OpenplanRecord, OpenplanSpeaking, OpenplanTab, OpenplanTeam } from "../types";
+import type { OpenplanFollowed, OpenplanSpeaking, OpenplanTab, OpenplanTeam } from "../types";
 
 type $ = EngineInterface;
 type Change<T> = (was: T) => T;
@@ -27,8 +27,7 @@ const followed = atom({ plugin: "openplan", key: "followed" } as const, null, {
 const problem = atom({ plugin: "openplan", key: "problem" } as const, null);
 const tab = atom({ plugin: "openplan", key: "tab" } as const, "team");
 const picks = atom({ plugin: "openplan", key: "picks" } as const, {});
-
-export type Followed = { member: string; record?: OpenplanRecord } | null;
+const sentBack = atom({ plugin: "openplan", key: "sentBack" } as const, {});
 
 export function readTeam($: $) {
   return read($, team);
@@ -45,7 +44,7 @@ export function changeSpeaking($: $, change: Change<OpenplanSpeaking | null>) {
 export function readFollowed($: $) {
   return read($, followed);
 }
-export function changeFollowed($: $, change: Change<Followed>) {
+export function changeFollowed($: $, change: Change<OpenplanFollowed | null>) {
   return update($, followed, change);
 }
 export function readProblem($: $) {
@@ -65,4 +64,10 @@ export function readPicks($: $) {
 }
 export function changePicks($: $, change: Change<Record<string, string[]>>) {
   return update($, picks, change);
+}
+export function readSentBack($: $) {
+  return read($, sentBack);
+}
+export function changeSentBack($: $, change: Change<Record<string, string>>) {
+  return update($, sentBack, change);
 }

@@ -4,7 +4,7 @@
  * tool names.
  */
 import type { EngineInterface } from "claude-code";
-import type { OpenplanAsk, OpenplanView } from "../types";
+import type { OpenplanAsk, OpenplanCalls, OpenplanView } from "../types";
 import { PLUGIN } from "./state";
 
 /** The session isn't in a repository: there are no goals to read until it is. */
@@ -16,10 +16,10 @@ let server: string | undefined;
 let socket: string | undefined;
 
 /** Calls one of openplan's server's tools: its text, or its error thrown. */
-export async function call(
+export async function call<Tool extends keyof OpenplanCalls>(
   $: EngineInterface,
-  tool: string,
-  args: Record<string, unknown> = {},
+  tool: Tool,
+  args: OpenplanCalls[Tool],
 ): Promise<string> {
   if (!server) {
     const connected = await $.mcp.connect(PLUGIN);
@@ -38,7 +38,7 @@ export async function call(
  * new socket, asked for after the old one fails.
  */
 export async function view($: EngineInterface, ask: OpenplanAsk): Promise<OpenplanView> {
-  socket ??= await call($, "pane");
+  socket ??= await call($, "pane", {});
   let response;
   try {
     response = await $.http.fetch("http://openplan/view", {

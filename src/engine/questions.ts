@@ -16,6 +16,7 @@ import type {
 import type { AskUserQuestionInput } from "@anthropic-ai/claude-agent-sdk/sdk-tools";
 import { PERMISSION_REPLIES } from "./prompts.ts";
 import {
+  isAcceptance,
   noteNeeded,
   type Ask,
   type Choice,
@@ -175,10 +176,7 @@ export class Questions {
 
   /** Calls off a task's delivery waiting on you, on one of `subtaskIds`, its subtasks: work in it is being done again. */
   cancelDelivery(subtaskIds: readonly string[]) {
-    this.cancelAll(
-      (q) =>
-        q.kind === "decision" && q.decision.kind === "delivery" && subtaskIds.includes(q.subtaskId),
-    );
+    this.cancelAll((q) => isAcceptance(q) && subtaskIds.includes(q.subtaskId));
   }
 
   /** A call the member's rules don't cover: allowed once, always, or denied. */

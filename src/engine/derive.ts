@@ -8,6 +8,7 @@ import { actionEvent, can, MEETING_MACHINE } from "./machines.ts";
 import {
   SUBTASK_ACTIONS,
   hostOf,
+  isAcceptance,
   isHalted,
   type Derived,
   type Meeting,
@@ -61,12 +62,9 @@ export function reviewerOf(
 }
 
 /** The acceptance a task waits for, its subtasks all done. */
-function acceptanceOf(state: Pick<GoalState, "questions" | "subtasks">, taskId: string) {
+export function acceptanceOf(state: Pick<GoalState, "questions" | "subtasks">, taskId: string) {
   return state.questions.find(
-    (q) =>
-      q.kind === "decision" &&
-      q.decision.kind === "delivery" &&
-      state.subtasks.find((s) => s.id === q.subtaskId)?.taskId === taskId,
+    (q) => isAcceptance(q) && state.subtasks.find((s) => s.id === q.subtaskId)?.taskId === taskId,
   );
 }
 

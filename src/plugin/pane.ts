@@ -33,6 +33,9 @@ import {
   taskDone,
   toYou,
   type Work,
+  type Notice,
+  acceptanceOf,
+  isAcceptance,
 } from "../engine/index.ts";
 import {
   attendanceText,
@@ -40,18 +43,13 @@ import {
   mainArgument,
   meetingStatus,
   needWords,
-  noGoalText,
-  NOTE_PROMPTS,
-  noticeText,
-  OPTION_LABELS,
   PLAN_TO_REVIEW,
   plural,
   resumableOf,
-  resumeRefusal,
-  inProgressText,
   waitText,
   whereOf,
   STATUS_WORDS,
+  stepText,
 } from "./words.ts";
 
 /** The meeting the pane shows: one under way, else one whose plan waits on you, else the latest. */
@@ -156,7 +154,7 @@ function needOf(question: QuestionToYou, work: Work): OpenplanNeed {
     from: question.from,
     headline,
     ...(detail && { detail }),
-    ask: question.kind !== "decision" || question.decision.kind !== "delivery",
+    ask: !isAcceptance(question),
   };
   switch (question.kind) {
     case "permission": {
@@ -245,7 +243,7 @@ function prompts(work: Work): OpenplanTeam["prompts"] {
         text: `The meeting [${meeting.id}] on "${work.goal.name}" has a plan for review: ${meeting.plan.summary}. ${AS_THE_SKILL_SAYS}`,
       });
   for (const question of work.questions) {
-    if (question.kind !== "decision" || question.decision.kind !== "delivery") continue;
+    if (!isAcceptance(question)) continue;
     const subtask = work.subtasks.find((s) => s.id === question.subtaskId);
     const delivered = work.subtasks
       .filter((s) => s.taskId === subtask?.taskId && s.delivery)
@@ -293,13 +291,9 @@ function taskLines(work: Work, derived: Derived): string[] {
   if (work.goal.status === "archived") return lines;
   for (const task of work.tasks) {
     const subtasks = work.subtasks.filter((s) => s.taskId === task.id);
-    const accepting = work.questions.some(
-      (q) =>
-        q.kind === "decision" &&
-        q.decision.kind === "delivery" &&
-        subtasks.some((s) => s.id === q.subtaskId),
-    );
-    const where = accepting ? "waits for you to accept it" : taskWhere(work, derived, subtasks);
+    const where = acceptanceOf(work, task.id)
+      ? "waits for you to accept it"
+      : taskWhere(work, derived, subtasks);
     if (where) lines.push(`${task.title} · ${where}`);
   }
   return lines.length > BAND_TASKS
@@ -334,6 +328,9 @@ function othersBand(others: readonly GoalEntry[]): string | undefined {
   return parts.length ? parts.join(" · ") : undefined;
 }
 
+/** Why `/openplan resume` takes nothing up when the repository has no goal this session doesn't run. */
+const NOTHING_TO_RESUME = "No goal to resume.";
+
 /**
  * The team as the pane shows it: the session's goal (`mine`), if it runs
  * one, and the repository's goals it doesn't run (`others`); `session`, the
@@ -358,6 +355,7 @@ export function paneTeam(
       milestones: [],
       prompts: [],
       resumable: resumableOf(others),
+      ...(!others.length && { resumeRefused: NOTHING_TO_RESUME }),
       pauseRefused: noGoal,
     };
   }
@@ -396,7 +394,7 @@ const callOf = (name: string, input: unknown): OpenplanCall => {
 function viewEntry(entry: RecordEntry): OpenplanEntry {
   switch (entry.kind) {
     case "run":
-      return { kind: "run", model: entry.model };
+      return { kind: "run", text: `a run on ${entry.model}` };
     case "thinking":
     case "text":
       return { kind: entry.kind, text: entry.text };
@@ -424,3 +422,76 @@ export const viewLive = (live: LiveRun): OpenplanLive => ({
   ...(live.starting && { starting: live.starting }),
   running: live.running.map((call) => callOf(call.name, call.input)),
 });
+
+/** What the Agent SDK reported while a run went on, in words. */
+function noticeText(notice: Notice): string {
+  const seconds = (ms: number) => `${String(Math.round(ms / 1000))}s`;
+  switch (notice.kind) {
+    case "retry":
+      return `the API call failed: attempt ${String(notice.attempt)} of ${String(notice.max)} in ${seconds(notice.delayMs)}`;
+    case "subagent-retry":
+      return `a subagent's API call failed: attempt ${String(notice.attempt)} of ${String(notice.max)} in ${seconds(notice.delayMs)}`;
+    case "compacted":
+      return `the conversation was compacted from ${notice.before.toLocaleString()} tokens${notice.after === undefined ? "" : ` to ${notice.after.toLocaleString()}`}`;
+    case "compaction-failed":
+      return `compacting the conversation failed${notice.error ? `: ${notice.error}` : ""}`;
+    case "fallback":
+      return `${notice.from} declined: ${notice.to} goes on`;
+    case "refusal":
+      return `${notice.model} declined, with no model to go on`;
+    case "task":
+      return `background task "${notice.title}" ${notice.state}`;
+    case "rate-limit":
+      return notice.status === "rejected" ? "rate limited" : "close to the rate limit";
+  }
+}
+
+/** A subtask in progress, in words: worked on and how far, in review, or being merged. */
+function inProgressText(subtask: InProgress): string {
+  switch (subtask.status) {
+    case "running": {
+      const step = stepText(subtask.progress);
+      return `works on "${subtask.title}"${step ? `, ${step}` : ""}`;
+    }
+    case "reviewing":
+      return `"${subtask.title}" in review`;
+    case "merging":
+      return `"${subtask.title}" being merged`;
+  }
+}
+
+/** What each answer to a permission or a decision is called. */
+const OPTION_LABELS: Record<PermissionOption | DecisionOption, string> = {
+  once: "Allow once",
+  always: "Always allow",
+  deny: "Deny",
+  rereview: "Review again",
+  skip: "Skip the review",
+  sendBack: "Send back",
+  ours: "Keep ours",
+  theirs: "Take theirs",
+  retry: "Retry",
+  stop: "Stop",
+  accept: "Accept",
+  revise: "Send back",
+};
+
+/** What a note typed instead of a pick says, for the option it goes with. */
+const NOTE_PROMPTS: Record<NoteOption, string> = {
+  deny: "Or deny it, saying why",
+  sendBack: "Or send it back, saying what to change",
+  revise: "What to change",
+};
+
+/**
+ * Why a session runs no goal, and what to do, as the pane says it: `moved`,
+ * the goal that moved to another session.
+ */
+const noGoalText = (moved: string | undefined) =>
+  moved
+    ? `"${moved}" moved to another Claude Code session. Bring it back here with /openplan resume.`
+    : "This session runs no goal. Hand the team a task with /openplan <task>, or take a goal up with /openplan resume.";
+
+/** Why `/openplan resume` takes nothing up while this session's goal (`name`) is under way. */
+const resumeRefusal = (name: string) =>
+  `"${name}" is under way in this session, which runs one goal: /openplan pause it first, or take the other up in another session.`;

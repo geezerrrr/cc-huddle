@@ -9,18 +9,21 @@
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { OpenplanAnswer } from "../../plugin/types/index.d.ts";
+import type { OpenplanAnswer, OpenplanCalls } from "../../plugin/types/index.d.ts";
 import {
   DECISION_OPTIONS,
   PERMISSION_OPTIONS,
   type PermissionOption,
   SLUG,
+  type GoalState,
+  type Member,
 } from "../engine/index.ts";
 
 import type { PaneServer } from "./pane-server.ts";
 import type { Session } from "./session.ts";
-import { handOffText } from "./words.ts";
+
 import { toolText } from "../shared/text.ts";
+import { rosterOf } from "./words.ts";
 
 const isPermission = (option: string): option is PermissionOption =>
   (PERMISSION_OPTIONS as readonly string[]).includes(option);
@@ -40,6 +43,19 @@ const answerSchema = z.discriminatedUnion("kind", [
   }),
 ]) satisfies z.ZodType<OpenplanAnswer>;
 
+const answerInput = z.object({
+  question: z.string(),
+  answer: answerSchema,
+}) satisfies z.ZodType<OpenplanCalls["answer"]>;
+
+const handOffInput = z.object({ task: z.string().trim().min(1) }) satisfies z.ZodType<
+  OpenplanCalls["hand_off"]
+>;
+
+const resumeInput = z.object({
+  goal: z.string().regex(SLUG).describe("The goal's slug"),
+}) satisfies z.ZodType<OpenplanCalls["resume_goal"]>;
+
 /** Adds the pane's tools to `server`, for the goal the session runs (`session`). */
 export function addPaneTools(server: McpServer, session: Session, pane: PaneServer) {
   server.registerTool(
@@ -55,7 +71,7 @@ export function addPaneTools(server: McpServer, session: Session, pane: PaneServ
     "answer",
     {
       description: `${PANE_ONLY} Answers what waits on the user, as they pressed it.`,
-      inputSchema: { question: z.string(), answer: answerSchema },
+      inputSchema: answerInput.shape,
     },
     async ({ question, answer }) => {
       await session.goal.answer(
@@ -74,7 +90,7 @@ export function addPaneTools(server: McpServer, session: Session, pane: PaneServ
     "hand_off",
     {
       description: `${PANE_ONLY} The prompt /openplan <task> gives the session: the task, for the team.`,
-      inputSchema: { task: z.string().trim().min(1) },
+      inputSchema: handOffInput.shape,
       annotations: { readOnlyHint: true },
     },
     ({ task }) => {
@@ -89,13 +105,32 @@ export function addPaneTools(server: McpServer, session: Session, pane: PaneServ
     "resume_goal",
     {
       description: `${PANE_ONLY} Takes up the goal you picked in this session and resumes it, as /openplan resume.`,
-      inputSchema: {
-        goal: z.string().regex(SLUG).describe("The goal's slug"),
-      },
+      inputSchema: resumeInput.shape,
     },
     async ({ goal: slug }) => {
       const { goal } = (await session.takeUp(slug)).work;
       return toolText(`Resumed "${goal.name}".`);
     },
   );
+}
+
+/**
+ * What `/openplan <task>` gives your session: the task, for the team and not
+ * for it, as the team skill says to take it on; with the team and the goal
+ * this session runs (`mine`), if it runs one.
+ */
+function handOffText(
+  task: string,
+  mine: { goal: GoalState["goal"]; members: readonly Member[] } | undefined,
+): string {
+  const goal = mine
+    ? `This session runs the goal "${mine.goal.name}", ${mine.goal.status === "active" ? "under way" : mine.goal.status}. The team: ${rosterOf(mine.members)}.`
+    : "This session runs no goal yet.";
+  return [
+    "The user hands this to openplan's team: take it on as openplan's team skill says.",
+    "",
+    task,
+    "",
+    goal,
+  ].join("\n");
 }

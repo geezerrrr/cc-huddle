@@ -55,10 +55,13 @@ export interface TeamFiles {
   meetingSize: MeetingSize;
 }
 
+/** What is wrong with the team's files, naming the file; a file that isn't JSON throws a SyntaxError instead. */
+export class TeamError extends Error {}
+
 /** Throws why a file's contents don't fit, naming the file. */
 function parsed<T>(schema: z.ZodType<T>, data: unknown, file: string): T {
   const result = schema.safeParse(data);
-  if (!result.success) throw new Error(`${file}:\n${z.prettifyError(result.error)}`);
+  if (!result.success) throw new TeamError(`${file}:\n${z.prettifyError(result.error)}`);
   return result.data;
 }
 
@@ -74,7 +77,7 @@ async function markdownFiles(folder: string) {
       try {
         data = parse(front?.[1] ?? "") ?? {};
       } catch (error) {
-        throw new Error(`${file}: ${errorText(error)}`, { cause: error });
+        throw new TeamError(`${file}: ${errorText(error)}`, { cause: error });
       }
       return {
         name: name.slice(0, -".md".length),
@@ -144,7 +147,7 @@ export async function loadTeam(userTeam: string, top: string): Promise<TeamFiles
   const members = byName.map(([name, { file, data }]): Member => {
     const { role, model, effort, env } = parsed(memberSchema, data, file);
     const found = roles.get(role);
-    if (!found) throw new Error(`${file}: there is no role "${role}" in the team's roles/`);
+    if (!found) throw new TeamError(`${file}: there is no role "${role}" in the team's roles/`);
     return {
       name,
       role: found,
@@ -154,7 +157,7 @@ export async function loadTeam(userTeam: string, top: string): Promise<TeamFiles
     };
   });
   if (!members.length)
-    throw new Error(
+    throw new TeamError(
       `The team has no members: add them in ${folders.map((f) => path.join(f, "members")).join(" or ")}`,
     );
   return {

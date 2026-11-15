@@ -88,7 +88,7 @@ describe("the MCP server", () => {
     expect(await call("status")).toContain(
       'Goal "Dice": active, on branch openplan/dice/main\nTeam: glm',
     );
-    expect(await call("start_goal", { name: "Chess" })).toContain("pause it first");
+    expect(await call("start_goal", { name: "Chess" })).toContain("a session runs one goal");
     await client.close();
   });
 

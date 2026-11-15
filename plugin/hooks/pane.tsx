@@ -11,9 +11,11 @@ import {
   PLUGIN,
   changeFollowed,
   changePicks,
+  changeSentBack,
   readFollowed,
   readPicks,
   readProblem,
+  readSentBack,
   readSpeaking,
   readTab,
   readTeam,
@@ -218,7 +220,7 @@ async function needView($: $, ui: Ui, need: OpenplanNeed) {
   }
   const { note, sendBack } = need;
   // A revised task goes back to the subtask that asked, unless you pick another.
-  const [back] = mine[`${need.id}:back`] ?? [];
+  const back = (await readSentBack($))[need.id];
   return (
     <Box key={`n-${need.id}`} flexDirection="column">
       {head}
@@ -238,7 +240,7 @@ async function needView($: $, ui: Ui, need: OpenplanNeed) {
           label={note.label}
           options={sendBack.map((s) => ({ value: s.id, label: s.title }))}
           value={back}
-          onSelect={(value) => changePicks($, (all) => ({ ...all, [`${need.id}:back`]: [value] }))}
+          onSelect={(value) => changeSentBack($, (all) => ({ ...all, [need.id]: value }))}
         />
       )}
       {note && (

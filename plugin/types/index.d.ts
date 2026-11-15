@@ -33,7 +33,7 @@ export type OpenplanTeam = {
    * repository's goals your session doesn't run, oldest first.
    */
   resumable: { slug: string; label: string }[];
-  /** Why `/openplan resume` takes nothing up now: your session's goal is under way. */
+  /** Why `/openplan resume` takes nothing up now: your session's goal is under way, or there is none to take up. */
   resumeRefused?: string;
   /** Why `/openplan pause` pauses nothing now: your session runs no goal, or its goal isn't under way. */
   pauseRefused?: string;
@@ -119,12 +119,23 @@ export type OpenplanAnswer =
   | { kind: "option"; option: OpenplanOption; note?: string; sentBack?: string }
   | { kind: "choices"; picks: string[] };
 
+/** What the mod calls each of the server's tools with. */
+export type OpenplanCalls = {
+  pane: Record<string, never>;
+  status: Record<string, never>;
+  answer: { question: string; answer: OpenplanAnswer };
+  hand_off: { task: string };
+  resume_goal: { goal: string };
+  goal_action: { action: "pause" | "resume" | "archive" | "delete" };
+};
+
 /** A tool call: its name and the argument its line shows. */
 export type OpenplanCall = { name: string; argument?: string };
 
 /** One whole thing a member's run did, as its record keeps it (src/engine/records.ts). */
 export type OpenplanEntry =
-  | { kind: "run"; model: string }
+  /** A run's start, in words: the model it runs on. */
+  | { kind: "run"; text: string }
   | { kind: "thinking" | "text"; text: string }
   | ({ kind: "tool"; state: "done" | "error"; output: string } & OpenplanCall)
   | { kind: "steps"; steps: { content: string; status: "pending" | "in_progress" | "completed" }[] }
@@ -146,6 +157,9 @@ export type OpenplanRecord = OpenplanRun & { subtask: string };
 
 /** The meeting turn being spoken: which speech it is, and who speaks it. */
 export type OpenplanSpeaking = OpenplanRun & { speech: string; speaker: string };
+
+/** The member whose record the pane follows, and the record as it has it, once read. */
+export type OpenplanFollowed = { member: string; record?: OpenplanRecord };
 
 /** What the mod asks `POST /view` for. */
 export type OpenplanAsk = {
@@ -175,13 +189,14 @@ declare module "claude-code" {
     openplan: {
       team: Shaped<OpenplanTeam | null>;
       speaking: Shaped<OpenplanSpeaking | null>;
-      /** The member whose record the pane follows, and the record as it has it, once read. */
-      followed: Shaped<{ member: string; record?: OpenplanRecord } | null>;
+      followed: Shaped<OpenplanFollowed | null>;
       /** Why there is no team to show. */
       problem: string | null;
       tab: OpenplanTab;
-      /** Picks made on a need not answered yet, by its id. */
+      /** Picks made on a question with choices not answered yet, by the need's id. */
       picks: Record<string, string[]>;
+      /** The subtask a revised task goes back to, where you picked one, by the need's id. */
+      sentBack: Record<string, string>;
     };
   }
 }

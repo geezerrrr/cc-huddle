@@ -4,18 +4,13 @@
  * thing the same way, from here.
  */
 import {
-  type DecisionOption,
   type GoalEntry,
   type GoalState,
-  type InProgress,
   hostOf,
   type Meeting,
   type MeetingNow,
   type Member,
-  type NoteOption,
-  type Notice,
   type Permission,
-  type PermissionOption,
   type QuestionToYou,
   type Subtask,
   type SubtaskStatus,
@@ -41,29 +36,6 @@ export const hostText = (meeting: Pick<Meeting, "participants" | "hostOnly">) =>
 /** Who is at a meeting: everyone at it, and who hosts it. */
 export const attendanceText = (meeting: Pick<Meeting, "hostOnly" | "participants">) =>
   `${listOf(meeting.participants)}, ${hostText(meeting)}`;
-
-/** What the Agent SDK reported while a run went on, in words. */
-export function noticeText(notice: Notice): string {
-  const seconds = (ms: number) => `${String(Math.round(ms / 1000))}s`;
-  switch (notice.kind) {
-    case "retry":
-      return `the API call failed: attempt ${String(notice.attempt)} of ${String(notice.max)} in ${seconds(notice.delayMs)}`;
-    case "subagent-retry":
-      return `a subagent's API call failed: attempt ${String(notice.attempt)} of ${String(notice.max)} in ${seconds(notice.delayMs)}`;
-    case "compacted":
-      return `the conversation was compacted from ${notice.before.toLocaleString()} tokens${notice.after === undefined ? "" : ` to ${notice.after.toLocaleString()}`}`;
-    case "compaction-failed":
-      return `compacting the conversation failed${notice.error ? `: ${notice.error}` : ""}`;
-    case "fallback":
-      return `${notice.from} declined: ${notice.to} goes on`;
-    case "refusal":
-      return `${notice.model} declined, with no model to go on`;
-    case "task":
-      return `background task "${notice.title}" ${notice.state}`;
-    case "rate-limit":
-      return notice.status === "rejected" ? "rate limited" : "close to the rate limit";
-  }
-}
 
 /** What a subtask waits on, in words. */
 export function waitText(wait: Wait, work: Work): string {
@@ -106,29 +78,11 @@ export const STATUS_WORDS: Record<SubtaskStatus, string> = {
   stoppedInMerge: "stopped while merging",
 };
 
-/** That a done subtask is built on work redone since, `titles` that work. */
-export const redoneText = (titles: readonly string[]) =>
-  `built on ${titles.map((t) => `"${t}"`).join(", ")}, redone since: redo it to take that in`;
-
 /** Where a running subtask is: "step 2 of 3: Write the reroll"; nothing before its steps are known. */
 export function stepText({ done, total, current }: Subtask["progress"]): string | undefined {
   if (!total) return undefined;
   const step = `step ${String(Math.min(done + 1, total))} of ${String(total)}`;
   return current ? `${step}: ${current}` : step;
-}
-
-/** A subtask in progress, in words: worked on and how far, in review, or being merged. */
-export function inProgressText(subtask: InProgress): string {
-  switch (subtask.status) {
-    case "running": {
-      const step = stepText(subtask.progress);
-      return `works on "${subtask.title}"${step ? `, ${step}` : ""}`;
-    }
-    case "reviewing":
-      return `"${subtask.title}" in review`;
-    case "merging":
-      return `"${subtask.title}" being merged`;
-  }
 }
 
 /**
@@ -177,29 +131,6 @@ function callText(permission: Permission): string {
   return main ? `${permission.tool}: ${main}` : permission.tool;
 }
 
-/** What each answer to a permission or a decision is called. */
-export const OPTION_LABELS: Record<PermissionOption | DecisionOption, string> = {
-  once: "Allow once",
-  always: "Always allow",
-  deny: "Deny",
-  rereview: "Review again",
-  skip: "Skip the review",
-  sendBack: "Send back",
-  ours: "Keep ours",
-  theirs: "Take theirs",
-  retry: "Retry",
-  stop: "Stop",
-  accept: "Accept",
-  revise: "Send back",
-};
-
-/** What a note typed instead of a pick says, for the option it goes with. */
-export const NOTE_PROMPTS: Record<NoteOption, string> = {
-  deny: "Or deny it, saying why",
-  sendBack: "Or send it back, saying what to change",
-  revise: "What to change",
-};
-
 /**
  * What waits on you, in a sentence (`headline`), and more of it where there
  * is (`detail`): a stuck review's notes, the files a merge can't take.
@@ -237,7 +168,7 @@ export function needWords(
 }
 
 /** Where one of the repository's goals is: in another session, unreadable, archived, or paused, as a session that ended left it too. */
-export type GoalWhere = "elsewhere" | "unreadable" | "archived" | "paused";
+type GoalWhere = "elsewhere" | "unreadable" | "archived" | "paused";
 
 export const whereOf = (entry: GoalEntry): GoalWhere =>
   entry.holder
@@ -278,43 +209,3 @@ const entryLabel = (entry: GoalEntry) =>
 /** The repository's goals a session doesn't run, each named with how far it got and where it is, for `/openplan resume`. */
 export const resumableOf = (others: readonly GoalEntry[]): { slug: string; label: string }[] =>
   others.map((entry) => ({ slug: entry.slug, label: entryLabel(entry) }));
-
-/**
- * Why a session runs no goal, and what to do, as the pane says it: `moved`,
- * the goal that moved to another session.
- */
-export const noGoalText = (moved: string | undefined) =>
-  moved
-    ? `"${moved}" moved to another Claude Code session. Bring it back here with /openplan resume.`
-    : "This session runs no goal. Hand the team a task with /openplan <task>, or take a goal up with /openplan resume.";
-
-/** Why a session runs no goal, and what to do, as its model is told: `moved`, the goal that moved to another session. */
-export const noGoalForModel = (moved: string | undefined) =>
-  moved
-    ? `The goal "${moved}" moved to another Claude Code session. The user brings it back with /openplan resume.`
-    : "This session runs no goal: start one (start_goal), or the user takes one up with /openplan resume.";
-
-/**
- * What `/openplan <task>` gives your session: the task, for the team and not
- * for it, as the team skill says to take it on; with the team and the goal
- * this session runs (`mine`), if it runs one.
- */
-export function handOffText(
-  task: string,
-  mine: { goal: GoalState["goal"]; members: readonly Member[] } | undefined,
-): string {
-  const goal = mine
-    ? `This session runs the goal "${mine.goal.name}", ${mine.goal.status === "active" ? "under way" : mine.goal.status}. The team: ${rosterOf(mine.members)}.`
-    : "This session runs no goal yet.";
-  return [
-    "The user hands this to openplan's team: take it on as openplan's team skill says, and don't do any of it yourself.",
-    "",
-    task,
-    "",
-    goal,
-  ].join("\n");
-}
-
-/** Why `/openplan resume` takes nothing up while this session's goal (`name`) is under way. */
-export const resumeRefusal = (name: string) =>
-  `"${name}" is under way in this session, which runs one goal: /openplan pause it first, or take the other up in another session.`;

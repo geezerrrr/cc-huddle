@@ -335,6 +335,7 @@ Take it to the user as openplan's team skill says.`,
       milestones: [],
       prompts: [],
       resumable: [],
+      resumeRefused: "No goal to resume.",
       pauseRefused: none,
     });
     expect(noGoal([], "Dice").noGoal).toBe(

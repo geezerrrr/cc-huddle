@@ -1,6 +1,6 @@
 /** How the mod fits what it is given into its rows. */
 
-/** How much of a tool's argument, or of what is stuck, a row shows. */
+/** How much of a tool's argument, of what is stuck, or of what an option means, a row or the question dialog shows. */
 const ROW_TEXT = 300;
 
 export const clip = (text: string) =>

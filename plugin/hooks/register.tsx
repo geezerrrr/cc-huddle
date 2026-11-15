@@ -38,7 +38,7 @@ export const register: Register = (on) => {
     const task = e.args.trim();
     // Certain, so said without a model turn.
     const certain: Record<string, () => Promise<string>> = {
-      status: () => call($, "status"),
+      status: () => call($, "status", {}),
       pause: () => pauseGoal($),
       resume: () => resumeGoal($),
     };

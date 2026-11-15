@@ -147,7 +147,7 @@ describe("the pane's socket and tools", () => {
 
   it("hand the session a task for the team, with the goal it runs and its team", async () => {
     expect((await call("hand_off", { task: "Add a scoreboard" })).text).toBe(
-      "The user hands this to openplan's team: take it on as openplan's team skill says, and don't do any of it yourself.\n\nAdd a scoreboard\n\nThis session runs no goal yet.",
+      "The user hands this to openplan's team: take it on as openplan's team skill says.\n\nAdd a scoreboard\n\nThis session runs no goal yet.",
     );
     await session.start("Dice");
     expect((await call("hand_off", { task: "Add a scoreboard" })).text).toContain(
@@ -189,6 +189,7 @@ describe("the pane's socket and tools", () => {
       prompts: [],
       resumable: [],
       opened: 0,
+      resumeRefused: "No goal to resume.",
       pauseRefused:
         "This session runs no goal. Hand the team a task with /openplan <task>, or take a goal up with /openplan resume.",
     });

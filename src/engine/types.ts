@@ -328,6 +328,10 @@ export type QuestionToYou = Exclude<Question, { kind: "teammate" }>;
 export const toYou = (question: Question): question is QuestionToYou =>
   question.kind !== "teammate";
 
+/** A task done, waiting for you to accept it: the decision on its last subtask. */
+export const isAcceptance = (question: Question) =>
+  question.kind === "decision" && question.decision.kind === "delivery";
+
 /** The state the engine saves for a goal: the goal, and its work. */
 export interface GoalState {
   goal: Goal;

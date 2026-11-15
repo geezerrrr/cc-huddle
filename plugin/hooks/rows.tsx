@@ -69,7 +69,7 @@ function entryRow(ui: Ui, entry: OpenplanEntry, key: string) {
     case "run":
       return (
         <Text key={key} dimColor>
-          ── a run on {entry.model}
+          ── {entry.text}
         </Text>
       );
     case "thinking":

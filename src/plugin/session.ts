@@ -12,7 +12,6 @@ import {
   RepositoryGoals,
 } from "../engine/index.ts";
 import { serialBy } from "../shared/serial.ts";
-import { noGoalForModel } from "./words.ts";
 
 /** The key the session's changes of goal take turns on. */
 const TURN = "goal";
@@ -145,7 +144,7 @@ export class Session {
     const { goal } = was.work;
     if (goal.status === "active")
       throw new Error(
-        `This session's goal "${goal.name}" is under way, and a session runs one goal: ask the user whether to pause it first (goal_action pause), or to run the other in another session`,
+        `This session's goal "${goal.name}" is under way, and a session runs one goal.`,
       );
     this.engine = undefined;
     this.changed(undefined);
@@ -164,3 +163,9 @@ export class Session {
     return engine;
   }
 }
+
+/** Why a session runs no goal, and what to do, as its model is told: `moved`, the goal that moved to another session. */
+const noGoalForModel = (moved: string | undefined) =>
+  moved
+    ? `The goal "${moved}" moved to another Claude Code session. The user brings it back with /openplan resume.`
+    : "This session runs no goal: start one (start_goal), or the user takes one up with /openplan resume.";

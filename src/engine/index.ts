@@ -5,13 +5,20 @@
  */
 export type { Team } from "./core.ts";
 export type { GoalEntry } from "./data.ts";
-export { derive, inProgress, type InProgress, taskDone, type Work } from "./derive.ts";
+export {
+  acceptanceOf,
+  derive,
+  inProgress,
+  type InProgress,
+  taskDone,
+  type Work,
+} from "./derive.ts";
 export { Engine, type EngineOptions, type HandedOver } from "./engine.ts";
 export { GitError, goalBranch, SLUG } from "./git.ts";
 export { planSchema, writtenPlan } from "./plan.ts";
 export { stopMembers } from "./processes.ts";
 export type { LiveRun, RecordEntry } from "./records.ts";
 export { RepositoryGoals } from "./repository.ts";
-export { claudeFolder, userTeamFolder } from "./team.ts";
+export { claudeFolder, TeamError, userTeamFolder } from "./team.ts";
 export type { Notice } from "./turns.ts";
 export * from "./types.ts";

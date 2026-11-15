@@ -13,6 +13,7 @@ import {
   GitError,
   RepositoryGoals,
   stopMembers,
+  TeamError,
   userTeamFolder,
 } from "../engine/index.ts";
 import { executableOf } from "./claude.ts";
@@ -120,7 +121,10 @@ async function listTeamFiles() {
     throw error;
   }
   // A team that doesn't read yet takes any name: starting a goal says what is wrong with it.
-  const team = await goals.team(userTeam).catch(() => undefined);
+  const team = await goals.team(userTeam).catch((error: unknown) => {
+    if (error instanceof TeamError || error instanceof SyntaxError) return undefined;
+    throw error;
+  });
   if (team) listMembers(team);
 }
 
