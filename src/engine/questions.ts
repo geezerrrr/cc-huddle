@@ -14,6 +14,7 @@ import type {
   PermissionRuleValue,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { AskUserQuestionInput } from "@anthropic-ai/claude-agent-sdk/sdk-tools";
+import { PERMISSION_REPLIES } from "./prompts.ts";
 import {
   noteNeeded,
   type Ask,
@@ -30,9 +31,6 @@ import {
 
 /** Claude Code's own tool for questions with choices. */
 const ASK_TOOL = "AskUserQuestion";
-
-/** What a member hears when its wait is called off: its turn ended first. */
-const CALLED_OFF = "Stopped.";
 
 /** A member waiting, on a subtask's run, until `signal` ends the run. */
 interface Asker {
@@ -201,7 +199,7 @@ export class Questions {
         options: rules.length ? ["once", "always", "deny"] : ["once", "deny"],
       },
     });
-    if (!answer) return { behavior: "deny", message: CALLED_OFF };
+    if (!answer) return { behavior: "deny", message: PERMISSION_REPLIES.calledOff };
     switch (answer.option) {
       case "once":
         return { behavior: "allow", updatedInput: input };
@@ -216,12 +214,7 @@ export class Questions {
           ],
         };
       case "deny":
-        return {
-          behavior: "deny",
-          message: answer.note
-            ? `The user denied this and said: ${answer.note}`
-            : "The user denied this.",
-        };
+        return { behavior: "deny", message: PERMISSION_REPLIES.denied(answer.note) };
     }
   }
 
@@ -242,7 +235,7 @@ export class Questions {
       kind: "choices",
       choices,
     });
-    if (!answer) return { behavior: "deny", message: CALLED_OFF };
+    if (!answer) return { behavior: "deny", message: PERMISSION_REPLIES.calledOff };
     const answers = Object.fromEntries(choices.map((c, i) => [c.question, answer.picks[i]]));
     return { behavior: "allow", updatedInput: { ...input, answers } };
   }

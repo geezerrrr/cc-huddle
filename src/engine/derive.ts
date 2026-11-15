@@ -215,6 +215,31 @@ export function waitsIn(state: Work, subtask: Subtask, busy: Set<string>): Wait[
   }
 }
 
+/** Work a subtask builds on, with what it delivered: what it depends on directly, or further up. */
+export interface Upstream {
+  subtask: Subtask;
+  direct: boolean;
+}
+
+/** The work a subtask builds on, up the chain of dependencies: what it depends on directly first. */
+export function upstreamOf(state: Pick<GoalState, "subtasks">, subtask: Subtask): Upstream[] {
+  const chain: Upstream[] = [];
+  const seen = new Set([subtask.id]);
+  let level = subtask.dependsOn;
+  for (let direct = true; level.length; direct = false) {
+    const next: string[] = [];
+    for (const id of level) {
+      const done = state.subtasks.find((s) => s.id === id);
+      if (!done || seen.has(id)) continue;
+      seen.add(id);
+      chain.push({ subtask: done, direct });
+      next.push(...done.dependsOn);
+    }
+    level = next;
+  }
+  return chain;
+}
+
 /** The upstream subtasks a done subtask built on that were done again after it started. */
 export function redoneUpstream(state: Pick<GoalState, "subtasks">, subtask: Subtask): Subtask[] {
   const startedAt = subtask.startedAt;

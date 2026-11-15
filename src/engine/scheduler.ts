@@ -6,10 +6,15 @@
  * goal's branch, one merge at a time.
  */
 import { randomUUID } from "node:crypto";
-import { stat } from "node:fs/promises";
-import path from "node:path";
-import { z } from "zod";
-import { actionsOf, busyMembers, redoneUpstream, reviewerOf, taskDone, waitsIn } from "./derive.ts";
+import {
+  actionsOf,
+  busyMembers,
+  redoneUpstream,
+  reviewerOf,
+  taskDone,
+  waitsIn,
+  upstreamOf,
+} from "./derive.ts";
 import { spend, workOf, type Core } from "./core.ts";
 import { errorText } from "../shared/errors.ts";
 import {
@@ -19,19 +24,11 @@ import {
   memberSigner,
   mergeDesk,
   openDesk,
-  openGoal,
   pickSide,
   subtaskBranch,
-  unresolved,
 } from "./git.ts";
 import { actionEvent, can, step, SUBTASK_MACHINE, type SubtaskEvent } from "./machines.ts";
-import {
-  goOnMessage,
-  reviewPrompt,
-  taskBrief,
-  teammateQuestion,
-  type Upstream,
-} from "./prompts.ts";
+import { goOnMessage, taskBrief } from "./prompts.ts";
 import {
   DOESNT_FIT,
   type DecisionAnswer,
@@ -39,7 +36,7 @@ import {
   type Questions,
 } from "./questions.ts";
 import { runSubtask, type RunOutcome } from "./run.ts";
-import { askOnce, type Step } from "./turns.ts";
+import { type Step } from "./turns.ts";
 import {
   DECISIONS,
   type Goal,
@@ -52,9 +49,8 @@ import {
   type SubtaskAction,
   type Task,
 } from "./types.ts";
-
-/** A reviewer's verdict on a delivery. */
-const verdictSchema = z.object({ pass: z.boolean(), notes: z.string().trim() });
+import { collaborationOf } from "./collaboration.ts";
+import { reviewDelivery } from "./review.ts";
 
 /** Sent back this many times, a delivery is yours to decide on. */
 const REVIEW_ROUNDS = 3;
@@ -479,26 +475,6 @@ export class Scheduler {
     };
   }
 
-  /** The work a subtask builds on, up the chain of dependencies: what it depends on directly first. */
-  private upstreamOf(subtask: Subtask): Upstream[] {
-    const { subtasks } = this.core.state;
-    const chain: Upstream[] = [];
-    const seen = new Set([subtask.id]);
-    let level = subtask.dependsOn;
-    for (let direct = true; level.length; direct = false) {
-      const next: string[] = [];
-      for (const id of level) {
-        const done = subtasks.find((s) => s.id === id);
-        if (!done || seen.has(id)) continue;
-        seen.add(id);
-        chain.push({ subtask: done, direct });
-        next.push(...done.dependsOn);
-      }
-      level = next;
-    }
-    return chain;
-  }
-
   /**
    * Runs a subtask in its worktree: from its brief, or in its last session
    * with why it goes on. Delivered, its worktree is committed in its member's
@@ -534,7 +510,7 @@ export class Scheduler {
               cwd: desk,
               branch: subtaskBranch(goal.slug, subtask.id),
               plan: this.planOf(task),
-              upstream: this.upstreamOf(subtask),
+              upstream: upstreamOf(core.state, subtask),
               notes,
             }),
         ...(goOn && { resume: subtask.session }),
@@ -543,11 +519,12 @@ export class Scheduler {
           subtaskId: subtask.id,
           signal: abort.signal,
         }),
-        collaboration: {
-          askTeammate: (name, question) =>
-            this.askTeammate(member, subtask, name, question, abort.signal),
-          checkDelivery: (files) => this.checkDelivery(subtask, desk, files),
-        },
+        collaboration: collaborationOf(core, this.questions, {
+          from: member,
+          subtask,
+          desk,
+          signal: abort.signal,
+        }),
         listener: {
           ...recorder,
           session: (id, model) => {
@@ -600,84 +577,6 @@ export class Scheduler {
   }
 
   /**
-   * A running member asks a teammate by name; the teammate answers in a
-   * read-only session in the goal's worktree. What the asker is told.
-   */
-  private async askTeammate(
-    from: Member,
-    subtask: Subtask,
-    name: string,
-    question: string,
-    signal: AbortSignal,
-  ): Promise<string> {
-    const { core } = this;
-    const others = core.team.members.filter((m) => m.name !== from.name);
-    const target = others.find((m) => m.name === name.trim());
-    if (!target)
-      return name.trim() === from.name
-        ? "That's you; no need to ask."
-        : `There's no teammate called "${name}". Your teammates: ${others.map((m) => m.name).join(", ") || "none"}.`;
-    try {
-      const reply = await this.questions.toTeammate(
-        { from: from.name, subtaskId: subtask.id },
-        target.name,
-        question,
-        async () =>
-          askOnce({
-            prompt: teammateQuestion({
-              from,
-              subtask,
-              question,
-              own: core.state.subtasks.filter((s) => s.assignee === target.name),
-            }),
-            options: core.options(target, "readOnly", await openGoal(core.places)),
-            signal,
-            spent: (tokens) => {
-              spend(core.state, target.name, tokens);
-            },
-          }),
-      );
-      core.changed();
-      return `${target.name} answered: ${reply.text}`;
-    } catch (error) {
-      return `${target.name} couldn't answer just now: ${errorText(error)}`;
-    }
-  }
-
-  /**
-   * Whether a delivery is taken: every file is in the worktree, and the
-   * conflicts a merge left are resolved. Its files as kept, or why not.
-   */
-  private async checkDelivery(subtask: Subtask, desk: string, files: string[]) {
-    const kept: string[] = [];
-    const missing: string[] = [];
-    for (const file of files) {
-      const relative = path.relative(desk, path.resolve(desk, file));
-      const inside = relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
-      const there =
-        inside &&
-        (await stat(path.join(desk, relative)).then(
-          (found) => found.isFile(),
-          () => false,
-        ));
-      if (there) kept.push(relative.split(path.sep).join("/"));
-      else missing.push(file);
-    }
-    if (missing.length)
-      return {
-        refused: `Not delivered: these aren't files in your worktree (${desk}): ${missing.join(", ")}. Deliver the files that are there.`,
-      };
-    const left = subtask.conflict
-      ? await unresolved(this.core.places, subtask.id, subtask.conflict.files)
-      : [];
-    if (left.length)
-      return {
-        refused: `Not delivered: conflict markers are still in ${left.join(", ")}. Resolve them first, keeping what both sides meant, then deliver.`,
-      };
-    return { files: [...new Set(kept)] };
-  }
-
-  /**
    * Reviews a delivery: a read-only session of the reviewer's in the
    * subtask's worktree passes it on to be merged, or sends it back with
    * notes; the third time back, or when the review fails, you decide. Stopped
@@ -690,23 +589,15 @@ export class Scheduler {
       const reviewer = this.memberOf(reviewerOf(workOf(core), subtask));
       const { delivery } = subtask;
       if (!delivery) throw new Error(`"${subtask.title}" has no delivery to review`);
-      const desk = await openDesk(core.places, subtask.id);
-      const reply = await askOnce({
-        prompt: reviewPrompt({
-          task: this.taskOf(subtask),
-          subtask,
-          delivery,
-          cwd: desk,
-        }),
-        options: core.options(reviewer, "readOnly", desk),
-        schema: verdictSchema,
+      const verdict = await reviewDelivery(core, {
+        reviewer,
+        task: this.taskOf(subtask),
+        subtask,
+        delivery,
+        desk: await openDesk(core.places, subtask.id),
         signal: abort.signal,
-        spent: (tokens) => {
-          spend(core.state, reviewer.name, tokens);
-        },
       });
       if (subtask.status !== "reviewing") return;
-      const verdict = verdictSchema.parse(reply.structured);
       const rounds = (subtask.review?.rounds ?? 0) + (verdict.pass ? 0 : 1);
       subtask.review = { rounds, notes: verdict.notes };
       if (verdict.pass) this.move(subtask, "merge");

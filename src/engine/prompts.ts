@@ -3,6 +3,7 @@
  * models read them, so they are in English.
  */
 import { listOf } from "../shared/text.ts";
+import type { Upstream } from "./derive.ts";
 import {
   hostOf,
   type Delivery,
@@ -42,12 +43,6 @@ ${others.length ? `Your teammates: ${others.join(", ")}.` : "You are the only me
 # Your duties
 ${member.role.duties.trim()}`;
   return kind === "work" ? `${who}\n\n${TASK_WAYS}` : who;
-}
-
-/** Work a subtask builds on, with what it delivered: what it depends on directly, or further up. */
-export interface Upstream {
-  subtask: Subtask;
-  direct: boolean;
 }
 
 /**
@@ -127,6 +122,47 @@ export const DELIVER_REMINDER =
 /** A subagent the member started may not speak for the subtask: asking and delivering are the session's own. */
 export const SESSION_ONLY =
   "Only the session that started you asks teammates and delivers this subtask: do your own part and report back to it.";
+
+/** The tools of a subtask's run, as the model is told of them. */
+export const RUN_TOOLS = {
+  askTeammate: {
+    what: "Asks a teammate a question and waits for the answer. Use it only when you need their information or decision.",
+    teammate: "The teammate's name",
+    question: "The question, with the context they need",
+  },
+  deliver: {
+    what: "Hands over your finished work: your subtask is done only once you call it. Then end your turn. If you deliver again, the last delivery counts.",
+    summary: "A few sentences: what you did, and anything to watch out for",
+    files:
+      "The files that are the result, as paths in your worktree (not scratch files); empty when the result is the summary itself",
+    done: "Delivered. End your turn now.",
+  },
+};
+
+/** What a member who asks a teammate is told back. */
+export const TEAMMATE_REPLIES = {
+  self: "That's you; no need to ask.",
+  unknown: (name: string, others: readonly string[]) =>
+    `There's no teammate called "${name}". Your teammates: ${others.join(", ") || "none"}.`,
+  answered: (name: string, text: string) => `${name} answered: ${text}`,
+  failed: (name: string, error: string) => `${name} couldn't answer just now: ${error}`,
+};
+
+/** Why a delivery isn't taken, as its member is told. */
+export const DELIVERY_REFUSED = {
+  missing: (desk: string, files: readonly string[]) =>
+    `Not delivered: these aren't files in your worktree (${desk}): ${files.join(", ")}. Deliver the files that are there.`,
+  conflicted: (files: readonly string[]) =>
+    `Not delivered: conflict markers are still in ${files.join(", ")}. Resolve them first, keeping what both sides meant, then deliver.`,
+};
+
+/** What a member hears back from a call that waited on you. */
+export const PERMISSION_REPLIES = {
+  /** Its turn ended first. */
+  calledOff: "Stopped.",
+  denied: (note?: string) =>
+    note ? `The user denied this and said: ${note}` : "The user denied this.",
+};
 
 /** What a reviewer is asked: the subtask, its acceptance criteria and what was delivered, checked in its worktree. */
 export function reviewPrompt(input: {

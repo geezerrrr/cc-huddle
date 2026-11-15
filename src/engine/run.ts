@@ -7,7 +7,7 @@ import { tool, type CanUseTool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { errorText } from "../shared/errors.ts";
 import type { MemberOptions } from "./policy.ts";
-import { DELIVER_REMINDER, SESSION_ONLY } from "./prompts.ts";
+import { DELIVER_REMINDER, RUN_TOOLS, SESSION_ONLY } from "./prompts.ts";
 import type { Handover } from "./types.ts";
 import {
   keepingSession,
@@ -40,34 +40,26 @@ function teamServer(collaboration: Collaboration, delivered: (handover: Handover
   return turnServer([
     tool(
       "ask_teammate",
-      "Asks a teammate a question and waits for the answer. Use it only when you need their information or decision.",
+      RUN_TOOLS.askTeammate.what,
       {
-        teammate: z.string().describe("The teammate's name"),
-        question: z.string().describe("The question, with the context they need"),
+        teammate: z.string().describe(RUN_TOOLS.askTeammate.teammate),
+        question: z.string().describe(RUN_TOOLS.askTeammate.question),
       },
       async ({ teammate, question }) =>
         toolText(await collaboration.askTeammate(teammate, question)),
     ),
     tool(
       "deliver",
-      "Hands over your finished work: your subtask is done only once you call it. Then end your turn. If you deliver again, the last delivery counts.",
+      RUN_TOOLS.deliver.what,
       {
-        summary: z
-          .string()
-          .trim()
-          .min(1)
-          .describe("A few sentences: what you did, and anything to watch out for"),
-        files: z
-          .array(z.string())
-          .describe(
-            "The files that are the result, as paths in your worktree (not scratch files); empty when the result is the summary itself",
-          ),
+        summary: z.string().trim().min(1).describe(RUN_TOOLS.deliver.summary),
+        files: z.array(z.string()).describe(RUN_TOOLS.deliver.files),
       },
       async ({ summary, files }) => {
         const checked = await collaboration.checkDelivery(files);
         if ("refused" in checked) return toolText(checked.refused);
         delivered({ summary, files: checked.files });
-        return toolText("Delivered. End your turn now.");
+        return toolText(RUN_TOOLS.deliver.done);
       },
     ),
   ]);
