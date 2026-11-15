@@ -24,6 +24,7 @@ const BAND = {
   component: "AbovePrompt",
   props: {
     hasSurvey: false,
+    isCollapsed: false,
     isWorking: false,
     maxRows: 4,
     bodyColumns: 80,
@@ -80,7 +81,12 @@ function serve(on: On, views: OpenplanView[]) {
   });
   on("http.fetch", (_, e) => {
     expect([e.url, e.init?.socketPath]).toEqual(["http://openplan/view", SOCKET]);
-    calls.push({ tool: "view", args: JSON.parse(e.init?.body ?? "{}") as Record<string, unknown> });
+    // The pane asks for its view as JSON text, never as bytes.
+    const body = e.init?.body;
+    calls.push({
+      tool: "view",
+      args: JSON.parse(typeof body === "string" ? body : "{}") as Record<string, unknown>,
+    });
     return served(200, JSON.stringify(views.length > 1 ? views.shift() : views[0]));
   });
   on("command.register", (_, e) => ({ value: { command: e.name } }));
