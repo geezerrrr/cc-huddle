@@ -10,7 +10,6 @@ import {
   holderOf,
   listGoals,
   newGoalFolder,
-  openedGoal,
   readState,
   releaseGoal,
   repoFolder,
@@ -103,10 +102,7 @@ describe("the lock", () => {
     await takeGoal(lock, ME, refuse);
     const other = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
     await once(other, "spawn");
-    await writeFile(
-      lock,
-      JSON.stringify({ pid: other.pid, session: 7, address: "there", open: true }),
-    );
+    await writeFile(lock, JSON.stringify({ pid: other.pid, session: 7, address: "there" }));
     releaseGoal(lock);
     await expect(takeGoal(lock, ME, refuse)).rejects.toThrow("held by 7");
     other.kill();
@@ -114,9 +110,7 @@ describe("the lock", () => {
     expect(holderOf(lock)).toBeUndefined();
     await takeGoal(lock, ME, refuse);
     const holder = { pid: process.pid, ...ME };
-    expect(holderOf(lock)).toEqual({ ...holder, open: false });
-    await openedGoal(lock, ME);
-    expect(holderOf(lock)).toEqual({ ...holder, open: true });
+    expect(holderOf(lock)).toEqual(holder);
     releaseGoal(lock);
     await expect(stat(lock)).rejects.toThrow();
   });
@@ -126,10 +120,7 @@ describe("the lock", () => {
     const other = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
     await once(other, "spawn");
     await mkdir(path.dirname(lock), { recursive: true });
-    await writeFile(
-      lock,
-      JSON.stringify({ pid: other.pid, session: 7, address: "there", open: true }),
-    );
+    await writeFile(lock, JSON.stringify({ pid: other.pid, session: 7, address: "there" }));
     const asked: string[] = [];
     const handed = await takeGoal(lock, ME, async (holder) => {
       asked.push(holder.address);
@@ -139,7 +130,7 @@ describe("the lock", () => {
     other.kill();
     expect(asked).toEqual(["there"]);
     expect(handed).toEqual({ meetings: ["m1"] });
-    expect(holderOf(lock)).toEqual({ pid: process.pid, ...ME, open: false });
+    expect(holderOf(lock)).toEqual({ pid: process.pid, ...ME });
     releaseGoal(lock);
   });
 
@@ -205,7 +196,7 @@ describe("a repository's goals", () => {
     await takeGoal(chess.lock, ME, refuse);
     expect(await listGoals(repo)).toEqual([
       { slug: "dice", state: fresh("dice", 1) },
-      { slug: "chess", state: fresh("chess", 2), holder: { pid: process.pid, ...ME, open: false } },
+      { slug: "chess", state: fresh("chess", 2), holder: { pid: process.pid, ...ME } },
     ]);
     releaseGoal(chess.lock);
   });

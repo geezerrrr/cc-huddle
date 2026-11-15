@@ -109,12 +109,10 @@ export interface Runner {
 
 /**
  * Who has a goal: the process that runs it, the session that started that
- * process, where it is asked to let the goal go, and whether it has opened
- * the goal yet (`Engine.takeUp`).
+ * process, and where it is asked to let the goal go.
  */
 export interface Holder extends Runner {
   pid: number;
-  open: boolean;
 }
 
 /** What a holder stopped as it let a goal go, for the session taking it up to resume: its meetings under way. */
@@ -148,10 +146,10 @@ export function holderOf(lock: string): Holder | undefined {
 }
 
 /** This process as the holder, in a file of its own beside the lock, to be put in place whole. */
-async function holding(lock: string, me: Runner, open: boolean): Promise<string> {
+async function holding(lock: string, me: Runner): Promise<string> {
   await mkdir(path.dirname(lock), { recursive: true });
   const file = `${lock}.${String(process.pid)}`;
-  const holder: Holder = { pid: process.pid, ...me, open };
+  const holder: Holder = { pid: process.pid, ...me };
   await writeFile(file, JSON.stringify(holder));
   return file;
 }
@@ -172,7 +170,7 @@ export async function takeGoal(
   me: Runner,
   takeOver: (holder: Holder) => Promise<HandedOver>,
 ): Promise<HandedOver> {
-  const mine = await holding(lock, me, false);
+  const mine = await holding(lock, me);
   // What every holder asked stopped: another taker may get in between.
   const handed: HandedOver = { meetings: [] };
   try {
@@ -223,11 +221,6 @@ export async function takeGoal(
   } finally {
     await rm(mine, { force: true });
   }
-}
-
-/** Tells the lock that this process has opened the goal: its state is the goal's as it goes on. */
-export async function openedGoal(lock: string, me: Runner): Promise<void> {
-  await renameOver(await holding(lock, me, true), lock);
 }
 
 /** Lets the goal go, as this process ends: at once, since it may be exiting. */

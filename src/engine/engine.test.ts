@@ -130,7 +130,6 @@ describe("Engine", () => {
       pid: process.pid,
       session: 41,
       address: "here",
-      open: true,
     });
     expect(await saved("dice-game")).toMatchObject({ state: { goal: { status: "active" } } });
 
@@ -226,10 +225,7 @@ describe("Engine", () => {
     const files = filesOf("dice");
     const other = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
     await once(other, "spawn");
-    await writeFile(
-      files.lock,
-      JSON.stringify({ pid: other.pid, session: 7, address: "there", open: true }),
-    );
+    await writeFile(files.lock, JSON.stringify({ pid: other.pid, session: 7, address: "there" }));
     const resume = vi.spyOn(Goals.prototype, "resume").mockResolvedValueOnce();
     await takeUp("dice", {
       takeOver: async () => {
@@ -247,10 +243,7 @@ describe("Engine", () => {
     const files = filesOf("dice");
     const other = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
     await once(other, "spawn");
-    await writeFile(
-      files.lock,
-      JSON.stringify({ pid: other.pid, session: 7, address: "there", open: true }),
-    );
+    await writeFile(files.lock, JSON.stringify({ pid: other.pid, session: 7, address: "there" }));
     const asked: string[] = [];
     const engine = await takeUp("dice", {
       takeOver: async (holder, slug) => {
@@ -262,8 +255,24 @@ describe("Engine", () => {
     other.kill();
     expect(asked).toEqual(["there dice"]);
     expect(engine.state.goal.status).toBe("active");
-    expect(holderOf(files.lock)).toMatchObject({ session: 41, address: "here", open: true });
+    expect(holderOf(files.lock)).toMatchObject({ session: 41, address: "here" });
     await expect(takeUp("chess")).rejects.toThrow('There is no goal "chess"');
+  });
+
+  it("takes nothing from the session that runs a goal when a member's key isn't here", async () => {
+    await close(await start());
+    const asked: string[] = [];
+    await expect(
+      takeUp("dice", {
+        env: {},
+        takeOver: (holder) => {
+          asked.push(holder.address);
+          return Promise.resolve({ meetings: [] });
+        },
+      }),
+    ).rejects.toThrow("glm: Not set in the environment: GLM_KEY");
+    expect(asked).toEqual([]);
+    expect(holderOf(filesOf("dice").lock)).toBeUndefined();
   });
 
   it("pauses what a session killed outright left running, then resumes it, its runs going on in their sessions", async () => {

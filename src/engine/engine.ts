@@ -12,7 +12,6 @@ import type { Work } from "./derive.ts";
 import {
   goalsFolder,
   newGoalFolder,
-  openedGoal,
   readState,
   releaseGoal,
   repoFolder,
@@ -118,6 +117,7 @@ export class Engine {
     );
     const files = goalFiles(folder);
     const me: Runner = { session: options.session, address: options.address };
+    let engine: Engine | undefined;
     try {
       // A new folder: nobody else holds it.
       await takeGoal(files.lock, me, (holder) => options.takeOver(holder, slug));
@@ -132,13 +132,12 @@ export class Engine {
         questions: [],
         tokens: {},
       };
-      const engine = await Engine.ready(options, places, files, copy, state);
+      engine = await Engine.ready(options, places, files, copy, state);
       engine.core.changed();
       await engine.writer.flush();
-      await openedGoal(files.lock, me);
       return engine;
     } catch (error) {
-      releaseGoal(files.lock);
+      await Engine.leave(engine, files);
       await rm(folder, { recursive: true, force: true });
       throw error;
     }
@@ -155,26 +154,34 @@ export class Engine {
     const folder = path.join(goalsFolder(repoFolder(options.dataFolder, repo)), slug);
     const files = goalFiles(folder);
     if (!existsSync(files.state)) throw new Error(`There is no goal "${slug}" in this repository`);
+    // What this openplan can't read, or a member's environment lacks, is said before the goal is taken from where it runs.
+    await readState(files.state);
+    filledSettings(await readCopy(files.team), options);
     const me: Runner = { session: options.session, address: options.address };
     const handed = await takeGoal(files.lock, me, (holder) => options.takeOver(holder, slug));
+    let engine: Engine | undefined;
     try {
+      // Both again, as the session that let it go left them: it may have allowed a rule since.
       const state = await readState(files.state);
-      const engine = await Engine.ready(
-        options,
-        { repo, root: folder },
-        files,
-        await readCopy(files.team),
-        state,
-      );
+      const copy = await readCopy(files.team);
+      engine = await Engine.ready(options, { repo, root: folder }, files, copy, state);
       // A session killed outright couldn't pause it: it is paused first, as if it had.
       if (state.goal.status === "active") await engine.goals.pause();
       await engine.goals.resume(handed.meetings);
       await engine.writer.flush();
-      await openedGoal(files.lock, me);
       return engine;
     } catch (error) {
-      releaseGoal(files.lock);
+      await Engine.leave(engine, files);
       throw error;
+    }
+  }
+
+  /** Lets a goal go that failed to open: what of its engine was made is shut, or else the lock and the record of members let go. */
+  private static async leave(engine: Engine | undefined, files: Files) {
+    if (engine) await engine.shut();
+    else {
+      stopRecording();
+      releaseGoal(files.lock);
     }
   }
 

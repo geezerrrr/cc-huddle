@@ -273,7 +273,7 @@ Tell the user what was done, and ask whether to accept it or send it back with w
     const entry = (slug: string, status: "active" | "paused" | "archived", held = false) => ({
       slug,
       state: { ...work(), goal: { ...now.goal, name: slug, slug, status } },
-      ...(held && { holder: { pid: 1, session: 7, address: "there", open: true } }),
+      ...(held && { holder: { pid: 1, session: 7, address: "there" } }),
     });
     const others = [
       entry("chess", "paused"),
@@ -305,7 +305,7 @@ Tell the user what was done, and ask whether to accept it or send it back with w
     const entry = (slug: string, status: "paused" | "archived", held = false) => ({
       slug,
       state: { ...work(), subtasks: [], goal: { ...work().goal, name: slug, slug, status } },
-      ...(held && { holder: { pid: 1, session: 7, address: "there", open: true } }),
+      ...(held && { holder: { pid: 1, session: 7, address: "there" } }),
     });
     expect(paneOf(undefined, [], undefined)).toEqual({
       noGoal:

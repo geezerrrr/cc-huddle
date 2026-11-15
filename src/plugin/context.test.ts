@@ -80,7 +80,7 @@ describe("the session's context", () => {
     await writeGoal("dice");
     await writeGoal("chess", "archived");
     await writeGoal("go", "active");
-    await hold("go", { pid: process.pid, session: 42, address: "there", open: true });
+    await hold("go", { pid: process.pid, session: 42, address: "there" });
     expect(await sessionContext(repo, data, SESSION))
       .toBe(`openplan: The repository's other goals, which the user takes up here with /openplan resume:
   - go · no plan yet · in another session
@@ -91,7 +91,7 @@ describe("the session's context", () => {
 
   it("tells a session that runs a goal where it stands (after /clear)", async () => {
     await writeGoal("dice", "active");
-    await hold("dice", { pid: process.pid, session: SESSION, address: "here", open: true });
+    await hold("dice", { pid: process.pid, session: SESSION, address: "here" });
     expect(await sessionContext(repo, data, SESSION))
       .toBe(`This session runs openplan's goal "dice", as it stands:
 
