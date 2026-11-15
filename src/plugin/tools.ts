@@ -25,6 +25,7 @@ import {
 } from "../engine/types.ts";
 import type { Session } from "./session.ts";
 import { othersText, statusText } from "./status.ts";
+import { rosterOf } from "./words.ts";
 
 /** A decision as the tools take it: `sentBack`, the subtask a revised task goes back to. */
 export const decisionOf = (decision: DecisionOption, note?: string, sentBack?: string): Answer => ({
@@ -56,8 +57,7 @@ function memberName(members?: readonly Member[]): z.ZodType<string> {
   if (!members) return z.string().describe("A member's name");
   // A team has a member at least (team.ts loadTeam).
   const names = members.map((m) => m.name) as [string, ...string[]];
-  const roster = members.map((m) => `${m.name} (${m.role.title})`).join(", ");
-  return z.enum(names).describe(`One of the team: ${roster}`);
+  return z.enum(names).describe(`One of the team: ${rosterOf(members)}`);
 }
 
 const meetingInput = (member: z.ZodType<string>) => ({

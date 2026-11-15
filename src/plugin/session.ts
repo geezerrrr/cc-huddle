@@ -18,7 +18,7 @@ export class Session {
   /** The folder of the session's repository in the data folder, once found. */
   private repo: Promise<string> | undefined;
   /** The goal that moved to another session, by name, until this one runs another. */
-  private moved: string | undefined;
+  private movedAway: string | undefined;
   private readonly turn = serialBy();
 
   /**
@@ -43,10 +43,15 @@ export class Session {
     throw new Error(this.none);
   }
 
+  /** The goal that moved to another session, by name, until this one runs another. */
+  get moved(): string | undefined {
+    return this.movedAway;
+  }
+
   /** Why the session runs no goal, and what to do. */
   get none(): string {
-    return this.moved
-      ? `The goal "${this.moved}" moved to another Claude Code session. The user brings it back with /openplan resume.`
+    return this.movedAway
+      ? `The goal "${this.movedAway}" moved to another Claude Code session. The user brings it back with /openplan resume.`
       : "This session runs no goal: start one (start_goal), or the user takes one up with /openplan resume.";
   }
 
@@ -79,7 +84,7 @@ export class Session {
       const was = this.engine;
       if (was?.state.goal.slug !== slug) return { meetings: [] };
       this.engine = undefined;
-      this.moved = was.state.goal.name;
+      this.movedAway = was.state.goal.name;
       this.changed(undefined);
       return was.close();
     });
@@ -146,7 +151,7 @@ export class Session {
 
   private run(engine: Engine): Engine {
     this.engine = engine;
-    this.moved = undefined;
+    this.movedAway = undefined;
     this.changed(engine);
     return engine;
   }

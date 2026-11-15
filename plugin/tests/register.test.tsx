@@ -33,18 +33,24 @@ const BAND = {
   },
 } as const;
 
-const NEED: OpenplanNeed = {
-  id: "q1",
+/** A permission request, as the server words it. */
+const permission = (id: string, call: string): OpenplanNeed => ({
+  id,
   from: "glm",
-  about: "Rules",
-  text: "",
-  kind: "permission",
-  call: "Bash: npm test",
-  options: ["once", "deny"],
-};
+  headline: `glm asks to use ${call} for "Rules". Allow it?`,
+  ask: true,
+  kind: "options",
+  options: [
+    { value: "once", label: "Allow once", primary: true },
+    { value: "deny", label: "Deny" },
+  ],
+  note: { option: "deny", prompt: "Or deny it, saying why", needed: false },
+});
+
+const NEED = permission("q1", "Bash: npm test");
 
 const TEAM: OpenplanTeam = {
-  goal: { name: "Dice", slug: "dice", active: true },
+  goal: { name: "Dice", slug: "dice" },
   band: "1 working · 1 needs you",
   tasks: ['Rules · glm works on "Rules"'],
   members: [
@@ -61,10 +67,13 @@ const TEAM: OpenplanTeam = {
   milestones: [],
   prompts: [],
   resumable: [],
+  resumeRefused:
+    '"Dice" is under way in this session, which runs one goal: /openplan pause it first, or take the other up in another session.',
 };
 
 /** The team of a session that runs no goal. */
 const NO_GOAL: OpenplanTeam = {
+  noGoal: "This session runs no goal. Hand the team a task with /openplan <task>.",
   tasks: [],
   members: [],
   needs: [],
@@ -94,7 +103,9 @@ function serve(on: On, views: OpenplanView[]) {
         ? SOCKET
         : e.tool === "resume_goal"
           ? `Resumed ${String(e.args.goal)}.`
-          : "Team: glm";
+          : e.tool === "hand_off"
+            ? `For the team: ${String(e.args.task)}`
+            : "Team: glm";
     return { value: { content: [{ type: "text", text }], isError: false } };
   });
   on("http.fetch", (_, e) => {
@@ -136,7 +147,12 @@ test("the band and the pane show the team, and a press answers what needs you", 
     await pane.press({ key: "tab-team" });
     expect(await pane.find({ type: "Text", text: /works on "Rules"/ })).toBeDefined();
     await pane.press({ key: "tab-needs" });
-    expect(await pane.find({ type: "Text", text: "Bash: npm test" })).toBeDefined();
+    expect(
+      await pane.find({
+        type: "Text",
+        text: 'glm asks to use Bash: npm test for "Rules". Allow it?',
+      }),
+    ).toBeDefined();
     await pane.press({ key: "q1-once" });
     await pane.unmount();
   }
@@ -161,7 +177,7 @@ test("a member's record shows in place of the team as it grows, and Back shows t
             at: 0,
             kind: "tool",
             name: "Read",
-            input: { file_path: "README.md" },
+            argument: "README.md",
             state: "done",
             output: "one\ntwo\nthree\nfour\nfive\n",
           },
@@ -211,10 +227,10 @@ test("the meeting shows the turn being spoken as a record, and your scrolling re
       team: {
         ...TEAM,
         meeting: {
-          id: "m1",
           about: "Dice",
           agenda: "Plan the game",
           status: "glm speaks",
+          host: "glm",
           participants: ["glm", "sonnet"],
           turns: [{ speaker: "glm", text: "A grid board" }],
           hands: [],
@@ -227,7 +243,7 @@ test("the meeting shows the turn being spoken as a record, and your scrolling re
             at: 0,
             kind: "tool",
             name: "Grep",
-            input: { pattern: "board" },
+            argument: "board",
             state: "done",
             output: "src/board.ts",
           },
@@ -312,7 +328,7 @@ test("a new milestone is a transcript row, a new prompt your session's; what was
 test("each need is asked as it comes, in turn, and answered as you said; a task to accept is your session's", async ($, on) => {
   const clock = mock.clock(on);
   const questions: string[] = [];
-  const said = ["Allow once", "don't touch dist", "Grid", "Review again"];
+  const said = ["Allow once", "don't touch dist", "Grid", "make it bigger"];
   on("tool.call", { tool: "AskUserQuestion" }, (_, e) => {
     const [question] = e.questions as { question: string }[];
     questions.push(question?.question ?? "");
@@ -325,12 +341,12 @@ test("each need is asked as it comes, in turn, and answered as you said; a task 
         ...TEAM,
         needs: [
           NEED,
-          { ...NEED, id: "q2", call: "Bash: rm -rf dist" },
+          permission("q2", "Bash: rm -rf dist"),
           {
             id: "q3",
             from: "glm",
-            about: "",
-            text: "",
+            headline: "glm asks:",
+            ask: true,
             kind: "choices",
             choices: [
               {
@@ -344,20 +360,28 @@ test("each need is asked as it comes, in turn, and answered as you said; a task 
           {
             id: "q4",
             from: "sonnet",
-            about: "Rules",
-            text: "Too small",
-            kind: "decision",
-            of: "review",
-            options: ["rereview", "skip", "sendBack"],
+            headline: 'The review of "Rules" is stuck. What now?',
+            detail: "Too small",
+            ask: true,
+            kind: "options",
+            options: [
+              { value: "rereview", label: "Review again" },
+              { value: "skip", label: "Skip the review" },
+              { value: "sendBack", label: "Send back" },
+            ],
+            note: { option: "sendBack", prompt: "Or send it back", needed: false },
           },
           {
             id: "q5",
             from: "glm",
-            about: "",
-            text: "Game",
-            kind: "decision",
-            of: "delivery",
-            options: ["accept", "revise"],
+            headline: 'The task "Game" is done. Accept it?',
+            ask: false,
+            kind: "options",
+            options: [
+              { value: "accept", label: "Accept" },
+              { value: "revise", label: "Send back" },
+            ],
+            note: { option: "revise", prompt: "What to change", needed: true },
           },
         ],
       },
@@ -369,13 +393,13 @@ test("each need is asked as it comes, in turn, and answered as you said; a task 
     'glm asks to use Bash: npm test for "Rules". Allow it?',
     'glm asks to use Bash: rm -rf dist for "Rules". Allow it?',
     "glm asks: Which board?",
-    'The review of "Rules" is stuck: Too small What now?',
+    'The review of "Rules" is stuck. What now?\nToo small',
   ]);
   expect(calls.filter((c) => c.tool === "answer").map((c) => c.args)).toEqual([
     { question: "q1", option: "once" },
     { question: "q2", option: "deny", note: "don't touch dist" },
     { question: "q3", picks: ["Grid"] },
-    { question: "q4", decision: "rereview" },
+    { question: "q4", option: "sendBack", note: "make it bigger" },
   ]);
 });
 
@@ -433,7 +457,7 @@ test("a goal that moved to another session leaves the pane, and the band says wh
   await clock.advance(500);
   expect(await band()).toBe("openplan · 1 goal in another session");
   const pane = await $.ui.mount({ ...PANE, surface: "terminal" });
-  expect(await pane.find({ type: "Text", text: /This session runs no goal/ })).toBeDefined();
+  expect(await pane.find({ type: "Text", text: NO_GOAL.noGoal })).toBeDefined();
   expect(
     await pane.find({ type: "Text", text: "Dice · no plan yet · in another session" }),
   ).toBeDefined();
@@ -497,26 +521,25 @@ test("/openplan pause pauses the session's goal, and resume takes up the only on
       revision: 1,
       team: {
         ...TEAM,
-        goal: { name: "Dice", slug: "g1", active: false },
+        goal: { name: "Dice", slug: "g1" },
         resumable: resumable(1),
+        resumeRefused: undefined,
       },
     },
   ]);
   await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
   await openplan($, "pause");
   expect(await openplan($, "resume")).toBe("Resumed g1.");
-  expect(calls.filter((c) => c.tool.endsWith("_goal"))).toEqual([
-    { tool: "pause_goal", args: {} },
+  expect(calls.filter((c) => /_goal$|^goal_action$/.test(c.tool))).toEqual([
+    { tool: "goal_action", args: { action: "pause" } },
     { tool: "resume_goal", args: { goal: "g1" } },
   ]);
 });
 
-test("/openplan resume says to pause the session's goal first while it is under way", async ($, on) => {
+test("/openplan resume says why it takes nothing up while the session's goal is under way", async ($, on) => {
   const calls = serve(on, [{ revision: 1, team: { ...TEAM, resumable: resumable(1) } }]);
   await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
-  expect(await openplan($, "resume")).toBe(
-    '"Dice" is under way in this session, which runs one goal: /openplan pause it first, or take the other up in another session.',
-  );
+  expect(await openplan($, "resume")).toBe(TEAM.resumeRefused);
   expect(calls.filter((c) => c.tool === "resume_goal")).toEqual([]);
 });
 
@@ -575,7 +598,7 @@ test("a goal taken up puts what waits in it to your session at once; its milesto
   const taken: OpenplanTeam = {
     ...TEAM,
     needs: [],
-    goal: { name: "Dice", slug: "g1", active: true },
+    goal: { name: "Dice", slug: "g1" },
     milestones: [{ key: "plan:m1", text: 'Plan approved: "Dice"' }],
     prompts: [{ key: "accept:q2", text: "A task to accept" }],
   };
@@ -592,7 +615,7 @@ test("a goal taken up puts what waits in it to your session at once; its milesto
   expect(prompts).toEqual(["A task to accept"]);
 });
 
-test("/openplan with a task hands it to your session for the team, with who is on it", async ($, on) => {
+test("/openplan with a task hands your session the prompt the server makes for it", async ($, on) => {
   const clock = mock.clock(on);
   const calls = serve(on, [{ revision: 1, team: TEAM }]);
   const prompts: string[] = [];
@@ -602,32 +625,11 @@ test("/openplan with a task hands it to your session for the team, with who is o
   });
   await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
   await clock.advance(500);
-  await $.command.run({
-    command: "openplan",
-    args: "make a dice game, @glm on the rules",
-    origin: { kind: "composer" },
-    presentation: { isFullscreen: true, columns: 120 },
-  });
+  await openplan($, "make a dice game, @glm on the rules");
   await clock.advance(1);
-  expect(prompts).toHaveLength(1);
-  expect(prompts[0]).toContain("The team: glm (Developer).");
-  expect(prompts[0]).toContain("\nmake a dice game, @glm on the rules\n");
+  expect(calls.filter((c) => c.tool === "hand_off")).toEqual([
+    { tool: "hand_off", args: { task: "make a dice game, @glm on the rules" } },
+  ]);
+  expect(prompts).toEqual(["For the team: make a dice game, @glm on the rules"]);
   expect(calls.filter((c) => c.tool === "ui.open")).toEqual([]);
-  expect(prompts[0]).toContain('This session runs the goal "Dice", under way: ask the user too');
-});
-
-test("/openplan with a task, in a session with no goal, has your session start one", async ($, on) => {
-  const clock = mock.clock(on);
-  serve(on, [{ revision: 1, team: NO_GOAL }]);
-  const prompts: string[] = [];
-  on("prompt.submit", (_, e) => {
-    prompts.push(e.text);
-    return { text: e.text };
-  });
-  await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
-  await clock.advance(500);
-  await openplan($, "make a dice game");
-  await clock.advance(1);
-  expect(prompts[0]).toContain("Don't do any of it yourself.\n");
-  expect(prompts[0]).toContain("Then start a goal (start_goal)");
 });

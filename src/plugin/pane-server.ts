@@ -17,7 +17,7 @@ import { z } from "zod";
 import type { OpenplanTeam, OpenplanView } from "../../plugin/types/index.d.ts";
 import { errorText, workOf } from "../engine/core.ts";
 import type { GoalEntry, HandedOver } from "../engine/data.ts";
-import { paneTeam, shownMeeting } from "./pane.ts";
+import { paneTeam, shownMeeting, viewEntries, viewLive } from "./pane.ts";
 import type { Session } from "./session.ts";
 
 const viewSchema = z.object({
@@ -51,7 +51,7 @@ function viewer(session: () => Session) {
     const entries = session().othersOf(all);
     const engine = session().current;
     const mine = engine && { work: workOf(engine), members: engine.team.members };
-    const team: OpenplanTeam = paneTeam(mine, entries);
+    const team: OpenplanTeam = paneTeam(mine, entries, session().moved);
     const text = JSON.stringify(team);
     if (text !== shown) {
       shown = text;
@@ -60,17 +60,25 @@ function viewer(session: () => Session) {
     const meeting = mine && shownMeeting(mine.work);
     const spoken = meeting && engine.records.speaking(meeting);
     const { record } = asked;
+    const read = record && engine && (await engine.records.read(record.subtask, record.from));
     return {
       revision,
       ...(asked.revision !== revision && { team }),
-      ...(spoken && { speaking: spoken }),
-      ...(record &&
-        engine && {
-          record: {
-            subtask: record.subtask,
-            ...(await engine.records.read(record.subtask, record.from)),
-          },
-        }),
+      ...(spoken && {
+        speaking: {
+          speaker: spoken.speaker,
+          entries: viewEntries(spoken.entries),
+          live: viewLive(spoken.live),
+        },
+      }),
+      ...(read && {
+        record: {
+          subtask: record.subtask,
+          entries: viewEntries(read.entries),
+          next: read.next,
+          ...(read.live && { live: viewLive(read.live) }),
+        },
+      }),
     };
   };
 }

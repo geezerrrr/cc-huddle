@@ -10,6 +10,7 @@ import { atom, read, update } from "claude-code";
 import type { Elements, EngineInterface, Register, Timer } from "claude-code";
 
 import type {
+  OpenplanCall,
   OpenplanEntry,
   OpenplanLive,
   OpenplanMeeting,
@@ -29,7 +30,7 @@ const PLUGIN = "openplan";
 /** The server's tools, as the model names them. */
 const TOOLS = /^mcp__plugin_openplan_openplan__/;
 /** The tools only the mod calls, as the model would name them. */
-const PANE_ONLY = /^mcp__plugin_openplan_openplan__(pane|answer|pause_goal|resume_goal)$/;
+const PANE_ONLY = /^mcp__plugin_openplan_openplan__(pane|answer|hand_off|resume_goal)$/;
 const PANE_ONLY_REASON = "This tool is the user's, in /openplan.";
 /** How often the pane asks the team how it stands. */
 const POLL_MS = 500;
@@ -43,11 +44,11 @@ const OUTPUT_LINES = 3;
 const KEYS =
   "1 meeting · 2 team · 3 needs you · tab or ↑/↓ to select · enter to press · esc to the prompt";
 
-const team = atom({ plugin: "openplan", key: "team" } as const, null, { shape: "team-2" });
+const team = atom({ plugin: "openplan", key: "team" } as const, null, { shape: "team-3" });
 const speaking = atom({ plugin: "openplan", key: "speaking" } as const, null, {
-  shape: "speaking-1",
+  shape: "speaking-2",
 });
-const record = atom({ plugin: "openplan", key: "record" } as const, null, { shape: "record-1" });
+const record = atom({ plugin: "openplan", key: "record" } as const, null, { shape: "record-2" });
 const problem = atom({ plugin: "openplan", key: "problem" } as const, null);
 const tab = atom({ plugin: "openplan", key: "tab" } as const, "team");
 const picks = atom({ plugin: "openplan", key: "picks" } as const, {});
@@ -57,18 +58,6 @@ const TABS: { tab: OpenplanTab; label: string; hotkey: string }[] = [
   { tab: "team", label: "Team", hotkey: "2" },
   { tab: "needs", label: "Needs you", hotkey: "3" },
 ];
-
-const DECISIONS: Record<string, string> = {
-  accept: "Accept",
-  rereview: "Review again",
-  skip: "Skip the review",
-  sendBack: "Send back",
-  ours: "Keep ours",
-  theirs: "Take theirs",
-  retry: "Retry",
-};
-
-const PERMISSIONS = { once: "Allow once", always: "Always allow", deny: "Deny" } as const;
 
 /** The name `$.mcp.call` takes for openplan's server, once connected. */
 let server: string | undefined;
@@ -103,20 +92,15 @@ const clip = (text: string) => (text.length > ROW_TEXT ? `${text.slice(0, ROW_TE
 
 const words = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-/** A tool call's main argument, the one its row shows. */
-function mainArgument(input: unknown): string | undefined {
-  const fields = (input ?? {}) as Record<string, unknown>;
-  const main = ["command", "file_path", "path", "pattern", "url", "description"]
-    .map((key) => fields[key])
-    .find((value) => typeof value === "string");
-  return main === undefined ? undefined : clip(String(main));
-}
-
 /** Text in one line, its runs of space and line breaks one space each. */
 const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
 
 /** A question dialog's chip holds this many characters. */
 const ASK_HEADER = 12;
+
+/** The options a need's buttons and dialog offer: all but one that is no answer without a note. */
+const pickable = (need: Extract<OpenplanNeed, { kind: "options" }>) =>
+  need.options.filter((o) => !(need.note?.needed && o.value === need.note.option));
 
 /**
  * Puts a need to you in Claude Code's question dialog, and gives what the
@@ -124,45 +108,26 @@ const ASK_HEADER = 12;
  * answers nothing. Rejects when you dismiss it.
  */
 async function askedAnswer($: $, need: OpenplanNeed): Promise<Record<string, unknown> | undefined> {
-  const header = need.from.slice(0, ASK_HEADER);
-  const about = need.about && ` for "${need.about}"`;
-  switch (need.kind) {
-    case "permission": {
-      const said = await $.ui.ask(`${need.from} asks to use ${need.call}${about}. Allow it?`, {
-        options: need.options.map((o) => PERMISSIONS[o]),
-        header,
-      });
-      const option = need.options.find((o) => PERMISSIONS[o] === said);
-      // What you type instead is why it is denied.
-      return option ? { option } : { option: "deny", note: said };
-    }
-    case "choices": {
-      const chosen: string[] = [];
-      for (const choice of need.choices)
-        chosen.push(
-          await $.ui.ask(`${need.from} asks: ${choice.question}`, {
-            options: choice.options,
-            header: (choice.header || need.from).slice(0, ASK_HEADER),
-            ...(choice.multiSelect && { multiSelect: true as const }),
-          }),
-        );
-      return { picks: chosen };
-    }
-    case "decision": {
-      const what =
-        need.of === "merge"
-          ? `Merging "${need.about}" needs you: ${need.text.split("\n").join(", ")}.`
-          : `The review of "${need.about}" is stuck: ${clip(need.text)}`;
-      const said = await $.ui.ask(`${what} What now?`, {
-        options: need.options.map((o) => DECISIONS[o] ?? o),
-        header,
-      });
-      const decision = need.options.find((o) => (DECISIONS[o] ?? o) === said);
-      if (decision) return { decision };
-      // What you type instead goes back with the work, where it can.
-      return need.options.includes("sendBack") ? { decision: "sendBack", note: said } : undefined;
-    }
+  if (need.kind === "choices") {
+    const chosen: string[] = [];
+    for (const choice of need.choices)
+      chosen.push(
+        await $.ui.ask(`${need.headline} ${choice.question}`, {
+          options: choice.options,
+          header: (choice.header || need.from).slice(0, ASK_HEADER),
+          ...(choice.multiSelect && { multiSelect: true as const }),
+        }),
+      );
+    return { picks: chosen };
   }
+  const said = await $.ui.ask(
+    need.detail ? `${need.headline}\n${clip(need.detail)}` : need.headline,
+    { options: pickable(need).map((o) => o.label), header: need.from.slice(0, ASK_HEADER) },
+  );
+  const option = need.options.find((o) => o.label === said);
+  if (option) return { option: option.value };
+  // What you type instead goes with the option a note goes with, where there is one.
+  return need.note ? { option: need.note.option, note: said } : undefined;
 }
 
 /** Asks a need that is still open, and answers it as you said; dismissed, it waits in the pane. */
@@ -190,23 +155,6 @@ async function call($: $, tool: string, args: Record<string, unknown> = {}): Pro
   const text = result.content.find((block) => block.type === "text")?.text ?? "";
   if (result.isError) throw new Refused(text);
   return text;
-}
-
-/** The prompt `/openplan <task>` gives your session: the task, for the team and not for it. */
-function handOff(task: string, now: OpenplanTeam | null): string {
-  const roster = now?.members.length
-    ? ` The team: ${now.members.map((m) => `${m.name} (${m.role})`).join(", ")}.`
-    : "";
-  const then = now?.goal
-    ? `This session runs the goal "${now.goal.name}"${now.goal.active ? ", under way" : ""}: ask the user too whether this is part of it, for a meeting or work in it (hold_meeting, assign), or a goal of its own (start_goal), which needs that one paused first, or another session.`
-    : "Then start a goal (start_goal) and hold the meeting (hold_meeting) or assign the work (assign).";
-  return [
-    `The user hands this to openplan's team. Don't do any of it yourself.${roster}`,
-    "",
-    task,
-    "",
-    `Propose who takes it, keeping to anyone the user named: a meeting when it needs planning among several members (who attends, the host first and whether they only run it, and what each brings to it), or one member when it doesn't (what they will do). Ask the user with AskUserQuestion to start with that or say what to change, and propose again until they start. ${then}`,
-  ].join("\n");
 }
 
 /**
@@ -248,8 +196,7 @@ const ASK_OPTIONS = 4;
  */
 async function resumeGoal($: $, number?: number): Promise<string> {
   const now = (await view($, {})).team;
-  if (now?.goal?.active)
-    return `"${now.goal.name}" is under way in this session, which runs one goal: /openplan pause it first, or take the other up in another session.`;
+  if (now?.resumeRefused) return now.resumeRefused;
   const listed = (now?.resumable ?? []).map((goal, i) => ({
     slug: goal.slug,
     name: goal.label,
@@ -344,7 +291,7 @@ async function answer($: $, need: OpenplanNeed, args: Record<string, unknown>) {
  */
 function tell($: $, now: OpenplanTeam) {
   for (const need of now.needs) {
-    if (asked.has(need.id) || (need.kind === "decision" && need.of === "delivery")) continue;
+    if (asked.has(need.id) || !need.ask) continue;
     asked.add(need.id);
     asking = asking.then(() => askNeed($, need));
   }
@@ -428,7 +375,7 @@ async function meetingTab($: $, ui: Ui, meeting: OpenplanMeeting | undefined) {
           {meeting.about} · {meeting.status}
         </Text>
         <Text dimColor>
-          {meeting.participants.join(", ")}, hosted by {meeting.participants[0]}
+          {meeting.participants.join(", ")}, hosted by {meeting.host}
         </Text>
         <Markdown key="agenda" text={meeting.agenda} dimColor />
       </Box>
@@ -461,10 +408,10 @@ async function meetingTab($: $, ui: Ui, meeting: OpenplanMeeting | undefined) {
 function toolRow(
   ui: Ui,
   key: string,
-  call: { name: string; input: unknown; state?: "done" | "error"; output?: string },
+  call: OpenplanCall & { state?: "done" | "error"; output?: string },
 ) {
   const { Box, Text } = ui;
-  const argument = mainArgument(call.input);
+  const { argument } = call;
   const lines = call.output?.trimEnd().split("\n") ?? [];
   const more = lines.length - OUTPUT_LINES;
   return (
@@ -475,7 +422,7 @@ function toolRow(
         color={call.state === "error" ? "red" : undefined}
       >
         <Text bold>⏺ {call.name}</Text>
-        {argument === undefined ? "" : `(${argument})`}
+        {argument === undefined ? "" : `(${clip(argument)})`}
         {call.state ? "" : " …"}
       </Text>
       {lines.slice(0, OUTPUT_LINES).map((line, n) => (
@@ -643,118 +590,89 @@ async function needView($: $, ui: Ui, need: OpenplanNeed) {
   const { Box, Button, Input, Markdown, Select, Text } = ui;
   const head = (
     <Box flexDirection="column">
-      <Text bold>
-        {need.from}
-        {need.about && <Text dimColor> · {need.about}</Text>}
-      </Text>
-      {need.kind !== "choices" && need.text && <Markdown key={`t-${need.id}`} text={need.text} />}
+      <Text bold>{need.headline}</Text>
+      {need.detail && <Markdown key={`t-${need.id}`} text={need.detail} />}
     </Box>
   );
   const mine = await read($, picks);
-  switch (need.kind) {
-    case "permission":
-      return (
-        <Box key={`n-${need.id}`} flexDirection="column">
-          {head}
-          <Text>{need.call}</Text>
-          <Box gap={1}>
-            {need.options.map((option) => (
-              <Button
-                key={`${need.id}-${option}`}
-                label={PERMISSIONS[option]}
-                variant={option === "once" ? "primary" : "secondary"}
-                onPress={() => answer($, need, { option })}
+  if (need.kind === "choices") {
+    const chosen = mine[need.id] ?? [];
+    // Answered once every question has its pick.
+    const pick = (index: number, value: string) =>
+      update($, picks, (all) => {
+        const now = [...(all[need.id] ?? [])];
+        now[index] = value;
+        if (need.choices.some((_, i) => now[i] === undefined)) return { ...all, [need.id]: now };
+        void answer($, need, { picks: now });
+        return Object.fromEntries(Object.entries(all).filter(([id]) => id !== need.id));
+      });
+    return (
+      <Box key={`n-${need.id}`} flexDirection="column">
+        {head}
+        {need.choices.map((choice, i) => (
+          <Box key={`${need.id}-${i}`} flexDirection="column">
+            <Text>{choice.question}</Text>
+            {choice.multiSelect ? (
+              <Input
+                key={`${need.id}-${i}-many`}
+                label={choice.header}
+                placeholder={`Any of: ${choice.options.join(", ")}`}
+                onSubmit={(value) => pick(i, value)}
               />
-            ))}
+            ) : (
+              <Select
+                key={`${need.id}-${i}-one`}
+                label={choice.header}
+                options={choice.options.map((label) => ({ value: label, label }))}
+                value={chosen[i]}
+                onSelect={(value) => pick(i, value)}
+              />
+            )}
           </Box>
-          <Input
-            key={`${need.id}-note`}
-            placeholder="Or deny it with a note"
-            submitLabel="Deny"
-            onSubmit={(note) => answer($, need, { option: "deny", note })}
-          />
-        </Box>
-      );
-    case "choices": {
-      const chosen = mine[need.id] ?? [];
-      // Answered once every question has its pick.
-      const pick = (index: number, value: string) =>
-        update($, picks, (all) => {
-          const now = [...(all[need.id] ?? [])];
-          now[index] = value;
-          if (need.choices.some((_, i) => now[i] === undefined)) return { ...all, [need.id]: now };
-          void answer($, need, { picks: now });
-          return Object.fromEntries(Object.entries(all).filter(([id]) => id !== need.id));
-        });
-      return (
-        <Box key={`n-${need.id}`} flexDirection="column">
-          {head}
-          {need.choices.map((choice, i) => (
-            <Box key={`${need.id}-${i}`} flexDirection="column">
-              <Text>{choice.question}</Text>
-              {choice.multiSelect ? (
-                <Input
-                  key={`${need.id}-${i}-many`}
-                  label={choice.header}
-                  placeholder={`Any of: ${choice.options.join(", ")}`}
-                  onSubmit={(value) => pick(i, value)}
-                />
-              ) : (
-                <Select
-                  key={`${need.id}-${i}-one`}
-                  label={choice.header}
-                  options={choice.options.map((label) => ({ value: label, label }))}
-                  value={chosen[i]}
-                  onSelect={(value) => pick(i, value)}
-                />
-              )}
-            </Box>
-          ))}
-        </Box>
-      );
-    }
-    case "decision": {
-      // A revised task goes back to the subtask that asked, unless you pick another.
-      const [back] = mine[`${need.id}:back`] ?? [];
-      return (
-        <Box key={`n-${need.id}`} flexDirection="column">
-          {head}
-          <Box gap={1}>
-            {need.options
-              .filter((option) => option !== "revise")
-              .map((option) => (
-                <Button
-                  key={`${need.id}-${option}`}
-                  label={DECISIONS[option] ?? option}
-                  onPress={() => answer($, need, { decision: option })}
-                />
-              ))}
-          </Box>
-          {need.options.includes("revise") && need.sendBack && need.sendBack.length > 1 && (
-            <Select
-              key={`${need.id}-back`}
-              label="Send back"
-              options={need.sendBack.map((s) => ({ value: s.id, label: s.title }))}
-              value={back}
-              onSelect={(value) =>
-                update($, picks, (all) => ({ ...all, [`${need.id}:back`]: [value] }))
-              }
-            />
-          )}
-          {need.options.includes("revise") && (
-            <Input
-              key={`${need.id}-revise`}
-              placeholder="What to change"
-              submitLabel="Send back"
-              onSubmit={(note) =>
-                answer($, need, { decision: "revise", note, ...(back && { sent_back: back }) })
-              }
-            />
-          )}
-        </Box>
-      );
-    }
+        ))}
+      </Box>
+    );
   }
+  const { note, sendBack } = need;
+  const noteLabel = note && need.options.find((o) => o.value === note.option)?.label;
+  // A revised task goes back to the subtask that asked, unless you pick another.
+  const [back] = mine[`${need.id}:back`] ?? [];
+  return (
+    <Box key={`n-${need.id}`} flexDirection="column">
+      {head}
+      <Box gap={1}>
+        {pickable(need).map((option) => (
+          <Button
+            key={`${need.id}-${option.value}`}
+            label={option.label}
+            variant={option.primary ? "primary" : "secondary"}
+            onPress={() => answer($, need, { option: option.value })}
+          />
+        ))}
+      </Box>
+      {note && sendBack && sendBack.length > 1 && (
+        <Select
+          key={`${need.id}-back`}
+          label={noteLabel}
+          options={sendBack.map((s) => ({ value: s.id, label: s.title }))}
+          value={back}
+          onSelect={(value) =>
+            update($, picks, (all) => ({ ...all, [`${need.id}:back`]: [value] }))
+          }
+        />
+      )}
+      {note && (
+        <Input
+          key={`${need.id}-note`}
+          placeholder={note.prompt}
+          submitLabel={noteLabel}
+          onSubmit={(text) =>
+            answer($, need, { option: note.option, note: text, ...(back && { sent_back: back }) })
+          }
+        />
+      )}
+    </Box>
+  );
 }
 
 async function needsTab($: $, ui: Ui, needs: OpenplanNeed[]) {
@@ -787,7 +705,7 @@ export const register: Register = (on) => {
     // Certain, so said without a model turn.
     const certain: Record<string, () => Promise<string>> = {
       status: () => call($, "status"),
-      pause: () => call($, "pause_goal"),
+      pause: () => call($, "goal_action", { action: "pause" }),
       resume: () => resumeGoal($),
     };
     const numbered = /^resume\s+(\d+)$/.exec(task);
@@ -803,7 +721,12 @@ export const register: Register = (on) => {
       await openPane($);
       return {};
     }
-    const text = handOff(task, await read($, team));
+    let text: string;
+    try {
+      text = await call($, "hand_off", { task });
+    } catch (error) {
+      return { text: `openplan: ${words(error)}` };
+    }
     // Once the command is done: a prompt submitted while it runs would wait on it.
     $.clock.after(0, () => {
       $.prompt.submit({ text }).catch((error: unknown) => {
@@ -864,10 +787,7 @@ export const register: Register = (on) => {
     if (!now.goal)
       return (
         <Box flexDirection="column" gap={1}>
-          <Text>
-            This session runs no goal. Hand the team a task with /openplan &lt;task&gt;, or take a
-            goal up with /openplan resume.
-          </Text>
+          <Text>{now.noGoal}</Text>
           {now.resumable.map((goal) => (
             <Text key={`goal-${goal.slug}`} dimColor>
               {goal.label}

@@ -1,19 +1,23 @@
 /**
  * The tools of openplan's mod (docs/design.md §7.2, §7.3): where the pane
  * reads the team (`pane`, its socket), how it answers what waits on you
- * (`answer`), and what `/openplan pause` and `/openplan resume` do
- * (`pause_goal`, `resume_goal`). They are the mod's, not your session's: the
- * mod keeps the model from calling them, so a permission is granted only by
- * you, pressing its button, and a goal is taken up only on your word.
+ * (`answer`), what `/openplan resume` does (`resume_goal`), and the prompt
+ * `/openplan <task>` gives your session (`hand_off`). They are the mod's, not
+ * your session's: the mod keeps the model from calling them, so a permission
+ * is granted only by you, pressing its button, and a goal is taken up only on
+ * your word.
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { Answer } from "../engine/questions.ts";
-import { DECISION_OPTIONS, PERMISSION_OPTIONS } from "../engine/types.ts";
+import { DECISION_OPTIONS, PERMISSION_OPTIONS, type PermissionOption } from "../engine/types.ts";
 import { toolText } from "../engine/turns.ts";
 import type { PaneServer } from "./pane-server.ts";
 import type { Session } from "./session.ts";
 import { decisionOf } from "./tools.ts";
+import { handOffText } from "./words.ts";
+
+const isPermission = (option: string): option is PermissionOption =>
+  (PERMISSION_OPTIONS as readonly string[]).includes(option);
 
 const PANE_ONLY = "For openplan's pane only: your session never calls it.";
 
@@ -34,37 +38,40 @@ export function addPaneTools(server: McpServer, session: Session, pane: PaneServ
       description: `${PANE_ONLY} Answers what waits on the user, as they pressed it.`,
       inputSchema: {
         question: z.string(),
-        option: z.enum(PERMISSION_OPTIONS).optional().describe("A permission's answer"),
+        option: z
+          .enum([...PERMISSION_OPTIONS, ...DECISION_OPTIONS])
+          .optional()
+          .describe("A permission's or a decision's answer"),
         picks: z.array(z.string()).optional().describe("One pick per question with choices"),
-        decision: z.enum(DECISION_OPTIONS).optional(),
         note: z.string().trim().optional().describe("Why it is denied, or what to change"),
         sent_back: z.string().optional().describe("The subtask a revised task goes back to"),
       },
     },
-    async ({ question, option, picks, decision, note, sent_back }) => {
-      const answer: Answer = option
-        ? { option, ...(note && { note }) }
-        : decision
-          ? decisionOf(decision, note, sent_back)
-          : { picks: picks ?? [] };
-      await session.goal.answer(question, answer);
+    async ({ question, option, picks, note, sent_back }) => {
+      await session.goal.answer(
+        question,
+        option === undefined
+          ? { picks: picks ?? [] }
+          : isPermission(option)
+            ? { option, ...(note && { note }) }
+            : decisionOf(option, note, sent_back),
+      );
       return toolText(`Answered ${question}.`);
     },
   );
 
   server.registerTool(
-    "pause_goal",
+    "hand_off",
     {
-      description: `${PANE_ONLY} Pauses the session's goal, as /openplan pause.`,
-      inputSchema: {},
+      description: `${PANE_ONLY} The prompt /openplan <task> gives the session: the task, for the team.`,
+      inputSchema: { task: z.string().trim().min(1) },
+      annotations: { readOnlyHint: true },
     },
-    async () => {
+    ({ task }) => {
       const engine = session.current;
-      if (!engine) return toolText(session.none);
-      const { goal } = engine.state;
-      if (goal.status !== "active") return toolText(`"${goal.name}" is ${goal.status} already.`);
-      await engine.goals.pause();
-      return toolText(`Paused "${goal.name}".`);
+      return toolText(
+        handOffText(task, engine && { goal: engine.state.goal, members: engine.team.members }),
+      );
     },
   );
 

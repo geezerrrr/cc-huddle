@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import type { GoalEntry } from "../engine/data.ts";
 import type { Work } from "../engine/derive.ts";
 import type { Ask, Member, Meeting, Question, Subtask } from "../engine/types.ts";
-import { paneTeam as paneOf } from "./pane.ts";
+import { paneTeam as paneOf, viewEntries, viewLive } from "./pane.ts";
 
 /** The pane for a session running the goal of `work`, with no other goals. */
 const paneTeam = (work: Work, team: readonly Member[], others: readonly GoalEntry[] = []) =>
-  paneOf({ work, members: team }, others);
+  paneOf({ work, members: team }, others, undefined);
 
 const role = { id: "dev", title: "Developer", duties: "" };
 const members: Member[] = [
@@ -137,7 +137,9 @@ describe("paneTeam", () => {
       'Score · "score" waits on "rules" by glm',
     ]);
     now.questions = now.questions.filter((q) => q.id !== "q3");
-    expect(paneTeam(now, members).tasks[0]).toBe('Game · glm works on "rules"');
+    expect(paneTeam(now, members).tasks[0]).toBe(
+      'Game · glm works on "rules", step 2 of 3: Write the reroll',
+    );
 
     for (const n of ["5", "6", "7", "8", "9"]) {
       now.tasks.push(task(`t${n}`, `Part ${n}`));
@@ -153,10 +155,10 @@ describe("paneTeam", () => {
     const team = paneTeam(work(), members);
     expect(team.band).toBe("1 working · 3 need you");
     expect(team.meeting).toEqual({
-      id: "m1",
       about: "Dice",
       agenda: "Plan a dice game for two, as the user put it",
       status: "plan approved",
+      host: "sonnet",
       participants: ["sonnet", "glm"],
       turns: [{ speaker: "sonnet", text: "Two dice." }],
       hands: [],
@@ -183,17 +185,21 @@ describe("paneTeam", () => {
       {
         id: "q1",
         from: "glm",
-        about: "rules",
-        text: "",
-        kind: "permission",
-        call: "Bash: npm test",
-        options: ["once", "always", "deny"],
+        headline: 'glm asks to use Bash: npm test for "rules". Allow it?',
+        ask: true,
+        kind: "options",
+        options: [
+          { value: "once", label: "Allow once", primary: true },
+          { value: "always", label: "Always allow" },
+          { value: "deny", label: "Deny" },
+        ],
+        note: { option: "deny", prompt: "Or deny it, saying why", needed: false },
       },
       {
         id: "q2",
         from: "glm",
-        about: "rules",
-        text: "Which board?",
+        headline: 'glm asks for "rules":',
+        ask: true,
         kind: "choices",
         choices: [
           { question: "Which board?", header: "Board", options: ["Grid"], multiSelect: false },
@@ -202,11 +208,14 @@ describe("paneTeam", () => {
       {
         id: "q3",
         from: "sonnet",
-        about: "board",
-        text: "Game",
-        kind: "decision",
-        of: "delivery",
-        options: ["accept", "revise"],
+        headline: 'The task "Game" is done. Accept it?',
+        ask: false,
+        kind: "options",
+        options: [
+          { value: "accept", label: "Accept" },
+          { value: "revise", label: "Send back" },
+        ],
+        note: { option: "revise", prompt: "What to change", needed: true },
         sendBack: [{ id: "board", title: "board" }],
       },
     ]);
@@ -273,7 +282,8 @@ Tell the user what was done, and ask whether to accept it or send it back with w
     ];
     const team = paneTeam(now, members, others);
     expect(team.band).toBe("paused");
-    expect(team.goal).toEqual({ name: "Dice", slug: "dice", active: false });
+    expect(team.goal).toEqual({ name: "Dice", slug: "dice" });
+    expect(team.resumeRefused).toBeUndefined();
     expect(team.resumable).toEqual([
       { slug: "dice", label: "Dice · no plan yet · paused, in this session" },
       { slug: "chess", label: "chess · 1/3 subtasks done · paused" },
@@ -281,6 +291,9 @@ Tell the user what was done, and ask whether to accept it or send it back with w
       { slug: "old", label: "old · 1/3 subtasks done · archived" },
     ]);
     now.goal.status = "active";
+    expect(paneTeam(now, members, others).resumeRefused).toBe(
+      '"Dice" is under way in this session, which runs one goal: /openplan pause it first, or take the other up in another session.',
+    );
     expect(paneTeam(now, members, others).resumable.map((r) => r.slug)).toEqual([
       "chess",
       "go",
@@ -294,7 +307,9 @@ Tell the user what was done, and ask whether to accept it or send it back with w
       state: { ...work(), subtasks: [], goal: { ...work().goal, name: slug, slug, status } },
       ...(held && { holder: { pid: 1, session: 7, address: "there", open: true } }),
     });
-    expect(paneOf(undefined, [])).toEqual({
+    expect(paneOf(undefined, [], undefined)).toEqual({
+      noGoal:
+        "This session runs no goal. Hand the team a task with /openplan <task>, or take a goal up with /openplan resume.",
       tasks: [],
       members: [],
       needs: [],
@@ -302,10 +317,84 @@ Tell the user what was done, and ask whether to accept it or send it back with w
       prompts: [],
       resumable: [],
     });
-    expect(paneOf(undefined, [entry("old", "archived")]).band).toBeUndefined();
+    expect(paneOf(undefined, [], "Dice").noGoal).toBe(
+      '"Dice" moved to another Claude Code session. Bring it back here with /openplan resume.',
+    );
+    expect(paneOf(undefined, [entry("old", "archived")], undefined).band).toBeUndefined();
     expect(
-      paneOf(undefined, [entry("a", "paused"), entry("b", "paused"), entry("c", "paused", true)])
-        .band,
+      paneOf(
+        undefined,
+        [entry("a", "paused"), entry("b", "paused"), entry("c", "paused", true)],
+        undefined,
+      ).band,
     ).toBe("2 goals paused · 1 goal in another session");
+  });
+
+  it("words a stuck review and a merge with the note each takes, if any", () => {
+    const now = work();
+    now.questions = [
+      question("q5", {
+        text: "Too small",
+        kind: "decision",
+        decision: { kind: "review", options: ["rereview", "skip", "sendBack"] },
+      }),
+      question("q6", {
+        text: "a.png\nb.png",
+        kind: "decision",
+        decision: {
+          kind: "merge",
+          options: ["ours", "theirs", "retry"],
+          files: ["a.png", "b.png"],
+        },
+      }),
+    ];
+    const [review, merge] = paneTeam(now, members).needs;
+    expect(review).toMatchObject({
+      headline: 'The review of "rules" is stuck. What now?',
+      detail: "Too small",
+      ask: true,
+      note: { option: "sendBack", prompt: "Or send it back, saying what to change", needed: false },
+    });
+    expect(merge).toMatchObject({
+      headline: 'Merging "rules" needs you. What now?',
+      detail: "a.png, b.png",
+      options: [
+        { value: "ours", label: "Keep ours" },
+        { value: "theirs", label: "Take theirs" },
+        { value: "retry", label: "Retry" },
+      ],
+    });
+    expect(merge).not.toHaveProperty("note");
+  });
+});
+
+describe("viewEntries and viewLive", () => {
+  it("name each tool call by its main argument", () => {
+    expect(
+      viewEntries([
+        { at: 0, kind: "text", text: "Done." },
+        {
+          at: 0,
+          kind: "tool",
+          name: "Bash",
+          input: { command: "npm test", timeout: 5 },
+          state: "done",
+          output: "ok",
+        },
+        { at: 0, kind: "tool", name: "TodoWrite", input: {}, state: "error", output: "" },
+      ]),
+    ).toEqual([
+      { at: 0, kind: "text", text: "Done." },
+      { at: 0, kind: "tool", name: "Bash", argument: "npm test", state: "done", output: "ok" },
+      { at: 0, kind: "tool", name: "TodoWrite", state: "error", output: "" },
+    ]);
+    expect(
+      viewLive({
+        starting: "Read",
+        running: [
+          { kind: "tool", id: "c1", name: "Grep", input: { pattern: "board" }, state: "running" },
+        ],
+      }),
+    ).toEqual({ starting: "Read", running: [{ name: "Grep", argument: "board" }] });
   });
 });

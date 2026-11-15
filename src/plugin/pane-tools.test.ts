@@ -110,24 +110,33 @@ describe("the pane's socket and tools", () => {
     ]);
   });
 
-  it("pause the session's goal, and take up the one picked", async () => {
-    expect((await call("pause_goal")).text).toContain("This session runs no goal");
-    await session.start("Dice");
-    expect((await call("pause_goal")).text).toBe('Paused "Dice".');
-    expect((await call("pause_goal")).text).toBe('"Dice" is paused already.');
+  it("take up the goal picked, and refuse while the session's own is under way", async () => {
+    const dice = await session.start("Dice");
+    await dice.goals.pause();
     expect((await view()).team?.resumable).toEqual([
       { slug: "dice", label: "Dice · no plan yet · paused, in this session" },
     ]);
     expect((await call("resume_goal", { goal: "dice" })).text).toBe('Resumed "Dice".');
     expect(session.current?.state.goal.status).toBe("active");
-    await call("pause_goal");
-    await session.start("Chess");
+    await dice.goals.pause();
+    const chess = await session.start("Chess");
+    expect((await view()).team?.resumeRefused).toContain('"Chess" is under way');
     expect((await call("resume_goal", { goal: "dice" })).text).toContain('"Chess" is under way');
-    await call("pause_goal");
+    await chess.goals.pause();
     expect((await call("resume_goal", { goal: "dice" })).text).toBe('Resumed "Dice".');
     expect((await view()).team?.resumable).toEqual([
       { slug: "chess", label: "Chess · no plan yet · paused" },
     ]);
+  });
+
+  it("hand the session a task for the team, with the goal it runs and its team", async () => {
+    expect((await call("hand_off", { task: "Add a scoreboard" })).text).toBe(
+      "The user hands this to openplan's team: take it on as openplan's team skill says, and don't do any of it yourself.\n\nAdd a scoreboard\n\nThis session runs no goal yet.",
+    );
+    await session.start("Dice");
+    expect((await call("hand_off", { task: "Add a scoreboard" })).text).toContain(
+      'This session runs the goal "Dice", under way. The team: glm (Developer).',
+    );
   });
 
   it("take up only a goal named by its slug", async () => {
@@ -155,6 +164,8 @@ describe("the pane's socket and tools", () => {
   it("give the team only when it changed since the pane's revision", async () => {
     const first = await view();
     expect(first.team).toEqual({
+      noGoal:
+        "This session runs no goal. Hand the team a task with /openplan <task>, or take a goal up with /openplan resume.",
       tasks: [],
       members: [],
       needs: [],
@@ -167,7 +178,7 @@ describe("the pane's socket and tools", () => {
     const next = await view({ revision: first.revision });
     expect(next.revision).toBeGreaterThan(first.revision);
     expect(next.team).toMatchObject({
-      goal: { name: "Dice", slug: "dice", active: true },
+      goal: { name: "Dice", slug: "dice" },
       band: "idle",
       members: [{ name: "glm", role: "Developer", model: "glm-5", doing: "free", tokens: 0 }],
     });

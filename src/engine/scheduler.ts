@@ -34,16 +34,17 @@ import {
 import type { Answer, Questions } from "./questions.ts";
 import { runSubtask, type RunOutcome } from "./run.ts";
 import { askOnce, type Step } from "./turns.ts";
-import type {
-  DecisionOption,
-  Goal,
-  GoOn,
-  Member,
-  PlanTask,
-  Progress,
-  Question,
-  Subtask,
-  Task,
+import {
+  DECISIONS,
+  type DecisionOption,
+  type Goal,
+  type GoOn,
+  type Member,
+  type PlanTask,
+  type Progress,
+  type Question,
+  type Subtask,
+  type Task,
 } from "./types.ts";
 
 /** A reviewer's verdict on a delivery. */
@@ -51,11 +52,6 @@ const verdictSchema = z.object({ pass: z.boolean(), notes: z.string().trim() });
 
 /** Sent back this many times, a delivery is yours to decide on. */
 const REVIEW_ROUNDS = 3;
-
-/** Your calls on a stuck review, a merge with files that can't be merged line by line, and a task done. */
-const REVIEW_CALLS: DecisionOption[] = ["rereview", "skip", "sendBack"];
-const SIDE_CALLS: DecisionOption[] = ["ours", "theirs", "retry"];
-const DELIVERY_CALLS: DecisionOption[] = ["accept", "revise"];
 
 /** One more reason for a subtask to go on in its session, after those it has. */
 function goOnWith(subtask: Subtask, reason: GoOn) {
@@ -675,7 +671,7 @@ export class Scheduler {
       else if (rounds >= REVIEW_ROUNDS)
         this.questions.openDecision(
           subtask,
-          { kind: "review", options: REVIEW_CALLS },
+          { kind: "review", options: [...DECISIONS.review.options] },
           verdict.notes,
         );
       else {
@@ -686,7 +682,7 @@ export class Scheduler {
       if (abort.signal.aborted || subtask.status !== "reviewing") return;
       this.questions.openDecision(
         subtask,
-        { kind: "review", options: REVIEW_CALLS },
+        { kind: "review", options: [...DECISIONS.review.options] },
         errorText(error),
       );
     } finally {
@@ -722,7 +718,7 @@ export class Scheduler {
       } else if (merged.other.length) {
         this.questions.openDecision(
           subtask,
-          { kind: "merge", options: SIDE_CALLS, files: merged.other },
+          { kind: "merge", options: [...DECISIONS.merge.options], files: merged.other },
           merged.other.join("\n"),
         );
       } else {
@@ -753,7 +749,7 @@ export class Scheduler {
     if (!this.taskOf(subtask).ownerAccepts) return;
     this.questions.openDecision(
       subtask,
-      { kind: "delivery", options: DELIVERY_CALLS },
+      { kind: "delivery", options: [...DECISIONS.delivery.options] },
       this.taskOf(subtask).title,
     );
   }

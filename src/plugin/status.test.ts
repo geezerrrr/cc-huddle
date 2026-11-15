@@ -60,7 +60,7 @@ describe("statusText", () => {
         question("q1", {
           subtaskId: "Rules",
           kind: "permission",
-          permission: { tool: "Bash", input: {}, title: "Run the tests", options: ["once"] },
+          permission: { tool: "Bash", input: { command: "npm test" }, options: ["once"] },
         }),
         question("q2", {
           subtaskId: "Score",
@@ -80,7 +80,7 @@ Team: glm (busy), sonnet
     - Score [Score], glm: failed, error: API Error: 529
 
 Waiting on you:
-  - [q1] glm asks to use Bash: Run the tests. Answer it in /openplan.
-  - [q2] The task "Game" is done: accept, revise.`);
+  - [q1] glm asks to use Bash: npm test for "Rules". Allow it? The user answers it in /openplan.
+  - [q2] The task "Game" is done. Accept it? Options: accept, revise.`);
   });
 });

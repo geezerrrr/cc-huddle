@@ -232,9 +232,30 @@ export type DecisionOption = (typeof DECISION_OPTIONS)[number];
 
 export type DecisionKind = "review" | "merge" | "delivery";
 
-/** The answers a permission request offers. */
+/**
+ * What a decision of each kind offers, and the option a note typed instead
+ * of a pick goes with, `needed` where that option is no answer without one.
+ * A merge that failed for another reason than its files offers `retry` alone.
+ */
+export const DECISIONS: Record<
+  DecisionKind,
+  { options: readonly DecisionOption[]; note?: { option: DecisionOption; needed?: true } }
+> = {
+  review: { options: ["rereview", "skip", "sendBack"], note: { option: "sendBack" } },
+  merge: { options: ["ours", "theirs", "retry"] },
+  delivery: { options: ["accept", "revise"], note: { option: "revise", needed: true } },
+};
+
+/** Whether picking `option` is no answer to a decision of `kind` without a note. */
+export function noteNeeded(kind: DecisionKind, option: DecisionOption): boolean {
+  const { note } = DECISIONS[kind];
+  return note?.option === option && note.needed === true;
+}
+
+/** The answers a permission request offers; a note typed instead denies it, saying why. */
 export const PERMISSION_OPTIONS = ["once", "always", "deny"] as const;
 export type PermissionOption = (typeof PERMISSION_OPTIONS)[number];
+export const PERMISSION_NOTE: PermissionOption = "deny";
 
 /** A decision on a subtask. `files`: conflicts that can't be merged line by line. */
 export interface Decision {
@@ -244,13 +265,12 @@ export interface Decision {
 }
 
 /**
- * A tool call waiting to be allowed: the tool, its input as the member gave
- * it, and Claude Code's own sentence for the call when it has one.
+ * A tool call waiting to be allowed: the tool, and its input as the member
+ * gave it.
  */
 export interface Permission {
   tool: string;
   input: Record<string, unknown>;
-  title?: string;
   options: PermissionOption[];
 }
 

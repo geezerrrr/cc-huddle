@@ -16,6 +16,7 @@ import type {
 import type { AskUserQuestionInput } from "@anthropic-ai/claude-agent-sdk/sdk-tools";
 import { QUESTION_MACHINE, step } from "./machines.ts";
 import {
+  noteNeeded,
   type Ask,
   type Choice,
   type Decision,
@@ -184,7 +185,6 @@ export class Questions {
       permission: {
         tool,
         input,
-        ...(request.title !== undefined && { title: request.title }),
         options: rules.length ? ["once", "always", "deny"] : ["once", "deny"],
       },
     });
@@ -245,6 +245,7 @@ export class Questions {
         return (
           "decision" in answer &&
           question.decision.options.includes(answer.decision) &&
+          (answer.note !== undefined || !noteNeeded(question.decision.kind, answer.decision)) &&
           (answer.decision !== "revise" || this.revisable(question, answer))
         );
       case "teammate":
@@ -252,9 +253,8 @@ export class Questions {
     }
   }
 
-  /** Sending a task back says what to change, and sends back only one of its subtasks that is done. */
+  /** Sending a task back sends back only one of its subtasks that is done. */
   private revisable(question: Question, answer: Extract<Answer, { decision: DecisionOption }>) {
-    if (!answer.note) return false;
     if (answer.sentBack === undefined) return true;
     const { subtasks } = this.inbox.state;
     const taskId = subtasks.find((s) => s.id === question.subtaskId)?.taskId;

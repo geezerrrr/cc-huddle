@@ -2,9 +2,13 @@
  * The team as openplan's pane shows it (docs/design.md §7.2), worked out here
  * from the state so the mod only draws: the band's words, the meeting, each
  * member at what they do, what waits on you with the answers it takes, the
- * milestones the transcript keeps, and what your session is asked to talk over.
+ * milestones the transcript keeps, what your session is asked to talk over,
+ * and a member's record with each call in its line.
  */
 import type {
+  OpenplanCall,
+  OpenplanEntry,
+  OpenplanLive,
   OpenplanMeeting,
   OpenplanMember,
   OpenplanNeed,
@@ -12,18 +16,35 @@ import type {
 } from "../../plugin/types/index.d.ts";
 import type { GoalEntry } from "../engine/data.ts";
 import { derive, reviewerOf, type Work } from "../engine/derive.ts";
+import type { LiveRun, RecordEntry } from "../engine/records.ts";
 import {
+  DECISIONS,
+  PERMISSION_NOTE,
   toYou,
+  type DecisionOption,
   type Derived,
   type Member,
   type Meeting,
-  type Permission,
+  type PermissionOption,
   type QuestionToYou,
   type Subtask,
 } from "../engine/types.ts";
-import { othersOf, progressOf, stepText, waitText, whereOf } from "./status.ts";
-
-const plural = (n: number, one: string, many: string) => `${String(n)} ${n === 1 ? one : many}`;
+import { othersOf } from "./status.ts";
+import {
+  goalLabel,
+  mainArgument,
+  meetingStatus,
+  needWords,
+  noGoalText,
+  NOTE_PROMPTS,
+  OPTION_LABELS,
+  PLAN_TO_REVIEW,
+  plural,
+  resumeRefusal,
+  underWay,
+  waitText,
+  whereOf,
+} from "./words.ts";
 
 /** The meeting the pane shows: one under way, else one whose plan waits on you, else the latest. */
 export function shownMeeting(work: Work): Meeting | undefined {
@@ -32,35 +53,12 @@ export function shownMeeting(work: Work): Meeting | undefined {
   return latest("running") ?? latest("review") ?? latest();
 }
 
-function meetingStatus(meeting: Meeting): string {
-  switch (meeting.status) {
-    case "running":
-      return meeting.planning
-        ? `${meeting.host} writes the plan`
-        : meeting.speaking
-          ? `${meeting.speaking} speaks`
-          : meeting.drafting
-            ? "the members form their first judgments"
-            : meeting.weighing
-              ? "deciding who speaks next"
-              : "under way";
-    case "review":
-      return "its plan waits for you";
-    case "approved":
-      return "plan approved";
-    case "cancelled":
-      return "cancelled";
-    case "failed":
-      return `failed${meeting.error ? `: ${meeting.error}` : ""}`;
-  }
-}
-
 const meetingOf = (meeting: Meeting, work: Work): OpenplanMeeting => ({
-  id: meeting.id,
   // Its agenda is the brief your session wrote for it, too long for a line.
   about: work.goal.name,
   agenda: meeting.agenda,
   status: meetingStatus(meeting),
+  host: meeting.host,
   participants: meeting.participants,
   turns: meeting.turns.map((t) => ({
     speaker: t.speaker,
@@ -86,14 +84,12 @@ function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>
   );
   const next = at("pending");
   const running = at("running");
-  let doing: string;
-  if (running) {
-    const step = stepText(running.progress);
-    doing = `works on "${running.title}"${step ? `, ${step}` : ""}`;
-  } else if (meeting) doing = `at the meeting on "${work.goal.name}"`;
+  const handedOver = at("reviewing") ?? at("merging");
+  let doing: string | undefined;
+  if (running) doing = underWay(running);
+  else if (meeting) doing = `at the meeting on "${work.goal.name}"`;
   else if (reviewing) doing = `reviews "${reviewing.title}" by ${reviewing.assignee}`;
-  else if (at("reviewing")) doing = `"${at("reviewing")?.title ?? ""}" is in review`;
-  else if (at("merging")) doing = `"${at("merging")?.title ?? ""}" is being merged`;
+  else if (handedOver) doing = underWay(handedOver);
   else if (next) {
     const waits = derived.subtasks[next.id]?.waits ?? [];
     doing = `next: "${next.title}"${waits.length ? `, ${waits.map((w) => waitText(w, work)).join(", ")}` : ""}`;
@@ -109,39 +105,54 @@ function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>
     name: member.name,
     role: member.role.title,
     ...(member.model && { model: member.model }),
-    doing,
+    doing: doing ?? "free",
     ...(followed && { subtask: followed.id }),
     tokens: own.reduce((sum, s) => sum + s.tokens, 0) + spoken,
   };
 }
 
-/** A tool call in a line: Claude Code's own sentence for it, else the tool and its main argument. */
-function callText(permission: Permission): string {
-  if (permission.title) return permission.title;
-  const { input } = permission;
-  // As the mod's callLine reads a call in a member's record.
-  const main = ["command", "file_path", "path", "pattern", "url", "description"]
-    .map((key) => input[key])
-    .find((value) => typeof value === "string");
-  return main ? `${permission.tool}: ${main}` : permission.tool;
+/** An answer a need takes, labelled. */
+const optionOf = (value: PermissionOption | DecisionOption) => ({
+  value,
+  label: OPTION_LABELS[value],
+});
+
+/** The answer a note typed instead of a pick goes with, if `options` offers it. */
+function noteOf(
+  options: readonly (PermissionOption | DecisionOption)[],
+  note: { option: PermissionOption | DecisionOption; needed?: true } | undefined,
+) {
+  if (!note || !options.includes(note.option)) return undefined;
+  return {
+    option: note.option,
+    prompt: NOTE_PROMPTS[note.option] ?? OPTION_LABELS[note.option],
+    needed: note.needed === true,
+  };
 }
 
 function needOf(question: QuestionToYou, work: Work): OpenplanNeed {
-  const subtask = work.subtasks.find((s) => s.id === question.subtaskId);
+  const { headline, detail } = needWords(question, work);
   const head = {
     id: question.id,
     from: question.from,
-    about: subtask?.title ?? "",
-    text: question.text,
+    headline,
+    ...(detail && { detail }),
+    ask: question.kind !== "decision" || question.decision.kind !== "delivery",
   };
   switch (question.kind) {
-    case "permission":
+    case "permission": {
+      const { options } = question.permission;
+      const note = noteOf(options, { option: PERMISSION_NOTE });
       return {
         ...head,
-        kind: "permission",
-        call: callText(question.permission),
-        options: question.permission.options,
+        kind: "options",
+        options: options.map((o) => ({
+          ...optionOf(o),
+          ...(o === "once" && { primary: true as const }),
+        })),
+        ...(note && { note }),
       };
+    }
     case "choices":
       return {
         ...head,
@@ -154,13 +165,16 @@ function needOf(question: QuestionToYou, work: Work): OpenplanNeed {
         })),
       };
     case "decision": {
+      const { kind, options } = question.decision;
+      const note = noteOf(options, DECISIONS[kind].note);
+      const subtask = work.subtasks.find((s) => s.id === question.subtaskId);
       const done = work.subtasks.filter((s) => s.taskId === subtask?.taskId && s.status === "done");
       return {
         ...head,
-        kind: "decision",
-        of: question.decision.kind,
-        options: question.decision.options,
-        ...(question.decision.kind === "delivery" && {
+        kind: "options",
+        options: options.map(optionOf),
+        ...(note && { note }),
+        ...(kind === "delivery" && {
           sendBack: done.map((s) => ({ id: s.id, title: s.title })),
         }),
       };
@@ -237,11 +251,10 @@ function taskWhere(work: Work, derived: Derived, subtasks: Subtask[]): string | 
   if (!at) return undefined;
   switch (at.status) {
     case "running":
-      return `${at.assignee} works on "${at.title}"`;
+      return `${at.assignee} ${underWay(at) ?? ""}`;
     case "reviewing":
-      return `"${at.title}" in review`;
     case "merging":
-      return `"${at.title}" merging`;
+      return underWay(at);
     case "pending": {
       const [wait] = derived.subtasks[at.id]?.waits ?? [];
       return `"${at.title}" ${wait ? waitText(wait, work) : "starts next"}`;
@@ -282,7 +295,7 @@ function taskLines(work: Work, derived: Derived): string[] {
 function bandText(work: Work, needs: number): string {
   const parts: string[] = [];
   if (work.meetings.some((m) => m.status === "running")) parts.push("meeting");
-  if (work.meetings.some((m) => m.status === "review")) parts.push("plan to review");
+  if (work.meetings.some((m) => m.status === "review")) parts.push(PLAN_TO_REVIEW);
   const working = work.subtasks.filter((s) => s.status === "running").length;
   if (working) parts.push(`${String(working)} working`);
   if (needs) parts.push(`${plural(needs, "needs", "need")} you`);
@@ -309,10 +322,12 @@ function othersBand(others: readonly GoalEntry[]): string | undefined {
 export function paneTeam(
   mine: { work: Work; members: readonly Member[] } | undefined,
   others: readonly GoalEntry[],
+  moved: string | undefined,
 ): OpenplanTeam {
   if (!mine) {
     const band = othersBand(others);
     return {
+      noGoal: noGoalText(moved),
       ...(band && { band }),
       tasks: [],
       members: [],
@@ -333,14 +348,9 @@ export function paneTeam(
   const here =
     goal.status === "active"
       ? []
-      : [
-          {
-            slug: goal.slug,
-            label: `${goal.name} · ${progressOf(work)} · ${goal.status}, in this session`,
-          },
-        ];
+      : [{ slug: goal.slug, label: goalLabel(work, `${goal.status}, in this session`) }];
   return {
-    goal: { name: goal.name, slug: goal.slug, active: goal.status === "active" },
+    goal: { name: goal.name, slug: goal.slug },
     band: bandText(work, needs.length),
     tasks: taskLines(work, derived),
     ...(meeting && { meeting: meetingOf(meeting, work) }),
@@ -349,5 +359,27 @@ export function paneTeam(
     milestones: milestones(work),
     prompts: prompts(work),
     resumable: [...here, ...othersOf(others)],
+    ...(goal.status === "active" && { resumeRefused: resumeRefusal(goal.name) }),
   };
 }
+
+/** A tool call as its line names it. */
+const callOf = (name: string, input: unknown): OpenplanCall => {
+  const argument = mainArgument(input);
+  return { name, ...(argument !== undefined && { argument }) };
+};
+
+/** A record's entries as the pane draws them: each tool call by its main argument. */
+export const viewEntries = (entries: readonly RecordEntry[]): OpenplanEntry[] =>
+  entries.map((entry) => {
+    if (entry.kind !== "tool") return entry;
+    const { input, name, ...rest } = entry;
+    return { ...rest, ...callOf(name, input) };
+  });
+
+/** What a run does now, as the pane draws it. */
+export const viewLive = (live: LiveRun): OpenplanLive => ({
+  ...(live.streaming && { streaming: live.streaming }),
+  ...(live.starting && { starting: live.starting }),
+  running: live.running.map((call) => callOf(call.name, call.input)),
+});

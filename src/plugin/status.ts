@@ -6,48 +6,8 @@
 import type { GoalEntry } from "../engine/data.ts";
 import { derive, type Work } from "../engine/derive.ts";
 import { goalBranch } from "../engine/git.ts";
-import {
-  toYou,
-  type Meeting,
-  type QuestionToYou,
-  type Subtask,
-  type Wait,
-} from "../engine/types.ts";
-
-const MEETING_STATUS: Record<Meeting["status"], string> = {
-  running: "under way",
-  review: "its plan waits for you: approve it, change it, or cancel it",
-  approved: "plan approved",
-  cancelled: "cancelled",
-  failed: "failed",
-};
-
-/** What a subtask waits on, in words. */
-export function waitText(wait: Wait, work: Work): string {
-  switch (wait.kind) {
-    case "goal":
-      return `its goal is ${wait.status}`;
-    case "upstream": {
-      const upstream = work.subtasks.find((s) => s.id === wait.subtaskId);
-      return `waits on "${upstream?.title ?? ""}" by ${wait.by}${wait.halted ? ", which has stopped" : ""}`;
-    }
-    case "busy":
-      return `waits until ${wait.by} is free`;
-    case "teammate":
-      return `asked ${wait.by}`;
-    case "you":
-      return wait.decision ? "waits on your decision" : "waits on your answer";
-    case "acceptance":
-      return "waits until you accept the task it builds on";
-  }
-}
-
-/** Where a running subtask is: "step 2 of 3: Write the reroll"; nothing before its steps are known. */
-export function stepText({ done, total, current }: Subtask["progress"]): string | undefined {
-  if (!total) return undefined;
-  const step = `step ${String(Math.min(done + 1, total))} of ${String(total)}`;
-  return current ? `${step}: ${current}` : step;
-}
+import { toYou, type QuestionToYou, type Subtask, type Wait } from "../engine/types.ts";
+import { goalLabel, meetingStatus, needWords, stepText, waitText, whereOf } from "./words.ts";
 
 /** A subtask on one line: its status, how far it is, what it waits on, what went wrong. */
 function subtaskLine(subtask: Subtask, waits: Wait[], work: Work): string {
@@ -59,23 +19,16 @@ function subtaskLine(subtask: Subtask, waits: Wait[], work: Work): string {
   return `    - ${subtask.title} [${subtask.id}], ${subtask.assignee}: ${parts.join(", ")}`;
 }
 
-/** A question put to you, in words. */
+/** A question put to you, in words: a decision with the options `decide` takes. */
 function questionLine(question: QuestionToYou, work: Work): string {
-  const about = work.subtasks.find((s) => s.id === question.subtaskId);
-  const head = `  - [${question.id}] `;
-  if (question.kind === "permission")
-    return `${head}${question.from} asks to use ${question.permission.tool}${question.permission.title ? `: ${question.permission.title}` : ""}. Answer it in /openplan.`;
-  if (question.kind === "choices")
-    return `${head}${question.from} asks: ${question.choices.map((c) => c.question).join(" ")} Answer it in /openplan.`;
-  const options = question.decision.options.join(", ");
-  switch (question.decision.kind) {
-    case "delivery":
-      return `${head}The task "${question.text}" is done: ${options}.`;
-    case "review":
-      return `${head}The review of "${about?.title ?? ""}" is stuck (${question.text}): ${options}.`;
-    case "merge":
-      return `${head}Merging "${about?.title ?? ""}" needs you (${question.text.split("\n").join(", ")}): ${options}.`;
-  }
+  const { headline, detail } = needWords(question, work);
+  const asks =
+    question.kind === "choices" ? ` ${question.choices.map((c) => c.question).join(" ")}` : "";
+  const then =
+    question.kind === "decision"
+      ? ` Options: ${question.decision.options.join(", ")}.`
+      : " The user answers it in /openplan.";
+  return `  - [${question.id}] ${headline}${asks}${detail ? ` (${detail})` : ""}${then}`;
 }
 
 /** The session's goal with its team, meetings and work, and what waits on you. */
@@ -89,7 +42,7 @@ export function statusText(work: Work): string {
   ];
   for (const meeting of work.meetings.filter((m) => m.status !== "approved"))
     lines.push(
-      `  Meeting [${meeting.id}], hosted by ${meeting.host}${meeting.hostOnly ? ", who only runs it" : ""}: ${MEETING_STATUS[meeting.status]}${meeting.error ? ` (${meeting.error})` : ""}${derived.resumable.includes(meeting.id) ? "; it can go on" : ""}`,
+      `  Meeting [${meeting.id}], hosted by ${meeting.host}${meeting.hostOnly ? ", who only runs it" : ""}: ${meetingStatus(meeting)}${meeting.status === "review" ? ": approve it, change it, or cancel it" : ""}${derived.resumable.includes(meeting.id) ? "; it can go on" : ""}`,
     );
   for (const task of work.tasks) {
     lines.push(
@@ -103,29 +56,11 @@ export function statusText(work: Work): string {
   return lines.join("\n");
 }
 
-/** Where a goal is: in another session, archived, or paused, as a session that ended left it too. */
-export const whereOf = (entry: GoalEntry) =>
-  entry.holder
-    ? "in another session"
-    : entry.state.goal.status === "archived"
-      ? "archived"
-      : "paused";
-
-/** How far a goal got, in words. */
-export function progressOf({ subtasks, meetings }: GoalEntry["state"]): string {
-  const done = subtasks.filter((s) => s.status === "done").length;
-  return subtasks.length
-    ? `${String(done)}/${String(subtasks.length)} subtasks done`
-    : meetings.some((m) => m.status === "review")
-      ? "plan to review"
-      : "no plan yet";
-}
-
 /** The repository's goals not running here, each named with how far it got and where it is, for `/openplan resume`. */
 export const othersOf = (others: readonly GoalEntry[]): { slug: string; label: string }[] =>
   others.map((entry) => ({
     slug: entry.slug,
-    label: `${entry.state.goal.name} · ${progressOf(entry.state)} · ${whereOf(entry)}`,
+    label: goalLabel(entry.state, whereOf(entry)),
   }));
 
 /** The repository's goals a session doesn't run, a line each; undefined when there are none. */
