@@ -14,6 +14,7 @@ import { toolText } from "../engine/turns.ts";
 import type { PaneServer } from "./pane-server.ts";
 import type { Session } from "./session.ts";
 import { handOffText } from "./words.ts";
+import { SLUG } from "../engine/git.ts";
 
 const isPermission = (option: string): option is PermissionOption =>
   (PERMISSION_OPTIONS as readonly string[]).includes(option);
@@ -79,11 +80,7 @@ export function addPaneTools(server: McpServer, session: Session, pane: PaneServ
     {
       description: `${PANE_ONLY} Takes up the goal you picked in this session and resumes it, as /openplan resume.`,
       inputSchema: {
-        // A slug names a folder: nothing that reaches out of the goals' folder.
-        goal: z
-          .string()
-          .regex(/^[a-z0-9-]+$/)
-          .describe("The goal's slug"),
+        goal: z.string().regex(SLUG).describe("The goal's slug"),
       },
     },
     async ({ goal: slug }) => {

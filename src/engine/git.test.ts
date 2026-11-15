@@ -16,6 +16,7 @@ import {
   openRepository,
   pickSide,
   removeGoal,
+  SLUG,
   slugFor,
   subtaskBranch,
   takenSlugs,
@@ -107,6 +108,9 @@ describe("goals", () => {
     expect(slugFor("Two-player Dice Game!", new Set())).toBe("two-player-dice-game");
     expect(slugFor("dice", new Set(["dice", "dice-2"]))).toBe("dice-3");
     expect(slugFor("骰子", new Set())).toBe("goal");
+    for (const name of ["Two-player Dice Game!", "--a  b--", "x".repeat(60) + " y"])
+      expect(slugFor(name, new Set())).toMatch(SLUG);
+    expect("../x").not.toMatch(SLUG);
   });
 
   it("cuts a goal's branch from HEAD and checks it out in its own folder", async () => {

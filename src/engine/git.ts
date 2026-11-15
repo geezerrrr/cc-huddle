@@ -145,6 +145,9 @@ export async function takenSlugs(repo: Repository): Promise<Set<string>> {
   return new Set(refs.stdout.split("\n").flatMap((ref) => (ref ? [ref.split("/")[0] ?? ""] : [])));
 }
 
+/** What a slug is (slugFor): lowercase letters and digits in dashed runs, nothing that reaches out of a folder. */
+export const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
 /** A goal's slug from its name: lowercase letters, digits and dashes, `-2` and on when taken. */
 export function slugFor(name: string, taken: ReadonlySet<string>): string {
   const base =
