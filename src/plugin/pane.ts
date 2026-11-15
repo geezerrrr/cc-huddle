@@ -19,6 +19,8 @@ import {
   derive,
   type Derived,
   type GoalEntry,
+  inProgress,
+  type InProgress,
   type LiveRun,
   type Meeting,
   type Member,
@@ -32,7 +34,6 @@ import {
   toYou,
   type Work,
 } from "../engine/index.ts";
-import { resumableOf } from "./status.ts";
 import {
   attendanceText,
   goalLabel,
@@ -45,10 +46,9 @@ import {
   OPTION_LABELS,
   PLAN_TO_REVIEW,
   plural,
+  resumableOf,
   resumeRefusal,
-  isUnderWay,
-  underWay,
-  type UnderWay,
+  inProgressText,
   waitText,
   whereOf,
   STATUS_WORDS,
@@ -81,8 +81,8 @@ function meetingOf(meeting: Meeting, work: Work): OpenplanMeeting {
 
 function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>): OpenplanMember {
   const own = work.subtasks.filter((s) => s.assignee === member.name);
-  const at = (...statuses: UnderWay["status"][]) =>
-    own.find((s): s is UnderWay => isUnderWay(s) && statuses.includes(s.status));
+  const at = (...statuses: InProgress["status"][]) =>
+    own.find((s): s is InProgress => inProgress(s) && statuses.includes(s.status));
   const reviewing = work.subtasks.find(
     (s) => s.assignee !== member.name && derived.subtasks[s.id]?.reviewedBy === member.name,
   );
@@ -93,10 +93,10 @@ function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>
   const running = at("running");
   const handedOver = at("reviewing") ?? at("merging");
   let doing: string;
-  if (running) doing = underWay(running);
+  if (running) doing = inProgressText(running);
   else if (meeting) doing = `at the meeting on "${work.goal.name}"`;
   else if (reviewing) doing = `reviews "${reviewing.title}" by ${reviewing.assignee}`;
-  else if (handedOver) doing = underWay(handedOver);
+  else if (handedOver) doing = inProgressText(handedOver);
   else if (next) {
     const waits = derived.subtasks[next.id]?.waits ?? [];
     doing = `next: "${next.title}"${waits.length ? `, ${waits.map((w) => waitText(w, work)).join(", ")}` : ""}`;
@@ -219,6 +219,9 @@ function milestones(work: Work): OpenplanTeam["milestones"] {
   return said;
 }
 
+/** Where a prompt to your session points for what to do with it. */
+const AS_THE_SKILL_SAYS = "Take it to the user as openplan's team skill says.";
+
 /**
  * What needs a conversation (§7.3): each plan out for review, and each task
  * done, waiting to be accepted. The mod submits each new one to your session.
@@ -229,7 +232,7 @@ function prompts(work: Work): OpenplanTeam["prompts"] {
     if (meeting.status === "review" && meeting.plan)
       asked.push({
         key: `review:${meeting.id}`,
-        text: `The meeting [${meeting.id}] on "${work.goal.name}" has a plan: ${meeting.plan.summary}. Get it with show_plan and show it to the user in full: its document as it is written, then its tasks, each with its subtasks, who does them and what each waits on. Then ask whether to approve it, change it, or cancel it, and which tasks, if any, they want to accept themselves once done: none is unless they say, since reviews and checks confirm the work; it is worth it for a result only looking at it or trying it can judge.`,
+        text: `The meeting [${meeting.id}] on "${work.goal.name}" has a plan for review: ${meeting.plan.summary}. ${AS_THE_SKILL_SAYS}`,
       });
   for (const question of work.questions) {
     if (question.kind !== "decision" || question.decision.kind !== "delivery") continue;
@@ -242,7 +245,7 @@ function prompts(work: Work): OpenplanTeam["prompts"] {
       text: [
         `The task "${question.text}" is done [${question.id}], merged into its goal's branch:`,
         ...delivered,
-        "Tell the user what was done, and ask whether to accept it or send it back with what to change (decide).",
+        AS_THE_SKILL_SAYS,
       ].join("\n"),
     });
   }
@@ -254,9 +257,11 @@ const BAND_TASKS = 5;
 
 /** Where a task's work is, in words: the subtask under way, else the next one and what it waits on. */
 function taskWhere(work: Work, derived: Derived, subtasks: Subtask[]): string | undefined {
-  const going = subtasks.find(isUnderWay);
+  const going = subtasks.find(inProgress);
   if (going)
-    return going.status === "running" ? `${going.assignee} ${underWay(going)}` : underWay(going);
+    return going.status === "running"
+      ? `${going.assignee} ${inProgressText(going)}`
+      : inProgressText(going);
   const at = subtasks.find((s) => s.status !== "done");
   if (!at) return undefined;
   switch (at.status) {
@@ -311,7 +316,7 @@ function bandText(work: Work, needs: number): string {
 /** The band of a session without a goal: the goals it can take up, but those archived; nothing with none. */
 function othersBand(others: readonly GoalEntry[]): string | undefined {
   const paused = others.filter((e) => whereOf(e) === "paused").length;
-  const elsewhere = others.filter((e) => whereOf(e) === "in another session").length;
+  const elsewhere = others.filter((e) => whereOf(e) === "elsewhere").length;
   const parts = [
     ...(paused ? [plural(paused, "goal paused", "goals paused")] : []),
     ...(elsewhere ? [`${plural(elsewhere, "goal", "goals")} in another session`] : []),

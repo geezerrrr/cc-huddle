@@ -7,6 +7,7 @@ import {
   type DecisionOption,
   type GoalEntry,
   type GoalState,
+  type InProgress,
   hostOf,
   type Meeting,
   type MeetingNow,
@@ -86,9 +87,9 @@ export function waitText(wait: Wait, work: Work): string {
     case "teammate":
       return `asked ${wait.by}`;
     case "you":
-      return wait.decision ? "waits on your decision" : "waits on your answer";
+      return wait.decision ? "waits for a decision" : "waits for an answer";
     case "acceptance":
-      return "waits until you accept the task it builds on";
+      return "waits until the task it builds on is accepted";
   }
 }
 
@@ -116,14 +117,8 @@ export function stepText({ done, total, current }: Subtask["progress"]): string 
   return current ? `${step}: ${current}` : step;
 }
 
-/** A subtask under way: worked on, in review, or being merged. */
-export type UnderWay = Subtask & { status: "running" | "reviewing" | "merging" };
-
-export const isUnderWay = (subtask: Subtask): subtask is UnderWay =>
-  subtask.status === "running" || subtask.status === "reviewing" || subtask.status === "merging";
-
-/** A subtask under way, in words: worked on and how far, in review, or being merged. */
-export function underWay(subtask: UnderWay): string {
+/** A subtask in progress, in words: worked on and how far, in review, or being merged. */
+export function inProgressText(subtask: InProgress): string {
   switch (subtask.status) {
     case "running": {
       const step = stepText(subtask.progress);
@@ -138,7 +133,7 @@ export function underWay(subtask: UnderWay): string {
 
 /**
  * Where a meeting is, in words: who speaks, the plan being written or
- * waiting for you, how it ended. `now`: what goes on at it, while it runs.
+ * waiting for review, how it ended. `now`: what goes on at it, while it runs.
  */
 export function meetingStatus(meeting: Meeting, now: MeetingNow | undefined): string {
   switch (meeting.status) {
@@ -153,7 +148,7 @@ export function meetingStatus(meeting: Meeting, now: MeetingNow | undefined): st
               ? "deciding who speaks next"
               : "under way";
     case "review":
-      return "its plan waits for you";
+      return "its plan waits for review";
     case "approved":
       return "plan approved";
     case "cancelled":
@@ -232,7 +227,7 @@ export function needWords(
           };
         case "merge":
           return {
-            headline: `Merging "${title ?? ""}" needs you. What now?`,
+            headline: `Merging "${title ?? ""}" is stuck. What now?`,
             detail: question.text.split("\n").join(", "),
           };
         case "delivery":
@@ -241,15 +236,24 @@ export function needWords(
   }
 }
 
-/** Where a goal is: in another session, archived, or paused, as a session that ended left it too; or unreadable here. */
-export const whereOf = (entry: GoalEntry) =>
+/** Where one of the repository's goals is: in another session, unreadable, archived, or paused, as a session that ended left it too. */
+export type GoalWhere = "elsewhere" | "unreadable" | "archived" | "paused";
+
+export const whereOf = (entry: GoalEntry): GoalWhere =>
   entry.holder
-    ? "in another session"
+    ? "elsewhere"
     : !("state" in entry)
       ? "unreadable"
       : entry.state.goal.status === "archived"
         ? "archived"
         : "paused";
+
+const WHERE_WORDS: Record<GoalWhere, string> = {
+  elsewhere: "in another session",
+  unreadable: "can't be read",
+  archived: "archived",
+  paused: "paused",
+};
 
 /** How far a goal got, in words. */
 function progressOf({ subtasks, meetings }: Pick<GoalState, "subtasks" | "meetings">): string {
@@ -266,10 +270,14 @@ export const goalLabel = (state: GoalState, where: string) =>
   `${state.goal.name} · ${progressOf(state)} · ${where}`;
 
 /** One of the repository's goals as `/openplan resume` lists it: one that can't be read by its folder, and why. */
-export const entryLabel = (entry: GoalEntry) =>
+const entryLabel = (entry: GoalEntry) =>
   "state" in entry
-    ? goalLabel(entry.state, whereOf(entry))
-    : `${entry.slug} · can't be read: ${entry.unreadable}`;
+    ? goalLabel(entry.state, WHERE_WORDS[whereOf(entry)])
+    : `${entry.slug} · ${WHERE_WORDS.unreadable}: ${entry.unreadable}`;
+
+/** The repository's goals a session doesn't run, each named with how far it got and where it is, for `/openplan resume`. */
+export const resumableOf = (others: readonly GoalEntry[]): { slug: string; label: string }[] =>
+  others.map((entry) => ({ slug: entry.slug, label: entryLabel(entry) }));
 
 /**
  * Why a session runs no goal, and what to do, as the pane says it: `moved`,

@@ -35,6 +35,12 @@ const openQuestions = (state: Pick<GoalState, "questions">, subtaskId: string) =
 
 const isActive = (state: Pick<GoalState, "goal">) => state.goal.status === "active";
 
+/** A subtask in progress: worked on, in review, or being merged. */
+export type InProgress = Subtask & { status: "running" | "reviewing" | "merging" };
+
+export const inProgress = (subtask: Subtask): subtask is InProgress =>
+  subtask.status === "running" || subtask.status === "reviewing" || subtask.status === "merging";
+
 /** Whether a task is done: every subtask of it merged, whether or not you accept it yet (§7.1). */
 export const taskDone = (state: Pick<GoalState, "subtasks">, taskId: string) =>
   state.subtasks.every((s) => s.taskId !== taskId || s.status === "done");

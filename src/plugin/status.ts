@@ -14,11 +14,11 @@ import {
   type Work,
 } from "../engine/index.ts";
 import {
-  entryLabel,
   hostText,
   meetingStatus,
   needWords,
   redoneText,
+  resumableOf,
   stepText,
   waitText,
   STATUS_WORDS,
@@ -48,7 +48,7 @@ function questionLine(question: QuestionToYou, work: Work): string {
   const then =
     question.kind === "decision"
       ? ` Options: ${question.decision.options.join(", ")}.`
-      : " The user answers it in /openplan.";
+      : " Answered in /openplan.";
   return `  - [${question.id}] ${headline}${asks}${detail ? ` (${detail})` : ""}${then}`;
 }
 
@@ -63,11 +63,11 @@ export function statusText(work: Work): string {
   ];
   for (const meeting of work.meetings.filter((m) => m.status !== "approved"))
     lines.push(
-      `  Meeting [${meeting.id}], ${hostText(meeting)}: ${meetingStatus(meeting, work.meetingsNow[meeting.id])}${meeting.status === "review" ? ": approve it, change it, or cancel it" : ""}${derived.resumable.includes(meeting.id) ? "; it can go on" : ""}`,
+      `  Meeting [${meeting.id}], ${hostText(meeting)}: ${meetingStatus(meeting, work.meetingsNow[meeting.id])}${derived.resumable.includes(meeting.id) ? "; it can go on" : ""}`,
     );
   for (const task of work.tasks) {
     lines.push(
-      `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", the user accepts it" : ""}`,
+      `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", accepted by the user" : ""}`,
     );
     for (const subtask of work.subtasks.filter((s) => s.taskId === task.id))
       lines.push(
@@ -75,22 +75,16 @@ export function statusText(work: Work): string {
       );
   }
   const open = work.questions.filter(toYou);
-  if (open.length) lines.push("", "Waiting on you:", ...open.map((q) => questionLine(q, work)));
+  if (open.length)
+    lines.push("", "Waiting for answers:", ...open.map((q) => questionLine(q, work)));
   return lines.join("\n");
 }
-
-/** The repository's goals not running here, each named with how far it got and where it is, for `/openplan resume`. */
-export const resumableOf = (others: readonly GoalEntry[]): { slug: string; label: string }[] =>
-  others.map((entry) => ({
-    slug: entry.slug,
-    label: entryLabel(entry),
-  }));
 
 /** The repository's goals a session doesn't run, a line each; undefined when there are none. */
 export function othersText(others: readonly GoalEntry[]): string | undefined {
   if (!others.length) return undefined;
   return [
-    "The repository's other goals, which the user takes up here with /openplan resume:",
+    "The repository's other goals, taken up here with /openplan resume:",
     ...resumableOf(others).map((o) => `  - ${o.label}`),
   ].join("\n");
 }

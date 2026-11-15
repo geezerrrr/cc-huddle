@@ -82,7 +82,7 @@ describe("the session's context", () => {
     await writeGoal("go", "active");
     await hold("go", { pid: process.pid, session: 42, address: "there" });
     expect(await sessionContext(repo, data, SESSION))
-      .toBe(`openplan: The repository's other goals, which the user takes up here with /openplan resume:
+      .toBe(`openplan: The repository's other goals, taken up here with /openplan resume:
   - go · no plan yet · in another session
   - dice · no plan yet · paused
   - chess · no plan yet · archived`);

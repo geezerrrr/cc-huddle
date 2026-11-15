@@ -236,7 +236,7 @@ describe("paneTeam", () => {
         key: "accept:q3",
         text: `The task "Game" is done [q3], merged into its goal's branch:
 - board, by sonnet: A grid board.
-Tell the user what was done, and ask whether to accept it or send it back with what to change (decide).`,
+Take it to the user as openplan's team skill says.`,
       },
     ]);
   });
@@ -262,7 +262,7 @@ Tell the user what was done, and ask whether to accept it or send it back with w
     expect(review.prompts).toEqual([
       {
         key: "review:m1",
-        text: 'The meeting [m1] on "Dice" has a plan: A dice game. Get it with show_plan and show it to the user in full: its document as it is written, then its tasks, each with its subtasks, who does them and what each waits on. Then ask whether to approve it, change it, or cancel it, and which tasks, if any, they want to accept themselves once done: none is unless they say, since reviews and checks confirm the work; it is worth it for a result only looking at it or trying it can judge.',
+        text: 'The meeting [m1] on "Dice" has a plan for review: A dice game. Take it to the user as openplan\'s team skill says.',
       },
     ]);
   });
@@ -360,7 +360,7 @@ Tell the user what was done, and ask whether to accept it or send it back with w
       },
     });
     expect(merge).toMatchObject({
-      headline: 'Merging "rules" needs you. What now?',
+      headline: 'Merging "rules" is stuck. What now?',
       detail: "a.png, b.png",
       options: [
         { value: "ours", label: "Keep ours" },

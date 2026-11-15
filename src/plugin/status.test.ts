@@ -68,14 +68,14 @@ describe("statusText", () => {
     });
     expect(text).toBe(`Goal "Dice": active, on branch openplan/dice/main
 Team: glm (busy), sonnet
-  Meeting [m1], hosted by sonnet: its plan waits for you: approve it, change it, or cancel it
-  Task "Game" [t1], the user accepts it
-    - Rules [Rules], glm: running, step 2 of 3: Write the rolls, waits on your answer
+  Meeting [m1], hosted by sonnet: its plan waits for review
+  Task "Game" [t1], accepted by the user
+    - Rules [Rules], glm: running, step 2 of 3: Write the rolls, waits for an answer
     - Board [Board], sonnet: pending, waits on "Rules" by glm
     - Score [Score], glm: failed, error: API Error: 529
 
-Waiting on you:
-  - [q1] glm asks to use Bash: npm test for "Rules". Allow it? The user answers it in /openplan.
+Waiting for answers:
+  - [q1] glm asks to use Bash: npm test for "Rules". Allow it? Answered in /openplan.
   - [q2] The task "Game" is done. Accept it? Options: accept, revise.`);
   });
 });
