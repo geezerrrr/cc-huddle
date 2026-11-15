@@ -37,7 +37,7 @@ Two layers. The engine knows nothing of the plugin.
 
 ```
 ┌─────────────────── Claude Code (your session) ───────────────────┐
-│  mod: pane, band, toasts, /openplan          skill               │
+│  mod: asks, pane, band, /openplan            skill               │
 │        │ socket: view    $.mcp.call: pane, answer                 │
 │  MCP server `openplan`: tools ── engine: state machines ·         │
 │                                  scheduler · meetings · questions │
@@ -78,7 +78,7 @@ One session runs a repository's team at a time, held by a lock in the repository
 ### 3.3 Plugin
 
 - **MCP server `openplan`**: the engine and the tools your session uses (§7.3). The pane reads the team twice a second from the server's own socket: `POST /view` gives the team as the pane draws it and a member's record from where it left off. It doesn't go through `$.mcp.call`, which Claude Code runs as a tool call, with your PreToolUse and PostToolUse hooks around it each time. The socket is one per session, in a folder only you can read (a named pipe on Windows), and does only one thing besides reading: `POST /release` lets the team go to another of your sessions that takes it over (§3.2). Two more tools serve the mod: `pane` names the socket, once, and `answer` carries what you pressed. The mod keeps both from your session's model, so an answer comes only from you.
-- **Mod**: the pane, the band, toasts, transcript rows and the `/openplan` command (§7.2), and the prompts that wake your session (§7.3). `/openplan <task>` hands your session the task for the team; the pane and `status` run without a model turn.
+- **Mod**: the asks, the pane, the band, transcript rows and the `/openplan` command (§7.2), and the prompts that wake your session (§7.3). `/openplan <task>` hands your session the task for the team; the pane and `status` run without a model turn.
 - **Skill**: tells your session what it is for: relay and act, never do the work itself.
 - **SessionStart hook**: tells your session what stopped or waits on you, as context. The mod shows you the same in the band.
 - **Permission mode hook**: keeps your session's permission mode for its members (§8). Claude Code gives `permission_mode` to the `UserPromptSubmit` hook, and to `PreToolUse`, here only on openplan's own tools; the hook writes it to the data folder under the session's pid, where the MCP server of that session reads it. A file whose session has ended goes as the next one is written.
@@ -227,7 +227,7 @@ A member session loads your user and project settings like any session of yours.
 2. Your session proposes who takes it, keeping to anyone you named: a meeting (who attends, the host first and whether they only run it, what each brings) or one member for work that needs no planning. It asks with `AskUserQuestion`: start, or say what to change; it proposes again until you start. Then it starts the goal and holds the meeting or assigns the work, and returns at once.
 3. The meeting runs in the background. You watch it live in the pane.
 4. The plan is ready: your session wakes, shows you the plan in full, its document and its tasks with who does what, on what each waits and which you accept, and asks with `AskUserQuestion`: approve, change it, or drop it, and which tasks, if any, you want to accept yourself once done. None is by default: code is checked by its reviewer and its checks, and you would rarely read it line by line; a task is worth your own acceptance when only looking at it or trying it can judge it. Changes are said in words, and your session rewrites the plan with them; any member can be given work, not only those who attended.
-5. Members work. Everything that needs you lands in the pane's "Needs you" tab with a toast, and the pane opens where it docks beside the transcript; you answer there with its own options.
+5. Members work. Whatever needs you is asked at once in Claude Code's own question dialog, as your session's questions are, and you answer it with a key; one you dismiss waits in the pane's "Needs you" tab.
 6. A task is done once its last subtask merges, and the transcript says so. One you chose to accept waits for you instead: your session wakes to ask, and work in other tasks that builds on it waits until you accept it. Either way, to change a done task, pass its member a message (§7.3); work built on it is marked as built on something redone. Work you assign directly is a task you don't accept.
 
 ### 7.2 What you see
@@ -235,9 +235,9 @@ A member session loads your user and project settings like any session of yours.
 - **Pane** (`/openplan`), beside the transcript in a wide fullscreen terminal, above the prompt otherwise. Three tabs:
   - **Meeting**: the discussion word by word, who speaks, raised hands, whom the host calls. The first judgments are formed all at once, so they don't stream: the pane says the members are forming them, and each shows once given.
   - **Team**: one line per member: what they do, which step, whom they wait on, tokens. Select a member to follow their record live: thinking, tool calls, files changed.
-  - **Needs you**: each open question with its options as buttons. Pressing one answers it. Nothing goes through a model, so a permission is granted only by you.
+  - **Needs you**: each open question with its options as buttons: the ones dismissed from their ask, and every one while it waits. Pressing one answers it. Nothing goes through a model, so a permission is granted only by you.
 - **Band** above the prompt, always: `openplan · meeting · 3 working · 1 needs you`, and under it a line for each task not yet done: its title and where it stands (`Rules · bob works on it`, `Board · waits on Rules`), as many as the band holds.
-- **Toast** when something new needs you.
+- **Asks**: what needs you, as it comes, in Claude Code's own question dialog (`$.ui.ask`), one at a time in the order it came, in the session that runs the team, whether or not it is in a turn. A member's permission request offers allow once, allow always where Claude Code suggests a rule, and deny; an answer typed instead denies it with that note. A member's question is put as they asked it, one question after another. A stuck review or a merge offers its decisions; typed text sends the work back with that note where it can be. A task done that you accept is your session's to ask (§7.3), not an ask. The mod asks and the mod answers: no model sees the dialog or the answer, so what Claude Code still asks after its own checks is answered by you. Dismissed, or "Chat about this", it stays open in "Needs you".
 - **Transcript rows**, dim, for milestones (plan approved, subtask merged, sent back), so the conversation keeps a timeline without model turns.
 - **Without drawing** (`claude -p`, a terminal too narrow): `/openplan status` prints the same as text, and every record is a file in the data folder.
 
