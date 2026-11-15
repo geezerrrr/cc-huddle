@@ -23,6 +23,8 @@ type $ = EngineInterface;
 type Ui = Pick<Elements["terminal"], "Box" | "Button" | "Input" | "Markdown" | "Select" | "Text">;
 
 const PANE = "openplan";
+/** This plugin, as `next.origin` names the caller of a `$` call. */
+const PLUGIN = "openplan";
 /** The server's tools, as the model names them. */
 const TOOLS = /^mcp__plugin_openplan_openplan__/;
 /** The tools only the mod calls, as the model would name them. */
@@ -638,11 +640,11 @@ export const register: Register = (on) => {
     return result;
   });
 
-  // The pane's tools are the person's: the model never answers a permission for them.
-  on("tool.check", { tool: PANE_ONLY }, () => ({
-    decision: "deny",
-    reason: PANE_ONLY_REASON,
-  })).catch(() => ({ decision: "deny", reason: PANE_ONLY_REASON }));
+  // The pane's tools are the person's: the model never answers a permission for
+  // them. The mod's own calls (`$.mcp.call`) are checked too, and go on.
+  on("tool.check", { tool: PANE_ONLY }, ($, e, next) =>
+    next.origin.plugin === PLUGIN ? next(e) : { decision: "deny", reason: PANE_ONLY_REASON },
+  ).catch(() => ({ decision: "deny", reason: PANE_ONLY_REASON }));
   on("tool.describe", { tool: PANE_ONLY }, async ($, e, next) => ({
     ...(await next(e)),
     isDeferred: true,
