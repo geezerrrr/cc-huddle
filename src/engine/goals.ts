@@ -7,6 +7,7 @@
 import { randomUUID } from "node:crypto";
 import { rm } from "node:fs/promises";
 import type { Core } from "./core.ts";
+import type { HandedOver } from "./data.ts";
 import { openGoal, removeGoal, slugFor, takenSlugs } from "./git.ts";
 import { can, GOAL_MACHINE, step } from "./machines.ts";
 import type { Meetings } from "./meetings.ts";
@@ -85,13 +86,22 @@ export class Goals {
   /** Puts a paused or archived goal back to work, from where it was. */
   resume(id: string): Promise<void> {
     return this.life(id, () => {
-      const goal = this.goal(id);
-      if (goal.status === "active") return;
-      goal.status = step(GOAL_MACHINE, goal.status, "resume");
-      goal.archivedAt = undefined;
+      if (!this.wake(this.goal(id))) return;
       this.core.changed();
       this.scheduler.pump();
     });
+  }
+
+  /**
+   * Puts back what a session stopped as it handed the team over (§3.2): its
+   * goals, then their meetings, and only then other work, so a meeting's
+   * members go back to it before anything else takes them.
+   */
+  async carryOn({ goals, meetings }: HandedOver) {
+    for (const id of goals) await this.life(id, () => this.wake(this.goal(id)));
+    for (const id of meetings) this.meetings.resume(id);
+    this.core.changed();
+    this.scheduler.pump();
   }
 
   /**
@@ -149,6 +159,14 @@ export class Goals {
         subtasks: [{ ...work, key: "", dependsOn: [] }],
       },
     ]);
+  }
+
+  /** Makes a goal active again; false when it was already. */
+  private wake(goal: Goal): boolean {
+    if (goal.status === "active") return false;
+    goal.status = step(GOAL_MACHINE, goal.status, "resume");
+    goal.archivedAt = undefined;
+    return true;
   }
 
   private goal(id: string): Goal {

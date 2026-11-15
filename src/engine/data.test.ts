@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -85,36 +85,62 @@ describe("the state file", () => {
   });
 });
 
-/** The session the team is taken for. */
+/** The session the team is taken for, and where it is asked to let it go. */
 const SESSION = 41;
+const ME = { session: SESSION, address: "here" };
 
 describe("the lock", () => {
   it("gives the team to one running process, and is let go of by its holder", async () => {
     const lock = path.join(dir, "repo", "lock");
-    await takeTeam(lock, SESSION);
-    await takeTeam(lock, SESSION);
+    await takeTeam(lock, ME);
+    await takeTeam(lock, ME);
     const other = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
     await once(other, "spawn");
-    await writeFile(lock, JSON.stringify({ pid: other.pid, session: 7, open: true }));
+    await writeFile(
+      lock,
+      JSON.stringify({ pid: other.pid, session: 7, address: "there", open: true }),
+    );
     releaseTeam(lock);
-    await expect(takeTeam(lock, SESSION)).rejects.toThrow("(pid 7)");
+    await expect(takeTeam(lock, ME)).rejects.toThrow("(pid 7)");
     other.kill();
     await once(other, "exit");
     expect(holderOf(lock)).toBeUndefined();
-    await takeTeam(lock, SESSION);
-    const holder = { pid: process.pid, session: SESSION };
+    await takeTeam(lock, ME);
+    const holder = { pid: process.pid, ...ME };
     expect(holderOf(lock)).toEqual({ ...holder, open: false });
-    await openedTeam(lock, SESSION);
+    await openedTeam(lock, ME);
     expect(holderOf(lock)).toEqual({ ...holder, open: true });
     releaseTeam(lock);
     await expect(stat(lock)).rejects.toThrow();
+  });
+
+  it("asks a running holder to let the team go, and gives back what it stopped", async () => {
+    const lock = path.join(dir, "repo", "lock");
+    const other = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
+    await once(other, "spawn");
+    await mkdir(path.dirname(lock), { recursive: true });
+    await writeFile(
+      lock,
+      JSON.stringify({ pid: other.pid, session: 7, address: "there", open: true }),
+    );
+    const asked: string[] = [];
+    const handed = await takeTeam(lock, ME, async (holder) => {
+      asked.push(holder.address);
+      await rm(lock);
+      return { goals: ["g1"], meetings: ["m1"] };
+    });
+    other.kill();
+    expect(asked).toEqual(["there"]);
+    expect(handed).toEqual({ goals: ["g1"], meetings: ["m1"] });
+    expect(holderOf(lock)).toEqual({ pid: process.pid, ...ME, open: false });
+    releaseTeam(lock);
   });
 
   it("goes to one of several sessions starting at once, also over one that has ended", async () => {
     const lock = path.join(dir, "repo", "lock");
     const take = `
       import { takeTeam } from ${JSON.stringify(path.join(import.meta.dirname, "data.ts"))};
-      takeTeam(process.argv[1], 1).then(() => console.log("took"), () => console.log("refused"));
+      takeTeam(process.argv[1], { session: 1, address: "" }).then(() => console.log("took"), () => console.log("refused"));
       setTimeout(() => {}, 2000);
     `;
     const race = async () => {

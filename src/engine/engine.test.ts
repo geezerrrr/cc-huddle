@@ -1,3 +1,5 @@
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -51,6 +53,7 @@ beforeEach(async () => {
     dataFolder,
     claude: "claude",
     session: 41,
+    address: "here",
     plugin: "openplan@inline",
     userTeam: path.join(dir, "user-team"),
     env: { GLM_KEY: "key-1" },
@@ -76,7 +79,12 @@ describe("Engine", () => {
       env: { ANTHROPIC_AUTH_TOKEN: "key-1" },
       enabledPlugins: { "openplan@inline": false },
     });
-    expect(holderOf(files.lock)).toEqual({ pid: process.pid, session: 41, open: true });
+    expect(holderOf(files.lock)).toEqual({
+      pid: process.pid,
+      session: 41,
+      address: "here",
+      open: true,
+    });
   });
 
   it("leaves a repository without a team as it is", async () => {
@@ -94,6 +102,49 @@ describe("Engine", () => {
 
     const again = await open();
     expect(again.state.goals).toMatchObject([{ id: goal.id, status: "paused" }]);
+  });
+
+  it("gives what it stopped as it closes, and writes no more", async () => {
+    const engine = await open();
+    const goal = await engine.goals.start("Dice");
+    expect(await engine.close()).toEqual({ goals: [goal.id], meetings: [] });
+    opened.splice(0);
+    for (const g of engine.state.goals) g.name = "Gone";
+    await engine.reloadTeam();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(await saved()).toMatchObject({ state: { goals: [{ name: "Dice", status: "paused" }] } });
+  });
+
+  it("takes a team another session holds only when asked to, and goes on with what it handed over", async () => {
+    const goal = { id: "g1", name: "Dice", slug: "dice", status: "paused", createdAt: 0 };
+    await mkdir(path.dirname(files.state), { recursive: true });
+    await writeFile(
+      files.state,
+      JSON.stringify({
+        version: 1,
+        state: { goals: [goal], tasks: [], subtasks: [], meetings: [], questions: [] },
+      }),
+    );
+    const other = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
+    await once(other, "spawn");
+    await writeFile(
+      files.lock,
+      JSON.stringify({ pid: other.pid, session: 7, address: "there", open: true }),
+    );
+    await expect(open()).rejects.toThrow("Using openplan here brings it");
+
+    const asked: string[] = [];
+    const engine = await open({
+      takeOver: async (holder) => {
+        asked.push(holder.address);
+        await rm(files.lock);
+        return { goals: ["g1"], meetings: [] };
+      },
+    });
+    other.kill();
+    expect(asked).toEqual(["there"]);
+    expect(engine.state.goals[0]?.status).toBe("active");
+    expect(holderOf(files.lock)).toMatchObject({ session: 41, address: "here", open: true });
   });
 
   it("lets the team go at once as the process dies", async () => {

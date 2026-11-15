@@ -1,6 +1,6 @@
 /**
  * The Claude Code processes started for members (docs/design.md §3.2). One
- * MCP server runs one team, so these are this process's own: those running
+ * MCP server runs one team at a time, so these are this process's own: those running
  * are kept, to be stopped at once when it exits, and written down with the
  * settings file each runs under, so that a start after a server that was
  * killed outright stops what it left.
@@ -94,4 +94,9 @@ export async function recordMembersIn(file: string) {
   );
   record = file;
   save();
+}
+
+/** Stops writing members down, as the team is let go: the file is the next holder's. */
+export function stopRecording() {
+  record = undefined;
 }

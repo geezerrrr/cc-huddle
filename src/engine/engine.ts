@@ -13,13 +13,15 @@ import {
   repoFolder,
   stateWriter,
   takeTeam,
+  type HandedOver,
+  type Holder,
   type StateWriter,
 } from "./data.ts";
 import { openRepository, type Places } from "./git.ts";
 import { Goals } from "./goals.ts";
 import { Meetings } from "./meetings.ts";
 import { memberSettings, readOnlyOptions, workOptions, writeSettings } from "./policy.ts";
-import { recordMembersIn, stopMembers } from "./processes.ts";
+import { recordMembersIn, stopMembers, stopRecording } from "./processes.ts";
 import { systemPrompt } from "./prompts.ts";
 import { Questions, type Answer } from "./questions.ts";
 import { Records } from "./records.ts";
@@ -36,6 +38,13 @@ export interface EngineOptions {
   claude: string;
   /** The pid of the session the team runs for, which the lock names. */
   session: number;
+  /** Where this process is asked to let the team go to another session, which the lock names too. */
+  address: string;
+  /**
+   * Asks the session that holds the team to let it go, and gives what it
+   * stopped (§3.2). Without it, the team opens only when nobody holds it.
+   */
+  takeOver?: (holder: Holder) => Promise<HandedOver>;
   /** openplan's id as `enabledPlugins` names it, turned off in members' sessions. */
   plugin: string;
   /** Your own team's folder, under the repository's (team.ts userTeamFolder). */
@@ -73,7 +82,8 @@ export class Engine {
   /**
    * Opens the team of the repository `cwd` is in, for this session alone:
    * what a server before left running is stopped, and the goals it left
-   * active are paused, as when a session closes (§3.2).
+   * active are paused, as when a session closes (§3.2). What a session
+   * handed over as it let the team go is resumed.
    */
   static async open(options: EngineOptions): Promise<Engine> {
     const repo = await openRepository(options.cwd);
@@ -84,7 +94,8 @@ export class Engine {
       options.userTeam,
       teamFolder(repo.top),
     ]);
-    await takeTeam(files.lock, options.session);
+    const me = { session: options.session, address: options.address };
+    const handed = await takeTeam(files.lock, me, options.takeOver);
     try {
       await recordMembersIn(files.members);
       const state = await readState(files.state);
@@ -113,8 +124,9 @@ export class Engine {
       engine.meetings.recover();
       for (const goal of state.goals)
         if (goal.status === "active") await engine.goals.pause(goal.id);
+      await engine.goals.carryOn(handed);
       await writer.flush();
-      await openedTeam(files.lock, options.session);
+      await openedTeam(files.lock, me);
       return engine;
     } catch (error) {
       releaseTeam(files.lock);
@@ -170,16 +182,23 @@ export class Engine {
   }
 
   /**
-   * Closes the team as the session ends (§3.2): every active goal is paused,
-   * a merge under way finishes, and the state is written.
+   * Closes the team as the session ends or hands it over (§3.2): every
+   * active goal is paused, a merge under way finishes, the state is written
+   * for the last time, and the team is let go. Gives what it stopped: the
+   * goals, and the meetings under way, which their pausing cancels.
    */
-  async close() {
-    for (const goal of this.state.goals)
-      if (goal.status === "active") await this.goals.pause(goal.id);
+  async close(): Promise<HandedOver> {
+    const { goals, meetings } = this.state;
+    const stopped: HandedOver = {
+      goals: goals.filter((g) => g.status === "active").map((g) => g.id),
+      meetings: meetings.filter((m) => m.status === "running").map((m) => m.id),
+    };
+    for (const id of stopped.goals) await this.goals.pause(id);
     await Promise.all([this.scheduler.close(), this.meetings.close()]);
-    this.writer.changed();
-    await Promise.all([this.writer.flush(), this.records.flush()]);
+    await Promise.all([this.writer.close(), this.records.flush()]);
+    stopRecording();
     releaseTeam(this.files.lock);
+    return stopped;
   }
 
   /**
