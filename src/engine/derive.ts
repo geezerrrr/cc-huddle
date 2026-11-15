@@ -4,7 +4,7 @@
  * and what you can do to a subtask. Worked out here only and never stored:
  * the scheduler acts on it, and the plugin shows it.
  */
-import { can, MEETING_MACHINE, SUBTASK_MACHINE } from "./machines.ts";
+import { actionEvent, can, MEETING_MACHINE } from "./machines.ts";
 import {
   SUBTASK_ACTIONS,
   isHalted,
@@ -186,6 +186,8 @@ export function waitsIn(state: Work, subtask: Subtask, busy: Set<string>): Wait[
     }
     case "failed":
     case "stopped":
+    case "stoppedInReview":
+    case "stoppedInMerge":
       return [];
   }
 }
@@ -206,21 +208,23 @@ export function redoneUpstream(state: Pick<GoalState, "subtasks">, subtask: Subt
  */
 export function actionsOf(state: Work, subtask: Subtask): SubtaskAction[] {
   const deciding = openQuestions(state, subtask.id).length > 0;
-  return SUBTASK_ACTIONS.filter(
-    (action) =>
-      can(SUBTASK_MACHINE, subtask.status, action) &&
-      (action !== "stop" || subtask.status !== "merging" || deciding) &&
-      (action !== "redo" || redoneUpstream(state, subtask).length > 0),
-  );
+  return SUBTASK_ACTIONS.filter((action) => {
+    const event = actionEvent(subtask.status, action);
+    return (
+      event !== undefined &&
+      (event !== "stopMerge" || deciding) &&
+      (event !== "redo" || redoneUpstream(state, subtask).length > 0)
+    );
+  });
 }
 
 /**
  * Whether a meeting can go on from where it stopped: it stopped before its
- * plan was out, and its goal is active. Who is busy changes by the minute;
- * it is asked as the meeting starts.
+ * plan, and its goal is active. Who is busy changes by the minute; it is
+ * asked as the meeting starts.
  */
 export function meetingResumes(state: Work, meeting: Meeting): boolean {
-  return can(MEETING_MACHINE, meeting.status, "resume") && !meeting.plan && isActive(state);
+  return can(MEETING_MACHINE, meeting.status, "resume") && isActive(state);
 }
 
 /** Everything the plugin shows of the rules, worked out once. */

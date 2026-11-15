@@ -48,6 +48,7 @@ import {
   type UnderWay,
   waitText,
   whereOf,
+  STATUS_WORDS,
 } from "./words.ts";
 
 /** The meeting the pane shows: one under way, else one whose plan waits on you, else the latest. */
@@ -258,7 +259,7 @@ function taskWhere(work: Work, derived: Derived, subtasks: Subtask[]): string | 
       return `"${at.title}" ${wait ? waitText(wait, work) : "starts next"}`;
     }
     default:
-      return `"${at.title}" ${at.status}`;
+      return `"${at.title}" ${STATUS_WORDS[at.status]}`;
   }
 }
 

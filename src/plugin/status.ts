@@ -15,6 +15,7 @@ import {
   redoneText,
   stepText,
   waitText,
+  STATUS_WORDS,
 } from "./words.ts";
 
 /** A subtask on one line: its status, how far it is, what it waits on, what it is built on that was redone, what went wrong. */
@@ -23,7 +24,7 @@ function subtaskLine(
   { waits, redone }: Derived["subtasks"][string],
   work: Work,
 ): string {
-  const parts: string[] = [subtask.status];
+  const parts: string[] = [STATUS_WORDS[subtask.status]];
   const step = subtask.status === "running" && stepText(subtask.progress);
   if (step) parts.push(step);
   parts.push(...waits.map((w) => waitText(w, work)));

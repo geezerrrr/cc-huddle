@@ -54,10 +54,22 @@ export interface Task {
 }
 
 export type SubtaskStatus =
-  "pending" | "running" | "reviewing" | "merging" | "done" | "failed" | "stopped";
+  | "pending"
+  | "running"
+  | "reviewing"
+  | "merging"
+  | "done"
+  | "failed"
+  | "stopped"
+  | "stoppedInReview"
+  | "stoppedInMerge";
 
 /** Failed or stopped: it waits for you to go on or retry. */
-export const isHalted = (status: SubtaskStatus) => status === "failed" || status === "stopped";
+export const isHalted = (status: SubtaskStatus) =>
+  status === "failed" ||
+  status === "stopped" ||
+  status === "stoppedInReview" ||
+  status === "stoppedInMerge";
 
 /** What a subtask hands over: what was done, and the files that are the result (relative to its worktree). */
 export interface Delivery {
@@ -104,8 +116,6 @@ export interface Subtask {
   review?: { rounds: number; notes?: string };
   /** Merging it left these text files in conflict, for its assignee to resolve. */
   conflict?: { files: string[] };
-  /** Stopped after it was handed over: the stage going on takes up again, its delivery standing. */
-  stoppedIn?: "reviewing" | "merging";
   error?: string;
   /** The session its last run was in. */
   session?: string;
@@ -141,7 +151,7 @@ export interface Plan {
 export const MEETING_SIZES = ["small", "discussion", "large"] as const;
 export type MeetingSize = (typeof MEETING_SIZES)[number];
 
-export type MeetingStatus = "running" | "review" | "approved" | "cancelled" | "failed";
+export type MeetingStatus = "running" | "review" | "approved" | "cancelled" | "dropped" | "failed";
 
 export interface MeetingTurn {
   speaker: string;

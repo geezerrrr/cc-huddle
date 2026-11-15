@@ -511,7 +511,7 @@ describe("Scheduler", () => {
         expect(askOnce).toHaveBeenCalledTimes(1);
       });
       await scheduler.act("s1", "stop");
-      expect(s1).toMatchObject({ status: "stopped", stoppedIn: "reviewing" });
+      expect(s1).toMatchObject({ status: "stoppedInReview" });
       await scheduler.act("s1", "continue");
       await settled(s1, "done");
       expect(runSubtask).toHaveBeenCalledTimes(1);

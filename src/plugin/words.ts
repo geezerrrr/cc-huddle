@@ -17,6 +17,7 @@ import type {
   PermissionOption,
   QuestionToYou,
   Subtask,
+  SubtaskStatus,
   Wait,
 } from "../engine/types.ts";
 
@@ -85,6 +86,19 @@ export function waitText(wait: Wait, work: Work): string {
   }
 }
 
+/** A subtask's status, in words. */
+export const STATUS_WORDS: Record<SubtaskStatus, string> = {
+  pending: "pending",
+  running: "running",
+  reviewing: "in review",
+  merging: "being merged",
+  done: "done",
+  failed: "failed",
+  stopped: "stopped",
+  stoppedInReview: "stopped in review",
+  stoppedInMerge: "stopped while merging",
+};
+
 /** That a done subtask is built on work redone since, `titles` that work. */
 export const redoneText = (titles: readonly string[]) =>
   `built on ${titles.map((t) => `"${t}"`).join(", ")}, redone since: redo it to take that in`;
@@ -135,6 +149,8 @@ export function meetingStatus(meeting: Meeting): string {
       return "plan approved";
     case "cancelled":
       return "cancelled";
+    case "dropped":
+      return "its plan dropped";
     case "failed":
       return `failed${meeting.error ? `: ${meeting.error}` : ""}`;
   }

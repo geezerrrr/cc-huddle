@@ -5,7 +5,7 @@
  * table lacks is refused. What you can be offered is asked of the same table
  * with `can`, in derive.ts.
  */
-import type { MeetingStatus, GoalStatus, SubtaskStatus } from "./types.ts";
+import type { MeetingStatus, GoalStatus, SubtaskAction, SubtaskStatus } from "./types.ts";
 
 /** Each event: the states it may happen in, and the state it leads to. */
 type Machine<S extends string> = Record<string, { from: readonly S[]; to: S }>;
@@ -21,7 +21,10 @@ export const GOAL_MACHINE = {
 export const MEETING_MACHINE = {
   plan: { from: ["running"], to: "review" },
   fail: { from: ["running"], to: "failed" },
-  cancel: { from: ["running", "review"], to: "cancelled" },
+  /** Stopped before its plan, it can go on from there. */
+  cancel: { from: ["running"], to: "cancelled" },
+  /** Its plan dropped, it is over. */
+  drop: { from: ["review"], to: "dropped" },
   change: { from: ["review"], to: "review" },
   approve: { from: ["review"], to: "approved" },
   resume: { from: ["failed", "cancelled"], to: "running" },
@@ -34,8 +37,11 @@ export const MEETING_MACHINE = {
 export const SUBTASK_MACHINE = {
   /** The scheduler starts it: upstream merged, its assignee free, its goal active. */
   start: { from: ["pending"], to: "running" },
-  /** Merging only while it waits on your call; a merge under way finishes first. */
-  stop: { from: ["pending", "running", "reviewing", "merging"], to: "stopped" },
+  stop: { from: ["pending", "running"], to: "stopped" },
+  /** Stopped once handed over, its delivery stands, to go on from the stage it stopped in. */
+  stopReview: { from: ["reviewing"], to: "stoppedInReview" },
+  /** Only while it waits on your call; a merge under way finishes first. */
+  stopMerge: { from: ["merging"], to: "stoppedInMerge" },
   /** Delivered with review on. */
   review: { from: ["running"], to: "reviewing" },
   /** Delivered with review off, or the review passed or was skipped. */
@@ -49,15 +55,29 @@ export const SUBTASK_MACHINE = {
   /** Merging it left text conflicts for its assignee to resolve. */
   conflict: { from: ["merging"], to: "pending" },
   /** From the start: no session, delivery or worktree. */
-  retry: { from: ["failed", "stopped"], to: "pending" },
+  retry: { from: ["failed", "stopped", "stoppedInReview", "stoppedInMerge"], to: "pending" },
   /** Where it stopped: its session and worktree. */
   continue: { from: ["failed", "stopped"], to: "pending" },
-  /** Stopped after delivery (Subtask.stoppedIn): its review, or its merge, again. */
-  reviewAgain: { from: ["stopped"], to: "reviewing" },
-  mergeAgain: { from: ["stopped"], to: "merging" },
+  /** Stopped after delivery: its review, or its merge, again. */
+  reviewAgain: { from: ["stoppedInReview"], to: "reviewing" },
+  mergeAgain: { from: ["stoppedInMerge"], to: "merging" },
   /** Done, then redone in its session: its upstream changed, you added to it, or you sent its task back. */
   redo: { from: ["done"], to: "pending" },
 } as const satisfies Machine<SubtaskStatus>;
+
+export type SubtaskEvent = keyof typeof SUBTASK_MACHINE;
+
+/** The events each of your actions on a subtask is: it does the one that can happen. */
+const ACTION_EVENTS: Record<SubtaskAction, readonly SubtaskEvent[]> = {
+  stop: ["stop", "stopReview", "stopMerge"],
+  continue: ["continue", "reviewAgain", "mergeAgain"],
+  retry: ["retry"],
+  redo: ["redo"],
+};
+
+/** The event `action` is in `status`; undefined where it can't be done. */
+export const actionEvent = (status: SubtaskStatus, action: SubtaskAction) =>
+  ACTION_EVENTS[action].find((event) => can(SUBTASK_MACHINE, status, event));
 
 /** The states a machine knows: every one it moves from or to. */
 type StateOf<M extends Machine<string>> = M[keyof M]["from"][number] | M[keyof M]["to"];

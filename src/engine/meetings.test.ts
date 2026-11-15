@@ -444,12 +444,12 @@ describe("A plan under review", () => {
     await expect(meetings.approve(meeting.id)).rejects.toThrow("no plan under review");
   });
 
-  it("is cancelled once, and nothing else is: a meeting over, or none", async () => {
+  it("is dropped once, and nothing else is: a meeting over, or none", async () => {
     const meeting = await reviewed();
     await meetings.cancel(meeting.id);
-    expect(meeting.status).toBe("cancelled");
+    expect(meeting.status).toBe("dropped");
     await expect(meetings.cancel(meeting.id)).rejects.toThrow(
-      "The meeting is cancelled: there is nothing to cancel",
+      "The meeting is dropped: there is nothing to cancel",
     );
     await expect(meetings.cancel("m9")).rejects.toThrow("There is no such meeting");
   });
@@ -459,7 +459,7 @@ describe("A plan under review", () => {
     const approving = meetings.approve(meeting.id);
     await meetings.cancel(meeting.id);
     await expect(approving).rejects.toThrow("changed while it was being approved");
-    expect(meeting.status).toBe("cancelled");
+    expect(meeting.status).toBe("dropped");
 
     const next = await reviewed();
     core.state.goal.status = "paused";

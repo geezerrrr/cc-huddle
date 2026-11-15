@@ -128,8 +128,8 @@ A session runs one goal (§3.2), so its band, its pane and what wakes it are abo
 | running           | you cancel, goal paused or archived        | cancelled                      |
 | review            | you change the plan                        | review                         |
 | review            | you approve                                | approved                       |
-| review            | you cancel, goal archived                  | cancelled                      |
-| failed, cancelled | you go on (no plan yet)                    | running, from where it stopped |
+| review            | you cancel, goal archived                  | dropped                        |
+| failed, cancelled | you go on                                  | running, from where it stopped |
 
 The flow is Crewloft's (its `team.md` §4): the host opens with the questions to settle; every member gives a first judgment, all at once and without hearing each other; members raise a hand to speak; the host gives the floor, closes when every question is settled or the size's turn budget is spent, and writes the plan. Sizes (`small`, `discussion`, `large`) set only how many turns each member gets. Meeting sessions are read-only.
 
@@ -139,27 +139,34 @@ A meeting is for lining up, not for working out details. It settles the directio
 - **The floor.** The host gives it to one member with `give_floor`, saying what they need from them, or gives it to nobody, which closes the talk, hands up or not. A hand about what an interface holds or how a piece is built isn't worth the floor. With no hand worth it, the host checks what they set out to decide one thing at a time against what was said (nobody objecting isn't it), then puts the split to the room once (the pieces, who takes each, the interfaces and who defines each) before closing. What the host says before handing over the floor is said to the room, as what follows is.
 - **The plan.** Subtasks follow what each piece needs from another: a subtask depends only on those whose results it uses. An interface others wait on is defined first, in a quick subtask of its own by whoever defines it; putting the pieces together and checking the whole is a subtask at the end. Beyond that, one member's piece is one subtask, since each subtask carries a fixed cost (a new session getting to know the repository, a review, a merge). No task comes for you to accept: which ones you accept yourself is yours to tick in review (§7.1).
 
+A meeting that stopped before its plan (failed, cancelled) can go on; one whose plan you dropped can't. Who speaks, whether the plan is being written, the first judgments being formed, who speaks next being weighed, and the hands up are what is under way: the meeting's owner keeps them while it runs, and they aren't in the state.
+
 Each attendee keeps one session for the whole meeting, in the goal's worktree. An approved plan's document is saved in the goal's folder, and the first run of each of its subtasks gets it in its brief, since members work in their worktrees and not in the data folder.
 
 ### 4.3 Subtask
 
-| From                                                  | Event                                                           | To                                                      |
-| ----------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------- |
-| —                                                     | plan approved, or assigned directly                             | pending                                                 |
-| pending                                               | upstream merged, owner free, goal active                        | running                                                 |
-| pending, running, reviewing, merging (waiting on you) | you stop it                                                     | stopped                                                 |
-| running                                               | delivered, review on                                            | reviewing                                               |
-| running                                               | delivered, review off                                           | merging                                                 |
-| running                                               | error, or no delivery after one reminder                        | failed                                                  |
-| running                                               | goal paused, you add to it                                      | pending, same session                                   |
-| reviewing                                             | passed, or you skip the review                                  | merging                                                 |
-| reviewing                                             | sent back (first two times)                                     | pending, same session, with the notes                   |
-| merging                                               | merged                                                          | done                                                    |
-| merging                                               | text conflicts                                                  | pending, same session, to resolve them                  |
-| failed, stopped                                       | retry                                                           | pending, fresh session and worktree                     |
-| failed, stopped                                       | go on                                                           | pending, same session and worktree                      |
-| stopped (after delivery)                              | go on                                                           | reviewing or merging, where it stopped                  |
-| done                                                  | redo: upstream redone, you add to it, or you send its task back | pending, same session, worktree rebuilt from the branch |
+| From                                                 | Event                                                           | To                                                      |
+| ---------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------- |
+| —                                                    | plan approved, or assigned directly                             | pending                                                 |
+| pending                                              | upstream merged, owner free, goal active                        | running                                                 |
+| pending, running                                     | you stop it                                                     | stopped                                                 |
+| reviewing                                            | you stop it                                                     | stopped in review                                       |
+| merging (waiting on you)                             | you stop it                                                     | stopped in merge                                        |
+| running                                              | delivered, review on                                            | reviewing                                               |
+| running                                              | delivered, review off                                           | merging                                                 |
+| running                                              | error, or no delivery after one reminder                        | failed                                                  |
+| running                                              | goal paused, you add to it                                      | pending, same session                                   |
+| reviewing                                            | passed, or you skip the review                                  | merging                                                 |
+| reviewing                                            | sent back (first two times)                                     | pending, same session, with the notes                   |
+| merging                                              | merged                                                          | done                                                    |
+| merging                                              | text conflicts                                                  | pending, same session, to resolve them                  |
+| failed, stopped, stopped in review, stopped in merge | retry                                                           | pending, fresh session and worktree                     |
+| failed, stopped                                      | go on                                                           | pending, same session and worktree                      |
+| stopped in review                                    | go on                                                           | reviewing, its delivery standing                        |
+| stopped in merge                                     | go on                                                           | merging, its delivery standing                          |
+| done                                                 | redo: upstream redone, you add to it, or you send its task back | pending, same session, worktree rebuilt from the branch |
+
+Your actions (stop, go on, retry, redo) are each one or more events: an action is offered where one of its events can happen, and does that one.
 
 A third failed review, a review that errors, a binary conflict and a git error each become a decision for you (§4.4) rather than a move.
 
@@ -174,7 +181,8 @@ Kinds: a teammate's question (answered by that teammate in a read-only session),
 ### 4.5 Derived, never stored
 
 - What a subtask waits on: an upstream subtask, a busy owner or reviewer, a merge ahead of it, a paused goal, a teammate's or your answer. Upstream work in a task you accept yourself is waited on as that whole task, done and accepted; in any other task, only the subtasks depended on, merged. A reviewer reviews one delivery at a time and the goal merges one at a time: the one under way first, then the rest in delivery order. What is under way isn't in the state (after a restart nothing is); the scheduler says, and the rules read it with the state. The scheduler starts exactly what these rules leave waiting on nothing.
-- Who is busy, who reviews a delivery (the meeting's host, else another member), whose upstream was redone after it started.
+- A member's work that goes on in its session (held, sent back, conflicts, redone) goes before new work of theirs: new work that could start waits for it while it can start too.
+- Who is busy, who reviews a delivery (the meeting's host, else another member), whose upstream was redone after it started, and whether a task you accept is accepted: done, with no acceptance waiting on you.
 - What you can do to each subtask, meeting and goal: asked of the same tables with `can`. The scheduler refuses anything else you ask of a subtask, saying why.
 
 ## 5. Git

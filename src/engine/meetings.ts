@@ -210,7 +210,9 @@ export class Meetings {
     const { core } = this;
     const meeting = core.state.meetings.find((m) => m.id === id);
     if (!meeting || !meetingResumes(workOf(core), meeting))
-      throw new Error("That meeting can't go on: its plan is out, or its goal isn't active");
+      throw new Error(
+        "That meeting can't go on: only one stopped before its plan can, in an active goal",
+      );
     this.admit(meeting.participants);
     meeting.status = step(MEETING_MACHINE, meeting.status, "resume");
     meeting.error = undefined;
@@ -219,20 +221,20 @@ export class Meetings {
   }
 
   /**
-   * Cancels a plan in review at once, or stops a meeting under way: it is
+   * Drops a plan in review at once, or stops a meeting under way: it is
    * cancelled as its run ends, which this waits for. Throws when there is no
    * such meeting, or it is over.
    */
   async cancel(id: string): Promise<void> {
     const meeting = this.core.state.meetings.find((m) => m.id === id);
     if (!meeting) throw new Error("There is no such meeting");
-    if (!can(MEETING_MACHINE, meeting.status, "cancel"))
-      throw new Error(`The meeting is ${meeting.status}: there is nothing to cancel`);
-    if (meeting.status === "review") {
-      meeting.status = step(MEETING_MACHINE, meeting.status, "cancel");
+    if (can(MEETING_MACHINE, meeting.status, "drop")) {
+      meeting.status = step(MEETING_MACHINE, meeting.status, "drop");
       this.core.changed();
       return;
     }
+    if (!can(MEETING_MACHINE, meeting.status, "cancel"))
+      throw new Error(`The meeting is ${meeting.status}: there is nothing to cancel`);
     this.aborts.get(id)?.abort();
     await this.ongoing.get(id);
   }

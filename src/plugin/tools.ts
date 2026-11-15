@@ -20,7 +20,7 @@ import {
 } from "../engine/types.ts";
 import type { Session } from "./session.ts";
 import { othersText, statusText } from "./status.ts";
-import { attendanceText, plural, rosterOf } from "./words.ts";
+import { attendanceText, plural, rosterOf, STATUS_WORDS } from "./words.ts";
 
 const meeting = z.string().describe("The meeting's id");
 const subtask = z.string().describe("The subtask's id");
@@ -219,7 +219,9 @@ export function addTools(server: McpServer, session: Session) {
       const engine = session.goal;
       await engine.scheduler.act(id, action);
       const acted = engine.state.subtasks.find((s) => s.id === id);
-      return toolText(`"${acted?.title ?? ""}" is ${acted?.status ?? "gone"} now.`);
+      return toolText(
+        acted ? `"${acted.title}" is ${STATUS_WORDS[acted.status]} now.` : "It is gone now.",
+      );
     },
   );
 

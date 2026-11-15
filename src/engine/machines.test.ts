@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { can, MEETING_MACHINE, step, SUBTASK_MACHINE } from "./machines.ts";
+import { actionEvent, can, MEETING_MACHINE, step, SUBTASK_MACHINE } from "./machines.ts";
 
 describe("state machines", () => {
   it("moves along a listed transition", () => {
@@ -14,8 +14,16 @@ describe("state machines", () => {
   });
 
   it("answers what may happen where", () => {
-    expect(can(SUBTASK_MACHINE, "merging", "stop")).toBe(true);
+    expect(can(SUBTASK_MACHINE, "merging", "stopMerge")).toBe(true);
     expect(can(SUBTASK_MACHINE, "done", "stop")).toBe(false);
     expect(can(SUBTASK_MACHINE, "done", "redo")).toBe(true);
+  });
+
+  it("does each of your actions as the event it is where the subtask stands", () => {
+    expect(actionEvent("running", "stop")).toBe("stop");
+    expect(actionEvent("reviewing", "stop")).toBe("stopReview");
+    expect(actionEvent("stoppedInMerge", "continue")).toBe("mergeAgain");
+    expect(actionEvent("stoppedInReview", "retry")).toBe("retry");
+    expect(actionEvent("done", "stop")).toBeUndefined();
   });
 });

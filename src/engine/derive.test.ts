@@ -231,12 +231,13 @@ describe("derive", () => {
 });
 
 describe("meetingResumes", () => {
-  it("lets a stopped meeting go on until its plan is out", () => {
+  it("lets a meeting stopped before its plan go on, and not one whose plan was dropped", () => {
     expect(meetingResumes(work(), meeting({ status: "failed" }))).toBe(true);
-    const planned = meeting({
-      status: "cancelled",
+    expect(meetingResumes(work(), meeting({ status: "cancelled" }))).toBe(true);
+    const dropped = meeting({
+      status: "dropped",
       plan: { summary: "", markdown: "", tasks: [] },
     });
-    expect(meetingResumes(work(), planned)).toBe(false);
+    expect(meetingResumes(work(), dropped)).toBe(false);
   });
 });

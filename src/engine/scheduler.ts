@@ -24,7 +24,7 @@ import {
   subtaskBranch,
   unresolved,
 } from "./git.ts";
-import { can, step, SUBTASK_MACHINE } from "./machines.ts";
+import { actionEvent, can, step, SUBTASK_MACHINE, type SubtaskEvent } from "./machines.ts";
 import {
   goOnMessage,
   reviewPrompt,
@@ -68,6 +68,14 @@ const progressOf = (steps: Step[]): Progress => {
     ...(current !== undefined && { current }),
   };
 };
+
+/** Handed over: in review or being merged, or stopped there, its delivery standing. */
+const HANDED_OVER: readonly Subtask["status"][] = [
+  "reviewing",
+  "merging",
+  "stoppedInReview",
+  "stoppedInMerge",
+];
 
 /** The stages a subtask is taken up in: run, reviewed, merged. */
 const TAKEN_UP: readonly Subtask["status"][] = ["pending", "reviewing", "merging"];
@@ -178,7 +186,7 @@ export class Scheduler {
     const subtask = this.subtask(subtaskId);
     if (!subtask) throw new Error("There is no such subtask");
     if (this.goal.status !== "active") return "onHold";
-    if (subtask.status === "reviewing" || subtask.status === "merging") return "handedOver";
+    if (HANDED_OVER.includes(subtask.status)) return "handedOver";
     const live = this.live.get(subtaskId);
     if (live) {
       this.keepOn(subtaskId, { why: "carried", note });
@@ -207,9 +215,11 @@ export class Scheduler {
   async act(subtaskId: string, action: SubtaskAction) {
     const subtask = this.subtask(subtaskId);
     if (!subtask) throw new Error("There is no such subtask");
-    if (!actionsOf(workOf(this.core), subtask).includes(action))
+    const event = actionEvent(subtask.status, action);
+    if (!event || !actionsOf(workOf(this.core), subtask).includes(action))
       throw new Error(`"${subtask.title}" can't ${action} while ${subtask.status}`);
-    await this[action](subtask);
+    if (action === "continue") this.continue(subtask, event);
+    else await this[action](subtask);
   }
 
   /**
@@ -245,18 +255,17 @@ export class Scheduler {
       return;
     }
     // Deleted work, stopped already: nothing to stop.
-    if (!can(SUBTASK_MACHINE, subtask.status, "stop")) return;
+    if (!actionEvent(subtask.status, "stop")) return;
     if (subtask.status === "merging") {
       // A merge under way finishes; one waiting on you is undone, its worktree back as delivered.
       if (live) return;
       await abortMerge(this.core.places, subtask.id);
-      // Stopped meanwhile: that stop did it.
-      if (!can(SUBTASK_MACHINE, subtask.status, "stop")) return;
     }
+    // Stopped meanwhile: that stop did it.
+    const event = actionEvent(subtask.status, "stop");
+    if (!event) return;
     live?.abort.abort();
-    const stage = subtask.status;
-    this.move(subtask, "stop");
-    if (stage === "reviewing" || stage === "merging") subtask.stoppedIn = stage;
+    this.move(subtask, event);
     subtask.finishedAt = Date.now();
     this.core.changed();
     this.pump();
@@ -282,18 +291,14 @@ export class Scheduler {
   }
 
   /**
-   * You have a failed or stopped subtask go on from where it stopped: its
-   * session and worktree, or, stopped once handed over, its review or merge,
-   * its delivery standing.
+   * You have a failed or stopped subtask go on from where it stopped
+   * (`event`, actionEvent): its session and worktree, or, stopped once handed
+   * over, its review or merge, its delivery standing.
    */
-  private continue(subtask: Subtask) {
-    const stage = subtask.stoppedIn;
-    this.move(
-      subtask,
-      stage === "reviewing" ? "reviewAgain" : stage === "merging" ? "mergeAgain" : "continue",
-    );
+  private continue(subtask: Subtask, event: SubtaskEvent) {
+    this.move(subtask, event);
     subtask.error = undefined;
-    if (!stage && subtask.session) goOnWith(subtask, { why: "continued" });
+    if (event === "continue" && subtask.session) goOnWith(subtask, { why: "continued" });
     this.core.changed();
     this.pump();
   }
@@ -379,13 +384,12 @@ export class Scheduler {
    * decision on it; done again, its task's delivery waits until it is done
    * again; leaving where it stopped, where it was handed over stands no more.
    */
-  private move(subtask: Subtask, event: keyof typeof SUBTASK_MACHINE) {
+  private move(subtask: Subtask, event: SubtaskEvent) {
     const from = subtask.status;
     subtask.status = step(SUBTASK_MACHINE, from, event);
     if ((from === "reviewing" || from === "merging") && subtask.status !== from)
       this.questions.cancelFor(subtask.id, true);
     if (from === "done") this.questions.cancelDelivery(subtask.taskId);
-    if (from === "stopped") subtask.stoppedIn = undefined;
   }
 
   /** A run about to be stopped goes on in its session, with `reason` too. */
