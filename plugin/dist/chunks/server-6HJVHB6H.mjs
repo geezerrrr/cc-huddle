@@ -7,13 +7,21 @@ import {
   errorCode,
   errorText,
   exists,
+  goalFiles,
+  goalFolder,
+  goalsFolder,
+  ifThere,
+  jsonIfThere,
+  lockFiles,
+  namesIfThere,
   renameOver,
+  repoFolder,
   running,
-  spend,
+  sessionsFolder,
   textIfThere,
-  workOf,
+  windowsProcessField,
   writeWhole
-} from "./chunk-MJULA7R6.mjs";
+} from "./chunk-IDZG3QQQ.mjs";
 
 // node_modules/.pnpm/yaml@2.9.1/node_modules/yaml/dist/nodes/identity.js
 var require_identity = __commonJS({
@@ -92,17 +100,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path12) {
-      const ctrl = callVisitor(key, node, visitor, path12);
+    function visit_(key, node, visitor, path8) {
+      const ctrl = callVisitor(key, node, visitor, path8);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path12, ctrl);
-        return visit_(key, ctrl, visitor, path12);
+        replaceNode(key, path8, ctrl);
+        return visit_(key, ctrl, visitor, path8);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path12 = Object.freeze(path12.concat(node));
+          path8 = Object.freeze(path8.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path12);
+            const ci = visit_(i, node.items[i], visitor, path8);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -113,13 +121,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path12 = Object.freeze(path12.concat(node));
-          const ck = visit_("key", node.key, visitor, path12);
+          path8 = Object.freeze(path8.concat(node));
+          const ck = visit_("key", node.key, visitor, path8);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path12);
+          const cv = visit_("value", node.value, visitor, path8);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -140,17 +148,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path12) {
-      const ctrl = await callVisitor(key, node, visitor, path12);
+    async function visitAsync_(key, node, visitor, path8) {
+      const ctrl = await callVisitor(key, node, visitor, path8);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path12, ctrl);
-        return visitAsync_(key, ctrl, visitor, path12);
+        replaceNode(key, path8, ctrl);
+        return visitAsync_(key, ctrl, visitor, path8);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path12 = Object.freeze(path12.concat(node));
+          path8 = Object.freeze(path8.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path12);
+            const ci = await visitAsync_(i, node.items[i], visitor, path8);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -161,13 +169,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path12 = Object.freeze(path12.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path12);
+          path8 = Object.freeze(path8.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path8);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path12);
+          const cv = await visitAsync_("value", node.value, visitor, path8);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -194,23 +202,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path12) {
+    function callVisitor(key, node, visitor, path8) {
       if (typeof visitor === "function")
-        return visitor(key, node, path12);
+        return visitor(key, node, path8);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path12);
+        return visitor.Map?.(key, node, path8);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path12);
+        return visitor.Seq?.(key, node, path8);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path12);
+        return visitor.Pair?.(key, node, path8);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path12);
+        return visitor.Scalar?.(key, node, path8);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path12);
+        return visitor.Alias?.(key, node, path8);
       return void 0;
     }
-    function replaceNode(key, path12, node) {
-      const parent = path12[path12.length - 1];
+    function replaceNode(key, path8, node) {
+      const parent = path8[path8.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -822,10 +830,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path12, value) {
+    function collectionFromPath(schema, path8, value) {
       let v = value;
-      for (let i = path12.length - 1; i >= 0; --i) {
-        const k = path12[i];
+      for (let i = path8.length - 1; i >= 0; --i) {
+        const k = path8[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -844,7 +852,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path12) => path12 == null || typeof path12 === "object" && !!path12[Symbol.iterator]().next().done;
+    var isEmptyPath = (path8) => path8 == null || typeof path8 === "object" && !!path8[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -874,11 +882,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path12, value) {
-        if (isEmptyPath(path12))
+      addIn(path8, value) {
+        if (isEmptyPath(path8))
           this.add(value);
         else {
-          const [key, ...rest] = path12;
+          const [key, ...rest] = path8;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -892,8 +900,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path12) {
-        const [key, ...rest] = path12;
+      deleteIn(path8) {
+        const [key, ...rest] = path8;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -907,8 +915,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path12, keepScalar) {
-        const [key, ...rest] = path12;
+      getIn(path8, keepScalar) {
+        const [key, ...rest] = path8;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -926,8 +934,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path12) {
-        const [key, ...rest] = path12;
+      hasIn(path8) {
+        const [key, ...rest] = path8;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -937,8 +945,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path12, value) {
-        const [key, ...rest] = path12;
+      setIn(path8, value) {
+        const [key, ...rest] = path8;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -1035,8 +1043,8 @@ var require_foldFlowLines = __commonJS({
           split = void 0;
         } else {
           if (ch === " " && prev && prev !== " " && prev !== "\n" && prev !== "	") {
-            const next = text2[i + 1];
-            if (next && next !== " " && next !== "\n" && next !== "	")
+            const next2 = text2[i + 1];
+            if (next2 && next2 !== " " && next2 !== "\n" && next2 !== "	")
               split = i;
           }
           if (i >= end2) {
@@ -3453,9 +3461,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path12, value) {
+      addIn(path8, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path12, value);
+          this.contents.addIn(path8, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3530,14 +3538,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path12) {
-        if (Collection.isEmptyPath(path12)) {
+      deleteIn(path8) {
+        if (Collection.isEmptyPath(path8)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path12) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path8) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3552,10 +3560,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path12, keepScalar) {
-        if (Collection.isEmptyPath(path12))
+      getIn(path8, keepScalar) {
+        if (Collection.isEmptyPath(path8))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path12, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path8, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3566,10 +3574,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path12) {
-        if (Collection.isEmptyPath(path12))
+      hasIn(path8) {
+        if (Collection.isEmptyPath(path8))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path12) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path8) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3586,13 +3594,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path12, value) {
-        if (Collection.isEmptyPath(path12)) {
+      setIn(path8, value) {
+        if (Collection.isEmptyPath(path8)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path12), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path8), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path12, value);
+          this.contents.setIn(path8, value);
         }
       }
       /**
@@ -3753,7 +3761,7 @@ ${pointer}
 var require_resolve_props = __commonJS({
   "node_modules/.pnpm/yaml@2.9.1/node_modules/yaml/dist/compose/resolve-props.js"(exports) {
     "use strict";
-    function resolveProps(tokens, { flow, indicator, next, offset, onError, parentIndent, startOnNewline }) {
+    function resolveProps(tokens, { flow, indicator, next: next2, offset, onError, parentIndent, startOnNewline }) {
       let spaceBefore = false;
       let atNewline = startOnNewline;
       let hasSpace = startOnNewline;
@@ -3782,7 +3790,7 @@ var require_resolve_props = __commonJS({
         }
         switch (token.type) {
           case "space":
-            if (!flow && (indicator !== "doc-start" || next?.type !== "flow-collection") && token.source.includes("	")) {
+            if (!flow && (indicator !== "doc-start" || next2?.type !== "flow-collection") && token.source.includes("	")) {
               tab = token;
             }
             hasSpace = true;
@@ -3861,10 +3869,10 @@ var require_resolve_props = __commonJS({
       }
       const last = tokens[tokens.length - 1];
       const end2 = last ? last.offset + last.source.length : offset;
-      if (reqSpace && next && next.type !== "space" && next.type !== "newline" && next.type !== "comma" && (next.type !== "scalar" || next.source !== "")) {
-        onError(next.offset, "MISSING_CHAR", "Tags and anchors must be separated from the next token by white space");
+      if (reqSpace && next2 && next2.type !== "space" && next2.type !== "newline" && next2.type !== "comma" && (next2.type !== "scalar" || next2.source !== "")) {
+        onError(next2.offset, "MISSING_CHAR", "Tags and anchors must be separated from the next token by white space");
       }
-      if (tab && (atNewline && tab.indent <= parentIndent || next?.type === "block-map" || next?.type === "block-seq"))
+      if (tab && (atNewline && tab.indent <= parentIndent || next2?.type === "block-map" || next2?.type === "block-seq"))
         onError(tab, "TAB_AS_INDENT", "Tabs are not allowed as indentation");
       return {
         comma,
@@ -4724,20 +4732,20 @@ var require_resolve_flow_scalar = __commonJS({
           res += fold;
           i = offset;
         } else if (ch === "\\") {
-          let next = source[++i];
-          const cc = escapeCodes[next];
+          let next2 = source[++i];
+          const cc = escapeCodes[next2];
           if (cc)
             res += cc;
-          else if (next === "\n") {
-            next = source[i + 1];
-            while (next === " " || next === "	")
-              next = source[++i + 1];
-          } else if (next === "\r" && source[i + 1] === "\n") {
-            next = source[++i + 1];
-            while (next === " " || next === "	")
-              next = source[++i + 1];
-          } else if (next === "x" || next === "u" || next === "U") {
-            const length = next === "x" ? 2 : next === "u" ? 4 : 8;
+          else if (next2 === "\n") {
+            next2 = source[i + 1];
+            while (next2 === " " || next2 === "	")
+              next2 = source[++i + 1];
+          } else if (next2 === "\r" && source[i + 1] === "\n") {
+            next2 = source[++i + 1];
+            while (next2 === " " || next2 === "	")
+              next2 = source[++i + 1];
+          } else if (next2 === "x" || next2 === "u" || next2 === "U") {
+            const length = next2 === "x" ? 2 : next2 === "u" ? 4 : 8;
             res += parseCharCode(source, i + 1, length, onError);
             i += length;
           } else {
@@ -4747,10 +4755,10 @@ var require_resolve_flow_scalar = __commonJS({
           }
         } else if (ch === " " || ch === "	") {
           const wsStart = i;
-          let next = source[i + 1];
-          while (next === " " || next === "	")
-            next = source[++i + 1];
-          if (next !== "\n" && !(next === "\r" && source[i + 2] === "\n"))
+          let next2 = source[i + 1];
+          while (next2 === " " || next2 === "	")
+            next2 = source[++i + 1];
+          if (next2 !== "\n" && !(next2 === "\r" && source[i + 2] === "\n"))
             res += i > wsStart ? source.slice(wsStart, i + 1) : ch;
         } else {
           res += ch;
@@ -5553,9 +5561,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path12) => {
+    visit.itemAtPath = (cst, path8) => {
       let item = cst;
-      for (const [field, index] of path12) {
+      for (const [field, index] of path8) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5564,23 +5572,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path12) => {
-      const parent = visit.itemAtPath(cst, path12.slice(0, -1));
-      const field = path12[path12.length - 1][0];
+    visit.parentCollection = (cst, path8) => {
+      const parent = visit.itemAtPath(cst, path8.slice(0, -1));
+      const field = path8[path8.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path12, item, visitor) {
-      let ctrl = visitor(item, path12);
+    function _visit(path8, item, visitor) {
+      let ctrl = visitor(item, path8);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path12.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path8.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -5591,10 +5599,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path12);
+            ctrl = ctrl(item, path8);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path12) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path8) : ctrl;
     }
     exports.visit = visit;
   }
@@ -5752,9 +5760,9 @@ var require_lexer = __commonJS({
           this.lineEndPos = null;
         }
         this.atEnd = !incomplete;
-        let next = this.next ?? "stream";
-        while (next && (incomplete || this.hasChars(1)))
-          next = yield* this.parseNext(next);
+        let next2 = this.next ?? "stream";
+        while (next2 && (incomplete || this.hasChars(1)))
+          next2 = yield* this.parseNext(next2);
       }
       atLineEnd() {
         let i = this.pos;
@@ -5777,8 +5785,8 @@ var require_lexer = __commonJS({
           while (ch === " ")
             ch = this.buffer[++indent + offset];
           if (ch === "\r") {
-            const next = this.buffer[indent + offset + 1];
-            if (next === "\n" || !next && !this.atEnd)
+            const next2 = this.buffer[indent + offset + 1];
+            if (next2 === "\n" || !next2 && !this.atEnd)
               return offset + indent + 1;
           }
           return ch === "\n" || indent >= this.indentNext || !ch && !this.atEnd ? offset + indent : -1;
@@ -5815,8 +5823,8 @@ var require_lexer = __commonJS({
       peek(n) {
         return this.buffer.substr(this.pos, n);
       }
-      *parseNext(next) {
-        switch (next) {
+      *parseNext(next2) {
+        switch (next2) {
           case "stream":
             return yield* this.parseStream();
           case "line-start":
@@ -6005,8 +6013,8 @@ var require_lexer = __commonJS({
             this.flowKey = true;
             return yield* this.parseQuotedScalar();
           case ":": {
-            const next = this.charAt(1);
-            if (this.flowKey || isEmpty(next) || next === ",") {
+            const next2 = this.charAt(1);
+            if (this.flowKey || isEmpty(next2) || next2 === ",") {
               this.flowKey = false;
               yield* this.pushCount(1);
               yield* this.pushSpaces(true);
@@ -6085,10 +6093,10 @@ var require_lexer = __commonJS({
               indent = 0;
               break;
             case "\r": {
-              const next = this.buffer[i2 + 1];
-              if (!next && !this.atEnd)
+              const next2 = this.buffer[i2 + 1];
+              if (!next2 && !this.atEnd)
                 return this.setNext("block-scalar");
-              if (next === "\n")
+              if (next2 === "\n")
                 break;
             }
             // fallthrough
@@ -6150,21 +6158,21 @@ var require_lexer = __commonJS({
         let ch;
         while (ch = this.buffer[++i]) {
           if (ch === ":") {
-            const next = this.buffer[i + 1];
-            if (isEmpty(next) || inFlow && flowIndicatorChars.has(next))
+            const next2 = this.buffer[i + 1];
+            if (isEmpty(next2) || inFlow && flowIndicatorChars.has(next2))
               break;
             end2 = i;
           } else if (isEmpty(ch)) {
-            let next = this.buffer[i + 1];
+            let next2 = this.buffer[i + 1];
             if (ch === "\r") {
-              if (next === "\n") {
+              if (next2 === "\n") {
                 i += 1;
                 ch = "\n";
-                next = this.buffer[i + 1];
+                next2 = this.buffer[i + 1];
               } else
                 end2 = i;
             }
-            if (next === "#" || inFlow && flowIndicatorChars.has(next))
+            if (next2 === "#" || inFlow && flowIndicatorChars.has(next2))
               break;
             if (ch === "\n") {
               const cs = this.continueScalar(i + 1);
@@ -7363,407 +7371,82 @@ var plugin_default = {
   types: "./types/index.d.ts"
 };
 
-// src/engine/git.ts
-import { spawn } from "node:child_process";
-import { readdir, readFile, realpath, rm } from "node:fs/promises";
-import path2 from "node:path";
-
-// src/engine/goal-files.ts
-import path from "node:path";
-var goalFiles = (folder) => ({
-  state: path.join(folder, "state.json"),
-  lock: path.join(folder, "lock"),
-  members: path.join(folder, "members.json"),
-  /** The goal's copy of the team (team.ts copyTeam). */
-  team: path.join(folder, "team.json"),
-  /** A member's settings file (policy.ts writeSettings). */
-  settings: (member) => path.join(folder, "settings", `${member}.json`),
-  /** The worktree the goal's branch is checked out in. */
-  checkout: path.join(folder, "checkout"),
-  /** The worktree a subtask works in. */
-  desk: (subtaskId) => path.join(folder, "desks", subtaskId),
-  /** What a subtask's runs did (records.ts). */
-  record: (subtaskId) => path.join(folder, "records", `${subtaskId}.jsonl`),
-  /** An approved plan's document. */
-  plan: (meetingId) => path.join(folder, "plans", `${meetingId}.md`)
-});
-
-// src/engine/serial.ts
-function serialBy() {
-  const queues = /* @__PURE__ */ new Map();
-  return function serial2(key, task) {
-    const next = (queues.get(key) ?? Promise.resolve()).then(task, task);
-    const settled = next.catch(() => void 0);
-    queues.set(key, settled);
-    void settled.then(() => {
-      if (queues.get(key) === settled) queues.delete(key);
-    });
-    return next;
-  };
-}
-function inOrder(failed) {
-  let tail = Promise.resolve();
-  return {
-    run(task) {
-      tail = tail.then(task).catch(failed);
-    },
-    idle: () => tail
-  };
-}
-
-// src/engine/git.ts
-var FLAGS = [
-  "-c",
-  "core.hooksPath=/dev/null",
-  "-c",
-  "core.fsmonitor=false",
-  "-c",
-  "commit.gpgsign=false",
-  "-c",
-  "core.quotepath=false",
-  "-c",
-  "core.longpaths=true"
-];
-var GitError = class extends Error {
-  constructor(args, code, output) {
-    super(`git ${args[0] ?? ""}: ${output}`);
-    this.args = args;
-    this.code = code;
-    this.output = output;
-    this.name = "GitError";
-  }
-  args;
-  code;
-  output;
+// src/engine/machines.ts
+var GOAL_MACHINE = {
+  pause: { from: ["active"], to: "paused" },
+  archive: { from: ["active", "paused"], to: "archived" },
+  resume: { from: ["paused", "archived"], to: "active" },
+  delete: { from: ["archived"], to: "removed" }
 };
-function git(at, args, options = {}) {
-  return new Promise((resolve, reject) => {
-    const child = spawn("git", [...FLAGS, ...args], {
-      cwd: at.cwd,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: "0", ...at.env }
-    });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.setEncoding("utf8").on("data", (chunk) => stdout += chunk);
-    child.stderr.setEncoding("utf8").on("data", (chunk) => stderr += chunk);
-    child.on("error", reject);
-    child.on("close", (code) => {
-      const exit = code ?? -1;
-      if (exit === 0 || options.allow?.includes(exit)) resolve({ code: exit, stdout, stderr });
-      else reject(new GitError(args, exit, (stderr || stdout).trim()));
-    });
-    child.stdin.end(options.input);
-  });
+var MEETING_MACHINE = {
+  plan: { from: ["running"], to: "review" },
+  fail: { from: ["running"], to: "failed" },
+  /** Stopped before its plan, it can go on from there. */
+  cancel: { from: ["running"], to: "cancelled" },
+  /** Its plan dropped, it is over. */
+  drop: { from: ["review"], to: "dropped" },
+  change: { from: ["review"], to: "review" },
+  approve: { from: ["review"], to: "approved" },
+  resume: { from: ["failed", "cancelled"], to: "running" }
+};
+var SUBTASK_MACHINE = {
+  /** The scheduler starts it: upstream merged, its assignee free, its goal active. */
+  start: { from: ["pending"], to: "running" },
+  stop: { from: ["pending", "running"], to: "stopped" },
+  /** Stopped once handed over, its delivery stands, to go on from the stage it stopped in. */
+  stopReview: { from: ["reviewing", "waitingInReview"], to: "stoppedInReview" },
+  /** Only while it waits on your call; a merge under way finishes first. */
+  stopMerge: { from: ["waitingInMerge"], to: "stoppedInMerge" },
+  /** Delivered with review on. */
+  review: { from: ["running"], to: "reviewing" },
+  /** A review sent it back too often, or failed: it waits on your decision. */
+  askReview: { from: ["reviewing"], to: "waitingInReview" },
+  /** You had it reviewed again. */
+  rereview: { from: ["waitingInReview"], to: "reviewing" },
+  /** Delivered with review off, or the review passed or you skipped it. */
+  merge: { from: ["running", "reviewing", "waitingInReview"], to: "merging" },
+  fail: { from: ["running"], to: "failed" },
+  /** Its goal paused, or you added to it: it goes on in its session. */
+  hold: { from: ["running"], to: "pending" },
+  /** The reviewer, or you, sent it back. */
+  reject: { from: ["reviewing", "waitingInReview"], to: "pending" },
+  merged: { from: ["merging"], to: "done" },
+  /** Merging it left text conflicts for its assignee to resolve. */
+  conflict: { from: ["merging"], to: "pending" },
+  /** Files it can't merge line by line, or git failing: it waits on your decision. */
+  askMerge: { from: ["merging"], to: "waitingInMerge" },
+  /** You kept a side, or had it merged again. */
+  remerge: { from: ["waitingInMerge"], to: "merging" },
+  /** From the start: no session, delivery or worktree. */
+  retry: { from: ["failed", "stopped", "stoppedInReview", "stoppedInMerge"], to: "pending" },
+  /** Where it stopped: its session and worktree. */
+  continue: { from: ["failed", "stopped"], to: "pending" },
+  /** Stopped after delivery: its review, or its merge, again. */
+  reviewAgain: { from: ["stoppedInReview"], to: "reviewing" },
+  mergeAgain: { from: ["stoppedInMerge"], to: "merging" },
+  /** Done, then redone in its session: its upstream changed, you added to it, or you sent its task back. */
+  redo: { from: ["done"], to: "pending" }
+};
+var ACTION_EVENTS = {
+  stop: ["stop", "stopReview", "stopMerge"],
+  continue: ["continue", "reviewAgain", "mergeAgain"],
+  retry: ["retry"],
+  redo: ["redo"]
+};
+var actionEvent = (status, action) => ACTION_EVENTS[action].find((event) => can(SUBTASK_MACHINE, status, event));
+function can(machine, state, event) {
+  return machine[event]?.from.includes(state) ?? false;
 }
-var memberSigner = (member) => ({
-  name: member,
-  email: `${member}@openplan.local`
-});
-var authorEnv = (by) => ({
-  GIT_AUTHOR_NAME: by.name,
-  GIT_AUTHOR_EMAIL: by.email,
-  GIT_COMMITTER_NAME: by.name,
-  GIT_COMMITTER_EMAIL: by.email
-});
-async function openRepository(folder) {
-  const at = { cwd: folder };
-  const found = await git(at, ["rev-parse", "--show-toplevel", "--git-common-dir"], {
-    allow: [128]
-  });
-  const [top, common] = found.stdout.split("\n");
-  if (found.code !== 0 || !top || !common)
-    throw new GitError(["rev-parse"], found.code, `${folder} is not in a git repository`);
-  const head = await git(at, ["rev-parse", "--verify", "-q", "HEAD"], { allow: [1] });
-  if (head.code !== 0)
-    throw new GitError(["rev-parse"], head.code, `${top} has no commit to start from yet`);
-  return { top: await realpath(top), common: await realpath(path2.resolve(folder, common)) };
+function step(machine, state, event) {
+  const move = machine[event];
+  if (!move?.from.includes(state)) throw new Error(`No "${event}" from "${state}"`);
+  return move.to;
 }
-var BRANCHES = "openplan/";
-var goalBranches = (slug) => `${BRANCHES}${slug}/`;
-var goalBranch = (slug) => `${goalBranches(slug)}main`;
-async function takenSlugs(repo) {
-  const refs = await git({ cwd: repo.top }, [
-    "for-each-ref",
-    "--format=%(refname:lstrip=3)",
-    `refs/heads/${BRANCHES}`
-  ]);
-  return new Set(refs.stdout.split("\n").flatMap((ref) => ref ? [ref.split("/")[0] ?? ""] : []));
-}
-function slugFor(name, taken) {
-  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40).replace(/-+$/, "") || "goal";
-  if (!taken.has(base)) return base;
-  for (let n = 2; ; n++) {
-    const slug = `${base}-${String(n)}`;
-    if (!taken.has(slug)) return slug;
-  }
-}
-var unlist = (repo, folder) => git({ cwd: repo.top }, ["worktree", "remove", "--force", folder], { allow: [128] });
-async function hasBranch(repo, branch) {
-  const found = await git({ cwd: repo.top }, ["rev-parse", "--verify", "-q", branch], {
-    allow: [1]
-  });
-  return found.code === 0;
-}
-async function checkOut(repo, folder, branch, from) {
-  await unlist(repo, folder);
-  await git(
-    { cwd: repo.top },
-    from ? ["worktree", "add", "-q", "-b", branch, folder, from] : ["worktree", "add", "-q", folder, branch]
-  );
-}
-var subtaskBranch = (slug, subtaskId) => `${goalBranches(slug)}${subtaskId}`;
-var serial = serialBy();
-var perGoal = (places, task) => serial(goalFiles(places.root).checkout, task);
-async function setUpGoal(places, slug) {
-  const { repo } = places;
-  const branch = goalBranch(slug);
-  const folder = goalFiles(places.root).checkout;
-  if (!await hasBranch(repo, branch)) await git({ cwd: repo.top }, ["branch", branch, "HEAD"]);
-  if (!await exists(folder)) await checkOut(repo, folder, branch);
-  return folder;
-}
-var openGoal = (places, slug) => perGoal(places, () => setUpGoal(places, slug));
-function openDesk(places, slug, subtaskId) {
-  return perGoal(places, async () => {
-    const { repo } = places;
-    const desk = goalFiles(places.root).desk(subtaskId);
-    await setUpGoal(places, slug);
-    if (await exists(path2.join(desk, ".git"))) return desk;
-    await rm(desk, { recursive: true, force: true });
-    const branch = subtaskBranch(slug, subtaskId);
-    await checkOut(
-      repo,
-      desk,
-      branch,
-      await hasBranch(repo, branch) ? void 0 : goalBranch(slug)
-    );
-    return desk;
-  });
-}
-async function worktreeAt(repo, tree) {
-  const real = (file) => realpath(file).catch(() => path2.resolve(file));
-  const here = await real(tree);
-  const entries = path2.join(repo.common, "worktrees");
-  const find = async () => {
-    for (const name of await readdir(entries).catch(() => [])) {
-      const gitdir = await readFile(path2.join(entries, name, "gitdir"), "utf8").catch(() => "");
-      if (gitdir && await real(path2.dirname(gitdir.trim())) === here)
-        return path2.join(entries, name);
-    }
-  };
-  const entry = await find() ?? await git({ cwd: repo.top }, ["worktree", "repair", tree], { allow: [128] }).then(find);
-  if (!entry) throw new GitError(["worktree"], 128, `${tree} isn't a worktree of ${repo.top}`);
-  return { cwd: tree, env: { GIT_DIR: entry, GIT_WORK_TREE: tree } };
-}
-var merging = async (at) => (await git(at, ["rev-parse", "-q", "--verify", "MERGE_HEAD"], { allow: [1] })).code === 0;
-function commitDesk(places, slug, subtaskId, by, message) {
-  return perGoal(places, async () => {
-    const at = await worktreeAt(places.repo, goalFiles(places.root).desk(subtaskId));
-    const signed = { ...at, env: { ...at.env, ...authorEnv(by) } };
-    await git(signed, ["add", "-A"]);
-    const staged = await git(signed, ["diff", "--cached", "--quiet"], { allow: [1] });
-    if (staged.code === 1 || await merging(signed))
-      await git(signed, ["commit", "-q", "--allow-empty", "-m", message]);
-  });
-}
-var MARKERS = /^<{7} [\s\S]*?^={7}\r?$[\s\S]*?^>{7} /m;
-async function unresolved(places, subtaskId, files) {
-  const desk = goalFiles(places.root).desk(subtaskId);
-  const marked = await Promise.all(
-    files.map(
-      (file) => readFile(path2.join(desk, file), "utf8").then(
-        (text2) => MARKERS.test(text2),
-        () => false
-      )
-    )
-  );
-  return files.filter((_, i) => marked[i]);
-}
-async function conflicts(places, subtaskId, at) {
-  const list = await git(at, ["diff", "--name-only", "-z", "--diff-filter=U"]);
-  const files = list.stdout.split("\0").filter(Boolean);
-  if (!files.length) return void 0;
-  const text2 = await unresolved(places, subtaskId, files);
-  return { kind: "conflict", text: text2, other: files.filter((file) => !text2.includes(file)) };
-}
-async function removeDesk(places, slug, subtaskId) {
-  const desk = goalFiles(places.root).desk(subtaskId);
-  await unlist(places.repo, desk);
-  await rm(desk, { recursive: true, force: true });
-  await git({ cwd: places.repo.top }, ["branch", "-q", "-D", subtaskBranch(slug, subtaskId)], {
-    allow: [1]
-  });
-}
-function mergeDesk(places, slug, subtaskId, by) {
-  return perGoal(places, async () => {
-    const { repo } = places;
-    const folder = goalFiles(places.root).desk(subtaskId);
-    if (!await exists(folder)) {
-      const branch = subtaskBranch(slug, subtaskId);
-      if (!await hasBranch(repo, branch)) return { kind: "merged" };
-      await checkOut(repo, folder, branch);
-    }
-    const at = await worktreeAt(repo, folder);
-    const desk = { ...at, env: { ...at.env, ...authorEnv(by) } };
-    if (await merging(desk)) {
-      const found = await conflicts(places, subtaskId, desk);
-      if (found) return found;
-      await git(desk, ["commit", "-q", "--no-edit"]);
-    } else {
-      const merge = await git(
-        desk,
-        ["-c", "merge.ff=true", "merge", "-q", "--no-edit", goalBranch(slug)],
-        { allow: [1] }
-      );
-      if (merge.code === 1) {
-        const found = await conflicts(places, subtaskId, desk);
-        if (found) return found;
-        throw new GitError(["merge"], 1, (merge.stderr || merge.stdout).trim());
-      }
-    }
-    const head = (await git(desk, ["rev-parse", "HEAD"])).stdout.trim();
-    const goal = await worktreeAt(repo, await setUpGoal(places, slug));
-    await git(goal, ["merge", "-q", "--ff-only", head]);
-    await removeDesk(places, slug, subtaskId);
-    return { kind: "merged" };
-  });
-}
-var literally = (file) => `:(literal)${file}`;
-function pickSide(places, subtaskId, files, side) {
-  return perGoal(places, async () => {
-    const desk = await worktreeAt(places.repo, goalFiles(places.root).desk(subtaskId));
-    const stages = await git(desk, ["ls-files", "-u", "-z", "--", ...files.map(literally)]);
-    const wanted = side === "ours" ? "2" : "3";
-    const kept = new Set(
-      stages.stdout.split("\0").filter(Boolean).map((line) => line.split("	")).filter(([meta]) => meta?.split(" ")[2] === wanted).map(([, file]) => file)
-    );
-    for (const file of files) {
-      if (kept.has(file)) {
-        await git(desk, ["checkout", `--${side}`, "--", literally(file)]);
-        await git(desk, ["add", "--", literally(file)]);
-      } else await git(desk, ["rm", "-q", "--", literally(file)]);
-    }
-  });
-}
-function abortMerge(places, subtaskId) {
-  return perGoal(places, async () => {
-    const desk = await worktreeAt(places.repo, goalFiles(places.root).desk(subtaskId));
-    if (await merging(desk)) await git(desk, ["merge", "--abort"]);
-  });
-}
-function dropDesk(places, slug, subtaskId) {
-  return perGoal(places, () => removeDesk(places, slug, subtaskId));
-}
-function removeGoal(places, slug) {
-  return perGoal(places, async () => {
-    const { repo } = places;
-    const refs = await git({ cwd: repo.top }, [
-      "for-each-ref",
-      "--format=%(refname:lstrip=4)",
-      `refs/heads/${goalBranches(slug)}`
-    ]);
-    for (const id of refs.stdout.split("\n")) {
-      if (id && id !== "main") await removeDesk(places, slug, id);
-    }
-    const folder = goalFiles(places.root).checkout;
-    await unlist(repo, folder);
-    await rm(folder, { recursive: true, force: true });
-  });
-}
-
-// src/engine/processes.ts
-import { execFile } from "node:child_process";
-import { readFile as readFile2 } from "node:fs/promises";
-import { setTimeout as delay } from "node:timers/promises";
-var running2 = /* @__PURE__ */ new Map();
-var record;
-function save() {
-  if (!record) return;
-  const { file, writes } = record;
-  const written2 = [...running2].map(([pid, { settings }]) => ({ pid, settings }));
-  writes.run(() => writeWhole(file, JSON.stringify(written2)));
-}
-function watchMember(child, settings) {
-  const { pid } = child;
-  if (pid === void 0) return;
-  running2.set(pid, { child, settings });
-  save();
-  child.once("exit", () => {
-    running2.delete(pid);
-    save();
-  });
-}
-function stopMembers() {
-  for (const { child } of running2.values()) child.kill("SIGTERM");
-}
-var commandLine = (pid) => new Promise((resolve) => {
-  const [command, args] = process.platform === "win32" ? [
-    "powershell.exe",
-    [
-      "-NoProfile",
-      "-Command",
-      `(Get-CimInstance Win32_Process -Filter "ProcessId=${String(pid)}").CommandLine`
-    ]
-  ] : ["ps", ["-o", "command=", "-p", String(pid)]];
-  execFile(command, args, (error, stdout) => {
-    resolve(error ? void 0 : stdout);
-  });
-});
-async function written(file) {
-  try {
-    return JSON.parse(await readFile2(file, "utf8"));
-  } catch (error) {
-    if (errorCode(error) === "ENOENT") return [];
-    throw error;
-  }
-}
-var LEFT_EXIT_MS = 5e3;
-async function exits(pid, ms) {
-  const until = Date.now() + ms;
-  while (running(pid)) {
-    if (Date.now() > until) return false;
-    await delay(50);
-  }
-  return true;
-}
-async function stopLeft(pid) {
-  const signal = (name) => {
-    try {
-      process.kill(pid, name);
-    } catch {
-    }
-  };
-  signal("SIGTERM");
-  if (await exits(pid, LEFT_EXIT_MS)) return;
-  signal("SIGKILL");
-  await exits(pid, LEFT_EXIT_MS);
-}
-async function recordMembersIn(file, failed) {
-  const left = await written(file);
-  await Promise.all(
-    left.map(async ({ pid, settings }) => {
-      if ((await commandLine(pid))?.includes(settings)) await stopLeft(pid);
-    })
-  );
-  record = { file, writes: inOrder(failed) };
-  save();
-}
-async function stopRecording() {
-  const was = record;
-  record = void 0;
-  await was?.writes.idle();
-}
-
-// src/engine/team.ts
-var import_yaml = __toESM(require_dist(), 1);
-import { readdir as readdir2, readFile as readFile3 } from "node:fs/promises";
-import { homedir } from "node:os";
-import path3 from "node:path";
-import { z } from "zod";
 
 // src/engine/types.ts
-var isHalted = (status) => status === "failed" || status === "stopped";
+var isHalted = (status) => status === "failed" || status === "stopped" || status === "stoppedInReview" || status === "stoppedInMerge";
 var MEETING_SIZES = ["small", "discussion", "large"];
+var hostOf = (meeting2) => meeting2.participants[0];
 var DECISION_OPTIONS = [
   "rereview",
   "skip",
@@ -7790,7 +7473,7 @@ var DECISIONS = {
   }),
   /** Files a merge can't take line by line: keep one side, or merge again. */
   mergeFiles: (files) => ({
-    kind: "merge",
+    kind: "conflict",
     options: ["ours", "theirs", "retry"],
     files
   }),
@@ -7807,294 +7490,59 @@ var noteNeeded = (decision, option) => decision.note?.option === option && decis
 var PERMISSION_OPTIONS = ["once", "always", "deny"];
 var PERMISSION_NOTE = "deny";
 var toYou = (question) => question.kind !== "teammate";
+var isAcceptance = (question) => question.kind === "decision" && question.decision.kind === "delivery";
 var SUBTASK_ACTIONS = ["stop", "continue", "retry", "redo"];
 var GOAL_ACTIONS = ["pause", "resume", "archive", "delete"];
-
-// src/engine/team.ts
-var teamFolder = (top) => path3.join(top, ".claude", "openplan");
-var claudeFolder = (env) => env.CLAUDE_CONFIG_DIR ?? path3.join(homedir(), ".claude");
-var userTeamFolder = (env) => path3.join(claudeFolder(env), "openplan");
-var EFFORTS = ["low", "medium", "high", "xhigh", "max"];
-var roleSchema = z.object({ title: z.string().trim().min(1) });
-var memberSchema = z.object({
-  role: z.string().trim().min(1),
-  model: z.string().trim().min(1).optional(),
-  effort: z.enum(EFFORTS).optional(),
-  // As in `.mcp.json`, though YAML reads `API_TIMEOUT_MS: 3000000` as a number.
-  env: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()]).transform(String)).default({})
-});
-var teamSchema = z.object({
-  review: z.boolean().optional(),
-  meetingSize: z.enum(MEETING_SIZES).optional()
-});
-var settingsSchema = z.record(z.string(), z.unknown());
-function parsed(schema, data, file) {
-  const result = schema.safeParse(data);
-  if (!result.success) throw new Error(`${file}:
-${z.prettifyError(result.error)}`);
-  return result.data;
-}
-async function jsonFile(file) {
-  let text2;
-  try {
-    text2 = await readFile3(file, "utf8");
-  } catch (error) {
-    if (errorCode(error) === "ENOENT") return void 0;
-    throw error;
-  }
-  try {
-    return JSON.parse(text2);
-  } catch (error) {
-    throw new Error(`${file}: ${errorText(error)}`, { cause: error });
-  }
-}
-async function markdownFiles(folder) {
-  let names;
-  try {
-    names = (await readdir2(folder)).filter((name) => name.endsWith(".md")).sort();
-  } catch (error) {
-    if (errorCode(error) === "ENOENT") return [];
-    throw error;
-  }
-  return Promise.all(
-    names.map(async (name) => {
-      const file = path3.join(folder, name);
-      const text2 = await readFile3(file, "utf8");
-      const front = /^---\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(text2);
-      let data;
-      try {
-        data = (0, import_yaml.parse)(front?.[1] ?? "") ?? {};
-      } catch (error) {
-        throw new Error(`${file}: ${errorText(error)}`, { cause: error });
-      }
-      return {
-        name: name.slice(0, -".md".length),
-        file,
-        data,
-        body: text2.slice(front?.[0].length ?? 0)
-      };
-    })
-  );
-}
-function mergeSettings(under, over) {
-  const merged = { ...under };
-  for (const [key, value] of Object.entries(over)) {
-    const was = merged[key];
-    merged[key] = Array.isArray(was) && Array.isArray(value) ? [.../* @__PURE__ */ new Set([...was, ...value])] : isObject(was) && isObject(value) ? mergeSettings(was, value) : value;
-  }
-  return merged;
-}
-var isObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
-async function loadTeam(userTeam2, top) {
-  const roles = /* @__PURE__ */ new Map();
-  const written2 = /* @__PURE__ */ new Map();
-  let own = {};
-  let settings = {};
-  const folders = [userTeam2, teamFolder(top)];
-  for (const folder of folders) {
-    for (const { name, file, data, body } of await markdownFiles(path3.join(folder, "roles")))
-      roles.set(name, {
-        id: name,
-        title: parsed(roleSchema, data, file).title,
-        duties: body.trim()
-      });
-    for (const { name, file, data } of await markdownFiles(path3.join(folder, "members")))
-      written2.set(name, { file, data });
-    const teamFile = path3.join(folder, "team.json");
-    own = { ...own, ...parsed(teamSchema, await jsonFile(teamFile) ?? {}, teamFile) };
-    const settingsFile = path3.join(folder, "settings.json");
-    settings = mergeSettings(
-      settings,
-      parsed(settingsSchema, await jsonFile(settingsFile) ?? {}, settingsFile)
-    );
-  }
-  const byName = [...written2].sort(([a], [b]) => a < b ? -1 : 1);
-  const members = byName.map(([name, { file, data }]) => {
-    const { role, model, effort, env } = parsed(memberSchema, data, file);
-    const found = roles.get(role);
-    if (!found) throw new Error(`${file}: there is no role "${role}" in the team's roles/`);
-    return {
-      name,
-      role: found,
-      ...model !== void 0 && { model },
-      ...effort !== void 0 && { effort },
-      env
-    };
-  });
-  if (!members.length)
-    throw new Error(
-      `The team has no members: add them in ${folders.map((f) => path3.join(f, "members")).join(" or ")}`
-    );
-  return {
-    team: { members, review: own.review ?? true },
-    settings,
-    meetingSize: own.meetingSize ?? "discussion"
-  };
-}
-var writing = serialBy();
-function allowing(settings, rules, file) {
-  const permissions = parsed(
-    z.looseObject({ allow: z.array(z.string()).default([]) }),
-    settings.permissions ?? {},
-    file
-  );
-  const allow = [.../* @__PURE__ */ new Set([...permissions.allow, ...rules])];
-  return { ...settings, permissions: { ...permissions, allow } };
-}
-function allowInTeam(top, rules) {
-  const file = path3.join(teamFolder(top), "settings.json");
-  return writing(file, async () => {
-    const settings = parsed(settingsSchema, await jsonFile(file) ?? {}, file);
-    await writeWhole(file, `${JSON.stringify(allowing(settings, rules, file), null, 2)}
-`);
-  });
-}
-var copyTeam = (file, team) => writeWhole(file, JSON.stringify(team));
-async function readCopy(file) {
-  return JSON.parse(await readFile3(file, "utf8"));
-}
-function allowInCopy(file, rules) {
-  return writing(file, async () => {
-    const copy = await readCopy(file);
-    const settings = allowing(copy.settings, rules, file);
-    const now = { ...copy, settings };
-    await copyTeam(file, now);
-    return now;
-  });
-}
-
-// src/plugin/claude.ts
-import { execFile as execFile2 } from "node:child_process";
-import { readlink } from "node:fs/promises";
-import { promisify } from "node:util";
-var run = async (command, args) => (await promisify(execFile2)(command, args)).stdout;
-async function executableOf(pid) {
-  const id = String(pid);
-  let found;
-  switch (process.platform) {
-    case "linux":
-      found = await readlink(`/proc/${id}/exe`);
-      break;
-    case "win32":
-      found = (await run("powershell.exe", [
-        "-NoProfile",
-        "-Command",
-        `(Get-CimInstance Win32_Process -Filter "ProcessId=${id}").ExecutablePath`
-      ])).trim();
-      break;
-    default:
-      found = (await run("lsof", ["-a", "-p", id, "-d", "txt", "-Fn"])).split("\n").find((line) => line.startsWith("n"))?.slice(1);
-  }
-  if (!found) throw new Error(`Can't tell which executable process ${id} runs`);
-  return found;
-}
-
-// src/plugin/plugin-id.ts
-import { readFile as readFile4 } from "node:fs/promises";
-import path4 from "node:path";
-var PLUGIN = "openplan";
-var pluginId = (dataFolder2) => `${PLUGIN}@${path4.basename(dataFolder2).slice(PLUGIN.length + 1)}`;
-async function idsIn(file) {
-  let settings;
-  try {
-    settings = JSON.parse(await readFile4(file, "utf8"));
-  } catch (error) {
-    if (error instanceof SyntaxError || errorCode(error) === "ENOENT") return [];
-    throw error;
-  }
-  return Object.keys(settings.enabledPlugins ?? {}).filter((id) => id.startsWith(`${PLUGIN}@`));
-}
-async function pluginIds(dataFolder2, configFolder, projectFolder) {
-  const files = [
-    path4.join(configFolder, "settings.json"),
-    path4.join(projectFolder, ".claude", "settings.json"),
-    path4.join(projectFolder, ".claude", "settings.local.json")
-  ];
-  const found = await Promise.all(files.map(idsIn));
-  return [.../* @__PURE__ */ new Set([pluginId(dataFolder2), ...found.flat()])];
-}
-
-// src/plugin/pane-server.ts
-import { randomBytes } from "node:crypto";
-import { mkdtempSync, rmSync } from "node:fs";
-import { createServer, request } from "node:http";
-import { tmpdir } from "node:os";
-import path5 from "node:path";
-import { text } from "node:stream/consumers";
-import { z as z2 } from "zod";
-
-// src/engine/machines.ts
-var GOAL_MACHINE = {
-  pause: { from: ["active"], to: "paused" },
-  archive: { from: ["active", "paused"], to: "archived" },
-  resume: { from: ["paused", "archived"], to: "active" },
-  delete: { from: ["archived"], to: "removed" }
-};
-var MEETING_MACHINE = {
-  plan: { from: ["running"], to: "review" },
-  fail: { from: ["running"], to: "failed" },
-  cancel: { from: ["running", "review"], to: "cancelled" },
-  change: { from: ["review"], to: "review" },
-  approve: { from: ["review"], to: "approved" },
-  resume: { from: ["failed", "cancelled"], to: "running" }
-};
-var SUBTASK_MACHINE = {
-  /** The scheduler starts it: upstream merged, its assignee free, its goal active. */
-  start: { from: ["pending"], to: "running" },
-  /** Merging only while it waits on your call; a merge under way finishes first. */
-  stop: { from: ["pending", "running", "reviewing", "merging"], to: "stopped" },
-  /** Delivered with review on. */
-  review: { from: ["running"], to: "reviewing" },
-  /** Delivered with review off, or the review passed or was skipped. */
-  merge: { from: ["running", "reviewing"], to: "merging" },
-  fail: { from: ["running"], to: "failed" },
-  /** Its goal paused, or you added to it: it goes on in its session. */
-  hold: { from: ["running"], to: "pending" },
-  /** The reviewer, or you, sent it back. */
-  reject: { from: ["reviewing"], to: "pending" },
-  merged: { from: ["merging"], to: "done" },
-  /** Merging it left text conflicts for its assignee to resolve. */
-  conflict: { from: ["merging"], to: "pending" },
-  /** From the start: no session, delivery or worktree. */
-  retry: { from: ["failed", "stopped"], to: "pending" },
-  /** Where it stopped: its session and worktree. */
-  continue: { from: ["failed", "stopped"], to: "pending" },
-  /** Stopped after delivery (Subtask.stoppedIn): its review, or its merge, again. */
-  reviewAgain: { from: ["stopped"], to: "reviewing" },
-  mergeAgain: { from: ["stopped"], to: "merging" },
-  /** Done, then redone in its session: its upstream changed, you added to it, or you sent its task back. */
-  redo: { from: ["done"], to: "pending" }
-};
-function can(machine, state, event) {
-  return machine[event]?.from.includes(state) ?? false;
-}
-function step(machine, state, event) {
-  const move = machine[event];
-  if (!move?.from.includes(state)) throw new Error(`No "${event}" from "${state}"`);
-  return move.to;
-}
 
 // src/engine/derive.ts
 var openQuestions = (state, subtaskId) => state.questions.filter((q) => q.subtaskId === subtaskId);
 var isActive = (state) => state.goal.status === "active";
+var IN_PROGRESS = [
+  "running",
+  "reviewing",
+  "waitingInReview",
+  "merging",
+  "waitingInMerge"
+];
+var inProgress = (subtask2) => IN_PROGRESS.includes(subtask2.status);
+var HANDED_OVER = [
+  "reviewing",
+  "waitingInReview",
+  "merging",
+  "waitingInMerge",
+  "stoppedInReview",
+  "stoppedInMerge"
+];
+function messageReach(state, subtask2) {
+  if (state.goal.status !== "active") return "onHold";
+  return HANDED_OVER.includes(subtask2.status) ? "handedOver" : "goes";
+}
+function canSendBack(state, question, sentBack) {
+  if (sentBack === void 0) return true;
+  const taskId = state.subtasks.find((s) => s.id === question.subtaskId)?.taskId;
+  const target = state.subtasks.find((s) => s.id === sentBack);
+  return target !== void 0 && target.taskId === taskId && target.status === "done";
+}
 var taskDone = (state, taskId) => state.subtasks.every((s) => s.taskId !== taskId || s.status === "done");
 function reviewerOf(state, subtask2) {
   const meetingId = state.tasks.find((t) => t.id === subtask2.taskId)?.meetingId;
-  const host = state.meetings.find((m) => m.id === meetingId)?.host;
+  const meeting2 = state.meetings.find((m) => m.id === meetingId);
+  const host = meeting2 && hostOf(meeting2);
   const other = state.members.find((m) => m !== subtask2.assignee);
   return [host, other].find((m) => m !== void 0 && m !== subtask2.assignee) ?? subtask2.assignee;
 }
 function acceptanceOf(state, taskId) {
   return state.questions.find(
-    (q) => q.kind === "decision" && q.decision.kind === "delivery" && state.subtasks.find((s) => s.id === q.subtaskId)?.taskId === taskId
+    (q) => isAcceptance(q) && state.subtasks.find((s) => s.id === q.subtaskId)?.taskId === taskId
   );
 }
-var underReview = (state, subtask2) => subtask2.status === "reviewing" && isActive(state) && !openQuestions(state, subtask2.id).some((q) => q.kind === "decision");
+var accepted = (state, taskId) => taskDone(state, taskId) && !acceptanceOf(state, taskId);
+var takenUpIn = (state, subtask2, stage) => subtask2.status === stage && isActive(state);
 function busyMembers(state) {
   const busy = /* @__PURE__ */ new Set();
   for (const s of state.subtasks) {
     if (s.status === "running") busy.add(s.assignee);
-    if (underReview(state, s)) busy.add(s.assignee).add(reviewerOf(state, s));
+    if (takenUpIn(state, s, "reviewing")) busy.add(s.assignee).add(reviewerOf(state, s));
   }
   for (const m of state.meetings)
     if (m.status === "running") for (const id of m.participants) busy.add(id);
@@ -8118,11 +7566,34 @@ function reviewerAway(state, subtask2) {
   const reviewing = ahead(
     state,
     subtask2,
-    (s) => underReview(state, s) && reviewerOf(state, s) === reviewer
+    (s) => takenUpIn(state, s, "reviewing") && reviewerOf(state, s) === reviewer
   );
   return working || meeting2 || reviewing ? reviewer : void 0;
 }
-var mergeable = (state, subtask2) => subtask2.status === "merging" && isActive(state) && !openQuestions(state, subtask2.id).some((q) => q.kind === "decision");
+function startWaits(state, subtask2, busy) {
+  const { goal } = state;
+  if (goal.status !== "active") return [{ kind: "goal", status: goal.status }];
+  const unmerged = (d) => ({
+    kind: "upstream",
+    by: d.assignee,
+    subtaskId: d.id,
+    halted: isHalted(d.status)
+  });
+  const upstream = subtask2.dependsOn.flatMap((id) => {
+    const d = state.subtasks.find((s) => s.id === id);
+    if (!d) return [];
+    if (d.status !== "done") return [unmerged(d)];
+    if (d.taskId === subtask2.taskId) return [];
+    if (!state.tasks.find((t) => t.id === d.taskId)?.ownerAccepts || accepted(state, d.taskId))
+      return [];
+    const rest = state.subtasks.find((s) => s.taskId === d.taskId && s.status !== "done");
+    if (rest) return [unmerged(rest)];
+    const acceptance = acceptanceOf(state, d.taskId);
+    return acceptance ? [{ kind: "acceptance", questionId: acceptance.id }] : [];
+  });
+  if (upstream.length) return [...new Map(upstream.map((w) => [JSON.stringify(w), w])).values()];
+  return busy.has(subtask2.assignee) ? [{ kind: "busy", by: subtask2.assignee }] : [];
+}
 function waitsIn(state, subtask2, busy) {
   const { goal } = state;
   const held = goal.status !== "active" ? [{ kind: "goal", status: goal.status }] : [];
@@ -8131,27 +7602,13 @@ function waitsIn(state, subtask2, busy) {
   );
   switch (subtask2.status) {
     case "pending": {
-      if (held.length) return held;
-      const unmerged = (d) => ({
-        kind: "upstream",
-        by: d.assignee,
-        subtaskId: d.id,
-        halted: isHalted(d.status)
-      });
-      const upstream = subtask2.dependsOn.flatMap((id) => {
-        const d = state.subtasks.find((s) => s.id === id);
-        if (!d) return [];
-        if (d.status !== "done") return [unmerged(d)];
-        if (d.taskId === subtask2.taskId) return [];
-        if (!state.tasks.find((t) => t.id === d.taskId)?.ownerAccepts) return [];
-        const rest = state.subtasks.find((s) => s.taskId === d.taskId && s.status !== "done");
-        if (rest) return [unmerged(rest)];
-        const acceptance = acceptanceOf(state, d.taskId);
-        return acceptance ? [{ kind: "acceptance", questionId: acceptance.id }] : [];
-      });
-      if (upstream.length)
-        return [...new Map(upstream.map((w) => [JSON.stringify(w), w])).values()];
-      return busy.has(subtask2.assignee) ? [{ kind: "busy", by: subtask2.assignee }] : [];
+      const waits = startWaits(state, subtask2, busy);
+      if (waits.length) return waits;
+      const could = state.subtasks.filter(
+        (s) => s.status === "pending" && s.assignee === subtask2.assignee && !startWaits(state, s, busy).length
+      );
+      const first = could.find((s) => s.goOn) ?? could[0];
+      return first && first !== subtask2 ? [{ kind: "after", subtaskId: first.id }] : [];
     }
     // A done subtask, the last of its task, carries the task's acceptance waiting on you.
     case "running":
@@ -8160,7 +7617,7 @@ function waitsIn(state, subtask2, busy) {
     // A merge under way finishes (§3.2); one yet to start waits for its goal, and its turn.
     case "merging": {
       if (state.underWay.includes(subtask2.id)) return asked2();
-      const before = mergeable(state, subtask2) ? ahead(state, subtask2, (s) => mergeable(state, s)) : void 0;
+      const before = takenUpIn(state, subtask2, "merging") ? ahead(state, subtask2, (s) => takenUpIn(state, s, "merging")) : void 0;
       return [
         ...held,
         ...asked2(),
@@ -8169,13 +7626,35 @@ function waitsIn(state, subtask2, busy) {
     }
     case "reviewing": {
       if (state.underWay.includes(subtask2.id)) return asked2();
-      const reviewer = underReview(state, subtask2) ? reviewerAway(state, subtask2) : void 0;
+      const reviewer = takenUpIn(state, subtask2, "reviewing") ? reviewerAway(state, subtask2) : void 0;
       return [...held, ...asked2(), ...reviewer ? [{ kind: "busy", by: reviewer }] : []];
     }
+    case "waitingInReview":
+    case "waitingInMerge":
+      return [...held, ...asked2()];
     case "failed":
     case "stopped":
+    case "stoppedInReview":
+    case "stoppedInMerge":
       return [];
   }
+}
+function upstreamOf(state, subtask2) {
+  const chain = [];
+  const seen = /* @__PURE__ */ new Set([subtask2.id]);
+  let level = subtask2.dependsOn;
+  for (let direct = true; level.length; direct = false) {
+    const next2 = [];
+    for (const id of level) {
+      const done = state.subtasks.find((s) => s.id === id);
+      if (!done || seen.has(id)) continue;
+      seen.add(id);
+      chain.push({ subtask: done, direct });
+      next2.push(...done.dependsOn);
+    }
+    level = next2;
+  }
+  return chain;
 }
 function redoneUpstream(state, subtask2) {
   const startedAt2 = subtask2.startedAt;
@@ -8186,13 +7665,13 @@ function redoneUpstream(state, subtask2) {
   });
 }
 function actionsOf(state, subtask2) {
-  const deciding = openQuestions(state, subtask2.id).length > 0;
-  return SUBTASK_ACTIONS.filter(
-    (action) => can(SUBTASK_MACHINE, subtask2.status, action) && (action !== "stop" || subtask2.status !== "merging" || deciding) && (action !== "redo" || redoneUpstream(state, subtask2).length > 0)
-  );
+  return SUBTASK_ACTIONS.filter((action) => {
+    const event = actionEvent(subtask2.status, action);
+    return event !== void 0 && (event !== "redo" || redoneUpstream(state, subtask2).length > 0);
+  });
 }
 function meetingResumes(state, meeting2) {
-  return can(MEETING_MACHINE, meeting2.status, "resume") && !meeting2.plan && isActive(state);
+  return can(MEETING_MACHINE, meeting2.status, "resume") && isActive(state);
 }
 function derive(state) {
   const busy = busyMembers(state);
@@ -8216,8 +7695,573 @@ function derive(state) {
   };
 }
 
-// src/engine/prompts.ts
+// src/engine/engine.ts
+import { existsSync } from "node:fs";
+import { rm as rm3 } from "node:fs/promises";
+
+// src/engine/core.ts
+var workOf = (core) => ({
+  ...core.state,
+  questions: [...core.state.questions, ...core.questionsNow()],
+  members: core.team.members.map((m) => m.name),
+  underWay: core.underWay(),
+  meetingsNow: core.meetingsNow()
+});
+function spend(state, member, tokens) {
+  state.tokens[member] = (state.tokens[member] ?? 0) + tokens;
+}
+
+// src/engine/data.ts
+import { mkdir, readdir, readFile as readFile2 } from "node:fs/promises";
+
+// src/shared/serial.ts
+function serialBy() {
+  const queues = /* @__PURE__ */ new Map();
+  return function serial2(key, task) {
+    const next2 = (queues.get(key) ?? Promise.resolve()).then(task, task);
+    const settled = next2.catch(() => void 0);
+    queues.set(key, settled);
+    void settled.then(() => {
+      if (queues.get(key) === settled) queues.delete(key);
+    });
+    return next2;
+  };
+}
+function inOrder(failed) {
+  let tail = Promise.resolve();
+  return {
+    run(task) {
+      tail = tail.then(task).catch(failed);
+    },
+    idle: () => tail
+  };
+}
+
+// src/engine/git.ts
+import { spawn } from "node:child_process";
+import { readFile, realpath, rm } from "node:fs/promises";
+import path from "node:path";
+var FLAGS = [
+  "-c",
+  "core.hooksPath=/dev/null",
+  "-c",
+  "core.fsmonitor=false",
+  "-c",
+  "commit.gpgsign=false",
+  "-c",
+  "core.quotepath=false",
+  "-c",
+  "core.longpaths=true"
+];
+var GitError = class extends Error {
+  constructor(command, output) {
+    super(`git ${command}: ${output}`);
+    this.name = "GitError";
+  }
+};
+function git(at, args, options = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn("git", [...FLAGS, ...args], {
+      cwd: at.cwd,
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0", ...at.env }
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk) => stdout += chunk);
+    child.stderr.setEncoding("utf8").on("data", (chunk) => stderr += chunk);
+    child.on("error", reject);
+    child.on("close", (code) => {
+      const exit = code ?? -1;
+      if (exit === 0 || options.allow?.includes(exit)) resolve({ code: exit, stdout, stderr });
+      else reject(new GitError(args[0] ?? "", (stderr || stdout).trim()));
+    });
+    child.stdin.end();
+  });
+}
+var memberSigner = (member) => ({
+  name: member,
+  email: `${member}@openplan.local`
+});
+var authorEnv = (by) => ({
+  GIT_AUTHOR_NAME: by.name,
+  GIT_AUTHOR_EMAIL: by.email,
+  GIT_COMMITTER_NAME: by.name,
+  GIT_COMMITTER_EMAIL: by.email
+});
+async function openRepository(folder) {
+  const at = { cwd: folder };
+  const found = await git(at, ["rev-parse", "--show-toplevel", "--git-common-dir"], {
+    allow: [128]
+  });
+  const [top, common] = found.stdout.split("\n");
+  if (found.code !== 0 || !top || !common)
+    throw new GitError("rev-parse", `${folder} is not in a git repository`);
+  const head = await git(at, ["rev-parse", "--verify", "-q", "HEAD"], { allow: [1] });
+  if (head.code !== 0) throw new GitError("rev-parse", `${top} has no commit to start from yet`);
+  return { top: await realpath(top), common: await realpath(path.resolve(folder, common)) };
+}
+var BRANCHES = "openplan/";
+var goalBranches = (slug) => `${BRANCHES}${slug}/`;
+var goalBranch = (slug) => `${goalBranches(slug)}main`;
+async function takenSlugs(repo) {
+  const refs = await git({ cwd: repo.top }, [
+    "for-each-ref",
+    "--format=%(refname:lstrip=3)",
+    `refs/heads/${BRANCHES}`
+  ]);
+  return new Set(refs.stdout.split("\n").flatMap((ref) => ref ? [ref.split("/")[0] ?? ""] : []));
+}
+var SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+function slugFor(name, taken) {
+  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40).replace(/-+$/, "") || "goal";
+  if (!taken.has(base)) return base;
+  for (let n = 2; ; n++) {
+    const slug = `${base}-${String(n)}`;
+    if (!taken.has(slug)) return slug;
+  }
+}
+var unlist = (repo, folder) => git({ cwd: repo.top }, ["worktree", "remove", "--force", folder], { allow: [128] });
+async function hasBranch(repo, branch) {
+  const found = await git({ cwd: repo.top }, ["rev-parse", "--verify", "-q", branch], {
+    allow: [1]
+  });
+  return found.code === 0;
+}
+async function checkOut(repo, folder, branch, from) {
+  await unlist(repo, folder);
+  await git(
+    { cwd: repo.top },
+    from ? ["worktree", "add", "-q", "-b", branch, folder, from] : ["worktree", "add", "-q", folder, branch]
+  );
+}
+var subtaskBranch = (slug, subtaskId) => `${goalBranches(slug)}${subtaskId}`;
+var serial = serialBy();
+var perGoal = (places, task) => serial(goalFiles(places.root).checkout, task);
+async function setUpGoal(places) {
+  const { repo, slug } = places;
+  const branch = goalBranch(slug);
+  const folder = goalFiles(places.root).checkout;
+  if (!await hasBranch(repo, branch)) await git({ cwd: repo.top }, ["branch", branch, "HEAD"]);
+  if (!await exists(folder)) await checkOut(repo, folder, branch);
+  return folder;
+}
+var openGoal = (places) => perGoal(places, () => setUpGoal(places));
+function openDesk(places, subtaskId) {
+  return perGoal(places, async () => {
+    const { repo, slug } = places;
+    const desk = goalFiles(places.root).desk(subtaskId);
+    await setUpGoal(places);
+    if (await exists(path.join(desk, ".git"))) return desk;
+    await rm(desk, { recursive: true, force: true });
+    const branch = subtaskBranch(slug, subtaskId);
+    await checkOut(
+      repo,
+      desk,
+      branch,
+      await hasBranch(repo, branch) ? void 0 : goalBranch(slug)
+    );
+    return desk;
+  });
+}
+async function worktreeAt(repo, tree) {
+  const real = (file) => ifThere(realpath(file), path.resolve(file));
+  const here = await real(tree);
+  const entries = path.join(repo.common, "worktrees");
+  const find = async () => {
+    for (const name of await namesIfThere(entries)) {
+      const gitdir = await ifThere(readFile(path.join(entries, name, "gitdir"), "utf8"), "");
+      if (gitdir && await real(path.dirname(gitdir.trim())) === here)
+        return path.join(entries, name);
+    }
+  };
+  const entry = await find() ?? await git({ cwd: repo.top }, ["worktree", "repair", tree], { allow: [128] }).then(find);
+  if (!entry) throw new GitError("worktree", `${tree} isn't a worktree of ${repo.top}`);
+  return { cwd: tree, env: { GIT_DIR: entry, GIT_WORK_TREE: tree } };
+}
+var merging = async (at) => (await git(at, ["rev-parse", "-q", "--verify", "MERGE_HEAD"], { allow: [1] })).code === 0;
+function commitDesk(places, subtaskId, by, message) {
+  return perGoal(places, async () => {
+    const at = await worktreeAt(places.repo, goalFiles(places.root).desk(subtaskId));
+    const signed = { ...at, env: { ...at.env, ...authorEnv(by) } };
+    await git(signed, ["add", "-A"]);
+    const staged = await git(signed, ["diff", "--cached", "--quiet"], { allow: [1] });
+    if (staged.code === 1 || await merging(signed))
+      await git(signed, ["commit", "-q", "--allow-empty", "-m", message]);
+  });
+}
+var MARKERS = /^<{7} [\s\S]*?^={7}\r?$[\s\S]*?^>{7} /m;
+async function unresolved(places, subtaskId, files) {
+  const desk = goalFiles(places.root).desk(subtaskId);
+  const marked = await Promise.all(
+    // One deleted on a side has no markers.
+    files.map(
+      async (file) => MARKERS.test(await ifThere(readFile(path.join(desk, file), "utf8"), ""))
+    )
+  );
+  return files.filter((_, i) => marked[i]);
+}
+async function conflicts(places, subtaskId, at) {
+  const list = await git(at, ["diff", "--name-only", "-z", "--diff-filter=U"]);
+  const files = list.stdout.split("\0").filter(Boolean);
+  if (!files.length) return void 0;
+  const text2 = await unresolved(places, subtaskId, files);
+  return { kind: "conflict", text: text2, other: files.filter((file) => !text2.includes(file)) };
+}
+async function removeDesk(places, subtaskId) {
+  const desk = goalFiles(places.root).desk(subtaskId);
+  await unlist(places.repo, desk);
+  await rm(desk, { recursive: true, force: true });
+  await git(
+    { cwd: places.repo.top },
+    ["branch", "-q", "-D", subtaskBranch(places.slug, subtaskId)],
+    {
+      allow: [1]
+    }
+  );
+}
+function mergeDesk(places, subtaskId, by) {
+  return perGoal(places, async () => {
+    const { repo, slug } = places;
+    const folder = goalFiles(places.root).desk(subtaskId);
+    if (!await exists(folder)) {
+      const branch = subtaskBranch(slug, subtaskId);
+      if (!await hasBranch(repo, branch)) return { kind: "merged" };
+      await checkOut(repo, folder, branch);
+    }
+    const at = await worktreeAt(repo, folder);
+    const desk = { ...at, env: { ...at.env, ...authorEnv(by) } };
+    if (await merging(desk)) {
+      const found = await conflicts(places, subtaskId, desk);
+      if (found) return found;
+      await git(desk, ["commit", "-q", "--no-edit"]);
+    } else {
+      const merge = await git(
+        desk,
+        ["-c", "merge.ff=true", "merge", "-q", "--no-edit", goalBranch(slug)],
+        { allow: [1] }
+      );
+      if (merge.code === 1) {
+        const found = await conflicts(places, subtaskId, desk);
+        if (found) return found;
+        throw new GitError("merge", (merge.stderr || merge.stdout).trim());
+      }
+    }
+    const head = (await git(desk, ["rev-parse", "HEAD"])).stdout.trim();
+    const goal = await worktreeAt(repo, await setUpGoal(places));
+    await git(goal, ["merge", "-q", "--ff-only", head]);
+    await removeDesk(places, subtaskId);
+    return { kind: "merged" };
+  });
+}
+var literally = (file) => `:(literal)${file}`;
+function pickSide(places, subtaskId, files, side) {
+  return perGoal(places, async () => {
+    const desk = await worktreeAt(places.repo, goalFiles(places.root).desk(subtaskId));
+    const stages = await git(desk, ["ls-files", "-u", "-z", "--", ...files.map(literally)]);
+    const wanted = side === "ours" ? "2" : "3";
+    const kept = new Set(
+      stages.stdout.split("\0").filter(Boolean).map((line) => line.split("	")).filter(([meta]) => meta?.split(" ")[2] === wanted).map(([, file]) => file)
+    );
+    for (const file of files) {
+      if (kept.has(file)) {
+        await git(desk, ["checkout", `--${side}`, "--", literally(file)]);
+        await git(desk, ["add", "--", literally(file)]);
+      } else await git(desk, ["rm", "-q", "--", literally(file)]);
+    }
+  });
+}
+function abortMerge(places, subtaskId) {
+  return perGoal(places, async () => {
+    const desk = await worktreeAt(places.repo, goalFiles(places.root).desk(subtaskId));
+    if (await merging(desk)) await git(desk, ["merge", "--abort"]);
+  });
+}
+function dropDesk(places, subtaskId) {
+  return perGoal(places, () => removeDesk(places, subtaskId));
+}
+function removeGoal(places) {
+  return perGoal(places, async () => {
+    const { repo, slug } = places;
+    const refs = await git({ cwd: repo.top }, [
+      "for-each-ref",
+      "--format=%(refname:lstrip=4)",
+      `refs/heads/${goalBranches(slug)}`
+    ]);
+    for (const id of refs.stdout.split("\n")) {
+      if (id && id !== "main") await removeDesk(places, id);
+    }
+    const folder = goalFiles(places.root).checkout;
+    await unlist(repo, folder);
+    await rm(folder, { recursive: true, force: true });
+  });
+}
+
+// src/engine/lock.ts
+import { link, rm as rm2 } from "node:fs/promises";
+import { unlinkSync } from "node:fs";
+import { setTimeout as delay } from "node:timers/promises";
+function readHolder(file) {
+  const text2 = textIfThere(file);
+  try {
+    return text2 === void 0 ? void 0 : JSON.parse(text2);
+  } catch (error) {
+    if (error instanceof SyntaxError) return void 0;
+    throw error;
+  }
+}
+function holderOf(lock) {
+  const holder = readHolder(lock);
+  return holder && running(holder.pid) ? holder : void 0;
+}
+async function holding(lock, me) {
+  const file = lockFiles(lock).mine(process.pid);
+  const holder = { pid: process.pid, ...me };
+  await writeWhole(file, JSON.stringify(holder));
+  return file;
+}
+var REPLACING_WAIT_MS = 10;
+async function takeLock(lock, me, takeOver) {
+  const mine = await holding(lock, me);
+  const handed = [];
+  try {
+    for (; ; ) {
+      try {
+        await link(mine, lock);
+        return handed;
+      } catch (error) {
+        if (errorCode(error) !== "EEXIST") throw error;
+      }
+      const ended = textIfThere(lock);
+      if (ended === void 0) continue;
+      const holder = readHolder(lock);
+      if (holder && running(holder.pid)) {
+        if (holder.pid === process.pid) {
+          await renameOver(mine, lock);
+          return handed;
+        }
+        const given = await takeOver(holder);
+        if (given !== void 0) {
+          handed.push(given);
+          continue;
+        }
+      }
+      const claim = lockFiles(lock).claim(String(holder?.pid ?? "unread"));
+      try {
+        await link(mine, claim);
+      } catch (error) {
+        if (errorCode(error) !== "EEXIST") throw error;
+        if (textIfThere(claim) === void 0) continue;
+        const replacing = readHolder(claim);
+        if (!replacing || !running(replacing.pid))
+          throw new Error(`A session taking this goal ended partway: delete ${lock} and ${claim}`, {
+            cause: error
+          });
+        await delay(REPLACING_WAIT_MS);
+        continue;
+      }
+      try {
+        if (textIfThere(lock) === ended) {
+          await renameOver(mine, lock);
+          return handed;
+        }
+      } finally {
+        await rm2(claim, { force: true });
+      }
+    }
+  } finally {
+    await rm2(mine, { force: true });
+  }
+}
+function releaseLock(lock) {
+  if (holderOf(lock)?.pid === process.pid) unlinkSync(lock);
+}
+
+// src/engine/data.ts
+var STATE_VERSION = 4;
+var SAVE_DELAY_MS = 200;
+async function readState(file) {
+  const text2 = await readFile2(file, "utf8");
+  let saved;
+  try {
+    saved = JSON.parse(text2);
+  } catch (error) {
+    throw new Error(`${file} can't be read (${errorText(error)}): move it away to start over`, {
+      cause: error
+    });
+  }
+  if (saved.version > STATE_VERSION)
+    throw new Error(`${file} was written by a newer openplan: update openplan to go on`);
+  if (saved.version < STATE_VERSION)
+    throw new Error(
+      `${file} was written by an openplan before its first release: move it away to start over`
+    );
+  return saved.state;
+}
+function stateWriter(file, state, failed) {
+  let timer;
+  const writing2 = inOrder(failed);
+  let closed = false;
+  const write = () => {
+    timer = void 0;
+    writing2.run(() => writeWhole(file, JSON.stringify({ version: STATE_VERSION, state: state() })));
+  };
+  return {
+    changed() {
+      if (!closed) timer ??= setTimeout(write, SAVE_DELAY_MS);
+    },
+    async flush() {
+      if (timer) {
+        clearTimeout(timer);
+        write();
+      }
+      await writing2.idle();
+    },
+    async close() {
+      clearTimeout(timer);
+      write();
+      closed = true;
+      await writing2.idle();
+    }
+  };
+}
+async function newGoalFolder(repoFolder2, name, taken) {
+  const goals = goalsFolder(repoFolder2);
+  await mkdir(goals, { recursive: true });
+  for (const slug of await readdir(goals)) taken.add(slug);
+  for (; ; ) {
+    const slug = slugFor(name, taken);
+    const folder = goalFolder(repoFolder2, slug);
+    try {
+      await mkdir(folder);
+      return { slug, folder };
+    } catch (error) {
+      if (errorCode(error) !== "EEXIST") throw error;
+      taken.add(slug);
+    }
+  }
+}
+var startedAt = (entry) => "state" in entry ? entry.state.goal.createdAt : Number.POSITIVE_INFINITY;
+async function listGoals(repoFolder2) {
+  const folder = goalsFolder(repoFolder2);
+  const slugs = await namesIfThere(folder);
+  const found = await Promise.all(
+    slugs.map(async (slug) => {
+      const files = goalFiles(goalFolder(repoFolder2, slug));
+      const holder = holderOf(files.lock);
+      const held = holder && { holder };
+      try {
+        return { slug, state: await readState(files.state), ...held };
+      } catch (error) {
+        if (errorCode(error) === "ENOENT" || errorCode(error) === "ENOTDIR") return void 0;
+        return { slug, unreadable: errorText(error), ...held };
+      }
+    })
+  );
+  return found.filter((entry) => entry !== void 0).sort((a, b) => startedAt(a) - startedAt(b));
+}
+
+// src/engine/goals.ts
+var LIFE = "life";
+var Goals = class {
+  constructor(core, scheduler, meetings) {
+    this.core = core;
+    this.scheduler = scheduler;
+    this.meetings = meetings;
+  }
+  core;
+  scheduler;
+  meetings;
+  life = serialBy();
+  /**
+   * Pauses the goal: its runs stop, to go on in their sessions when it is
+   * resumed, and a meeting under way is cancelled; a plan in review stays,
+   * to approve once it goes on.
+   */
+  pause() {
+    return this.life(LIFE, () => {
+      const { goal } = this;
+      if (goal.status === "paused") return;
+      if (goal.status === "archived")
+        throw new Error(`The goal "${goal.name}" is archived: resume it first`);
+      goal.status = step(GOAL_MACHINE, goal.status, "pause");
+      this.hold(false);
+    });
+  }
+  /** Archives the goal as it stands: its work held as when paused, and its plans in review dropped. */
+  archive() {
+    return this.life(LIFE, () => {
+      const { goal } = this;
+      if (goal.status === "archived") return;
+      goal.status = step(GOAL_MACHINE, goal.status, "archive");
+      this.hold(true);
+    });
+  }
+  /**
+   * Puts a paused or archived goal back to work, from where it was; then the
+   * meetings a session stopped as it let the goal go (§3.2), and only then
+   * other work, so a meeting's members go back to it before anything else
+   * takes them.
+   */
+  resume(meetings = []) {
+    return this.life(LIFE, () => {
+      if (!this.wake()) return;
+      for (const id of meetings) this.meetings.resume(id);
+      this.core.changed();
+      this.scheduler.pump();
+    });
+  }
+  /**
+   * Takes an archived goal out of the repository for good: its subtasks'
+   * worktrees and branches, and its own worktree. Its branch stays, yours to
+   * merge or delete. The engine removes the goal's folder after (Engine.delete).
+   */
+  delete() {
+    return this.life(LIFE, async () => {
+      const { core, goal } = this;
+      if (!can(GOAL_MACHINE, goal.status, "delete"))
+        throw new Error(`The goal "${goal.name}" isn't archived: archive it before deleting it`);
+      await this.scheduler.release(core.state.subtasks.map((s) => s.id));
+      await this.meetings.settled();
+      await removeGoal(core.places);
+    });
+  }
+  /** Makes the goal active again; false when it was already. */
+  wake() {
+    const { goal } = this;
+    if (goal.status === "active") return false;
+    goal.status = step(GOAL_MACHINE, goal.status, "resume");
+    return true;
+  }
+  get goal() {
+    return this.core.state.goal;
+  }
+  /** Holds the goal's work, cancels its meeting under way and, `plansToo`, its plans in review. */
+  hold(plansToo) {
+    this.scheduler.hold();
+    for (const meeting2 of this.core.state.meetings)
+      if (meeting2.status === "running" || plansToo && meeting2.status === "review")
+        void this.meetings.cancel(meeting2.id);
+    this.core.changed();
+  }
+};
+
+// src/engine/meetings.ts
+import { randomUUID } from "node:crypto";
+
+// src/engine/meeting-run.ts
+import {
+  tool
+} from "@anthropic-ai/claude-agent-sdk";
+import { z as z3 } from "zod";
+
+// src/shared/text.ts
 var listOf = (items) => new Intl.ListFormat("en", { type: "conjunction" }).format(items);
+var toolText = (text2) => ({ content: [{ type: "text", text: text2 }] });
+
+// src/engine/plan.ts
+import { z } from "zod";
+
+// src/engine/prompts.ts
 var called = (member) => `${member.name} (${member.role.title})`;
 var TASK_WAYS = `# How you work on a subtask
 - You work in a git worktree of your own, on a branch cut from the goal's branch, which is merged into the goal's branch once you deliver. Teammates working at the same time each have theirs, so you never get in each other's way. Stay in yours.
@@ -8292,6 +8336,34 @@ Make those changes, then deliver again.`;
 }
 var DELIVER_REMINDER = "You haven't delivered yet. If the work is finished, call deliver now with a summary and the files that are the result. If you can't finish it, say what stands in the way.";
 var SESSION_ONLY = "Only the session that started you asks teammates and delivers this subtask: do your own part and report back to it.";
+var RUN_TOOLS = {
+  askTeammate: {
+    what: "Asks a teammate a question and waits for the answer. Use it only when you need their information or decision.",
+    teammate: "The teammate's name",
+    question: "The question, with the context they need"
+  },
+  deliver: {
+    what: "Hands over your finished work: your subtask is done only once you call it. Then end your turn. If you deliver again, the last delivery counts.",
+    summary: "A few sentences: what you did, and anything to watch out for",
+    files: "The files that are the result, as paths in your worktree (not scratch files); empty when the result is the summary itself",
+    done: "Delivered. End your turn now."
+  }
+};
+var TEAMMATE_REPLIES = {
+  self: "That's you; no need to ask.",
+  unknown: (name, others) => `There's no teammate called "${name}". Your teammates: ${others.join(", ") || "none"}.`,
+  answered: (name, text2) => `${name} answered: ${text2}`,
+  failed: (name, error) => `${name} couldn't answer just now: ${error}`
+};
+var DELIVERY_REFUSED = {
+  missing: (desk, files) => `Not delivered: these aren't files in your worktree (${desk}): ${files.join(", ")}. Deliver the files that are there.`,
+  conflicted: (files) => `Not delivered: conflict markers are still in ${files.join(", ")}. Resolve them first, keeping what both sides meant, then deliver.`
+};
+var PERMISSION_REPLIES = {
+  /** Its turn ended first. */
+  calledOff: "Stopped.",
+  denied: (note) => note ? `The user denied this and said: ${note}` : "The user denied this."
+};
 function reviewPrompt(input) {
   const { task, subtask: subtask2, delivery } = input;
   const files = delivery.files.length ? delivery.files.join(", ") : "none (the summary is the result)";
@@ -8361,7 +8433,7 @@ var MEETING_TOOLS = {
 function briefing(ctx, member) {
   const { meeting: meeting2 } = ctx;
   if (meeting2.seats?.[member.name]) return "";
-  const part = member.name !== meeting2.host ? "taking part in a" : meeting2.hostOnly ? "only running this; you're not one of its members and take no work in the" : "hosting this, and you also take part in it from your role, as one of its members; as the host you run the";
+  const part = member.name !== hostOf(meeting2) ? "taking part in a" : meeting2.hostOnly ? "only running this; you're not one of its members and take no work in the" : "hosting this, and you also take part in it from your role, as one of its members; as the host you run the";
   return `You're ${part} planning meeting.
 Goal: ${ctx.goal.name}
 To plan: ${meeting2.agenda}
@@ -8376,7 +8448,7 @@ function meetingOpening(ctx) {
   return `${briefing(ctx, ctx.attendees[0])}Open the meeting: restate the goal and the scope, then list the things this meeting has to decide. Put them to everyone as open questions: don't answer them or suggest answers yet, and don't hand topics out by role. You'll give your own view later. Don't write the plan. ${SPOKEN}`;
 }
 function meetingRound(ctx, member) {
-  const opened = member.name === ctx.meeting.host ? "You opened with" : "The host opened with";
+  const opened = member.name === hostOf(ctx.meeting) ? "You opened with" : "The host opened with";
   return `${briefing(ctx, member)}${opened}:
 ${ctx.meeting.turns[0]?.text ?? ""}
 
@@ -8394,12 +8466,10 @@ ${news(ctx, member)}
 
 You have the floor${point ? `, for what you raised your hand about: ${point}` : ": the host has called on you"}. Say it to the person it's for and take up what they actually said. Agree only where you have a reason of your own; if you disagree, say so and why; don't make up a disagreement. Keep to what the meeting settles: don't add what an interface should hold or how you'll build your piece. ${SPOKEN}`;
 }
-function meetingSteer(ctx, left) {
+function meetingSteer(ctx, left, raised) {
   const { meeting: meeting2, attendees } = ctx;
   const host = attendees[0];
-  const hands = (meeting2.hands ?? []).map(
-    (h) => `- ${h.member}${h.to ? ` (to ${h.to})` : ""}: ${h.point}`
-  );
+  const hands = raised.map((h) => `- ${h.member}${h.to ? ` (to ${h.to})` : ""}: ${h.point}`);
   const had = attendees.slice(1).map(
     (m) => `${m.name} ${String(meeting2.turns.filter((t) => t.phase === "answer" && t.speaker === m.name).length)}`
   );
@@ -8418,15 +8488,15 @@ With no hand worth the floor, go back over what you set out to decide: is it tru
 Not calling give_floor closes the talk. What you write before and after the call is said to the room. ${SPOKEN}`;
 }
 function meetingClosing(ctx) {
-  const { attendees, members } = ctx;
+  const { attendees, members: members2 } = ctx;
   return `${briefing(ctx, attendees[0])}Said since you last took it in:
 ${news(ctx, attendees[0])}
 
 You're the host: turn the discussion into the final plan.
-Members (subtasks can only go to them): ${listOf(members.map(called))}${ctx.meeting.hostOnly ? "\nYou only ran the meeting: you take no work in it." : ""}
+Members (subtasks can only go to them): ${listOf(members2.map(called))}${ctx.meeting.hostOnly ? "\nYou only ran the meeting: you take no work in it." : ""}
 
 Requirements:
-- Break the work into 1\u20134 tasks with 1\u20134 subtasks each; every subtask goes to exactly one member, whose name goes in assignee: ${listOf(members.map((m) => `"${m.name}"`))}. Who takes what is the split put to the room; where it wasn't, you decide, from their roles.
+- Break the work into 1\u20134 tasks with 1\u20134 subtasks each; every subtask goes to exactly one member, whose name goes in assignee: ${listOf(members2.map((m) => `"${m.name}"`))}. Who takes what is the split put to the room; where it wasn't, you decide, from their roles.
 - Split by what each piece of work needs from another. In depends_on (the keys of other subtasks) a subtask names only the subtasks whose results it actually uses; it starts as soon as they are merged. Don't make sequential what can run in parallel.
 - When others wait only on something small and quick to make, such as an interface, types, a config or a skeleton, make it a subtask of its own, so they can start soon; its assignee defines that interface.
 - Every interface the meeting said someone defines and others use is defined in such a quick subtask at the start, by whoever defines it. A subtask that only needs to know an interface depends on the subtask defining it, not on the work behind it. Putting the real pieces together and checking the whole is a subtask of its own at the end.
@@ -8437,623 +8507,116 @@ Requirements:
 - plan_markdown is the plan document for the user and the team: the goal and scope; what was decided, why, and what was turned down; where people didn't agree and how you ruled; what the meeting didn't get to; then who does what, dependencies and risks.
 - summary states the outcome in one sentence.`;
 }
-
-// src/plugin/words.ts
-var plural = (n, one, many) => `${String(n)} ${n === 1 ? one : many}`;
-var PLAN_TO_REVIEW = "plan to review";
-var rosterOf = (members) => members.map((m) => `${m.name} (${m.role.title})`).join(", ");
-var hostText = (meeting2) => `hosted by ${meeting2.host}${meeting2.hostOnly ? ", who only runs it" : ""}`;
-var attendanceText = (meeting2) => `${listOf(meeting2.participants)}, ${hostText(meeting2)}`;
-function noticeText(notice) {
-  const seconds = (ms) => `${String(Math.round(ms / 1e3))}s`;
-  switch (notice.kind) {
-    case "retry":
-      return `the API call failed: attempt ${String(notice.attempt)} of ${String(notice.max)} in ${seconds(notice.delayMs)}`;
-    case "subagent-retry":
-      return `a subagent's API call failed: attempt ${String(notice.attempt)} of ${String(notice.max)} in ${seconds(notice.delayMs)}`;
-    case "compacted":
-      return `the conversation was compacted from ${notice.before.toLocaleString()} tokens${notice.after === void 0 ? "" : ` to ${notice.after.toLocaleString()}`}`;
-    case "compaction-failed":
-      return `compacting the conversation failed${notice.error ? `: ${notice.error}` : ""}`;
-    case "fallback":
-      return `${notice.from} declined: ${notice.to} goes on`;
-    case "refusal":
-      return `${notice.model} declined, with no model to go on`;
-    case "task":
-      return `background task "${notice.title}" ${notice.state}`;
-    case "rate-limit":
-      return notice.status === "rejected" ? "rate limited" : "close to the rate limit";
-  }
-}
-function waitText(wait, work) {
-  switch (wait.kind) {
-    case "goal":
-      return `its goal is ${wait.status}`;
-    case "upstream": {
-      const upstream = work.subtasks.find((s) => s.id === wait.subtaskId);
-      return `waits on "${upstream?.title ?? ""}" by ${wait.by}${wait.halted ? ", which has stopped" : ""}`;
-    }
-    case "busy":
-      return `waits until ${wait.by} is free`;
-    case "merge": {
-      const ahead2 = work.subtasks.find((s) => s.id === wait.subtaskId);
-      return `waits until "${ahead2?.title ?? ""}" is merged`;
-    }
-    case "teammate":
-      return `asked ${wait.by}`;
-    case "you":
-      return wait.decision ? "waits on your decision" : "waits on your answer";
-    case "acceptance":
-      return "waits until you accept the task it builds on";
-  }
-}
-var redoneText = (titles) => `built on ${titles.map((t) => `"${t}"`).join(", ")}, redone since: redo it to take that in`;
-function stepText({ done, total, current }) {
-  if (!total) return void 0;
-  const step2 = `step ${String(Math.min(done + 1, total))} of ${String(total)}`;
-  return current ? `${step2}: ${current}` : step2;
-}
-var isUnderWay = (subtask2) => subtask2.status === "running" || subtask2.status === "reviewing" || subtask2.status === "merging";
-function underWay(subtask2) {
-  switch (subtask2.status) {
-    case "running": {
-      const step2 = stepText(subtask2.progress);
-      return `works on "${subtask2.title}"${step2 ? `, ${step2}` : ""}`;
-    }
-    case "reviewing":
-      return `"${subtask2.title}" in review`;
-    case "merging":
-      return `"${subtask2.title}" being merged`;
-  }
-}
-function meetingStatus(meeting2) {
-  switch (meeting2.status) {
-    case "running":
-      return meeting2.planning ? `${meeting2.host} writes the plan` : meeting2.speaking ? `${meeting2.speaking} speaks` : meeting2.drafting ? "the members form their first judgments" : meeting2.weighing ? "deciding who speaks next" : "under way";
-    case "review":
-      return "its plan waits for you";
-    case "approved":
-      return "plan approved";
-    case "cancelled":
-      return "cancelled";
-    case "failed":
-      return `failed${meeting2.error ? `: ${meeting2.error}` : ""}`;
-  }
-}
-var MAIN_ARGUMENTS = ["command", "file_path", "path", "pattern", "url", "description"];
-function mainArgument(input) {
-  const fields = input ?? {};
-  return MAIN_ARGUMENTS.map((key) => fields[key]).find(
-    (value) => typeof value === "string"
-  );
-}
-function callText(permission) {
-  const main = mainArgument(permission.input);
-  return main ? `${permission.tool}: ${main}` : permission.tool;
-}
-var OPTION_LABELS = {
-  once: "Allow once",
-  always: "Always allow",
-  deny: "Deny",
-  rereview: "Review again",
-  skip: "Skip the review",
-  sendBack: "Send back",
-  ours: "Keep ours",
-  theirs: "Take theirs",
-  retry: "Retry",
-  stop: "Stop",
-  accept: "Accept",
-  revise: "Send back"
+var PLAN_FIELDS = {
+  summary: "The outcome in one sentence",
+  markdown: "The plan document",
+  outcome: "What the task delivers",
+  key: "A short id, unique within this plan, such as api-1",
+  assignee: "The name of the member it goes to",
+  dependsOn: "The keys of the subtasks it waits for",
+  ownerAccepts: "Whether the user accepts this task themselves once it is done"
 };
-var NOTE_PROMPTS = {
-  deny: "Or deny it, saying why",
-  sendBack: "Or send it back, saying what to change",
-  revise: "What to change"
-};
-function needWords(question, work) {
-  const title = work.subtasks.find((s) => s.id === question.subtaskId)?.title;
-  const about = title ? ` for "${title}"` : "";
-  switch (question.kind) {
-    case "permission":
-      return {
-        headline: `${question.from} asks to use ${callText(question.permission)}${about}. Allow it?`,
-        ...question.text && { detail: question.text }
-      };
-    case "choices":
-      return { headline: `${question.from} asks${about}:` };
-    case "decision":
-      switch (question.decision.kind) {
-        case "review":
-          return {
-            headline: `The review of "${title ?? ""}" is stuck. What now?`,
-            detail: question.text
-          };
-        case "merge":
-          return {
-            headline: `Merging "${title ?? ""}" needs you. What now?`,
-            detail: question.text.split("\n").join(", ")
-          };
-        case "delivery":
-          return { headline: `The task "${question.text}" is done. Accept it?` };
-      }
-  }
-}
-var whereOf = (entry) => entry.holder ? "in another session" : !("state" in entry) ? "unreadable" : entry.state.goal.status === "archived" ? "archived" : "paused";
-function progressOf({ subtasks, meetings }) {
-  const done = subtasks.filter((s) => s.status === "done").length;
-  return subtasks.length ? `${String(done)}/${String(subtasks.length)} subtasks done` : meetings.some((m) => m.status === "review") ? PLAN_TO_REVIEW : "no plan yet";
-}
-var goalLabel = (state, where) => `${state.goal.name} \xB7 ${progressOf(state)} \xB7 ${where}`;
-var entryLabel = (entry) => "state" in entry ? goalLabel(entry.state, whereOf(entry)) : `${entry.slug} \xB7 can't be read: ${entry.unreadable}`;
-var noGoalText = (moved) => moved ? `"${moved}" moved to another Claude Code session. Bring it back here with /openplan resume.` : "This session runs no goal. Hand the team a task with /openplan <task>, or take a goal up with /openplan resume.";
-var noGoalForModel = (moved) => moved ? `The goal "${moved}" moved to another Claude Code session. The user brings it back with /openplan resume.` : "This session runs no goal: start one (start_goal), or the user takes one up with /openplan resume.";
-function handOffText(task, mine) {
-  const goal = mine ? `This session runs the goal "${mine.goal.name}", ${mine.goal.status === "active" ? "under way" : mine.goal.status}. The team: ${rosterOf(mine.members)}.` : "This session runs no goal yet.";
-  return [
-    "The user hands this to openplan's team: take it on as openplan's team skill says, and don't do any of it yourself.",
-    "",
-    task,
-    "",
-    goal
-  ].join("\n");
-}
-var resumeRefusal = (name) => `"${name}" is under way in this session, which runs one goal: /openplan pause it first, or take the other up in another session.`;
 
-// src/plugin/status.ts
-function subtaskLine(subtask2, { waits, redone }, work) {
-  const parts = [subtask2.status];
-  const step2 = subtask2.status === "running" && stepText(subtask2.progress);
-  if (step2) parts.push(step2);
-  parts.push(...waits.map((w) => waitText(w, work)));
-  if (redone.length)
-    parts.push(redoneText(redone.map((id) => work.subtasks.find((s) => s.id === id)?.title ?? "")));
-  if (subtask2.error) parts.push(`error: ${subtask2.error}`);
-  return `    - ${subtask2.title} [${subtask2.id}], ${subtask2.assignee}: ${parts.join(", ")}`;
-}
-function questionLine(question, work) {
-  const { headline, detail } = needWords(question, work);
-  const asks = question.kind === "choices" ? ` ${question.choices.map((c) => c.question).join(" ")}` : "";
-  const then = question.kind === "decision" ? ` Options: ${question.decision.options.join(", ")}.` : " The user answers it in /openplan.";
-  return `  - [${question.id}] ${headline}${asks}${detail ? ` (${detail})` : ""}${then}`;
-}
-function statusText(work) {
-  const derived = derive(work);
-  const busy = new Set(derived.busy);
-  const { goal } = work;
-  const lines = [
-    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)}`,
-    `Team: ${work.members.map((m) => busy.has(m) ? `${m} (busy)` : m).join(", ")}`
-  ];
-  for (const meeting2 of work.meetings.filter((m) => m.status !== "approved"))
-    lines.push(
-      `  Meeting [${meeting2.id}], ${hostText(meeting2)}: ${meetingStatus(meeting2)}${meeting2.status === "review" ? ": approve it, change it, or cancel it" : ""}${derived.resumable.includes(meeting2.id) ? "; it can go on" : ""}`
-    );
-  for (const task of work.tasks) {
-    lines.push(
-      `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", the user accepts it" : ""}`
-    );
-    for (const subtask2 of work.subtasks.filter((s) => s.taskId === task.id))
-      lines.push(
-        subtaskLine(subtask2, derived.subtasks[subtask2.id] ?? { waits: [], redone: [] }, work)
-      );
-  }
-  const open2 = work.questions.filter(toYou);
-  if (open2.length) lines.push("", "Waiting on you:", ...open2.map((q) => questionLine(q, work)));
-  return lines.join("\n");
-}
-var resumableOf = (others) => others.map((entry) => ({
-  slug: entry.slug,
-  label: entryLabel(entry)
-}));
-function othersText(others) {
-  if (!others.length) return void 0;
-  return [
-    "The repository's other goals, which the user takes up here with /openplan resume:",
-    ...resumableOf(others).map((o) => `  - ${o.label}`)
-  ].join("\n");
-}
-
-// src/plugin/pane.ts
-function shownMeeting(work) {
-  const latest = (status) => work.meetings.filter((m) => !status || m.status === status).at(-1);
-  return latest("running") ?? latest("review") ?? latest();
-}
-var meetingOf = (meeting2, work) => ({
-  // Its agenda is the brief your session wrote for it, too long for a line.
-  about: work.goal.name,
-  agenda: meeting2.agenda,
-  status: meetingStatus(meeting2),
-  attendance: attendanceText(meeting2),
-  turns: meeting2.turns.map((t) => ({
-    speaker: t.speaker,
-    text: t.text,
-    ...t.calls && { to: t.calls }
-  })),
-  hands: (meeting2.hands ?? []).map((h) => ({ member: h.member, point: h.point })),
-  ...meeting2.plan && { plan: meeting2.plan.summary }
+// src/engine/plan.ts
+var taskShape = (assignee) => ({
+  title: z.string().trim(),
+  outcome: z.string().trim().describe(PLAN_FIELDS.outcome),
+  subtasks: z.array(
+    z.object({
+      key: z.string().trim().describe(PLAN_FIELDS.key),
+      title: z.string().trim(),
+      description: z.string().trim(),
+      assignee,
+      depends_on: z.array(z.string()).describe(PLAN_FIELDS.dependsOn),
+      acceptance: z.string().trim()
+    })
+  )
 });
-function memberOf(member, work, derived) {
-  const own = work.subtasks.filter((s) => s.assignee === member.name);
-  const at = (...statuses) => own.find((s) => isUnderWay(s) && statuses.includes(s.status));
-  const reviewing = work.subtasks.find(
-    (s) => s.assignee !== member.name && derived.subtasks[s.id]?.reviewedBy === member.name
-  );
-  const meeting2 = work.meetings.find(
-    (m) => m.status === "running" && m.participants.includes(member.name)
-  );
-  const next = own.find((s) => s.status === "pending");
-  const running3 = at("running");
-  const handedOver = at("reviewing") ?? at("merging");
-  let doing;
-  if (running3) doing = underWay(running3);
-  else if (meeting2) doing = `at the meeting on "${work.goal.name}"`;
-  else if (reviewing) doing = `reviews "${reviewing.title}" by ${reviewing.assignee}`;
-  else if (handedOver) doing = underWay(handedOver);
-  else if (next) {
-    const waits = derived.subtasks[next.id]?.waits ?? [];
-    doing = `next: "${next.title}"${waits.length ? `, ${waits.map((w) => waitText(w, work)).join(", ")}` : ""}`;
-  } else doing = "free";
-  const followed = running3 ?? own.filter((s) => s.startedAt).sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0))[0];
-  return {
-    name: member.name,
-    role: member.role.title,
-    ...member.model && { model: member.model },
-    doing,
-    ...followed && { subtask: followed.id },
-    tokens: work.tokens[member.name] ?? 0
-  };
-}
-var optionOf = (value) => ({
-  value,
-  label: OPTION_LABELS[value]
+var planShape = (task) => z.object({
+  summary: z.string().trim().describe(PLAN_FIELDS.summary),
+  plan_markdown: z.string().trim().describe(PLAN_FIELDS.markdown),
+  tasks: z.array(task)
 });
-function answersOf(options, note) {
-  return {
-    options: options.filter((o) => !(note?.needed && o === note.option)).map(optionOf),
-    ...note && {
-      note: {
-        option: note.option,
-        label: OPTION_LABELS[note.option],
-        prompt: NOTE_PROMPTS[note.option]
-      }
+var planSchema = (assignee) => planShape(
+  z.object({
+    ...taskShape(assignee),
+    owner_accepts: z.boolean().default(false).describe(PLAN_FIELDS.ownerAccepts)
+  })
+);
+var hostPlanSchema = (members2) => planShape(z.object(taskShape(z.enum(members2).describe(PLAN_FIELDS.assignee))));
+var hostWritten = (plan) => ({
+  ...plan,
+  tasks: plan.tasks.map((task) => ({ ...task, owner_accepts: false }))
+});
+var writtenPlan = (plan) => ({
+  summary: plan.summary,
+  plan_markdown: plan.markdown,
+  tasks: plan.tasks.map((task) => ({
+    title: task.title,
+    outcome: task.outcome,
+    owner_accepts: task.ownerAccepts,
+    subtasks: task.subtasks.map(({ dependsOn, ...subtask2 }) => ({
+      ...subtask2,
+      depends_on: dependsOn
+    }))
+  }))
+});
+function loopingDependencies(tasks) {
+  const taskOf = new Map(tasks.flatMap((t) => t.subtasks.map((s) => [s.key, t])));
+  const waitsOn = new Map(tasks.flatMap((t) => t.subtasks.map((s) => [s.key, s.dependsOn])));
+  const state = /* @__PURE__ */ new Map();
+  const loops = [];
+  const follow = (key) => {
+    state.set(key, "open");
+    for (const dependency of waitsOn.get(key) ?? []) {
+      const task = taskOf.get(dependency);
+      if (!task) continue;
+      const awaited = task.ownerAccepts && task !== taskOf.get(key) ? task.subtasks.map((s) => s.key) : [dependency];
+      if (awaited.some((k) => state.get(k) === "open")) loops.push([key, dependency]);
+      else for (const k of awaited) if (!state.has(k)) follow(k);
     }
+    state.set(key, "done");
   };
+  for (const key of waitsOn.keys()) if (!state.has(key)) follow(key);
+  return loops;
 }
-function needOf(question, work) {
-  const { headline, detail } = needWords(question, work);
-  const head = {
-    id: question.id,
-    from: question.from,
-    headline,
-    ...detail && { detail },
-    ask: question.kind !== "decision" || question.decision.kind !== "delivery"
-  };
-  switch (question.kind) {
-    case "permission": {
-      const { options, note } = answersOf(question.permission.options, { option: PERMISSION_NOTE });
+function soundPlan(plan, loops) {
+  const used = /* @__PURE__ */ new Set();
+  const tasks = plan.tasks.filter((task) => task.subtasks.length).map((task, n) => ({
+    title: task.title || `Task ${String(n + 1)}`,
+    outcome: task.outcome,
+    ownerAccepts: task.owner_accepts,
+    subtasks: task.subtasks.map((sub, i) => {
+      let key = sub.key || `t${String(n + 1)}-${String(i + 1)}`;
+      while (used.has(key)) key = `${key}'`;
+      used.add(key);
       return {
-        ...head,
-        kind: "options",
-        options: options.map((o) => ({
-          ...o,
-          ...o.value === "once" && { primary: true }
-        })),
-        ...note && { note }
+        key,
+        title: sub.title || `Subtask ${String(i + 1)}`,
+        description: sub.description,
+        assignee: sub.assignee,
+        dependsOn: sub.depends_on,
+        acceptance: sub.acceptance
       };
-    }
-    case "choices":
-      return {
-        ...head,
-        kind: "choices",
-        choices: question.choices.map((c) => ({
-          question: c.question,
-          header: c.header,
-          options: c.options.map((o) => ({
-            label: o.label,
-            ...o.description && { description: o.description }
-          })),
-          multiSelect: c.multiSelect
-        }))
-      };
-    case "decision": {
-      const { kind } = question.decision;
-      const subtask2 = work.subtasks.find((s) => s.id === question.subtaskId);
-      const done = work.subtasks.filter((s) => s.taskId === subtask2?.taskId && s.status === "done");
-      return {
-        ...head,
-        kind: "options",
-        ...answersOf(question.decision.options, question.decision.note),
-        ...kind === "delivery" && {
-          sendBack: done.map((s) => ({ id: s.id, title: s.title }))
-        }
-      };
-    }
-  }
-}
-function milestones(work) {
-  const said = [];
-  for (const meeting2 of work.meetings)
-    if (meeting2.status === "approved")
-      said.push({ key: `plan:${meeting2.id}`, text: `Plan approved: "${work.goal.name}"` });
-  for (const s of work.subtasks) {
-    if (s.review?.rounds)
-      said.push({
-        key: `back:${s.id}:${String(s.review.rounds)}`,
-        text: `"${s.title}" went back to ${s.assignee}${s.review.notes ? `: ${s.review.notes}` : ""}`
-      });
-    if (s.status === "done")
-      said.push({ key: `done:${s.id}`, text: `"${s.title}" by ${s.assignee} is merged` });
-    if (s.status === "failed")
-      said.push({
-        key: `failed:${s.id}:${String(s.startedAt ?? 0)}`,
-        text: `"${s.title}" by ${s.assignee} failed${s.error ? `: ${s.error}` : ""}`
-      });
-  }
-  for (const task of work.tasks)
-    if (taskDone(work, task.id))
-      said.push({ key: `task:${task.id}`, text: `The task "${task.title}" is done` });
-  return said;
-}
-function prompts(work) {
-  const asked2 = [];
-  for (const meeting2 of work.meetings)
-    if (meeting2.status === "review" && meeting2.plan)
-      asked2.push({
-        key: `review:${meeting2.id}`,
-        text: `The meeting [${meeting2.id}] on "${work.goal.name}" has a plan: ${meeting2.plan.summary}. Get it with show_plan and show it to the user in full: its document as it is written, then its tasks, each with its subtasks, who does them and what each waits on. Then ask whether to approve it, change it, or cancel it, and which tasks, if any, they want to accept themselves once done: none is unless they say, since reviews and checks confirm the work; it is worth it for a result only looking at it or trying it can judge.`
-      });
-  for (const question of work.questions) {
-    if (question.kind !== "decision" || question.decision.kind !== "delivery") continue;
-    const subtask2 = work.subtasks.find((s) => s.id === question.subtaskId);
-    const delivered = work.subtasks.filter((s) => s.taskId === subtask2?.taskId && s.delivery).map((s) => `- ${s.title}, by ${s.assignee}: ${s.delivery?.summary ?? ""}`);
-    asked2.push({
-      key: `accept:${question.id}`,
-      text: [
-        `The task "${question.text}" is done [${question.id}], merged into its goal's branch:`,
-        ...delivered,
-        "Tell the user what was done, and ask whether to accept it or send it back with what to change (decide)."
-      ].join("\n")
-    });
-  }
-  return asked2;
-}
-var BAND_TASKS = 5;
-function taskWhere(work, derived, subtasks) {
-  const going = subtasks.find(isUnderWay);
-  if (going)
-    return going.status === "running" ? `${going.assignee} ${underWay(going)}` : underWay(going);
-  const at = subtasks.find((s) => s.status !== "done");
-  if (!at) return void 0;
-  switch (at.status) {
-    case "pending": {
-      const [wait] = derived.subtasks[at.id]?.waits ?? [];
-      return `"${at.title}" ${wait ? waitText(wait, work) : "starts next"}`;
-    }
-    default:
-      return `"${at.title}" ${at.status}`;
-  }
-}
-function taskLines(work, derived) {
-  const lines = [];
-  if (work.goal.status === "archived") return lines;
-  for (const task of work.tasks) {
-    const subtasks = work.subtasks.filter((s) => s.taskId === task.id);
-    const accepting = work.questions.some(
-      (q) => q.kind === "decision" && q.decision.kind === "delivery" && subtasks.some((s) => s.id === q.subtaskId)
+    })
+  }));
+  if (!tasks.length) throw new Error("The plan has no tasks");
+  const subtasks = tasks.flatMap((task) => task.subtasks);
+  for (const subtask2 of subtasks)
+    subtask2.dependsOn = [...new Set(subtask2.dependsOn)].filter(
+      (key) => key !== subtask2.key && used.has(key)
     );
-    const where = accepting ? "waits for you to accept it" : taskWhere(work, derived, subtasks);
-    if (where) lines.push(`${task.title} \xB7 ${where}`);
-  }
-  return lines.length > BAND_TASKS ? [
-    ...lines.slice(0, BAND_TASKS),
-    `and ${plural(lines.length - BAND_TASKS, "more task", "more tasks")}`
-  ] : lines;
-}
-function bandText(work, needs) {
-  const parts = [];
-  if (work.meetings.some((m) => m.status === "running")) parts.push("meeting");
-  if (work.meetings.some((m) => m.status === "review")) parts.push(PLAN_TO_REVIEW);
-  const working = work.subtasks.filter((s) => s.status === "running").length;
-  if (working) parts.push(`${String(working)} working`);
-  if (needs) parts.push(`${plural(needs, "needs", "need")} you`);
-  const { status } = work.goal;
-  if (!parts.length) parts.push(status === "active" ? "idle" : status);
-  return parts.join(" \xB7 ");
-}
-function othersBand(others) {
-  const paused = others.filter((e) => whereOf(e) === "paused").length;
-  const elsewhere = others.filter((e) => whereOf(e) === "in another session").length;
-  const parts = [
-    ...paused ? [plural(paused, "goal paused", "goals paused")] : [],
-    ...elsewhere ? [`${plural(elsewhere, "goal", "goals")} in another session`] : []
-  ];
-  return parts.length ? parts.join(" \xB7 ") : void 0;
-}
-function paneTeam(mine, others, moved) {
-  if (!mine) {
-    const band = othersBand(others);
-    return {
-      noGoal: noGoalText(moved),
-      ...band && { band },
-      tasks: [],
-      members: [],
-      needs: [],
-      milestones: [],
-      prompts: [],
-      resumable: resumableOf(others)
-    };
-  }
-  const { work, members } = mine;
-  const derived = derive(work);
-  const needs = work.questions.filter(toYou).map((q) => needOf(q, work));
-  const meeting2 = shownMeeting(work);
-  const { goal } = work;
-  const here = goal.status === "active" ? [] : [{ slug: goal.slug, label: goalLabel(work, `${goal.status}, in this session`) }];
-  return {
-    goal: { name: goal.name, slug: goal.slug },
-    band: bandText(work, needs.length),
-    tasks: taskLines(work, derived),
-    ...meeting2 && { meeting: meetingOf(meeting2, work) },
-    members: members.map((m) => memberOf(m, work, derived)),
-    needs,
-    milestones: milestones(work),
-    prompts: prompts(work),
-    resumable: [...here, ...resumableOf(others)],
-    ...goal.status === "active" && { resumeRefused: resumeRefusal(goal.name) }
-  };
-}
-var callOf = (name, input) => {
-  const argument = mainArgument(input);
-  return { name, ...argument !== void 0 && { argument } };
-};
-function viewEntry(entry) {
-  switch (entry.kind) {
-    case "run":
-      return { kind: "run", model: entry.model };
-    case "thinking":
-    case "text":
-      return { kind: entry.kind, text: entry.text };
-    case "tool":
-      return {
-        kind: "tool",
-        state: entry.state,
-        output: entry.output,
-        ...callOf(entry.name, entry.input)
-      };
-    case "steps":
-      return { kind: "steps", steps: entry.steps };
-    case "notice":
-      return { kind: "notice", text: noticeText(entry.notice) };
-  }
-}
-var viewEntries = (entries) => entries.map(viewEntry);
-var viewLive = (live) => ({
-  ...live.streaming && { streaming: live.streaming },
-  ...live.starting && { starting: live.starting },
-  running: live.running.map((call) => callOf(call.name, call.input))
-});
-
-// src/plugin/pane-server.ts
-var viewSchema = z2.object({
-  /** The revision the pane has. */
-  revision: z2.number().int().optional(),
-  /** The subtask whose record the pane follows, and the byte it read up to. */
-  record: z2.object({ subtask: z2.string(), from: z2.number().int().min(0) }).optional()
-});
-var releaseSchema = z2.object({ goal: z2.string() });
-var GOALS_MS = 2e3;
-function viewer(session2) {
-  let revision = 0;
-  let shown = "";
-  let goals;
-  return async (asked2) => {
-    if (!goals || asked2.revision === void 0 || Date.now() - goals.at >= GOALS_MS)
-      goals = { at: Date.now(), entries: session2().goals() };
-    const all = await goals.entries.catch((error) => {
-      goals = void 0;
-      throw error;
-    });
-    const entries = session2().othersOf(all);
-    const engine = session2().current;
-    const mine = engine && { work: engine.work, members: engine.team.members };
-    const team = paneTeam(mine, entries, session2().moved);
-    const text2 = JSON.stringify(team);
-    if (text2 !== shown) {
-      shown = text2;
-      revision++;
-    }
-    const meeting2 = mine && shownMeeting(mine.work);
-    const spoken = meeting2 && engine.records.speaking(meeting2);
-    const { record: record2 } = asked2;
-    const read = record2 && engine && await engine.records.read(record2.subtask, record2.from);
-    return {
-      revision,
-      ...asked2.revision !== revision && { team },
-      ...spoken && {
-        speaking: {
-          speaker: spoken.speaker,
-          entries: viewEntries(spoken.entries),
-          live: viewLive(spoken.live)
-        }
-      },
-      ...read && {
-        record: {
-          subtask: record2.subtask,
-          entries: viewEntries(read.entries),
-          next: read.next,
-          ...read.live && { live: viewLive(read.live) }
-        }
-      }
-    };
-  };
-}
-function socketAddress() {
-  if (process.platform === "win32")
-    return { address: `\\\\.\\pipe\\openplan-${randomBytes(12).toString("hex")}` };
-  const folder = mkdtempSync(path5.join(tmpdir(), "openplan-"));
-  return { address: path5.join(folder, "pane.sock"), folder };
-}
-var asked = async (schema, request2) => schema.parse(JSON.parse(await text(request2) || "{}"));
-async function servePane(session2) {
-  const { address, folder } = socketAddress();
-  const view = viewer(session2);
-  const server2 = createServer((request2, response) => {
-    const routes = {
-      "/view": async () => view(await asked(viewSchema, request2)),
-      "/release": async () => session2().letGo((await asked(releaseSchema, request2)).goal)
-    };
-    const route = request2.method === "POST" && routes[request2.url ?? ""];
-    if (!route) {
-      response.writeHead(404).end();
-      return;
-    }
-    route().then(
-      (answer) => {
-        response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(answer));
-      },
-      (error) => {
-        const status = error instanceof z2.ZodError || error instanceof SyntaxError ? 400 : error instanceof GitError ? 409 : 500;
-        response.writeHead(status, { "content-type": "text/plain" }).end(errorText(error));
-      }
+  const looping = loopingDependencies(tasks);
+  if (looping.length && loops === "refuse")
+    throw new Error(
+      `These dependencies go round in a loop, counting a task you accept as waited on whole: ${looping.map(([key, dependency]) => `${key} on ${dependency}`).join(", ")}. Drop them, or accept fewer tasks.`
     );
-  });
-  await new Promise((resolve, reject) => {
-    server2.once("error", reject).listen(address, resolve);
-  });
-  return {
-    address,
-    close() {
-      server2.close();
-      if (folder) rmSync(folder, { recursive: true, force: true });
-    }
-  };
+  for (const [key, dependency] of looping) {
+    const subtask2 = subtasks.find((s) => s.key === key);
+    if (subtask2) subtask2.dependsOn = subtask2.dependsOn.filter((k) => k !== dependency);
+  }
+  return { summary: plan.summary, markdown: plan.plan_markdown, tasks };
 }
-function askToLetGo(address, slug) {
-  return new Promise((resolve, reject) => {
-    const asking = request({ socketPath: address, path: "/release", method: "POST" }, (answer) => {
-      text(answer).then((body) => {
-        if (answer.statusCode === 200) resolve(JSON.parse(body));
-        else reject(new Error(body));
-      }, reject);
-    });
-    asking.once("error", (error) => {
-      if (errorCode(error) === "ENOENT" || errorCode(error) === "ECONNREFUSED")
-        resolve(void 0);
-      else reject(error);
-    }).end(JSON.stringify({ goal: slug }));
-  });
-}
-
-// src/plugin/session-mode.ts
-import path6 from "node:path";
-var folderOf = (dataFolder2) => path6.join(dataFolder2, "sessions");
-var fileOf = (dataFolder2, session2) => path6.join(folderOf(dataFolder2), `${String(session2)}.mode`);
-function modeOf(dataFolder2, session2) {
-  return textIfThere(fileOf(dataFolder2, session2));
-}
-
-// src/plugin/pane-tools.ts
-import { z as z6 } from "zod";
 
 // src/engine/turns.ts
 import { spawn as spawn2 } from "node:child_process";
@@ -9061,11 +8624,92 @@ import {
   createSdkMcpServer,
   query
 } from "@anthropic-ai/claude-agent-sdk";
-import { z as z3 } from "zod";
+import { z as z2 } from "zod";
+
+// src/engine/processes.ts
+import { execFile } from "node:child_process";
+import { setTimeout as delay2 } from "node:timers/promises";
+var members = /* @__PURE__ */ new Map();
+var record;
+function save() {
+  if (!record) return;
+  const { file, writes } = record;
+  const written2 = [...members].map(([pid, { settings }]) => ({ pid, settings }));
+  writes.run(() => writeWhole(file, JSON.stringify(written2)));
+}
+function watchMember(child, settings) {
+  const { pid } = child;
+  if (pid === void 0) return;
+  members.set(pid, { child, settings });
+  save();
+  child.once("exit", () => {
+    members.delete(pid);
+    save();
+  });
+}
+function stopMembers() {
+  for (const { child } of members.values()) child.kill("SIGTERM");
+}
+var commandLine = (pid) => new Promise((resolve, reject) => {
+  const [command, args] = process.platform === "win32" ? windowsProcessField(pid, "CommandLine") : ["ps", ["-o", "command=", "-p", String(pid)]];
+  execFile(command, args, (error, stdout) => {
+    if (!error) resolve(stdout);
+    else if (typeof error.code === "number") resolve(void 0);
+    else reject(new Error(`${command}: ${error.message}`, { cause: error }));
+  });
+});
+async function written(file) {
+  return await jsonIfThere(file) ?? [];
+}
+var LEFT_EXIT_MS = 5e3;
+async function exits(pid, ms) {
+  const until = Date.now() + ms;
+  while (running(pid)) {
+    if (Date.now() > until) return false;
+    await delay2(50);
+  }
+  return true;
+}
+async function stopLeft(pid) {
+  const signal = (name) => {
+    try {
+      process.kill(pid, name);
+    } catch (error) {
+      if (errorCode(error) !== "ESRCH") throw error;
+    }
+  };
+  signal("SIGTERM");
+  if (await exits(pid, LEFT_EXIT_MS)) return;
+  signal("SIGKILL");
+  await exits(pid, LEFT_EXIT_MS);
+}
+async function recordMembersIn(file, failed) {
+  const left = await written(file);
+  await Promise.all(
+    left.map(async ({ pid, settings }) => {
+      if ((await commandLine(pid))?.includes(settings)) await stopLeft(pid);
+    })
+  );
+  record = { file, writes: inOrder(failed) };
+  save();
+}
+async function stopRecording() {
+  const was = record;
+  record = void 0;
+  await was?.writes.idle();
+}
+
+// src/engine/turns.ts
 var TURN_SERVER = "openplan";
 var turnToolName = (name) => `mcp__${TURN_SERVER}__${name}`;
-var toolText = (text2) => ({ content: [{ type: "text", text: text2 }] });
 var turnServer = (tools) => createSdkMcpServer({ name: TURN_SERVER, tools });
+var withTurn = (options, turn) => ({
+  ...options,
+  ...turn.resume !== void 0 && { resume: turn.resume },
+  ...turn.server && { mcpServers: { ...options.mcpServers, [TURN_SERVER]: turn.server } },
+  ...turn.allowed && { allowedTools: turn.allowed },
+  ...turn.canUseTool && { canUseTool: turn.canUseTool }
+});
 var tokensOf = (usage) => usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens + usage.output_tokens;
 function resultOutcome(message, subagentTokens = 0) {
   const tokens = tokensOf(message.usage) + subagentTokens;
@@ -9319,7 +8963,7 @@ async function askOnce(params) {
       ...schema && {
         outputFormat: {
           type: "json_schema",
-          schema: z3.toJSONSchema(schema, { target: "draft-7" })
+          schema: z2.toJSONSchema(schema, { target: "draft-7" })
         }
       }
     },
@@ -9333,671 +8977,7 @@ async function askOnce(params) {
   return { text: outcome.text, structured: outcome.structured, session: session2 };
 }
 
-// src/plugin/tools.ts
-import { z as z5 } from "zod";
-
-// src/engine/plan.ts
-import { z as z4 } from "zod";
-var taskShape = (assignee) => ({
-  title: z4.string().trim(),
-  outcome: z4.string().trim().describe("What the task delivers"),
-  subtasks: z4.array(
-    z4.object({
-      key: z4.string().trim().describe("A short id, unique within this plan, such as api-1"),
-      title: z4.string().trim(),
-      description: z4.string().trim(),
-      assignee,
-      depends_on: z4.array(z4.string()).describe("The keys of the subtasks it waits for"),
-      acceptance: z4.string().trim()
-    })
-  )
-});
-var planShape = (task) => z4.object({
-  summary: z4.string().trim().describe("The outcome in one sentence"),
-  plan_markdown: z4.string().trim().describe("The plan document"),
-  tasks: z4.array(task)
-});
-var planSchema = (assignee) => planShape(
-  z4.object({
-    ...taskShape(assignee),
-    owner_accepts: z4.boolean().default(false).describe("Whether the user accepts this task themselves once it is done")
-  })
-);
-var hostPlanSchema = (members) => planShape(z4.object(taskShape(z4.enum(members).describe("The name of the member it goes to"))));
-var hostWritten = (plan) => ({
-  ...plan,
-  tasks: plan.tasks.map((task) => ({ ...task, owner_accepts: false }))
-});
-function loopingDependencies(tasks) {
-  const taskOf = new Map(tasks.flatMap((t) => t.subtasks.map((s) => [s.key, t])));
-  const waitsOn = new Map(tasks.flatMap((t) => t.subtasks.map((s) => [s.key, s.dependsOn])));
-  const state = /* @__PURE__ */ new Map();
-  const loops = [];
-  const follow = (key) => {
-    state.set(key, "open");
-    for (const dependency of waitsOn.get(key) ?? []) {
-      const task = taskOf.get(dependency);
-      if (!task) continue;
-      const awaited = task.ownerAccepts && task !== taskOf.get(key) ? task.subtasks.map((s) => s.key) : [dependency];
-      if (awaited.some((k) => state.get(k) === "open")) loops.push([key, dependency]);
-      else for (const k of awaited) if (!state.has(k)) follow(k);
-    }
-    state.set(key, "done");
-  };
-  for (const key of waitsOn.keys()) if (!state.has(key)) follow(key);
-  return loops;
-}
-function soundPlan(plan, loops) {
-  const used = /* @__PURE__ */ new Set();
-  const tasks = plan.tasks.filter((task) => task.subtasks.length).map((task, n) => ({
-    title: task.title || `Task ${String(n + 1)}`,
-    outcome: task.outcome,
-    ownerAccepts: task.owner_accepts,
-    subtasks: task.subtasks.map((sub, i) => {
-      let key = sub.key || `t${String(n + 1)}-${String(i + 1)}`;
-      while (used.has(key)) key = `${key}'`;
-      used.add(key);
-      return {
-        key,
-        title: sub.title || `Subtask ${String(i + 1)}`,
-        description: sub.description,
-        assignee: sub.assignee,
-        dependsOn: sub.depends_on,
-        acceptance: sub.acceptance
-      };
-    })
-  }));
-  if (!tasks.length) throw new Error("The plan has no tasks");
-  const subtasks = tasks.flatMap((task) => task.subtasks);
-  for (const subtask2 of subtasks)
-    subtask2.dependsOn = [...new Set(subtask2.dependsOn)].filter(
-      (key) => key !== subtask2.key && used.has(key)
-    );
-  const looping = loopingDependencies(tasks);
-  if (looping.length && loops === "refuse")
-    throw new Error(
-      `These dependencies go round in a loop, counting a task you accept as waited on whole: ${looping.map(([key, dependency]) => `${key} on ${dependency}`).join(", ")}. Drop them, or accept fewer tasks.`
-    );
-  for (const [key, dependency] of looping) {
-    const subtask2 = subtasks.find((s) => s.key === key);
-    if (subtask2) subtask2.dependsOn = subtask2.dependsOn.filter((k) => k !== dependency);
-  }
-  return { summary: plan.summary, markdown: plan.plan_markdown, tasks };
-}
-
-// src/plugin/tools.ts
-var decisionOf = (decision, note, sentBack) => ({
-  decision,
-  ...note && { note },
-  ...sentBack !== void 0 && { sentBack }
-});
-var writtenPlan = (plan) => ({
-  summary: plan.summary,
-  plan_markdown: plan.markdown,
-  tasks: plan.tasks.map((task) => ({
-    title: task.title,
-    outcome: task.outcome,
-    owner_accepts: task.ownerAccepts,
-    subtasks: task.subtasks.map(({ dependsOn, ...subtask2 }) => ({
-      ...subtask2,
-      depends_on: dependsOn
-    }))
-  }))
-});
-var meeting = z5.string().describe("The meeting's id");
-var subtask = z5.string().describe("The subtask's id");
-function memberName(members) {
-  if (!members) return z5.string().describe("A member's name");
-  const names = members.map((m) => m.name);
-  return z5.enum(names).describe(`One of the team: ${rosterOf(members)}`);
-}
-var meetingInput = (member) => ({
-  agenda: z5.string().trim().min(1).describe("What to plan, with everything the user said about it"),
-  size: z5.enum(MEETING_SIZES).optional().describe("How long the discussion runs; the team's default when left out"),
-  attendees: z5.array(member).default([]).describe("The host first; everyone when empty"),
-  host_only: z5.boolean().default(false).describe(
-    "True when the host only runs the meeting: no view of their own and no work in the plan. Leave it out for a host who also takes part from their role, the usual"
-  )
-});
-var changePlanInput = (member) => ({ meeting, plan: planSchema(member) });
-var assignInput = (member) => ({
-  assignee: member,
-  title: z5.string().trim().min(1),
-  description: z5.string().trim().describe("Everything the user said about it"),
-  acceptance: z5.string().trim().default("").describe("When it counts as done")
-});
-function addTools(server2, session2) {
-  server2.registerTool(
-    "status",
-    {
-      description: "Where this session's goal stands: its meetings, tasks and subtasks, who is busy, and what waits on the user; and the repository's other goals. Ids are in brackets.",
-      annotations: { readOnlyHint: true }
-    },
-    async () => {
-      const engine = session2.current;
-      const others = othersText(await session2.others());
-      return toolText(
-        [engine ? statusText(engine.work) : session2.none, ...others ? [others] : []].join("\n\n")
-      );
-    }
-  );
-  server2.registerTool(
-    "start_goal",
-    {
-      description: "Start a goal in this session: something the user wants done. It gets its own branch, cut from the repository's HEAD, and its own copy of the team. A session runs one goal: refused while its goal is under way. Then hold a meeting to plan it, or assign work directly.",
-      inputSchema: { name: z5.string().trim().min(1).describe("A few words for what is wanted") }
-    },
-    async ({ name }) => {
-      const { goal } = (await session2.start(name)).state;
-      return toolText(`Started the goal "${goal.name}" on branch ${goalBranch(goal.slug)}.`);
-    }
-  );
-  const meetingTool = server2.registerTool(
-    "hold_meeting",
-    {
-      description: "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and the session is told when its plan waits for the user. Hold one only once the user has agreed who attends.",
-      inputSchema: meetingInput(memberName())
-    },
-    ({ agenda, size, attendees, host_only }) => {
-      const engine = session2.goal;
-      const held = engine.meetings.start({
-        agenda,
-        size: size ?? engine.meetingSize,
-        attendees,
-        hostOnly: host_only
-      });
-      return toolText(`The meeting [${held.id}] has begun: ${attendanceText(held)}.`);
-    }
-  );
-  server2.registerTool(
-    "show_plan",
-    {
-      description: "A meeting's plan in full: its document and its tasks and subtasks, in the shape change_plan takes.",
-      inputSchema: { meeting },
-      annotations: { readOnlyHint: true }
-    },
-    ({ meeting: id }) => {
-      const found = session2.goal.state.meetings.find((m) => m.id === id);
-      if (!found?.plan) throw new Error("That meeting has no plan");
-      return toolText(JSON.stringify(writtenPlan(found.plan), null, 2));
-    }
-  );
-  const changePlanTool = server2.registerTool(
-    "change_plan",
-    {
-      description: "Replace a plan under review with the user's changes: the whole plan, as show_plan gives it, changed. Any member can be given work. owner_accepts marks a task the user accepts themselves once done; none is, unless they say.",
-      inputSchema: changePlanInput(memberName())
-    },
-    ({ meeting: id, plan }) => {
-      session2.goal.meetings.change(id, plan);
-      return toolText("The plan is changed. It waits for the user's approval.");
-    }
-  );
-  server2.registerTool(
-    "approve_plan",
-    {
-      description: "Approve a plan under review, as the user said: its tasks and subtasks go to work, each starting once what it builds on is merged and its member is free.",
-      inputSchema: { meeting }
-    },
-    async ({ meeting: id }) => {
-      const added = await session2.goal.meetings.approve(id);
-      return toolText(`Approved: ${plural(added.length, "subtask goes", "subtasks go")} to work.`);
-    }
-  );
-  server2.registerTool(
-    "cancel_meeting",
-    {
-      description: "Stop a meeting under way, or drop a plan the user doesn't want.",
-      inputSchema: { meeting }
-    },
-    async ({ meeting: id }) => {
-      await session2.goal.meetings.cancel(id);
-      return toolText("Cancelled.");
-    }
-  );
-  server2.registerTool(
-    "resume_meeting",
-    {
-      description: "Go on with a meeting that failed or was cancelled before its plan, from where it stopped.",
-      inputSchema: { meeting }
-    },
-    ({ meeting: id }) => {
-      session2.goal.meetings.resume(id);
-      return toolText("The meeting goes on.");
-    }
-  );
-  const assignTool = server2.registerTool(
-    "assign",
-    {
-      description: "Give a member one subtask directly, without a meeting. It starts once they are free. Assign only once the user has agreed who takes it.",
-      inputSchema: assignInput(memberName())
-    },
-    (work) => {
-      const [added] = session2.goal.goals.assign(work);
-      return toolText(`Assigned "${work.title}" [${added?.id ?? ""}] to ${work.assignee}.`);
-    }
-  );
-  server2.registerTool(
-    "goal_action",
-    {
-      description: "Pause this session's goal (its runs stop, to go on later in their sessions), resume it, archive it, or delete it once archived: its folder, worktrees and subtask branches go, its own branch stays. Delete only when the user has confirmed it.",
-      inputSchema: { action: z5.enum(GOAL_ACTIONS) },
-      annotations: { destructiveHint: true }
-    },
-    async ({ action }) => {
-      const engine = session2.goal;
-      const { name } = engine.state.goal;
-      if (action === "delete") await session2.delete();
-      else await engine.goals[action]();
-      return toolText(`The goal "${name}": ${action} done.`);
-    }
-  );
-  server2.registerTool(
-    "subtask_action",
-    {
-      description: "Stop a subtask; continue a stopped or failed one in its session and worktree; retry one from the start; or redo a done one whose upstream was redone.",
-      inputSchema: { subtask, action: z5.enum(SUBTASK_ACTIONS) }
-    },
-    async ({ subtask: id, action }) => {
-      const engine = session2.goal;
-      await engine.scheduler.act(id, action);
-      const acted = engine.state.subtasks.find((s) => s.id === id);
-      return toolText(`"${acted?.title ?? ""}" is ${acted?.status ?? "gone"} now.`);
-    }
-  );
-  server2.registerTool(
-    "message",
-    {
-      description: "Pass the user's words to the member working on a subtask: a running one takes them at once, in its session; one not started reads them first.",
-      inputSchema: { subtask, text: z5.string().trim().min(1) }
-    },
-    ({ subtask: id, text: text2 }) => {
-      const went = session2.goal.scheduler.carry(id, text2);
-      return toolText(
-        went === "goes" ? "Passed on." : went === "handedOver" ? "Not passed on: it is delivered and in review or being merged. Send its task back once it is done." : "Not passed on: its goal is paused or archived."
-      );
-    }
-  );
-  server2.registerTool(
-    "decide",
-    {
-      description: "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask), a stuck review (rereview, skip, sendBack; one that failed goes back only with a note), or a merge (ours, theirs, retry; one git failed on: retry, stop).",
-      inputSchema: {
-        question: z5.string().describe("The id of what waits on the user"),
-        decision: z5.enum(DECISION_OPTIONS),
-        note: z5.string().trim().optional().describe("What to change, in the user's words"),
-        sent_back: z5.string().optional().describe("The subtask a revised task goes back to")
-      }
-    },
-    async ({ question, decision, note, sent_back }) => {
-      await session2.goal.answer(question, decisionOf(decision, note, sent_back));
-      return toolText("Done.");
-    }
-  );
-  return ({ members }) => {
-    const member = memberName(members);
-    meetingTool.update({ paramsSchema: meetingInput(member) });
-    changePlanTool.update({ paramsSchema: changePlanInput(member) });
-    assignTool.update({ paramsSchema: assignInput(member) });
-  };
-}
-
-// src/plugin/pane-tools.ts
-var isPermission = (option) => PERMISSION_OPTIONS.includes(option);
-var PANE_ONLY = "For openplan's pane only: your session never calls it.";
-function addPaneTools(server2, session2, pane2) {
-  server2.registerTool(
-    "pane",
-    {
-      description: `${PANE_ONLY} The socket the pane reads the team from.`,
-      annotations: { readOnlyHint: true }
-    },
-    () => toolText(pane2.address)
-  );
-  server2.registerTool(
-    "answer",
-    {
-      description: `${PANE_ONLY} Answers what waits on the user, as they pressed it.`,
-      inputSchema: {
-        question: z6.string(),
-        option: z6.enum([...PERMISSION_OPTIONS, ...DECISION_OPTIONS]).optional().describe("A permission's or a decision's answer"),
-        picks: z6.array(z6.string()).optional().describe("One pick per question with choices"),
-        note: z6.string().trim().optional().describe("Why it is denied, or what to change"),
-        sent_back: z6.string().optional().describe("The subtask a revised task goes back to")
-      }
-    },
-    async ({ question, option, picks, note, sent_back }) => {
-      await session2.goal.answer(
-        question,
-        option === void 0 ? { picks: picks ?? [] } : isPermission(option) ? { option, ...note && { note } } : decisionOf(option, note, sent_back)
-      );
-      return toolText(`Answered ${question}.`);
-    }
-  );
-  server2.registerTool(
-    "hand_off",
-    {
-      description: `${PANE_ONLY} The prompt /openplan <task> gives the session: the task, for the team.`,
-      inputSchema: { task: z6.string().trim().min(1) },
-      annotations: { readOnlyHint: true }
-    },
-    ({ task }) => {
-      const engine = session2.current;
-      return toolText(
-        handOffText(task, engine && { goal: engine.state.goal, members: engine.team.members })
-      );
-    }
-  );
-  server2.registerTool(
-    "resume_goal",
-    {
-      description: `${PANE_ONLY} Takes up the goal you picked in this session and resumes it, as /openplan resume.`,
-      inputSchema: {
-        // A slug names a folder: nothing that reaches out of the goals' folder.
-        goal: z6.string().regex(/^[a-z0-9-]+$/).describe("The goal's slug")
-      }
-    },
-    async ({ goal: slug }) => {
-      const { goal } = (await session2.takeUp(slug)).state;
-      return toolText(`Resumed "${goal.name}".`);
-    }
-  );
-}
-
-// src/engine/data.ts
-import { createHash } from "node:crypto";
-import { link, mkdir, readdir as readdir3, readFile as readFile5, rm as rm2, writeFile } from "node:fs/promises";
-import { unlinkSync } from "node:fs";
-import { setTimeout as delay2 } from "node:timers/promises";
-import path7 from "node:path";
-function repoFolder(dataFolder2, repo) {
-  const name = path7.basename(repo.top).replace(/[^\w.-]+/g, "-");
-  const hash = createHash("sha256").update(repo.common).digest("hex").slice(0, 12);
-  return path7.join(dataFolder2, "repos", `${name}-${hash}`);
-}
-var goalsFolder = (repoFolder2) => path7.join(repoFolder2, "goals");
-var STATE_VERSION = 2;
-var SAVE_DELAY_MS = 200;
-async function readState(file) {
-  const text2 = await readFile5(file, "utf8");
-  let saved;
-  try {
-    saved = JSON.parse(text2);
-  } catch (error) {
-    throw new Error(`${file} can't be read (${errorText(error)}): move it away to start over`, {
-      cause: error
-    });
-  }
-  if (saved.version > STATE_VERSION)
-    throw new Error(`${file} was written by a newer openplan: update openplan to go on`);
-  if (saved.version < STATE_VERSION)
-    throw new Error(
-      `${file} was written by an openplan before its first release: move it away to start over`
-    );
-  return saved.state;
-}
-function stateWriter(file, state, failed) {
-  let timer;
-  const writing2 = inOrder(failed);
-  let closed = false;
-  const write = () => {
-    timer = void 0;
-    writing2.run(() => writeWhole(file, JSON.stringify({ version: STATE_VERSION, state: state() })));
-  };
-  return {
-    changed() {
-      if (!closed) timer ??= setTimeout(write, SAVE_DELAY_MS);
-    },
-    async flush() {
-      if (timer) {
-        clearTimeout(timer);
-        write();
-      }
-      await writing2.idle();
-    },
-    async close() {
-      clearTimeout(timer);
-      write();
-      closed = true;
-      await writing2.idle();
-    }
-  };
-}
-function readHolder(file) {
-  const text2 = textIfThere(file);
-  try {
-    return text2 === void 0 ? void 0 : JSON.parse(text2);
-  } catch {
-    return void 0;
-  }
-}
-function holderOf(lock) {
-  const holder = readHolder(lock);
-  return holder && running(holder.pid) ? holder : void 0;
-}
-async function holding(lock, me) {
-  await mkdir(path7.dirname(lock), { recursive: true });
-  const file = `${lock}.${String(process.pid)}`;
-  const holder = { pid: process.pid, ...me };
-  await writeFile(file, JSON.stringify(holder));
-  return file;
-}
-var REPLACING_WAIT_MS = 10;
-async function takeGoal(lock, me, takeOver) {
-  const mine = await holding(lock, me);
-  const handed = { meetings: [] };
-  try {
-    for (; ; ) {
-      try {
-        await link(mine, lock);
-        return handed;
-      } catch (error) {
-        if (errorCode(error) !== "EEXIST") throw error;
-      }
-      const ended = textIfThere(lock);
-      if (ended === void 0) continue;
-      const holder = readHolder(lock);
-      if (holder && running(holder.pid)) {
-        if (holder.pid === process.pid) {
-          await renameOver(mine, lock);
-          return handed;
-        }
-        const stopped = await takeOver(holder);
-        if (stopped) {
-          handed.meetings.push(...stopped.meetings);
-          continue;
-        }
-      }
-      const claim = `${lock}.ended-${String(holder?.pid ?? "unread")}`;
-      try {
-        await link(mine, claim);
-      } catch (error) {
-        if (errorCode(error) !== "EEXIST") throw error;
-        if (textIfThere(claim) === void 0) continue;
-        const replacing = readHolder(claim);
-        if (!replacing || !running(replacing.pid))
-          throw new Error(`A session taking this goal ended partway: delete ${lock} and ${claim}`, {
-            cause: error
-          });
-        await delay2(REPLACING_WAIT_MS);
-        continue;
-      }
-      try {
-        if (textIfThere(lock) === ended) {
-          await renameOver(mine, lock);
-          return handed;
-        }
-      } finally {
-        await rm2(claim, { force: true });
-      }
-    }
-  } finally {
-    await rm2(mine, { force: true });
-  }
-}
-function releaseGoal(lock) {
-  if (holderOf(lock)?.pid === process.pid) unlinkSync(lock);
-}
-async function newGoalFolder(repoFolder2, name, taken) {
-  const goals = goalsFolder(repoFolder2);
-  await mkdir(goals, { recursive: true });
-  for (const slug of await readdir3(goals)) taken.add(slug);
-  for (; ; ) {
-    const slug = slugFor(name, taken);
-    const folder = path7.join(goals, slug);
-    try {
-      await mkdir(folder);
-      return { slug, folder };
-    } catch (error) {
-      if (errorCode(error) !== "EEXIST") throw error;
-      taken.add(slug);
-    }
-  }
-}
-var startedAt = (entry) => "state" in entry ? entry.state.goal.createdAt : Number.POSITIVE_INFINITY;
-async function listGoals(repoFolder2) {
-  const folder = goalsFolder(repoFolder2);
-  let slugs;
-  try {
-    slugs = await readdir3(folder);
-  } catch (error) {
-    if (errorCode(error) === "ENOENT") return [];
-    throw error;
-  }
-  const found = await Promise.all(
-    slugs.map(async (slug) => {
-      const files = goalFiles(path7.join(folder, slug));
-      const holder = holderOf(files.lock);
-      const held = holder && { holder };
-      try {
-        return { slug, state: await readState(files.state), ...held };
-      } catch (error) {
-        if (errorCode(error) === "ENOENT" || errorCode(error) === "ENOTDIR") return void 0;
-        return { slug, unreadable: errorText(error), ...held };
-      }
-    })
-  );
-  return found.filter((entry) => entry !== void 0).sort((a, b) => startedAt(a) - startedAt(b));
-}
-
-// src/engine/engine.ts
-import { existsSync } from "node:fs";
-import { rm as rm3 } from "node:fs/promises";
-import path11 from "node:path";
-
-// src/engine/goals.ts
-var LIFE = "life";
-var Goals = class {
-  constructor(core, scheduler, meetings) {
-    this.core = core;
-    this.scheduler = scheduler;
-    this.meetings = meetings;
-  }
-  core;
-  scheduler;
-  meetings;
-  life = serialBy();
-  /**
-   * Pauses the goal: its runs stop, to go on in their sessions when it is
-   * resumed, and a meeting under way is cancelled; a plan in review stays,
-   * to approve once it goes on.
-   */
-  pause() {
-    return this.life(LIFE, () => {
-      const { goal } = this;
-      if (goal.status === "paused") return;
-      if (goal.status === "archived")
-        throw new Error(`The goal "${goal.name}" is archived: resume it first`);
-      goal.status = step(GOAL_MACHINE, goal.status, "pause");
-      this.hold(false);
-    });
-  }
-  /** Archives the goal as it stands: its work held as when paused, and its plans in review dropped. */
-  archive() {
-    return this.life(LIFE, () => {
-      const { goal } = this;
-      if (goal.status === "archived") return;
-      goal.status = step(GOAL_MACHINE, goal.status, "archive");
-      this.hold(true);
-    });
-  }
-  /**
-   * Puts a paused or archived goal back to work, from where it was; then the
-   * meetings a session stopped as it let the goal go (§3.2), and only then
-   * other work, so a meeting's members go back to it before anything else
-   * takes them.
-   */
-  resume(meetings = []) {
-    return this.life(LIFE, () => {
-      if (!this.wake()) return;
-      for (const id of meetings) this.meetings.resume(id);
-      this.core.changed();
-      this.scheduler.pump();
-    });
-  }
-  /**
-   * Takes an archived goal out of the repository for good: its subtasks'
-   * worktrees and branches, and its own worktree. Its branch stays, yours to
-   * merge or delete. The engine removes the goal's folder after (Engine.delete).
-   */
-  delete() {
-    return this.life(LIFE, async () => {
-      const { core, goal } = this;
-      if (!can(GOAL_MACHINE, goal.status, "delete"))
-        throw new Error(`The goal "${goal.name}" isn't archived: archive it before deleting it`);
-      await this.scheduler.release(core.state.subtasks.map((s) => s.id));
-      await this.meetings.settled();
-      await removeGoal(core.places, goal.slug);
-    });
-  }
-  /**
-   * Gives a member a subtask directly, as a task of its own. It starts once
-   * they are free; a paused goal's waits for the goal to go on.
-   */
-  assign(work) {
-    const { goal } = this;
-    if (goal.status === "archived")
-      throw new Error(`The goal "${goal.name}" is archived: resume it first`);
-    if (!this.core.team.members.some((m) => m.name === work.assignee))
-      throw new Error(`There is no member called "${work.assignee}"`);
-    return this.scheduler.assign([
-      // Work you assign is done once merged: it isn't yours to accept (§7.1).
-      {
-        title: work.title,
-        outcome: "",
-        ownerAccepts: false,
-        subtasks: [{ ...work, key: "", dependsOn: [] }]
-      }
-    ]);
-  }
-  /** Makes the goal active again; false when it was already. */
-  wake() {
-    const { goal } = this;
-    if (goal.status === "active") return false;
-    goal.status = step(GOAL_MACHINE, goal.status, "resume");
-    return true;
-  }
-  get goal() {
-    return this.core.state.goal;
-  }
-  /** Holds the goal's work, cancels its meeting under way and, `plansToo`, its plans in review. */
-  hold(plansToo) {
-    this.scheduler.hold();
-    for (const meeting2 of this.core.state.meetings)
-      if (meeting2.status === "running" || plansToo && meeting2.status === "review")
-        void this.meetings.cancel(meeting2.id);
-    this.core.changed();
-  }
-};
-
-// src/engine/meetings.ts
-import { randomUUID } from "node:crypto";
-import { mkdir as mkdir2, writeFile as writeFile2 } from "node:fs/promises";
-import path8 from "node:path";
-import {
-  tool
-} from "@anthropic-ai/claude-agent-sdk";
-import { z as z7 } from "zod";
+// src/engine/meeting-run.ts
 var MEETING_TURNS_EACH = {
   small: 1,
   discussion: 2,
@@ -10012,8 +8992,8 @@ var handTool = (raise) => turnTool(
     "raise_hand",
     MEETING_TOOLS.raiseHand.what,
     {
-      point: z7.string().trim().min(1).describe(MEETING_TOOLS.raiseHand.point),
-      to: z7.string().trim().optional().describe(MEETING_TOOLS.raiseHand.to)
+      point: z3.string().trim().min(1).describe(MEETING_TOOLS.raiseHand.point),
+      to: z3.string().trim().optional().describe(MEETING_TOOLS.raiseHand.to)
     },
     ({ point, to }) => {
       raise({ point, ...to && { to } });
@@ -10026,8 +9006,8 @@ var floorTool = (others, give) => turnTool(
     "give_floor",
     MEETING_TOOLS.giveFloor.what,
     {
-      member: z7.enum(others.map((m) => m.name)).describe(MEETING_TOOLS.giveFloor.member),
-      quiet: z7.boolean().optional().describe(MEETING_TOOLS.giveFloor.quiet)
+      member: z3.enum(others.map((m) => m.name)).describe(MEETING_TOOLS.giveFloor.member),
+      quiet: z3.boolean().optional().describe(MEETING_TOOLS.giveFloor.quiet)
     },
     (floor) => {
       give(floor);
@@ -10035,13 +9015,6 @@ var floorTool = (others, give) => turnTool(
     }
   )
 );
-var quiet = (meeting2) => Object.assign(meeting2, {
-  speaking: void 0,
-  planning: void 0,
-  drafting: void 0,
-  weighing: void 0,
-  hands: void 0
-});
 var meetingMembers = ({ participants, hostOnly }) => hostOnly ? participants.slice(1) : participants;
 function nextMove(meeting2) {
   const { turns, participants, size } = meeting2;
@@ -10058,6 +9031,210 @@ function nextMove(meeting2) {
   const left = others.length * MEETING_TURNS_EACH[size] - turns.filter((t) => t.phase === "answer").length;
   return left > 0 ? { kind: "discuss", left } : { kind: "close" };
 }
+var MeetingRun = class {
+  /** Throws when its host or members aren't on the team. */
+  constructor(core, meeting2, now, signal, cwd2, goal) {
+    this.core = core;
+    this.meeting = meeting2;
+    this.now = now;
+    this.signal = signal;
+    const named = (names) => names.flatMap((name) => core.team.members.filter((m) => m.name === name));
+    const [host, ...others] = named(meeting2.participants);
+    const [member, ...more] = named(meetingMembers(meeting2));
+    if (!host || !member) throw new Error("The meeting's host or members aren't on the team");
+    this.host = host;
+    this.others = others;
+    this.ctx = { meeting: meeting2, goal, attendees: [host, ...others], members: [member, ...more], cwd: cwd2 };
+  }
+  core;
+  meeting;
+  now;
+  signal;
+  host;
+  /** Everyone at it but the host. */
+  others;
+  ctx;
+  /**
+   * Talks it through from where it is and has the host write the plan, its
+   * summary the meeting's last turn. Throws when a turn fails, or it was
+   * stopped, before the plan is out.
+   */
+  async toPlan() {
+    let talking = true;
+    for (let move = nextMove(this.meeting); talking && move.kind !== "close"; move = nextMove(this.meeting)) {
+      switch (move.kind) {
+        case "open":
+          this.said(
+            this.host,
+            (await this.speak(this.host, meetingOpening(this.ctx))).text,
+            "opening"
+          );
+          break;
+        case "round":
+          await this.round(move.members.map((name) => this.attendee(name)));
+          break;
+        case "answer":
+          await this.answer(move.member);
+          break;
+        case "discuss":
+          talking = await this.discuss(move.left);
+      }
+    }
+    this.now.hands = [];
+    const names = this.ctx.members.map((m) => m.name);
+    const schema = hostPlanSchema(names);
+    const closing = await this.speak(this.host, meetingClosing(this.ctx), { schema });
+    this.signal.throwIfAborted();
+    const plan = soundPlan(hostWritten(schema.parse(closing.structured)), "drop");
+    this.said(this.host, plan.summary, "summary");
+    this.meeting.seats = void 0;
+    return plan;
+  }
+  /** One exchange in this member's session for the meeting, which goes on across all their turns. */
+  async ask(member, prompt, turn = {}) {
+    const { core, meeting: meeting2 } = this;
+    const heard = turn.heard ?? meeting2.turns.length;
+    const options = core.options(member, "readOnly", this.ctx.cwd);
+    const seat = meeting2.seats?.[member.name];
+    const reply = await askOnce({
+      prompt,
+      options: withTurn(options, {
+        ...seat && { resume: seat.session },
+        ...turn.tool && { server: turn.tool.server, allowed: [turn.tool.name] }
+      }),
+      ...turn.schema && { schema: turn.schema },
+      signal: turn.signal ?? this.signal,
+      spent: (tokens) => {
+        spend(core.state, member.name, tokens);
+      },
+      ...turn.listener && { listener: turn.listener }
+    });
+    meeting2.seats = { ...meeting2.seats, [member.name]: { session: reply.session, heard } };
+    return reply;
+  }
+  /**
+   * A turn said aloud: it streams as it is said, and becomes the meeting's
+   * next turn once done; nobody is speaking then. `saying`: the message
+   * under way, each time it grows.
+   */
+  async speak(member, prompt, turn = {}) {
+    const { saying, ...asked2 } = turn;
+    this.now.speaking = { member: member.name, planning: turn.schema !== void 0 };
+    const speech = this.core.speech(this.meeting);
+    let words = "";
+    try {
+      return await this.ask(member, prompt, {
+        ...asked2,
+        listener: {
+          ...speech,
+          text: (delta, fresh) => {
+            speech.text?.(delta, fresh);
+            words = fresh ? delta : words + delta;
+            saying?.(words);
+          }
+        }
+      });
+    } finally {
+      this.now.speaking = void 0;
+    }
+  }
+  said(speaker, text2, phase, calls) {
+    this.meeting.turns.push({
+      speaker: speaker.name,
+      text: text2,
+      at: Date.now(),
+      phase,
+      ...calls !== void 0 && { calls }
+    });
+    this.core.changed();
+  }
+  attendee(name) {
+    const found = this.ctx.attendees.find((m) => m.name === name);
+    if (!found) throw new Error(`${name} isn't at this meeting`);
+    return found;
+  }
+  /** Whoever has the floor speaks: about what they raised their hand for, if they did. */
+  async answer(name) {
+    const member = this.attendee(name);
+    const point = this.now.hands.find((hand) => hand.member === name)?.point;
+    this.now.hands = [];
+    this.said(
+      member,
+      (await this.speak(member, meetingAnswer(this.ctx, member, point))).text,
+      "answer"
+    );
+  }
+  /** Each of `who` at once, doing `what` meanwhile: one failing stops the others, and fails the lot. */
+  async allAtOnce(who, what, each) {
+    this.now.together = what;
+    const stop = new AbortController();
+    const together = AbortSignal.any([this.signal, stop.signal]);
+    const settled = await Promise.allSettled(
+      who.map(
+        (member) => each(member, together).catch((error) => {
+          stop.abort();
+          throw error;
+        })
+      )
+    );
+    this.now.together = void 0;
+    const failed = settled.find((r) => r.status === "rejected");
+    if (failed) throw failed.reason;
+  }
+  /** Those who may speak next each decide whether to. */
+  weigh(who) {
+    this.now.hands = [];
+    return this.allAtOnce(
+      who,
+      "weighing",
+      (member, weighing) => this.ask(member, meetingHand(this.ctx, member), {
+        signal: weighing,
+        tool: handTool((hand) => {
+          this.now.hands = [
+            ...this.now.hands.filter((h) => h.member !== member.name),
+            { member: member.name, ...hand }
+          ];
+        })
+      })
+    );
+  }
+  /** The first judgments: none hears the others, so none waits for them. Each becomes a turn once given. */
+  round(who) {
+    return this.allAtOnce(who, "drafting", async (member, drafting) => {
+      const judged = await this.ask(member, meetingRound(this.ctx, member), {
+        heard: 1,
+        signal: drafting
+      });
+      this.said(member, judged.text, "round");
+    });
+  }
+  /** A step of the discussion: hands go up, the host gives the floor or ends it. False once it is over. */
+  async discuss(left) {
+    const last = this.meeting.turns.at(-1);
+    await this.weigh(
+      this.others.filter((m) => last?.phase === "round" || m.name !== last?.speaker)
+    );
+    let floor;
+    let saying = "";
+    let before = "";
+    const steer = await this.speak(this.host, meetingSteer(this.ctx, left, this.now.hands), {
+      tool: floorTool(this.others, (given) => {
+        floor = given;
+        before = saying.trim();
+      }),
+      saying: (words) => saying = words
+    });
+    const called2 = floor?.member;
+    const after = steer.text.trim();
+    const text2 = before && before !== after ? [before, after].filter(Boolean).join("\n\n") : after;
+    if (text2 && !floor?.quiet) this.said(this.host, text2, "steer", called2);
+    else if (called2) await this.answer(called2);
+    else return false;
+    return true;
+  }
+};
+
+// src/engine/meetings.ts
 var Meetings = class {
   constructor(core, scheduler) {
     this.core = core;
@@ -10065,24 +9242,21 @@ var Meetings = class {
   }
   core;
   scheduler;
-  /** Meeting id → stops its run. */
-  aborts = /* @__PURE__ */ new Map();
-  /** Meeting id → its run, settling once it has ended. */
-  ongoing = /* @__PURE__ */ new Map();
+  /** Meeting id → its run under way. */
+  live = /* @__PURE__ */ new Map();
   /** Calls a meeting, or throws why it can't be held now. */
   start(call) {
     const { core } = this;
     const named = [...new Set(call.attendees.map((name) => name.trim()))];
     const attendees = named.length ? named : core.team.members.map((m) => m.name).sort((a, b) => a.localeCompare(b));
-    const host = this.admit(attendees);
-    if (call.hostOnly && attendees.length < 2)
-      throw new Error(`${host} can't only run a meeting with nobody else at it`);
+    const participants = this.admit(attendees);
+    if (call.hostOnly && participants.length < 2)
+      throw new Error(`${participants[0]} can't only run a meeting with nobody else at it`);
     const meeting2 = {
       id: randomUUID(),
       agenda: call.agenda,
       size: call.size,
-      participants: attendees,
-      host,
+      participants,
       ...call.hostOnly && { hostOnly: true },
       status: "running",
       turns: []
@@ -10097,7 +9271,9 @@ var Meetings = class {
     const { core } = this;
     const meeting2 = core.state.meetings.find((m) => m.id === id);
     if (!meeting2 || !meetingResumes(workOf(core), meeting2))
-      throw new Error("That meeting can't go on: its plan is out, or its goal isn't active");
+      throw new Error(
+        "That meeting can't go on: only one stopped before its plan can, in an active goal"
+      );
     this.admit(meeting2.participants);
     meeting2.status = step(MEETING_MACHINE, meeting2.status, "resume");
     meeting2.error = void 0;
@@ -10105,22 +9281,23 @@ var Meetings = class {
     this.track(meeting2);
   }
   /**
-   * Cancels a plan in review at once, or stops a meeting under way: it is
+   * Drops a plan in review at once, or stops a meeting under way: it is
    * cancelled as its run ends, which this waits for. Throws when there is no
    * such meeting, or it is over.
    */
   async cancel(id) {
     const meeting2 = this.core.state.meetings.find((m) => m.id === id);
     if (!meeting2) throw new Error("There is no such meeting");
-    if (!can(MEETING_MACHINE, meeting2.status, "cancel"))
-      throw new Error(`The meeting is ${meeting2.status}: there is nothing to cancel`);
-    if (meeting2.status === "review") {
-      meeting2.status = step(MEETING_MACHINE, meeting2.status, "cancel");
+    if (can(MEETING_MACHINE, meeting2.status, "drop")) {
+      meeting2.status = step(MEETING_MACHINE, meeting2.status, "drop");
       this.core.changed();
       return;
     }
-    this.aborts.get(id)?.abort();
-    await this.ongoing.get(id);
+    if (!can(MEETING_MACHINE, meeting2.status, "cancel"))
+      throw new Error(`The meeting is ${meeting2.status}: there is nothing to cancel`);
+    const live = this.live.get(id);
+    live?.abort.abort();
+    await live?.ended;
   }
   /**
    * Your changes to a plan under review: `plan` is the whole plan, which may
@@ -10142,42 +9319,43 @@ var Meetings = class {
     const { meeting: meeting2, plan } = this.underReview(id, "approve");
     this.activeGoal();
     const file = goalFiles(core.places.root).plan(meeting2.id);
-    await mkdir2(path8.dirname(file), { recursive: true });
-    await writeFile2(file, plan.markdown);
+    await writeWhole(file, plan.markdown);
     if (meeting2.plan !== plan || !can(MEETING_MACHINE, meeting2.status, "approve"))
       throw new Error("The plan changed while it was being approved");
     this.activeGoal();
     meeting2.status = step(MEETING_MACHINE, meeting2.status, "approve");
     return this.scheduler.assign(plan.tasks, meeting2.id);
   }
+  /** What goes on at each meeting under way, by its id. */
+  now() {
+    return Object.fromEntries([...this.live].map(([id, live]) => [id, live.now]));
+  }
   /** Settles once no meeting is under way: one being cancelled has ended. */
   async settled() {
-    await Promise.all(this.ongoing.values());
+    await Promise.all([...this.live.values()].map((live) => live.ended));
   }
   /** Stops every meeting under way, as cancelled; settles once they have ended. */
   async close() {
-    for (const abort of this.aborts.values()) abort.abort();
-    await Promise.all(this.ongoing.values());
+    for (const live of this.live.values()) live.abort.abort();
+    await this.settled();
   }
   /** After a restart no meeting is under way: one that was is cancelled, to go on from where it was. */
   recover() {
-    for (const meeting2 of this.core.state.meetings) {
-      if (meeting2.status !== "running") continue;
-      meeting2.status = step(MEETING_MACHINE, meeting2.status, "cancel");
-      quiet(meeting2);
-    }
+    for (const meeting2 of this.core.state.meetings)
+      if (meeting2.status === "running")
+        meeting2.status = step(MEETING_MACHINE, meeting2.status, "cancel");
   }
   /**
    * Whether these members can sit down together now: the goal
-   * is active, each is on the team and free. Throws why not; gives the first,
-   * who hosts. Nothing is
+   * is active, each is on the team and free. Throws why not; gives them, the
+   * first hosting. Nothing is
    * awaited here or before the meeting is under way, so two meetings can't
    * both take the same member.
    */
   admit(attendees) {
     const { core } = this;
     this.activeGoal();
-    const [host] = attendees;
+    const [host, ...rest] = attendees;
     if (host === void 0) throw new Error("The team has no members");
     const names = new Set(core.team.members.map((m) => m.name));
     const stranger = attendees.find((name) => !names.has(name));
@@ -10185,7 +9363,7 @@ var Meetings = class {
     const busy = busyMembers(workOf(core));
     const taken = attendees.find((name) => busy.has(name));
     if (taken) throw new Error(`${taken} is busy: working, reviewing, or at another meeting`);
-    return host;
+    return [host, ...rest];
   }
   /** Throws why the goal isn't active, if it isn't. */
   activeGoal() {
@@ -10202,193 +9380,25 @@ var Meetings = class {
   /** Runs a meeting, kept as under way until it ends. */
   track(meeting2) {
     const abort = new AbortController();
-    this.aborts.set(meeting2.id, abort);
-    const run2 = this.run(meeting2, abort.signal).finally(() => {
-      this.aborts.delete(meeting2.id);
-      this.ongoing.delete(meeting2.id);
+    const now = { hands: [] };
+    const ended = this.run(meeting2, now, abort.signal).finally(() => {
+      this.live.delete(meeting2.id);
     });
-    this.ongoing.set(meeting2.id, run2);
+    this.live.set(meeting2.id, { abort, ended, now });
   }
-  async run(meeting2, signal) {
+  async run(meeting2, now, signal) {
     const { core } = this;
     try {
-      const named = (names2) => names2.flatMap((name) => core.team.members.filter((m) => m.name === name));
-      const [host, ...others] = named(meeting2.participants);
-      const [member, ...more] = named(meetingMembers(meeting2));
-      const { goal } = core.state;
-      if (!host || !member) throw new Error("The meeting's host or members aren't on the team");
-      let ctx = {
-        meeting: meeting2,
-        goal,
-        attendees: [host, ...others],
-        members: [member, ...more],
-        cwd: ""
-      };
-      const ask = async (member2, prompt, turn = {}) => {
-        const heard = turn.heard ?? meeting2.turns.length;
-        const options = core.options(member2, "readOnly", ctx.cwd);
-        const seat = meeting2.seats?.[member2.name];
-        const reply = await askOnce({
-          prompt,
-          options: {
-            ...options,
-            ...seat && { resume: seat.session },
-            ...turn.tool && {
-              mcpServers: { ...options.mcpServers, [TURN_SERVER]: turn.tool.server },
-              allowedTools: [turn.tool.name]
-            }
-          },
-          ...turn.schema && { schema: turn.schema },
-          signal: turn.signal ?? signal,
-          spent: (tokens) => {
-            spend(core.state, member2.name, tokens);
-          },
-          ...turn.listener && { listener: turn.listener }
-        });
-        meeting2.seats = { ...meeting2.seats, [member2.name]: { session: reply.session, heard } };
-        return reply;
-      };
-      const speak = async (member2, prompt, turn = {}) => {
-        const { saying, ...asked2 } = turn;
-        meeting2.speaking = member2.name;
-        meeting2.planning = turn.schema !== void 0;
-        core.changed();
-        const speech = core.speech(meeting2, member2.name);
-        let words = "";
-        try {
-          return await ask(member2, prompt, {
-            ...asked2,
-            listener: {
-              ...speech,
-              text: (delta, fresh) => {
-                speech.text?.(delta, fresh);
-                words = fresh ? delta : words + delta;
-                saying?.(words);
-              }
-            }
-          });
-        } finally {
-          meeting2.speaking = void 0;
-          meeting2.planning = void 0;
-        }
-      };
-      const said = (speaker, text2, phase, calls) => {
-        meeting2.turns.push({
-          speaker: speaker.name,
-          text: text2,
-          at: Date.now(),
-          phase,
-          ...calls !== void 0 && { calls }
-        });
-        core.changed();
-      };
-      const attendee = (name) => {
-        const found = ctx.attendees.find((m) => m.name === name);
-        if (!found) throw new Error(`${name} isn't at this meeting`);
-        return found;
-      };
-      ctx = { ...ctx, cwd: await openGoal(core.places, goal.slug) };
-      const answer = async (name) => {
-        const member2 = attendee(name);
-        const point = meeting2.hands?.find((hand) => hand.member === name)?.point;
-        meeting2.hands = void 0;
-        said(member2, (await speak(member2, meetingAnswer(ctx, member2, point))).text, "answer");
-      };
-      const allAtOnce = async (who, flag, each) => {
-        meeting2[flag] = true;
-        core.changed();
-        const stop = new AbortController();
-        const together = AbortSignal.any([signal, stop.signal]);
-        const settled = await Promise.allSettled(
-          who.map(
-            (member2) => each(member2, together).catch((error) => {
-              stop.abort();
-              throw error;
-            })
-          )
-        );
-        meeting2[flag] = void 0;
-        core.changed();
-        const failed = settled.find((r) => r.status === "rejected");
-        if (failed) throw failed.reason;
-      };
-      const weigh = (who) => {
-        meeting2.hands = [];
-        return allAtOnce(
-          who,
-          "weighing",
-          (member2, weighing) => ask(member2, meetingHand(ctx, member2), {
-            signal: weighing,
-            tool: handTool((hand) => {
-              meeting2.hands = [
-                ...(meeting2.hands ?? []).filter((h) => h.member !== member2.name),
-                { member: member2.name, ...hand }
-              ];
-              core.changed();
-            })
-          })
-        );
-      };
-      const round = (who) => allAtOnce(who, "drafting", async (member2, drafting) => {
-        const judged = await ask(member2, meetingRound(ctx, member2), {
-          heard: 1,
-          signal: drafting
-        });
-        said(member2, judged.text, "round");
-      });
-      const discuss = async (left) => {
-        const last = meeting2.turns.at(-1);
-        await weigh(others.filter((m) => last?.phase === "round" || m.name !== last?.speaker));
-        let floor;
-        let saying = "";
-        let before = "";
-        const steer = await speak(host, meetingSteer(ctx, left), {
-          tool: floorTool(others, (given) => {
-            floor = given;
-            before = saying.trim();
-          }),
-          saying: (words) => saying = words
-        });
-        const called2 = floor?.member;
-        const after = steer.text.trim();
-        const text2 = before && before !== after ? [before, after].filter(Boolean).join("\n\n") : after;
-        if (text2 && !floor?.quiet) said(host, text2, "steer", called2);
-        else if (called2) await answer(called2);
-        else return false;
-        return true;
-      };
-      let talking = true;
-      for (let move = nextMove(meeting2); talking && move.kind !== "close"; move = nextMove(meeting2)) {
-        switch (move.kind) {
-          case "open":
-            said(host, (await speak(host, meetingOpening(ctx))).text, "opening");
-            break;
-          case "round":
-            await round(move.members.map(attendee));
-            break;
-          case "answer":
-            await answer(move.member);
-            break;
-          case "discuss":
-            talking = await discuss(move.left);
-        }
-      }
-      meeting2.hands = void 0;
-      const names = ctx.members.map((m) => m.name);
-      const schema = hostPlanSchema(names);
-      const closing = await speak(host, meetingClosing(ctx), { schema });
-      signal.throwIfAborted();
-      meeting2.plan = soundPlan(hostWritten(schema.parse(closing.structured)), "drop");
-      said(host, meeting2.plan.summary, "summary");
+      const cwd2 = await openGoal(core.places);
+      const talk = new MeetingRun(core, meeting2, now, signal, cwd2, core.state.goal);
+      meeting2.plan = await talk.toPlan();
       meeting2.status = step(MEETING_MACHINE, meeting2.status, "plan");
-      meeting2.seats = void 0;
     } catch (error) {
       if (meeting2.status === "running") {
         meeting2.status = step(MEETING_MACHINE, meeting2.status, signal.aborted ? "cancel" : "fail");
         if (!signal.aborted) meeting2.error = errorText(error);
       }
     } finally {
-      quiet(meeting2);
       core.changed();
       this.scheduler.pump();
     }
@@ -10442,13 +9452,22 @@ function memberSettings(team, member, from, plugins2) {
     }
   };
 }
+function teamSettings(team, members2, from, plugins2) {
+  return members2.map((member) => {
+    try {
+      return [member.name, memberSettings(team, member, from, plugins2)];
+    } catch (error) {
+      throw new Error(`${member.name}: ${errorText(error)}`, { cause: error });
+    }
+  });
+}
 async function writeSettings(file, settings) {
   await writeWhole(file, JSON.stringify(settings), 384);
-  return file;
 }
 var sessionOptions = (seat, kind, from) => kind === "work" ? workOptions(seat, from) : readOnlyOptions(seat, from);
 function workOptions(seat, from) {
-  return memberOptions(seat, from, seat.teamMode ? void 0 : seat.sessionMode);
+  const teamMode = seat.team.permissions?.defaultMode !== void 0;
+  return memberOptions(seat, from, teamMode ? void 0 : seat.sessionMode);
 }
 function memberOptions(seat, from, mode) {
   const { member } = seat;
@@ -10484,7 +9503,7 @@ function readOnlyOptions(seat, from) {
 // src/engine/questions.ts
 import { randomUUID as randomUUID2 } from "node:crypto";
 var ASK_TOOL = "AskUserQuestion";
-var CALLED_OFF = "Stopped.";
+var DOESNT_FIT = "That answer doesn't fit the question.";
 var ruleText = ({ toolName, ruleContent }) => ruleContent === void 0 ? toolName : `${toolName}(${ruleContent})`;
 var alwaysRules = (request2) => request2.matchedAskRule || request2.suppressAlwaysAllowRule ? [] : (request2.suggestions ?? []).flatMap(
   (update) => update.type === "addRules" && update.behavior === "allow" ? update.rules : []
@@ -10494,8 +9513,14 @@ var Questions = class {
     this.inbox = inbox;
   }
   inbox;
+  /** What members' turns wait on now. */
+  live = [];
   /** Questions a member's turn waits on: question id → resume it (undefined: called off). */
   waiting = /* @__PURE__ */ new Map();
+  /** What members' turns wait on now: they end with the turn, and aren't in the state. */
+  now() {
+    return this.live;
+  }
   /**
    * The `canUseTool` of a member's turn: its questions with choices and
    * every call its rules don't cover wait for you, and are called off when
@@ -10507,18 +9532,22 @@ var Questions = class {
       return tool3 === ASK_TOOL ? this.ask(who, input) : this.permit(who, tool3, input, request2);
     };
   }
+  /** A question put to you, open still; throws when it is no longer open. */
+  find(id) {
+    const question = this.all().find((q) => q.id === id && toYou(q));
+    if (!question) throw new Error("That question is no longer open.");
+    return question;
+  }
   /**
-   * Answers a question put to you, and gives it back: a decision is the
-   * scheduler's to act on. Throws when it is no longer open, or the answer
+   * Answers a question put to you: a decision is the scheduler's to act on
+   * (Scheduler.decide). Throws when it is no longer open, or the answer
    * doesn't fit it: not one of its options, not one pick per question, a
-   * task sent back without what to change, or with a subtask not done in it.
+   * task sent back without what to change.
    */
   answer(id, answer) {
-    const question = this.inbox.state.questions.find((q) => q.id === id && q.kind !== "teammate");
-    if (!question) throw new Error("That question is no longer open.");
-    if (!this.fits(question, answer)) throw new Error("That answer doesn't fit the question.");
+    const question = this.find(id);
+    if (!this.fits(question, answer)) throw new Error(DOESNT_FIT);
     this.close(question, answer);
-    return question;
   }
   /**
    * A member asks a teammate: the question is open while `answering` runs
@@ -10531,7 +9560,7 @@ var Questions = class {
     try {
       return await answering();
     } finally {
-      if (this.inbox.state.questions.includes(question)) this.close(question);
+      if (this.live.includes(question)) this.close(question);
     }
   }
   /**
@@ -10539,10 +9568,16 @@ var Questions = class {
    * what, in `text`): it waits for your answer, no turn behind it.
    */
   openDecision(subtask2, decision, text2) {
-    this.open(
-      { from: subtask2.assignee },
-      { text: text2, kind: "decision", decision, subtaskId: subtask2.id }
-    );
+    const question = {
+      id: randomUUID2(),
+      subtaskId: subtask2.id,
+      from: subtask2.assignee,
+      text: text2,
+      kind: "decision",
+      decision
+    };
+    this.inbox.state.questions.push(question);
+    this.inbox.changed();
   }
   /**
    * Calls off what a subtask's run waits on (the run ended or was stopped);
@@ -10552,18 +9587,9 @@ var Questions = class {
   cancelFor(subtaskId, decisions = false) {
     this.cancelAll((q) => q.subtaskId === subtaskId && (decisions || q.kind !== "decision"));
   }
-  /** After a restart no turn waits on anything: what members asked is called off; your decisions stand. */
-  recover() {
-    this.cancelAll((q) => q.kind !== "decision");
-  }
-  /** Calls off a task's delivery waiting on you: work in it is being done again. */
-  cancelDelivery(taskId) {
-    const inTask = new Set(
-      this.inbox.state.subtasks.filter((s) => s.taskId === taskId).map((s) => s.id)
-    );
-    this.cancelAll(
-      (q) => q.kind === "decision" && q.decision.kind === "delivery" && inTask.has(q.subtaskId)
-    );
+  /** Calls off a task's delivery waiting on you, on one of `subtaskIds`, its subtasks: work in it is being done again. */
+  cancelDelivery(subtaskIds) {
+    this.cancelAll((q) => isAcceptance(q) && subtaskIds.includes(q.subtaskId));
   }
   /** A call the member's rules don't cover: allowed once, always, or denied. */
   async permit(asker, tool3, input, request2) {
@@ -10578,7 +9604,7 @@ var Questions = class {
         options: rules.length ? ["once", "always", "deny"] : ["once", "deny"]
       }
     });
-    if (!answer) return { behavior: "deny", message: CALLED_OFF };
+    if (!answer) return { behavior: "deny", message: PERMISSION_REPLIES.calledOff };
     switch (answer.option) {
       case "once":
         return { behavior: "allow", updatedInput: input };
@@ -10592,10 +9618,7 @@ var Questions = class {
           ]
         };
       case "deny":
-        return {
-          behavior: "deny",
-          message: answer.note ? `The user denied this and said: ${answer.note}` : "The user denied this."
-        };
+        return { behavior: "deny", message: PERMISSION_REPLIES.denied(answer.note) };
     }
   }
   /** Questions with choices: your picks go back as the tool's answers. */
@@ -10615,7 +9638,7 @@ var Questions = class {
       kind: "choices",
       choices
     });
-    if (!answer) return { behavior: "deny", message: CALLED_OFF };
+    if (!answer) return { behavior: "deny", message: PERMISSION_REPLIES.calledOff };
     const answers = Object.fromEntries(choices.map((c, i) => [c.question, answer.picks[i]]));
     return { behavior: "allow", updatedInput: { ...input, answers } };
   }
@@ -10623,22 +9646,12 @@ var Questions = class {
   fits(question, answer) {
     switch (question.kind) {
       case "permission":
-        return "option" in answer && question.permission.options.includes(answer.option);
+        return answer.kind === "permission" && question.permission.options.includes(answer.option);
       case "choices":
-        return "picks" in answer && answer.picks.length === question.choices.length;
+        return answer.kind === "choices" && answer.picks.length === question.choices.length;
       case "decision":
-        return "decision" in answer && question.decision.options.includes(answer.decision) && (answer.note !== void 0 || !noteNeeded(question.decision, answer.decision)) && (answer.decision !== "revise" || this.revisable(question, answer));
-      case "teammate":
-        return false;
+        return answer.kind === "decision" && question.decision.options.includes(answer.option) && (Boolean(answer.note) || !noteNeeded(question.decision, answer.option));
     }
-  }
-  /** Sending a task back sends back only one of its subtasks that is done. */
-  revisable(question, answer) {
-    if (answer.sentBack === void 0) return true;
-    const { subtasks } = this.inbox.state;
-    const taskId = subtasks.find((s) => s.id === question.subtaskId)?.taskId;
-    const target = subtasks.find((s) => s.id === answer.sentBack);
-    return target !== void 0 && target.taskId === taskId && target.status === "done";
   }
   /**
    * Puts a question to you and waits for your answer (answer() checks it
@@ -10658,35 +9671,40 @@ var Questions = class {
       });
     });
   }
-  /** Puts a question: to a teammate, or to you. */
+  /** A member's turn puts a question: to a teammate, or to you. */
   open(asker, ask) {
     const question = {
       id: randomUUID2(),
-      ...asker.subtaskId !== void 0 && { subtaskId: asker.subtaskId },
+      subtaskId: asker.subtaskId,
       from: asker.from,
       ...ask
     };
-    this.inbox.state.questions.push(question);
+    this.live.push(question);
     this.inbox.changed();
     return question;
   }
+  /** Every open question: your decisions, and what turns wait on. */
+  all() {
+    return [...this.inbox.state.questions, ...this.live];
+  }
   /** Calls off every open question that `which` picks. */
   cancelAll(which) {
-    const picked = this.inbox.state.questions.filter(which);
-    for (const question of picked) this.close(question);
+    for (const question of this.all().filter(which)) this.close(question);
   }
-  /** Answers or calls off a question: it leaves the state, and whoever waits on it hears. */
+  /** Answers or calls off a question: it leaves, and whoever waits on it hears. */
   close(question, answer) {
     this.waiting.get(question.id)?.(answer);
     this.waiting.delete(question.id);
+    this.live = this.live.filter((q) => q !== question);
     this.inbox.state.questions = this.inbox.state.questions.filter((q) => q !== question);
     this.inbox.changed();
   }
 };
 
 // src/engine/records.ts
-import { appendFile, mkdir as mkdir3, open } from "node:fs/promises";
-import path9 from "node:path";
+import { randomUUID as randomUUID3 } from "node:crypto";
+import { appendFile, mkdir as mkdir2, open } from "node:fs/promises";
+import path2 from "node:path";
 var OUTPUT_MAX = 4e3;
 var liveOf = (now) => ({
   ...now.streaming && { streaming: now.streaming },
@@ -10753,7 +9771,7 @@ var Records = class {
     const file = goalFiles(this.places.root).record(subtaskId);
     const write = (entry) => {
       this.writing.run(async () => {
-        await mkdir3(path9.dirname(file), { recursive: true });
+        await mkdir2(path2.dirname(file), { recursive: true });
         await appendFile(file, `${JSON.stringify(entry)}
 `);
       });
@@ -10790,9 +9808,10 @@ var Records = class {
    * its record; kept until it is the meeting's. A turn's start isn't kept:
    * the meeting says who speaks.
    */
-  speech(meeting2, speaker) {
+  speech(meeting2) {
     const speaking = {
-      speaker,
+      // A turn spoken again, after a stop, is another speech.
+      speech: randomUUID3(),
       turn: meeting2.turns.length,
       entries: [],
       now: { running: /* @__PURE__ */ new Map() }
@@ -10802,11 +9821,20 @@ var Records = class {
       if (entry.kind !== "run") speaking.entries.push(entry);
     });
   }
-  /** The turn being spoken at `meeting` now, if one is. */
-  speaking(meeting2) {
+  /**
+   * The turn being spoken at `meeting` now, if one is: from where a read of
+   * it (`since`) left off, when it is the speech that read was of.
+   */
+  speaking(meeting2, since) {
     const speaking = this.spoken.get(meeting2.id);
     if (meeting2.status !== "running" || speaking?.turn !== meeting2.turns.length) return void 0;
-    return { speaker: speaking.speaker, entries: speaking.entries, live: liveOf(speaking.now) };
+    const { speech, entries } = speaking;
+    return {
+      speech,
+      entries: entries.slice(since?.speech === speech ? since.next : 0),
+      next: entries.length,
+      live: liveOf(speaking.now)
+    };
   }
   /** Every entry written so far is in its file. */
   flush() {
@@ -10815,40 +9843,35 @@ var Records = class {
 };
 
 // src/engine/scheduler.ts
-import { randomUUID as randomUUID3 } from "node:crypto";
-import { stat } from "node:fs/promises";
-import path10 from "node:path";
-import { z as z9 } from "zod";
+import { randomUUID as randomUUID4 } from "node:crypto";
 
 // src/engine/run.ts
 import { tool as tool2 } from "@anthropic-ai/claude-agent-sdk";
-import { z as z8 } from "zod";
+import { z as z4 } from "zod";
 var OWN_TOOLS = /* @__PURE__ */ new Set([turnToolName("ask_teammate"), turnToolName("deliver")]);
 function teamServer(collaboration, delivered) {
   return turnServer([
     tool2(
       "ask_teammate",
-      "Asks a teammate a question and waits for the answer. Use it only when you need their information or decision.",
+      RUN_TOOLS.askTeammate.what,
       {
-        teammate: z8.string().describe("The teammate's name"),
-        question: z8.string().describe("The question, with the context they need")
+        teammate: z4.string().trim().describe(RUN_TOOLS.askTeammate.teammate),
+        question: z4.string().describe(RUN_TOOLS.askTeammate.question)
       },
       async ({ teammate, question }) => toolText(await collaboration.askTeammate(teammate, question))
     ),
     tool2(
       "deliver",
-      "Hands over your finished work: your subtask is done only once you call it. Then end your turn. If you deliver again, the last delivery counts.",
+      RUN_TOOLS.deliver.what,
       {
-        summary: z8.string().trim().min(1).describe("A few sentences: what you did, and anything to watch out for"),
-        files: z8.array(z8.string()).describe(
-          "The files that are the result, as paths in your worktree (not scratch files); empty when the result is the summary itself"
-        )
+        summary: z4.string().trim().min(1).describe(RUN_TOOLS.deliver.summary),
+        files: z4.array(z4.string()).describe(RUN_TOOLS.deliver.files)
       },
       async ({ summary, files }) => {
         const checked = await collaboration.checkDelivery(files);
         if ("refused" in checked) return toolText(checked.refused);
         delivered({ summary, files: checked.files });
-        return toolText("Delivered. End your turn now.");
+        return toolText(RUN_TOOLS.deliver.done);
       }
     )
   ]);
@@ -10866,15 +9889,11 @@ async function runSubtask(params) {
   };
   const turn = (prompt) => runTurn(
     prompt,
-    {
-      ...options,
+    withTurn(options, {
       ...session2 !== void 0 && { resume: session2 },
-      mcpServers: {
-        ...options.mcpServers,
-        [TURN_SERVER]: teamServer(params.collaboration, (given) => handover = given)
-      },
+      server: teamServer(params.collaboration, (given) => handover = given),
       canUseTool
-    },
+    }),
     signal,
     decode
   );
@@ -10900,13 +9919,87 @@ async function runSubtask(params) {
   }
 }
 
+// src/engine/collaboration.ts
+import { stat } from "node:fs/promises";
+import path3 from "node:path";
+function collaborationOf(core, questions, run2) {
+  return {
+    askTeammate: (name, question) => askTeammate(core, questions, run2, name, question),
+    checkDelivery: (files) => checkDelivery(core, run2.subtask, run2.desk, files)
+  };
+}
+async function askTeammate(core, questions, { from, subtask: subtask2, signal }, name, question) {
+  const others = core.team.members.filter((m) => m.name !== from.name);
+  const target = others.find((m) => m.name === name);
+  if (!target)
+    return name === from.name ? TEAMMATE_REPLIES.self : TEAMMATE_REPLIES.unknown(
+      name,
+      others.map((m) => m.name)
+    );
+  try {
+    const reply = await questions.toTeammate(
+      { from: from.name, subtaskId: subtask2.id },
+      target.name,
+      question,
+      async () => askOnce({
+        prompt: teammateQuestion({
+          from,
+          subtask: subtask2,
+          question,
+          own: core.state.subtasks.filter((s) => s.assignee === target.name)
+        }),
+        options: core.options(target, "readOnly", await openGoal(core.places)),
+        signal,
+        spent: (tokens) => {
+          spend(core.state, target.name, tokens);
+        }
+      })
+    );
+    core.changed();
+    return TEAMMATE_REPLIES.answered(target.name, reply.text);
+  } catch (error) {
+    return TEAMMATE_REPLIES.failed(target.name, errorText(error));
+  }
+}
+async function checkDelivery(core, subtask2, desk, files) {
+  const kept = [];
+  const missing = [];
+  for (const file of files) {
+    const relative = path3.relative(desk, path3.resolve(desk, file));
+    const inside = relative !== "" && !relative.startsWith("..") && !path3.isAbsolute(relative);
+    const there = inside && (await ifThere(stat(path3.join(desk, relative)), void 0))?.isFile() === true;
+    if (there) kept.push(relative.split(path3.sep).join("/"));
+    else missing.push(file);
+  }
+  if (missing.length) return { refused: DELIVERY_REFUSED.missing(desk, missing) };
+  const left = subtask2.conflict ? await unresolved(core.places, subtask2.id, subtask2.conflict.files) : [];
+  if (left.length) return { refused: DELIVERY_REFUSED.conflicted(left) };
+  return { files: [...new Set(kept)] };
+}
+
+// src/engine/review.ts
+import { z as z5 } from "zod";
+var verdictSchema = z5.object({ pass: z5.boolean(), notes: z5.string().trim() });
+async function reviewDelivery(core, review) {
+  const { reviewer, task, subtask: subtask2, delivery, desk, signal } = review;
+  const reply = await askOnce({
+    prompt: reviewPrompt({ task, subtask: subtask2, delivery, cwd: desk }),
+    options: core.options(reviewer, "readOnly", desk),
+    schema: verdictSchema,
+    signal,
+    spent: (tokens) => {
+      spend(core.state, reviewer.name, tokens);
+    }
+  });
+  return verdictSchema.parse(reply.structured);
+}
+
 // src/engine/scheduler.ts
-var verdictSchema = z9.object({ pass: z9.boolean(), notes: z9.string().trim() });
 var REVIEW_ROUNDS = 3;
 function goOnWith(subtask2, reason) {
   subtask2.goOn = [...subtask2.goOn ?? [], reason];
 }
-var progressOf2 = (steps) => {
+var progressOf = (steps) => {
   const current = steps.find((s) => s.status === "in_progress")?.content;
   return {
     done: steps.filter((s) => s.status === "completed").length,
@@ -10959,7 +10052,7 @@ var Scheduler = class {
     const ids = /* @__PURE__ */ new Map();
     const added = tasks.flatMap(({ title, outcome, ownerAccepts, subtasks }) => {
       const task = {
-        id: randomUUID3(),
+        id: randomUUID4(),
         title,
         outcome,
         ownerAccepts,
@@ -10967,7 +10060,7 @@ var Scheduler = class {
       };
       state.tasks.push(task);
       return subtasks.map(({ key, ...planned }) => {
-        const id = randomUUID3();
+        const id = randomUUID4();
         ids.set(key, id);
         return {
           ...planned,
@@ -10983,6 +10076,28 @@ var Scheduler = class {
     state.subtasks.push(...added);
     this.core.changed();
     this.pump();
+    return added;
+  }
+  /**
+   * Gives a member one subtask directly, as a task of its own: done once
+   * merged, not yours to accept (§7.1). Throws when the goal is archived or
+   * there is no such member.
+   */
+  assignOne(work) {
+    const { goal } = this;
+    if (goal.status === "archived")
+      throw new Error(`The goal "${goal.name}" is archived: resume it first`);
+    if (!this.core.team.members.some((m) => m.name === work.assignee))
+      throw new Error(`There is no member called "${work.assignee}"`);
+    const [added] = this.assign([
+      {
+        title: work.title,
+        outcome: "",
+        ownerAccepts: false,
+        subtasks: [{ ...work, key: "", dependsOn: [] }]
+      }
+    ]);
+    if (!added) throw new Error("No subtask was made");
     return added;
   }
   /**
@@ -11008,8 +10123,8 @@ var Scheduler = class {
   carry(subtaskId, note) {
     const subtask2 = this.subtask(subtaskId);
     if (!subtask2) throw new Error("There is no such subtask");
-    if (this.goal.status !== "active") return "onHold";
-    if (subtask2.status === "reviewing" || subtask2.status === "merging") return "handedOver";
+    const reach = messageReach(this.core.state, subtask2);
+    if (reach !== "goes") return reach;
     const live = this.live.get(subtaskId);
     if (live) {
       this.keepOn(subtaskId, { why: "carried", note });
@@ -11036,9 +10151,11 @@ var Scheduler = class {
   async act(subtaskId, action) {
     const subtask2 = this.subtask(subtaskId);
     if (!subtask2) throw new Error("There is no such subtask");
-    if (!actionsOf(workOf(this.core), subtask2).includes(action))
+    const event = actionEvent(subtask2.status, action);
+    if (!event || !actionsOf(workOf(this.core), subtask2).includes(action))
       throw new Error(`"${subtask2.title}" can't ${action} while ${subtask2.status}`);
-    await this[action](subtask2);
+    if (action === "continue") this.continue(subtask2, event);
+    else await this[action](subtask2);
   }
   /**
    * Lets go of work about to be deleted: what waits to start won't, what runs
@@ -11070,23 +10187,19 @@ var Scheduler = class {
       await live.ended;
       return;
     }
-    if (!can(SUBTASK_MACHINE, subtask2.status, "stop")) return;
-    if (subtask2.status === "merging") {
-      if (live) return;
-      await abortMerge(this.core.places, subtask2.id);
-      if (!can(SUBTASK_MACHINE, subtask2.status, "stop")) return;
-    }
+    if (!actionEvent(subtask2.status, "stop")) return;
+    if (subtask2.status === "waitingInMerge") await abortMerge(this.core.places, subtask2.id);
+    const event = actionEvent(subtask2.status, "stop");
+    if (!event) return;
     live?.abort.abort();
-    const stage = subtask2.status;
-    this.move(subtask2, "stop");
-    if (stage === "reviewing" || stage === "merging") subtask2.stoppedIn = stage;
+    this.move(subtask2, event);
     subtask2.finishedAt = Date.now();
     this.core.changed();
     this.pump();
   }
   /** You retry a failed or stopped subtask from the start: its session, delivery, review and worktree go. */
   async retry(subtask2) {
-    await dropDesk(this.core.places, this.goal.slug, subtask2.id);
+    await dropDesk(this.core.places, subtask2.id);
     if (!can(SUBTASK_MACHINE, subtask2.status, "retry")) return;
     this.move(subtask2, "retry");
     Object.assign(subtask2, {
@@ -11102,18 +10215,14 @@ var Scheduler = class {
     this.pump();
   }
   /**
-   * You have a failed or stopped subtask go on from where it stopped: its
-   * session and worktree, or, stopped once handed over, its review or merge,
-   * its delivery standing.
+   * You have a failed or stopped subtask go on from where it stopped
+   * (`event`, actionEvent): its session and worktree, or, stopped once handed
+   * over, its review or merge, its delivery standing.
    */
-  continue(subtask2) {
-    const stage = subtask2.stoppedIn;
-    this.move(
-      subtask2,
-      stage === "reviewing" ? "reviewAgain" : stage === "merging" ? "mergeAgain" : "continue"
-    );
+  continue(subtask2, event) {
+    this.move(subtask2, event);
     subtask2.error = void 0;
-    if (!stage && subtask2.session) goOnWith(subtask2, { why: "continued" });
+    if (event === "continue" && subtask2.session) goOnWith(subtask2, { why: "continued" });
     this.core.changed();
     this.pump();
   }
@@ -11126,26 +10235,32 @@ var Scheduler = class {
     this.pump();
   }
   /**
-   * Carries out your decision, answered already (Questions.answer): on a
+   * Answers a decision put to you (Questions.answer) and carries it out: on a
    * stuck review (review again, skip it, send it back), on a merge (keep one
    * side of the files that can't be merged line by line, or try again), on a
    * task done (accept it, which is all it takes for work built on it to
    * start; or send one of its subtasks, `sentBack` or else the last one done,
-   * back with what to change).
+   * back with what to change). Throws as answering does, and when the
+   * subtask sent back isn't one done in the task.
    */
-  async decide(question, answer) {
+  async decide(id, answer) {
+    const question = this.questions.find(id);
+    if (question.kind !== "decision" || !canSendBack(this.core.state, question, answer.sentBack))
+      throw new Error(DOESNT_FIT);
+    this.questions.answer(id, answer);
     const subtask2 = this.subtask(question.subtaskId);
     if (!subtask2) return;
-    const { decision: pick, note = "" } = answer;
+    const { option: pick, note = "" } = answer;
     if (question.decision.kind === "delivery") {
       const sentBack = this.subtask(answer.sentBack ?? subtask2.id);
       if (pick === "revise" && sentBack) {
         this.move(sentBack, "redo");
         goOnWith(sentBack, { why: "revised", note });
       }
-    } else if (subtask2.status === "reviewing") {
+    } else if (subtask2.status === "waitingInReview") {
       subtask2.review = { ...subtask2.review, rounds: 0 };
-      if (pick === "skip") this.move(subtask2, "merge");
+      if (pick === "rereview") this.move(subtask2, "rereview");
+      else if (pick === "skip") this.move(subtask2, "merge");
       else if (pick === "sendBack") {
         this.move(subtask2, "reject");
         if (subtask2.session) {
@@ -11154,50 +10269,56 @@ var Scheduler = class {
           if (note) goOnWith(subtask2, { why: "carried", note });
         }
       }
-    } else if (subtask2.status === "merging") {
-      if (pick === "retry") await abortMerge(this.core.places, subtask2.id);
-      else if (pick === "stop") await this.stop(subtask2);
-      else if (pick === "ours" || pick === "theirs")
-        await pickSide(this.core.places, subtask2.id, question.decision.files ?? [], pick);
+    } else if (subtask2.status === "waitingInMerge") {
+      if (pick === "stop") await this.stop(subtask2);
+      else {
+        if (pick === "retry") await abortMerge(this.core.places, subtask2.id);
+        else if (question.decision.kind === "conflict" && (pick === "ours" || pick === "theirs"))
+          await pickSide(this.core.places, subtask2.id, question.decision.files, pick);
+        if (can(SUBTASK_MACHINE, subtask2.status, "remerge")) this.move(subtask2, "remerge");
+      }
     }
     this.core.changed();
     this.pump();
   }
   /**
-   * Takes up whatever can go on, as the rules say (derive.ts waitsIn): what
-   * goes on in its session first, then new work, and delivered work reviewed
-   * and merged in the order it was delivered. Each start is seen by the next:
-   * its member is busy, its review or merge under way.
+   * Takes up whatever the rules leave waiting on nothing (derive.ts
+   * waitsIn), one at a time: each start is seen by the next, its member
+   * busy, its review or merge under way.
    */
   pump() {
     if (this.closed) return;
-    const order = [...this.core.state.subtasks].sort(
-      (a, b) => Number(Boolean(b.goOn)) - Number(Boolean(a.goOn))
-    );
     for (; ; ) {
       const work = workOf(this.core);
       const busy = busyMembers(work);
-      const next = order.find(
+      const next2 = work.subtasks.find(
         (s) => !this.live.has(s.id) && TAKEN_UP.includes(s.status) && !waitsIn(work, s, busy).length
       );
-      if (!next) return;
-      if (next.status === "pending") void this.startRun(next);
-      else if (next.status === "reviewing") void this.startReview(next);
-      else void this.startMerge(next);
+      if (!next2) return;
+      if (next2.status === "pending") void this.startRun(next2);
+      else if (next2.status === "reviewing") void this.startReview(next2);
+      else void this.startMerge(next2);
     }
   }
+  /** A review or merge waits on your decision: `text`, what it came to, if it says more. */
+  ask(subtask2, decision, text2) {
+    this.move(subtask2, decision.kind === "review" ? "askReview" : "askMerge");
+    this.questions.openDecision(subtask2, decision, text2);
+  }
   /**
-   * Moves a subtask by its machine. Leaving review or a merge calls off your
-   * decision on it; done again, its task's delivery waits until it is done
-   * again; leaving where it stopped, where it was handed over stands no more.
+   * Moves a subtask by its machine. Leaving where it waits on you calls off
+   * your decision on it; done again, its task's delivery waits until it is
+   * done again.
    */
   move(subtask2, event) {
     const from = subtask2.status;
     subtask2.status = step(SUBTASK_MACHINE, from, event);
-    if ((from === "reviewing" || from === "merging") && subtask2.status !== from)
+    if (from === "waitingInReview" || from === "waitingInMerge")
       this.questions.cancelFor(subtask2.id, true);
-    if (from === "done") this.questions.cancelDelivery(subtask2.taskId);
-    if (from === "stopped") subtask2.stoppedIn = void 0;
+    if (from === "done")
+      this.questions.cancelDelivery(
+        this.core.state.subtasks.filter((s) => s.taskId === subtask2.taskId).map((s) => s.id)
+      );
   }
   /** A run about to be stopped goes on in its session, with `reason` too. */
   keepOn(subtaskId, reason) {
@@ -11237,25 +10358,6 @@ var Scheduler = class {
       }
     };
   }
-  /** The work a subtask builds on, up the chain of dependencies: what it depends on directly first. */
-  upstreamOf(subtask2) {
-    const { subtasks } = this.core.state;
-    const chain = [];
-    const seen = /* @__PURE__ */ new Set([subtask2.id]);
-    let level = subtask2.dependsOn;
-    for (let direct = true; level.length; direct = false) {
-      const next = [];
-      for (const id of level) {
-        const done = subtasks.find((s) => s.id === id);
-        if (!done || seen.has(id)) continue;
-        seen.add(id);
-        chain.push({ subtask: done, direct });
-        next.push(...done.dependsOn);
-      }
-      level = next;
-    }
-    return chain;
-  }
   /**
    * Runs a subtask in its worktree: from its brief, or in its last session
    * with why it goes on. Delivered, its worktree is committed in its member's
@@ -11276,7 +10378,7 @@ var Scheduler = class {
       const member = this.memberOf(subtask2.assignee);
       const { goal } = this;
       const task = this.taskOf(subtask2);
-      const desk = await openDesk(core.places, goal.slug, subtask2.id);
+      const desk = await openDesk(core.places, subtask2.id);
       const recorder = core.recorder(subtask2);
       outcome = await runSubtask({
         options: core.options(member, "work", desk),
@@ -11287,7 +10389,7 @@ var Scheduler = class {
           cwd: desk,
           branch: subtaskBranch(goal.slug, subtask2.id),
           plan: this.planOf(task),
-          upstream: this.upstreamOf(subtask2),
+          upstream: upstreamOf(core.state, subtask2),
           notes
         }),
         ...goOn && { resume: subtask2.session },
@@ -11296,10 +10398,12 @@ var Scheduler = class {
           subtaskId: subtask2.id,
           signal: abort.signal
         }),
-        collaboration: {
-          askTeammate: (name, question) => this.askTeammate(member, subtask2, name, question, abort.signal),
-          checkDelivery: (files) => this.checkDelivery(subtask2, desk, files)
-        },
+        collaboration: collaborationOf(core, this.questions, {
+          from: member,
+          subtask: subtask2,
+          desk,
+          signal: abort.signal
+        }),
         listener: {
           ...recorder,
           session: (id, model) => {
@@ -11308,7 +10412,7 @@ var Scheduler = class {
             recorder.session?.(id, model);
           },
           steps: (steps) => {
-            subtask2.progress = progressOf2(steps);
+            subtask2.progress = progressOf(steps);
             core.changed();
             recorder.steps?.(steps);
           }
@@ -11318,7 +10422,6 @@ var Scheduler = class {
       if (outcome.status === "delivered")
         await commitDesk(
           core.places,
-          goal.slug,
           subtask2.id,
           memberSigner(member.name),
           `${subtask2.title}
@@ -11349,69 +10452,6 @@ ${outcome.handover.summary}`
     this.pump();
   }
   /**
-   * A running member asks a teammate by name; the teammate answers in a
-   * read-only session in the goal's worktree. What the asker is told.
-   */
-  async askTeammate(from, subtask2, name, question, signal) {
-    const { core } = this;
-    const others = core.team.members.filter((m) => m.name !== from.name);
-    const target = others.find((m) => m.name === name.trim());
-    if (!target)
-      return name.trim() === from.name ? "That's you; no need to ask." : `There's no teammate called "${name}". Your teammates: ${others.map((m) => m.name).join(", ") || "none"}.`;
-    try {
-      const reply = await this.questions.toTeammate(
-        { from: from.name, subtaskId: subtask2.id },
-        target.name,
-        question,
-        async () => askOnce({
-          prompt: teammateQuestion({
-            from,
-            subtask: subtask2,
-            question,
-            own: core.state.subtasks.filter((s) => s.assignee === target.name)
-          }),
-          options: core.options(target, "readOnly", await openGoal(core.places, this.goal.slug)),
-          signal,
-          spent: (tokens) => {
-            spend(core.state, target.name, tokens);
-          }
-        })
-      );
-      core.changed();
-      return `${target.name} answered: ${reply.text}`;
-    } catch (error) {
-      return `${target.name} couldn't answer just now: ${errorText(error)}`;
-    }
-  }
-  /**
-   * Whether a delivery is taken: every file is in the worktree, and the
-   * conflicts a merge left are resolved. Its files as kept, or why not.
-   */
-  async checkDelivery(subtask2, desk, files) {
-    const kept = [];
-    const missing = [];
-    for (const file of files) {
-      const relative = path10.relative(desk, path10.resolve(desk, file));
-      const inside = relative !== "" && !relative.startsWith("..") && !path10.isAbsolute(relative);
-      const there = inside && await stat(path10.join(desk, relative)).then(
-        (found) => found.isFile(),
-        () => false
-      );
-      if (there) kept.push(relative.split(path10.sep).join("/"));
-      else missing.push(file);
-    }
-    if (missing.length)
-      return {
-        refused: `Not delivered: these aren't files in your worktree (${desk}): ${missing.join(", ")}. Deliver the files that are there.`
-      };
-    const left = subtask2.conflict ? await unresolved(this.core.places, subtask2.id, subtask2.conflict.files) : [];
-    if (left.length)
-      return {
-        refused: `Not delivered: conflict markers are still in ${left.join(", ")}. Resolve them first, keeping what both sides meant, then deliver.`
-      };
-    return { files: [...new Set(kept)] };
-  }
-  /**
    * Reviews a delivery: a read-only session of the reviewer's in the
    * subtask's worktree passes it on to be merged, or sends it back with
    * notes; the third time back, or when the review fails, you decide. Stopped
@@ -11424,28 +10464,19 @@ ${outcome.handover.summary}`
       const reviewer = this.memberOf(reviewerOf(workOf(core), subtask2));
       const { delivery } = subtask2;
       if (!delivery) throw new Error(`"${subtask2.title}" has no delivery to review`);
-      const desk = await openDesk(core.places, this.goal.slug, subtask2.id);
-      const reply = await askOnce({
-        prompt: reviewPrompt({
-          task: this.taskOf(subtask2),
-          subtask: subtask2,
-          delivery,
-          cwd: desk
-        }),
-        options: core.options(reviewer, "readOnly", desk),
-        schema: verdictSchema,
-        signal: abort.signal,
-        spent: (tokens) => {
-          spend(core.state, reviewer.name, tokens);
-        }
+      const verdict = await reviewDelivery(core, {
+        reviewer,
+        task: this.taskOf(subtask2),
+        subtask: subtask2,
+        delivery,
+        desk: await openDesk(core.places, subtask2.id),
+        signal: abort.signal
       });
       if (subtask2.status !== "reviewing") return;
-      const verdict = verdictSchema.parse(reply.structured);
       const rounds = (subtask2.review?.rounds ?? 0) + (verdict.pass ? 0 : 1);
       subtask2.review = { rounds, notes: verdict.notes };
       if (verdict.pass) this.move(subtask2, "merge");
-      else if (rounds >= REVIEW_ROUNDS)
-        this.questions.openDecision(subtask2, DECISIONS.stuckReview(), verdict.notes);
+      else if (rounds >= REVIEW_ROUNDS) this.ask(subtask2, DECISIONS.stuckReview(), verdict.notes);
       else {
         this.move(subtask2, "reject");
         if (subtask2.session) goOnWith(subtask2, { why: "rejected", note: verdict.notes });
@@ -11453,7 +10484,7 @@ ${outcome.handover.summary}`
     } catch (error) {
       if (abort.signal.aborted || subtask2.status !== "reviewing") return;
       subtask2.review = { rounds: subtask2.review?.rounds ?? 0 };
-      this.questions.openDecision(subtask2, DECISIONS.failedReview(), errorText(error));
+      this.ask(subtask2, DECISIONS.failedReview(), errorText(error));
     } finally {
       end2();
       core.changed();
@@ -11470,30 +10501,20 @@ ${outcome.handover.summary}`
     const { core } = this;
     const { end: end2 } = this.begin(subtask2, "merge");
     try {
-      const { goal } = this;
-      const merged = await mergeDesk(
-        core.places,
-        goal.slug,
-        subtask2.id,
-        memberSigner(subtask2.assignee)
-      );
+      const merged = await mergeDesk(core.places, subtask2.id, memberSigner(subtask2.assignee));
       if (merged.kind === "merged") {
         this.move(subtask2, "merged");
         subtask2.conflict = void 0;
         this.finished(subtask2);
       } else if (merged.other.length) {
-        this.questions.openDecision(
-          subtask2,
-          DECISIONS.mergeFiles(merged.other),
-          merged.other.join("\n")
-        );
+        this.ask(subtask2, DECISIONS.mergeFiles(merged.other), "");
       } else {
         this.move(subtask2, "conflict");
         subtask2.conflict = { files: merged.text };
         if (subtask2.session) goOnWith(subtask2, { why: "conflict" });
       }
     } catch (error) {
-      this.questions.openDecision(subtask2, DECISIONS.failedMerge(), errorText(error));
+      this.ask(subtask2, DECISIONS.failedMerge(), errorText(error));
     } finally {
       end2();
       core.changed();
@@ -11512,63 +10533,236 @@ ${outcome.handover.summary}`
   }
 };
 
-// src/engine/engine.ts
-function filledSettings({ team, settings }, options) {
-  return team.members.map((member) => {
-    try {
-      return [member.name, memberSettings(settings, member, options.env, options.plugins)];
-    } catch (error) {
-      throw new Error(`${member.name}: ${errorText(error)}`, { cause: error });
-    }
+// src/engine/team.ts
+var import_yaml = __toESM(require_dist(), 1);
+import { readFile as readFile3 } from "node:fs/promises";
+import { homedir } from "node:os";
+import path4 from "node:path";
+import { z as z6 } from "zod";
+var teamFolder = (top) => path4.join(top, ".claude", "openplan");
+var claudeFolder = (env) => env.CLAUDE_CONFIG_DIR ?? path4.join(homedir(), ".claude");
+var userTeamFolder = (env) => path4.join(claudeFolder(env), "openplan");
+var EFFORTS = ["low", "medium", "high", "xhigh", "max"];
+var roleSchema = z6.object({ title: z6.string().trim().min(1) });
+var memberSchema = z6.object({
+  role: z6.string().trim().min(1),
+  model: z6.string().trim().min(1).optional(),
+  effort: z6.enum(EFFORTS).optional(),
+  // As in `.mcp.json`, though YAML reads `API_TIMEOUT_MS: 3000000` as a number.
+  env: z6.record(z6.string(), z6.union([z6.string(), z6.number(), z6.boolean()]).transform(String)).default({})
+});
+var teamSchema = z6.object({
+  review: z6.boolean().optional(),
+  meetingSize: z6.enum(MEETING_SIZES).optional()
+});
+var settingsSchema = z6.record(z6.string(), z6.unknown());
+var TeamError = class extends Error {
+};
+function parsed(schema, data, file) {
+  const result = schema.safeParse(data);
+  if (!result.success) throw new TeamError(`${file}:
+${z6.prettifyError(result.error)}`);
+  return result.data;
+}
+async function markdownFiles(folder) {
+  const names = (await namesIfThere(folder)).filter((name) => name.endsWith(".md")).sort();
+  return Promise.all(
+    names.map(async (name) => {
+      const file = path4.join(folder, name);
+      const text2 = await readFile3(file, "utf8");
+      const front = /^---\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(text2);
+      let data;
+      try {
+        data = (0, import_yaml.parse)(front?.[1] ?? "") ?? {};
+      } catch (error) {
+        throw new TeamError(`${file}: ${errorText(error)}`, { cause: error });
+      }
+      return {
+        name: name.slice(0, -".md".length),
+        file,
+        data,
+        body: text2.slice(front?.[0].length ?? 0)
+      };
+    })
+  );
+}
+function mergeSettings(under, over) {
+  const merged = { ...under };
+  for (const [key, value] of Object.entries(over)) {
+    const was = merged[key];
+    merged[key] = Array.isArray(was) && Array.isArray(value) ? [.../* @__PURE__ */ new Set([...was, ...value])] : isObject(was) && isObject(value) ? mergeSettings(was, value) : value;
+  }
+  return merged;
+}
+var isObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+async function loadTeam(userTeam2, top) {
+  const roles = /* @__PURE__ */ new Map();
+  const written2 = /* @__PURE__ */ new Map();
+  let own = {};
+  let settings = {};
+  const folders = [userTeam2, teamFolder(top)];
+  for (const folder of folders) {
+    for (const { name, file, data, body } of await markdownFiles(path4.join(folder, "roles")))
+      roles.set(name, {
+        id: name,
+        title: parsed(roleSchema, data, file).title,
+        duties: body.trim()
+      });
+    for (const { name, file, data } of await markdownFiles(path4.join(folder, "members")))
+      written2.set(name, { file, data });
+    const teamFile = path4.join(folder, "team.json");
+    own = { ...own, ...parsed(teamSchema, await jsonIfThere(teamFile) ?? {}, teamFile) };
+    const settingsFile = path4.join(folder, "settings.json");
+    settings = mergeSettings(
+      settings,
+      parsed(settingsSchema, await jsonIfThere(settingsFile) ?? {}, settingsFile)
+    );
+  }
+  const byName = [...written2].sort(([a], [b]) => a < b ? -1 : 1);
+  const members2 = byName.map(([name, { file, data }]) => {
+    const { role, model, effort, env } = parsed(memberSchema, data, file);
+    const found = roles.get(role);
+    if (!found) throw new TeamError(`${file}: there is no role "${role}" in the team's roles/`);
+    return {
+      name,
+      role: found,
+      ...model !== void 0 && { model },
+      ...effort !== void 0 && { effort },
+      env
+    };
+  });
+  if (!members2.length)
+    throw new TeamError(
+      `The team has no members: add them in ${folders.map((f) => path4.join(f, "members")).join(" or ")}`
+    );
+  return {
+    team: { members: members2, review: own.review ?? true },
+    settings,
+    meetingSize: own.meetingSize ?? "discussion"
+  };
+}
+var writing = serialBy();
+function allowing(settings, rules, file) {
+  const permissions = parsed(
+    z6.looseObject({ allow: z6.array(z6.string()).default([]) }),
+    settings.permissions ?? {},
+    file
+  );
+  const allow = [.../* @__PURE__ */ new Set([...permissions.allow, ...rules])];
+  return { ...settings, permissions: { ...permissions, allow } };
+}
+function allowInTeam(top, rules) {
+  const file = path4.join(teamFolder(top), "settings.json");
+  return writing(file, async () => {
+    const settings = parsed(settingsSchema, await jsonIfThere(file) ?? {}, file);
+    await writeWhole(file, `${JSON.stringify(allowing(settings, rules, file), null, 2)}
+`);
   });
 }
+var copyTeam = (file, team) => writeWhole(file, JSON.stringify(team));
+async function readCopy(file) {
+  return JSON.parse(await readFile3(file, "utf8"));
+}
+function allowInCopy(file, rules) {
+  return writing(file, async () => {
+    const copy = await readCopy(file);
+    const settings = allowing(copy.settings, rules, file);
+    const now = { ...copy, settings };
+    await copyTeam(file, now);
+    return now;
+  });
+}
+
+// src/engine/repository.ts
+var RepositoryGoals = class _RepositoryGoals {
+  constructor(repo, folder) {
+    this.repo = repo;
+    this.folder = folder;
+  }
+  repo;
+  folder;
+  /** The goals of the repository `cwd` is in; throws a GitError when it is in none. */
+  static async of(dataFolder2, cwd2) {
+    const repo = await openRepository(cwd2);
+    return new _RepositoryGoals(repo, repoFolder(dataFolder2, repo));
+  }
+  /** Its goals, oldest first (listGoals). */
+  list() {
+    return listGoals(this.folder);
+  }
+  /** A goal's folder, and the files in it, by its slug. */
+  goal(slug) {
+    const folder = goalFolder(this.folder, slug);
+    return { folder, files: goalFiles(folder) };
+  }
+  /** The team a goal started now would have: yours, with the repository's own (team.ts loadTeam). */
+  async team(userTeam2) {
+    return (await loadTeam(userTeam2, this.repo.top)).team;
+  }
+  /** A goal as its files left it, with nothing under way: as a session that doesn't run it reads it. */
+  async stored(slug, state) {
+    const { team } = await readCopy(this.goal(slug).files.team);
+    return workOf({
+      state,
+      team,
+      underWay: () => [],
+      meetingsNow: () => ({}),
+      questionsNow: () => []
+    });
+  }
+};
+
+// src/engine/engine.ts
 var Engine = class _Engine {
   constructor(core, records, files, writer, options, copy) {
     this.core = core;
-    this.records = records;
     this.files = files;
     this.writer = writer;
     this.options = options;
     this.copy = copy;
-    this.questions = new Questions(core);
-    this.scheduler = new Scheduler(core, this.questions);
-    this.meetings = new Meetings(core, this.scheduler);
-    this.goals = new Goals(core, this.scheduler, this.meetings);
+    const questions = new Questions(core);
+    const scheduler = new Scheduler(core, questions);
+    const meetings = new Meetings(core, scheduler);
+    const goals = new Goals(core, scheduler, meetings);
+    this.parts = { questions, scheduler, meetings, goals, records };
+    this.scheduler = scheduler;
+    this.meetings = meetings;
+    this.goals = goals;
+    this.records = records;
   }
   core;
-  records;
   files;
   writer;
   options;
   copy;
-  questions;
+  /** Your actions on the goal's subtasks, a message to one, and work given directly. */
   scheduler;
+  /** Calling meetings, and their plans in review. */
   meetings;
+  /** Pausing, resuming and archiving the goal; deleting it is the engine's own (delete). */
   goals;
-  /** The team's settings set the members' permission mode, over your session's. */
-  teamMode = false;
+  /** What the subtasks' runs and the meeting turns did and do. */
+  records;
+  parts;
   /**
    * Starts a goal for this session: a folder of its own, the team copied
    * into it as its files have it now (§6), and its branch cut from your
    * HEAD, checked out in its own worktree.
    */
   static async start(options, name) {
-    const repo = await openRepository(options.cwd);
+    const goals = await RepositoryGoals.of(options.dataFolder, options.cwd);
+    const { repo } = goals;
     const copy = await loadTeam(options.userTeam, repo.top);
-    filledSettings(copy, options);
-    const { slug, folder } = await newGoalFolder(
-      repoFolder(options.dataFolder, repo),
-      name,
-      await takenSlugs(repo)
-    );
+    teamSettings(copy.settings, copy.team.members, options.env, options.plugins);
+    const { slug, folder } = await newGoalFolder(goals.folder, name, await takenSlugs(repo));
     const files = goalFiles(folder);
     const me = { session: options.session, address: options.address };
     let engine;
     try {
-      await takeGoal(files.lock, me, (holder) => options.takeOver(holder, slug));
+      await takeLock(files.lock, me, (holder) => options.takeOver(holder, slug));
       await copyTeam(files.team, copy);
-      const places = { repo, root: folder };
-      await openGoal(places, slug);
+      const places = { repo, slug, root: folder };
+      await openGoal(places);
       const state = {
         goal: { name, slug, status: "active", createdAt: Date.now() },
         tasks: [],
@@ -11594,21 +10788,23 @@ var Engine = class _Engine {
    * left running is stopped first.
    */
   static async takeUp(options, slug) {
-    const repo = await openRepository(options.cwd);
-    const folder = path11.join(goalsFolder(repoFolder(options.dataFolder, repo)), slug);
-    const files = goalFiles(folder);
+    const goals = await RepositoryGoals.of(options.dataFolder, options.cwd);
+    const { folder, files } = goals.goal(slug);
     if (!existsSync(files.state)) throw new Error(`There is no goal "${slug}" in this repository`);
     await readState(files.state);
-    filledSettings(await readCopy(files.team), options);
+    const { settings, team } = await readCopy(files.team);
+    teamSettings(settings, team.members, options.env, options.plugins);
     const me = { session: options.session, address: options.address };
-    const handed = await takeGoal(files.lock, me, (holder) => options.takeOver(holder, slug));
+    const handed = await takeLock(files.lock, me, (holder) => options.takeOver(holder, slug));
+    const stopped = handed.flatMap((h) => h.meetings);
     let engine;
     try {
       const state = await readState(files.state);
       const copy = await readCopy(files.team);
-      engine = await _Engine.ready(options, { repo, root: folder }, files, copy, state);
-      if (state.goal.status === "active") await engine.goals.pause();
-      await engine.goals.resume(handed.meetings);
+      const places = { repo: goals.repo, slug, root: folder };
+      engine = await _Engine.ready(options, places, files, copy, state);
+      if (state.goal.status === "active") await engine.parts.goals.pause();
+      await engine.parts.goals.resume(stopped);
       await engine.writer.flush();
       return engine;
     } catch (error) {
@@ -11621,7 +10817,7 @@ var Engine = class _Engine {
     if (engine) await engine.shut();
     else {
       await stopRecording();
-      releaseGoal(files.lock);
+      releaseLock(files.lock);
     }
   }
   /** The engine of a goal whose lock this process holds, put together; what a server before left running is stopped. */
@@ -11639,18 +10835,16 @@ var Engine = class _Engine {
       allowAlways: (rules) => engine.allow(rules),
       options: (member, kind, cwd2) => engine.turnOptions(member, kind, cwd2),
       recorder: (subtask2) => records.recorder(subtask2.id),
-      speech: (meeting2, speaker) => records.speech(meeting2, speaker),
-      underWay: () => engine.scheduler.underWay()
+      speech: (meeting2) => records.speech(meeting2),
+      underWay: () => engine.parts.scheduler.underWay(),
+      meetingsNow: () => engine.parts.meetings.now(),
+      questionsNow: () => engine.parts.questions.now()
     };
     const engine = new _Engine(core, records, files, writer, options, copy);
     await engine.writeMemberSettings(copy);
-    engine.questions.recover();
-    engine.scheduler.recover();
-    engine.meetings.recover();
+    engine.parts.scheduler.recover();
+    engine.parts.meetings.recover();
     return engine;
-  }
-  get state() {
-    return this.core.state;
   }
   /** The goal as the rules read it (derive.ts). */
   get work() {
@@ -11670,10 +10864,8 @@ var Engine = class _Engine {
    * answer doesn't fit it.
    */
   async answer(id, answer) {
-    const question = this.questions.answer(id, answer);
-    if (question.kind === "decision" && "decision" in answer)
-      await this.scheduler.decide(question, answer);
-    return question;
+    if (answer.kind === "decision") await this.parts.scheduler.decide(id, answer);
+    else this.parts.questions.answer(id, answer);
   }
   /**
    * Closes the goal as the session ends or lets it go (§3.2): an active goal
@@ -11682,12 +10874,12 @@ var Engine = class _Engine {
    * way, which pausing cancels.
    */
   async close() {
-    const { goal, meetings } = this.state;
+    const { goal, meetings } = this.core.state;
     const stopped = {
       meetings: meetings.filter((m) => m.status === "running").map((m) => m.id)
     };
     try {
-      if (goal.status === "active") await this.goals.pause();
+      if (goal.status === "active") await this.parts.goals.pause();
     } finally {
       await this.shut();
     }
@@ -11698,7 +10890,7 @@ var Engine = class _Engine {
    * branches, then its folder. Its branch stays, yours to merge or delete.
    */
   async delete() {
-    await this.goals.delete();
+    await this.parts.goals.delete();
     await this.shut();
     await rm3(this.core.places.root, { recursive: true, force: true });
   }
@@ -11709,7 +10901,7 @@ var Engine = class _Engine {
    * take the goal up pauses what it left active.
    */
   abandon() {
-    releaseGoal(this.files.lock);
+    releaseLock(this.files.lock);
   }
   /**
    * Stops what runs, writes the state for the last time, and lets the goal
@@ -11718,11 +10910,11 @@ var Engine = class _Engine {
    */
   async shut() {
     try {
-      await Promise.all([this.scheduler.close(), this.meetings.close()]);
-      await Promise.all([this.writer.close(), this.records.flush()]);
+      await Promise.all([this.parts.scheduler.close(), this.parts.meetings.close()]);
+      await Promise.all([this.writer.close(), this.parts.records.flush()]);
     } finally {
       await stopRecording();
-      releaseGoal(this.files.lock);
+      releaseLock(this.files.lock);
     }
   }
   /**
@@ -11738,11 +10930,11 @@ var Engine = class _Engine {
     });
   }
   allowing = serialBy();
-  /** Writes each member's settings file (filledSettings); throws before writing any when one can't be filled in. */
-  async writeMemberSettings(copy) {
-    for (const [name, filled] of filledSettings(copy, this.options))
+  /** Writes each member's settings file (teamSettings); throws before writing any when one can't be filled in. */
+  async writeMemberSettings({ settings, team }) {
+    const { env, plugins: plugins2 } = this.options;
+    for (const [name, filled] of teamSettings(settings, team.members, env, plugins2))
       await writeSettings(this.files.settings(name), filled);
-    this.teamMode = copy.settings.permissions?.defaultMode !== void 0;
   }
   turnOptions(...[member, kind, cwd2]) {
     const sessionMode = this.options.sessionMode();
@@ -11753,11 +10945,745 @@ var Engine = class _Engine {
       settings: this.files.settings(member.name),
       system: systemPrompt(kind, member, this.core.team.members),
       ...sessionMode && { sessionMode },
-      teamMode: this.teamMode
+      team: this.copy.settings
     };
     return sessionOptions(seat, kind, this.options.env);
   }
 };
+
+// src/plugin/claude.ts
+import { execFile as execFile2 } from "node:child_process";
+import { readlink } from "node:fs/promises";
+import { promisify } from "node:util";
+var run = async (command, args) => (await promisify(execFile2)(command, args)).stdout;
+async function executableOf(pid) {
+  const id = String(pid);
+  let found;
+  switch (process.platform) {
+    case "linux":
+      found = await readlink(`/proc/${id}/exe`);
+      break;
+    case "win32":
+      found = (await run(...windowsProcessField(pid, "ExecutablePath"))).trim();
+      break;
+    default:
+      found = (await run("lsof", ["-a", "-p", id, "-d", "txt", "-Fn"])).split("\n").find((line) => line.startsWith("n"))?.slice(1);
+  }
+  if (!found) throw new Error(`Can't tell which executable process ${id} runs`);
+  return found;
+}
+
+// src/plugin/plugin-id.ts
+import path5 from "node:path";
+var PLUGIN = "openplan";
+var pluginId = (dataFolder2) => `${PLUGIN}@${path5.basename(dataFolder2).slice(PLUGIN.length + 1)}`;
+async function idsIn(file) {
+  let settings;
+  try {
+    settings = await jsonIfThere(file);
+  } catch (error) {
+    if (error instanceof SyntaxError) return [];
+    throw error;
+  }
+  return Object.keys(settings?.enabledPlugins ?? {}).filter((id) => id.startsWith(`${PLUGIN}@`));
+}
+async function pluginIds(dataFolder2, configFolder, projectFolder) {
+  const files = [
+    path5.join(configFolder, "settings.json"),
+    path5.join(projectFolder, ".claude", "settings.json"),
+    path5.join(projectFolder, ".claude", "settings.local.json")
+  ];
+  const found = await Promise.all(files.map(idsIn));
+  return [.../* @__PURE__ */ new Set([pluginId(dataFolder2), ...found.flat()])];
+}
+
+// src/plugin/pane-server.ts
+import { randomBytes } from "node:crypto";
+import { mkdtempSync, rmSync } from "node:fs";
+import { createServer, request } from "node:http";
+import { tmpdir } from "node:os";
+import path6 from "node:path";
+import { text } from "node:stream/consumers";
+import { z as z7 } from "zod";
+
+// src/plugin/words.ts
+var plural = (n, one, many) => `${String(n)} ${n === 1 ? one : many}`;
+var PLAN_TO_REVIEW = "plan to review";
+var rosterOf = (members2) => members2.map((m) => `${m.name} (${m.role.title})`).join(", ");
+var hostText = (meeting2) => `hosted by ${hostOf(meeting2)}${meeting2.hostOnly ? ", who only runs it" : ""}`;
+var attendanceText = (meeting2) => `${listOf(meeting2.participants)}, ${hostText(meeting2)}`;
+function waitText(wait, work) {
+  switch (wait.kind) {
+    case "goal":
+      return `its goal is ${wait.status}`;
+    case "upstream": {
+      const upstream = work.subtasks.find((s) => s.id === wait.subtaskId);
+      return `waits on "${upstream?.title ?? ""}" by ${wait.by}${wait.halted ? ", which has stopped" : ""}`;
+    }
+    case "busy":
+      return `waits until ${wait.by} is free`;
+    case "after": {
+      const first = work.subtasks.find((s) => s.id === wait.subtaskId);
+      return `waits for "${first?.title ?? ""}" to start first`;
+    }
+    case "merge": {
+      const ahead2 = work.subtasks.find((s) => s.id === wait.subtaskId);
+      return `waits until "${ahead2?.title ?? ""}" is merged`;
+    }
+    case "teammate":
+      return `asked ${wait.by}`;
+    case "you":
+      return wait.decision ? "waits for a decision" : "waits for an answer";
+    case "acceptance":
+      return "waits until the task it builds on is accepted";
+  }
+}
+var STATUS_WORDS = {
+  pending: "pending",
+  running: "running",
+  reviewing: "in review",
+  waitingInReview: "in review, waits for a decision",
+  merging: "being merged",
+  waitingInMerge: "being merged, waits for a decision",
+  done: "done",
+  failed: "failed",
+  stopped: "stopped",
+  stoppedInReview: "stopped in review",
+  stoppedInMerge: "stopped while merging"
+};
+function stepText({ done, total, current }) {
+  if (!total) return void 0;
+  const step2 = `step ${String(Math.min(done + 1, total))} of ${String(total)}`;
+  return current ? `${step2}: ${current}` : step2;
+}
+function meetingStatus(meeting2, now) {
+  switch (meeting2.status) {
+    case "running":
+      return now?.speaking?.planning ? `${now.speaking.member} writes the plan` : now?.speaking ? `${now.speaking.member} speaks` : now?.together === "drafting" ? "the members form their first judgments" : now?.together === "weighing" ? "deciding who speaks next" : "under way";
+    case "review":
+      return "its plan waits for review";
+    case "approved":
+      return "plan approved";
+    case "cancelled":
+      return "cancelled";
+    case "dropped":
+      return "its plan dropped";
+    case "failed":
+      return `failed${meeting2.error ? `: ${meeting2.error}` : ""}`;
+  }
+}
+var MAIN_ARGUMENTS = ["command", "file_path", "path", "pattern", "url", "description"];
+function mainArgument(input) {
+  const fields = input ?? {};
+  return MAIN_ARGUMENTS.map((key) => fields[key]).find(
+    (value) => typeof value === "string"
+  );
+}
+function callText(permission) {
+  const main = mainArgument(permission.input);
+  return main ? `${permission.tool}: ${main}` : permission.tool;
+}
+function needWords(question, work) {
+  const title = work.subtasks.find((s) => s.id === question.subtaskId)?.title;
+  const about = title ? ` for "${title}"` : "";
+  switch (question.kind) {
+    case "permission":
+      return {
+        headline: `${question.from} asks to use ${callText(question.permission)}${about}. Allow it?`,
+        ...question.text && { detail: question.text }
+      };
+    case "choices":
+      return { headline: `${question.from} asks${about}:` };
+    case "decision":
+      switch (question.decision.kind) {
+        case "review":
+          return {
+            headline: `The review of "${title ?? ""}" is stuck. What now?`,
+            detail: question.text
+          };
+        case "conflict":
+          return {
+            headline: `Merging "${title ?? ""}" is stuck. What now?`,
+            detail: question.decision.files.join(", ")
+          };
+        case "merge":
+          return {
+            headline: `Merging "${title ?? ""}" is stuck. What now?`,
+            detail: question.text
+          };
+        case "delivery":
+          return { headline: `The task "${question.text}" is done. Accept it?` };
+      }
+  }
+}
+var whereOf = (entry) => entry.holder ? "elsewhere" : !("state" in entry) ? "unreadable" : entry.state.goal.status === "archived" ? "archived" : "paused";
+var WHERE_WORDS = {
+  elsewhere: "in another session",
+  unreadable: "can't be read",
+  archived: "archived",
+  paused: "paused"
+};
+function progressOf2({ subtasks, meetings }) {
+  const done = subtasks.filter((s) => s.status === "done").length;
+  return subtasks.length ? `${String(done)}/${String(subtasks.length)} subtasks done` : meetings.some((m) => m.status === "review") ? PLAN_TO_REVIEW : "no plan yet";
+}
+var goalLabel = (state, where) => `${state.goal.name} \xB7 ${progressOf2(state)} \xB7 ${where}`;
+var entryLabel = (entry) => "state" in entry ? goalLabel(entry.state, WHERE_WORDS[whereOf(entry)]) : `${entry.slug} \xB7 ${WHERE_WORDS.unreadable}: ${entry.unreadable}`;
+var resumableOf = (others) => others.map((entry) => ({ slug: entry.slug, label: entryLabel(entry) }));
+
+// src/plugin/pane.ts
+function shownMeeting(work) {
+  const latest = (status) => work.meetings.filter((m) => !status || m.status === status).at(-1);
+  return latest("running") ?? latest("review") ?? latest();
+}
+function meetingOf(meeting2, work) {
+  const now = work.meetingsNow[meeting2.id];
+  const hands = now?.hands ?? [];
+  return {
+    // Named by its goal: its agenda is the brief your session wrote for it, too long for a line.
+    heading: `${work.goal.name} \xB7 ${meetingStatus(meeting2, now)}`,
+    attendance: attendanceText(meeting2),
+    agenda: meeting2.agenda,
+    turns: meeting2.turns.map((t) => ({
+      heading: t.calls ? `${t.speaker} \u2192 ${t.calls}` : t.speaker,
+      text: t.text
+    })),
+    ...hands.length && {
+      hands: `Hands up: ${hands.map((h) => `${h.member} (${h.point})`).join(", ")}`
+    },
+    ...meeting2.plan && { plan: `Plan: ${meeting2.plan.summary}` }
+  };
+}
+function followedOf(member, work) {
+  const own = work.subtasks.filter((s) => s.assignee === member);
+  return own.find((s) => s.status === "running") ?? own.filter((s) => s.startedAt).sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0))[0];
+}
+function memberOf(member, work, derived) {
+  const own = work.subtasks.filter((s) => s.assignee === member.name);
+  const at = (...statuses) => own.find((s) => inProgress(s) && statuses.includes(s.status));
+  const reviewing = work.subtasks.find(
+    (s) => s.assignee !== member.name && derived.subtasks[s.id]?.reviewedBy === member.name
+  );
+  const meeting2 = work.meetings.find(
+    (m) => m.status === "running" && m.participants.includes(member.name)
+  );
+  const next2 = own.find((s) => s.status === "pending");
+  const running2 = at("running");
+  const handedOver = at("reviewing", "waitingInReview") ?? at("merging", "waitingInMerge");
+  let doing;
+  if (running2) doing = inProgressText(running2);
+  else if (meeting2) doing = `at the meeting on "${work.goal.name}"`;
+  else if (reviewing) doing = `reviews "${reviewing.title}" by ${reviewing.assignee}`;
+  else if (handedOver) doing = inProgressText(handedOver);
+  else if (next2) {
+    const waits = derived.subtasks[next2.id]?.waits ?? [];
+    doing = `next: "${next2.title}"${waits.length ? `, ${waits.map((w) => waitText(w, work)).join(", ")}` : ""}`;
+  } else doing = "free";
+  const tokens = (work.tokens[member.name] ?? 0).toLocaleString();
+  return {
+    name: member.name,
+    line: [member.role.title, ...member.model ? [member.model] : [], `${tokens} tokens`].join(
+      " \xB7 "
+    ),
+    doing,
+    followable: followedOf(member.name, work) !== void 0
+  };
+}
+var optionOf = (value) => ({
+  value,
+  label: OPTION_LABELS[value]
+});
+function answersOf(options, note) {
+  return {
+    options: options.filter((o) => !(note?.needed && o === note.option)).map(optionOf),
+    ...note && {
+      note: {
+        option: note.option,
+        label: OPTION_LABELS[note.option],
+        prompt: NOTE_PROMPTS[note.option]
+      }
+    }
+  };
+}
+function needOf(question, work) {
+  const { headline, detail } = needWords(question, work);
+  const head = {
+    id: question.id,
+    from: question.from,
+    headline,
+    ...detail && { detail },
+    ask: !isAcceptance(question)
+  };
+  switch (question.kind) {
+    case "permission": {
+      const { options, note } = answersOf(question.permission.options, { option: PERMISSION_NOTE });
+      return {
+        ...head,
+        kind: "options",
+        options: options.map((o) => ({
+          ...o,
+          ...o.value === "once" && { primary: true }
+        })),
+        ...note && { note }
+      };
+    }
+    case "choices":
+      return {
+        ...head,
+        kind: "choices",
+        choices: question.choices.map((c) => ({
+          question: c.question,
+          header: c.header,
+          options: c.options.map((o) => ({
+            label: o.label,
+            ...o.description && { description: o.description }
+          })),
+          multiSelect: c.multiSelect
+        }))
+      };
+    case "decision": {
+      const { kind } = question.decision;
+      const subtask2 = work.subtasks.find((s) => s.id === question.subtaskId);
+      const done = work.subtasks.filter((s) => s.taskId === subtask2?.taskId && s.status === "done");
+      return {
+        ...head,
+        kind: "options",
+        ...answersOf(question.decision.options, question.decision.note),
+        // With one done subtask, a revised task goes back to it: nothing to pick.
+        ...kind === "delivery" && done.length > 1 && {
+          sendBack: done.map((s) => ({ id: s.id, title: s.title }))
+        }
+      };
+    }
+  }
+}
+function milestones(work) {
+  const said = [];
+  for (const meeting2 of work.meetings)
+    if (meeting2.status === "approved")
+      said.push({ key: `plan:${meeting2.id}`, text: `Plan approved: "${work.goal.name}"` });
+  for (const s of work.subtasks) {
+    if (s.review?.rounds)
+      said.push({
+        key: `back:${s.id}:${String(s.review.rounds)}`,
+        text: `"${s.title}" went back to ${s.assignee}${s.review.notes ? `: ${s.review.notes}` : ""}`
+      });
+    if (s.status === "done")
+      said.push({ key: `done:${s.id}`, text: `"${s.title}" by ${s.assignee} is merged` });
+    if (s.status === "failed")
+      said.push({
+        key: `failed:${s.id}:${String(s.startedAt ?? 0)}`,
+        text: `"${s.title}" by ${s.assignee} failed${s.error ? `: ${s.error}` : ""}`
+      });
+  }
+  for (const task of work.tasks)
+    if (taskDone(work, task.id))
+      said.push({ key: `task:${task.id}`, text: `The task "${task.title}" is done` });
+  return said;
+}
+var AS_THE_SKILL_SAYS = "Take it to the user as openplan's team skill says.";
+function prompts(work) {
+  const asked2 = [];
+  for (const meeting2 of work.meetings)
+    if (meeting2.status === "review" && meeting2.plan)
+      asked2.push({
+        key: `review:${meeting2.id}`,
+        text: `The meeting [${meeting2.id}] on "${work.goal.name}" has a plan for review: ${meeting2.plan.summary}. ${AS_THE_SKILL_SAYS}`
+      });
+  for (const question of work.questions) {
+    if (!isAcceptance(question)) continue;
+    const subtask2 = work.subtasks.find((s) => s.id === question.subtaskId);
+    const delivered = work.subtasks.filter((s) => s.taskId === subtask2?.taskId && s.delivery).map((s) => `- ${s.title}, by ${s.assignee}: ${s.delivery?.summary ?? ""}`);
+    asked2.push({
+      key: `accept:${question.id}`,
+      text: [
+        `The task "${question.text}" is done [${question.id}], merged into its goal's branch:`,
+        ...delivered,
+        AS_THE_SKILL_SAYS
+      ].join("\n")
+    });
+  }
+  return asked2;
+}
+var BAND_TASKS = 5;
+function taskWhere(work, derived, subtasks) {
+  const going = subtasks.find(inProgress);
+  if (going)
+    return going.status === "running" ? `${going.assignee} ${inProgressText(going)}` : inProgressText(going);
+  const at = subtasks.find((s) => s.status !== "done");
+  if (!at) return void 0;
+  switch (at.status) {
+    case "pending": {
+      const [wait] = derived.subtasks[at.id]?.waits ?? [];
+      return `"${at.title}" ${wait ? waitText(wait, work) : "starts next"}`;
+    }
+    default:
+      return `"${at.title}" ${STATUS_WORDS[at.status]}`;
+  }
+}
+function taskLines(work, derived) {
+  const lines = [];
+  if (work.goal.status === "archived") return lines;
+  for (const task of work.tasks) {
+    const subtasks = work.subtasks.filter((s) => s.taskId === task.id);
+    const where = acceptanceOf(work, task.id) ? "waits for you to accept it" : taskWhere(work, derived, subtasks);
+    if (where) lines.push(`${task.title} \xB7 ${where}`);
+  }
+  return lines.length > BAND_TASKS ? [
+    ...lines.slice(0, BAND_TASKS),
+    `and ${plural(lines.length - BAND_TASKS, "more task", "more tasks")}`
+  ] : lines;
+}
+function bandText(work, needs) {
+  const parts = [];
+  if (work.meetings.some((m) => m.status === "running")) parts.push("meeting");
+  if (work.meetings.some((m) => m.status === "review")) parts.push(PLAN_TO_REVIEW);
+  const working = work.subtasks.filter((s) => s.status === "running").length;
+  if (working) parts.push(`${String(working)} working`);
+  if (needs) parts.push(`${plural(needs, "needs", "need")} you`);
+  const { status } = work.goal;
+  if (!parts.length) parts.push(status === "active" ? "idle" : status);
+  return parts.join(" \xB7 ");
+}
+function othersBand(others) {
+  const paused = others.filter((e) => whereOf(e) === "paused").length;
+  const elsewhere = others.filter((e) => whereOf(e) === "elsewhere").length;
+  const parts = [
+    ...paused ? [plural(paused, "goal paused", "goals paused")] : [],
+    ...elsewhere ? [`${plural(elsewhere, "goal", "goals")} in another session`] : []
+  ];
+  return parts.length ? parts.join(" \xB7 ") : void 0;
+}
+var NOTHING_TO_RESUME = "No goal to resume.";
+function paneTeam(mine, others, session2) {
+  const { opened } = session2;
+  if (!mine) {
+    const band = othersBand(others);
+    const noGoal = noGoalText(session2.moved);
+    return {
+      noGoal,
+      opened,
+      ...band && { band },
+      tasks: [],
+      members: [],
+      needs: [],
+      milestones: [],
+      prompts: [],
+      resumable: resumableOf(others),
+      ...!others.length && { resumeRefused: NOTHING_TO_RESUME },
+      pauseRefused: noGoal
+    };
+  }
+  const { work, members: members2 } = mine;
+  const derived = derive(work);
+  const needs = work.questions.filter(toYou).map((q) => needOf(q, work));
+  const meeting2 = shownMeeting(work);
+  const { goal } = work;
+  const here = goal.status === "active" ? [] : [{ slug: goal.slug, label: goalLabel(work, `${goal.status}, in this session`) }];
+  return {
+    opened,
+    band: bandText(work, needs.length),
+    tasks: taskLines(work, derived),
+    ...meeting2 && { meeting: meetingOf(meeting2, work) },
+    members: members2.map((m) => memberOf(m, work, derived)),
+    needs,
+    milestones: milestones(work),
+    prompts: prompts(work),
+    resumable: [...here, ...resumableOf(others)],
+    ...goal.status === "active" ? { resumeRefused: resumeRefusal(goal.name) } : { pauseRefused: `"${goal.name}" isn't under way: it is ${goal.status}.` }
+  };
+}
+var callOf = (name, input) => {
+  const argument = mainArgument(input);
+  return { name, ...argument !== void 0 && { argument } };
+};
+function viewEntry(entry) {
+  switch (entry.kind) {
+    case "run":
+      return { kind: "run", text: `a run on ${entry.model}` };
+    case "thinking":
+    case "text":
+      return { kind: entry.kind, text: entry.text };
+    case "tool":
+      return {
+        kind: "tool",
+        state: entry.state,
+        output: entry.output,
+        ...callOf(entry.name, entry.input)
+      };
+    case "steps":
+      return { kind: "steps", steps: entry.steps };
+    case "notice":
+      return { kind: "notice", text: noticeText(entry.notice) };
+  }
+}
+var viewEntries = (entries) => entries.map(viewEntry);
+var viewLive = (live) => ({
+  ...live.streaming && { streaming: live.streaming },
+  ...live.starting && { starting: live.starting },
+  running: live.running.map((call) => callOf(call.name, call.input))
+});
+function noticeText(notice) {
+  const seconds = (ms) => `${String(Math.round(ms / 1e3))}s`;
+  switch (notice.kind) {
+    case "retry":
+      return `the API call failed: attempt ${String(notice.attempt)} of ${String(notice.max)} in ${seconds(notice.delayMs)}`;
+    case "subagent-retry":
+      return `a subagent's API call failed: attempt ${String(notice.attempt)} of ${String(notice.max)} in ${seconds(notice.delayMs)}`;
+    case "compacted":
+      return `the conversation was compacted from ${notice.before.toLocaleString()} tokens${notice.after === void 0 ? "" : ` to ${notice.after.toLocaleString()}`}`;
+    case "compaction-failed":
+      return `compacting the conversation failed${notice.error ? `: ${notice.error}` : ""}`;
+    case "fallback":
+      return `${notice.from} declined: ${notice.to} goes on`;
+    case "refusal":
+      return `${notice.model} declined, with no model to go on`;
+    case "task":
+      return `background task "${notice.title}" ${notice.state}`;
+    case "rate-limit":
+      return notice.status === "rejected" ? "rate limited" : "close to the rate limit";
+  }
+}
+function inProgressText(subtask2) {
+  switch (subtask2.status) {
+    case "running": {
+      const step2 = stepText(subtask2.progress);
+      return `works on "${subtask2.title}"${step2 ? `, ${step2}` : ""}`;
+    }
+    default:
+      return `"${subtask2.title}" ${STATUS_WORDS[subtask2.status]}`;
+  }
+}
+var OPTION_LABELS = {
+  once: "Allow once",
+  always: "Always allow",
+  deny: "Deny",
+  rereview: "Review again",
+  skip: "Skip the review",
+  sendBack: "Send back",
+  ours: "Keep ours",
+  theirs: "Take theirs",
+  retry: "Retry",
+  stop: "Stop",
+  accept: "Accept",
+  revise: "Send back"
+};
+var NOTE_PROMPTS = {
+  deny: "Or deny it, saying why",
+  sendBack: "Or send it back, saying what to change",
+  revise: "What to change"
+};
+var noGoalText = (moved) => moved ? `"${moved}" moved to another Claude Code session. Bring it back here with /openplan resume.` : "This session runs no goal. Hand the team a task with /openplan <task>, or take a goal up with /openplan resume.";
+var resumeRefusal = (name) => `"${name}" is under way in this session, which runs one goal: /openplan pause it first, or take the other up in another session.`;
+
+// src/plugin/pane-server.ts
+var next = z7.number().int().min(0);
+var askSchema = z7.object({
+  revision: z7.number().int().optional(),
+  record: z7.object({
+    member: z7.string(),
+    read: z7.object({ subtask: z7.string(), next }).optional()
+  }).optional(),
+  speaking: z7.object({ speech: z7.string(), next }).optional()
+});
+var releaseSchema = z7.object({ goal: z7.string() });
+var GOALS_MS = 2e3;
+function viewer(session2) {
+  let revision = 0;
+  let shown = "";
+  let goals;
+  return async (asked2) => {
+    if (!goals || asked2.revision === void 0 || Date.now() - goals.at >= GOALS_MS)
+      goals = { at: Date.now(), entries: session2().goals() };
+    const all = await goals.entries.catch((error) => {
+      goals = void 0;
+      throw error;
+    });
+    const entries = session2().othersOf(all);
+    const engine = session2().current;
+    const mine = engine && { work: engine.work, members: engine.team.members };
+    const team = paneTeam(mine, entries, session2());
+    const text2 = JSON.stringify(team);
+    if (text2 !== shown) {
+      shown = text2;
+      revision++;
+    }
+    const meeting2 = engine && shownMeeting(engine.work);
+    const speaker = meeting2 && engine.work.meetingsNow[meeting2.id]?.speaking?.member;
+    const spoken = engine && meeting2 && speaker !== void 0 && engine.records.speaking(meeting2, asked2.speaking);
+    const followed = asked2.record && engine && followedOf(asked2.record.member, engine.work);
+    const { read } = asked2.record ?? {};
+    const record2 = followed && await engine.records.read(followed.id, read?.subtask === followed.id ? read.next : 0);
+    return {
+      revision,
+      ...asked2.revision !== revision && { team },
+      ...spoken && {
+        speaking: {
+          speech: spoken.speech,
+          speaker,
+          entries: viewEntries(spoken.entries),
+          next: spoken.next,
+          live: viewLive(spoken.live)
+        }
+      },
+      ...record2 && {
+        record: {
+          subtask: followed.id,
+          entries: viewEntries(record2.entries),
+          next: record2.next,
+          ...record2.live && { live: viewLive(record2.live) }
+        }
+      }
+    };
+  };
+}
+function socketAddress() {
+  if (process.platform === "win32")
+    return { address: `\\\\.\\pipe\\openplan-${randomBytes(12).toString("hex")}` };
+  const folder = mkdtempSync(path6.join(tmpdir(), "openplan-"));
+  return { address: path6.join(folder, "pane.sock"), folder };
+}
+var asked = async (schema, request2) => schema.parse(JSON.parse(await text(request2) || "{}"));
+async function servePane(session2) {
+  const { address, folder } = socketAddress();
+  const view = viewer(session2);
+  const server2 = createServer((request2, response) => {
+    const routes = {
+      "/view": async () => view(await asked(askSchema, request2)),
+      "/release": async () => session2().letGo((await asked(releaseSchema, request2)).goal)
+    };
+    const route = request2.method === "POST" && routes[request2.url ?? ""];
+    if (!route) {
+      response.writeHead(404).end();
+      return;
+    }
+    route().then(
+      (answer) => {
+        response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(answer));
+      },
+      (error) => {
+        const status = error instanceof z7.ZodError || error instanceof SyntaxError ? 400 : error instanceof GitError ? 409 : 500;
+        response.writeHead(status, { "content-type": "text/plain" }).end(errorText(error));
+      }
+    );
+  });
+  await new Promise((resolve, reject) => {
+    server2.once("error", reject).listen(address, resolve);
+  });
+  return {
+    address,
+    close() {
+      server2.close();
+      if (folder) rmSync(folder, { recursive: true, force: true });
+    }
+  };
+}
+function askToLetGo(address, slug) {
+  return new Promise((resolve, reject) => {
+    const asking = request({ socketPath: address, path: "/release", method: "POST" }, (answer) => {
+      text(answer).then((body) => {
+        if (answer.statusCode === 200) resolve(JSON.parse(body));
+        else reject(new Error(body));
+      }, reject);
+    });
+    asking.once("error", (error) => {
+      if (errorCode(error) === "ENOENT" || errorCode(error) === "ECONNREFUSED")
+        resolve(void 0);
+      else reject(error);
+    }).end(JSON.stringify({ goal: slug }));
+  });
+}
+
+// src/plugin/session-mode.ts
+import path7 from "node:path";
+var fileOf = (dataFolder2, session2) => path7.join(sessionsFolder(dataFolder2), `${String(session2)}.mode`);
+function modeOf(dataFolder2, session2) {
+  return textIfThere(fileOf(dataFolder2, session2));
+}
+
+// src/plugin/pane-tools.ts
+import { z as z8 } from "zod";
+var isPermission = (option) => PERMISSION_OPTIONS.includes(option);
+var PANE_ONLY = "For openplan's pane only: your session never calls it.";
+var answerSchema = z8.discriminatedUnion("kind", [
+  z8.object({
+    kind: z8.literal("option"),
+    option: z8.enum([...PERMISSION_OPTIONS, ...DECISION_OPTIONS]),
+    note: z8.string().trim().optional().describe("Why it is denied, or what to change"),
+    sentBack: z8.string().optional().describe("The subtask a revised task goes back to")
+  }),
+  z8.object({
+    kind: z8.literal("choices"),
+    picks: z8.array(z8.string()).describe("One pick per question with choices")
+  })
+]);
+var answerInput = z8.object({
+  question: z8.string(),
+  answer: answerSchema
+});
+var handOffInput = z8.object({ task: z8.string().trim().min(1) });
+var resumeInput = z8.object({
+  goal: z8.string().regex(SLUG).describe("The goal's slug")
+});
+function addPaneTools(server2, session2, pane2) {
+  server2.registerTool(
+    "pane",
+    {
+      description: `${PANE_ONLY} The socket the pane reads the team from.`,
+      annotations: { readOnlyHint: true }
+    },
+    () => toolText(pane2.address)
+  );
+  server2.registerTool(
+    "answer",
+    {
+      description: `${PANE_ONLY} Answers what waits on the user, as they pressed it.`,
+      inputSchema: answerInput.shape
+    },
+    async ({ question, answer }) => {
+      await session2.goal.answer(
+        question,
+        answer.kind === "choices" ? answer : isPermission(answer.option) ? { kind: "permission", option: answer.option, note: answer.note } : { ...answer, kind: "decision", option: answer.option }
+      );
+      return toolText(`Answered ${question}.`);
+    }
+  );
+  server2.registerTool(
+    "hand_off",
+    {
+      description: `${PANE_ONLY} The prompt /openplan <task> gives the session: the task, for the team.`,
+      inputSchema: handOffInput.shape,
+      annotations: { readOnlyHint: true }
+    },
+    ({ task }) => {
+      const engine = session2.current;
+      return toolText(
+        handOffText(task, engine && { goal: engine.work.goal, members: engine.team.members })
+      );
+    }
+  );
+  server2.registerTool(
+    "resume_goal",
+    {
+      description: `${PANE_ONLY} Takes up the goal you picked in this session and resumes it, as /openplan resume.`,
+      inputSchema: resumeInput.shape
+    },
+    async ({ goal: slug }) => {
+      const { goal } = (await session2.takeUp(slug)).work;
+      return toolText(`Resumed "${goal.name}".`);
+    }
+  );
+}
+function handOffText(task, mine) {
+  const goal = mine ? `This session runs the goal "${mine.goal.name}", ${mine.goal.status === "active" ? "under way" : mine.goal.status}. The team: ${rosterOf(mine.members)}.` : "This session runs no goal yet.";
+  return [
+    "The user hands this to openplan's team: take it on as openplan's team skill says.",
+    "",
+    task,
+    "",
+    goal
+  ].join("\n");
+}
 
 // src/plugin/session.ts
 var TURN = "goal";
@@ -11776,10 +11702,11 @@ var Session = class {
   claude;
   changed;
   engine;
-  /** The folder of the session's repository in the data folder, once found. */
+  /** The session's repository's goals, once found. */
   repo;
   /** The goal that moved to another session, by name, until this one runs another. */
   movedAway;
+  openedCount = 0;
   turn = serialBy();
   /** The session's goal, while it runs one. */
   get current() {
@@ -11793,6 +11720,10 @@ var Session = class {
   /** The goal that moved to another session, by name, until this one runs another. */
   get moved() {
     return this.movedAway;
+  }
+  /** How many goals the session has started or taken up: each one opened here counts. */
+  get opened() {
+    return this.openedCount;
   }
   /** Why the session runs no goal, and what to do. */
   get none() {
@@ -11811,7 +11742,7 @@ var Session = class {
    */
   takeUp(slug) {
     return this.turn(TURN, async () => {
-      if (this.engine?.state.goal.slug === slug) {
+      if (this.engine?.work.goal.slug === slug) {
         await this.engine.goals.resume();
         return this.engine;
       }
@@ -11823,9 +11754,9 @@ var Session = class {
   letGo(slug) {
     return this.turn(TURN, async () => {
       const was = this.engine;
-      if (was?.state.goal.slug !== slug) return { meetings: [] };
+      if (was?.work.goal.slug !== slug) return { meetings: [] };
       this.engine = void 0;
-      this.movedAway = was.state.goal.name;
+      this.movedAway = was.work.goal.name;
       this.changed(void 0);
       return was.close();
     });
@@ -11847,18 +11778,17 @@ var Session = class {
   }
   /** The repository's goals, oldest first. */
   async goals() {
-    this.repo ??= openRepository(this.options.cwd).then(
-      (repo) => repoFolder(this.options.dataFolder, repo),
+    this.repo ??= RepositoryGoals.of(this.options.dataFolder, this.options.cwd).catch(
       (error) => {
         this.repo = void 0;
         throw error;
       }
     );
-    return listGoals(await this.repo);
+    return (await this.repo).list();
   }
   /** Of the repository's goals (`goals`), those this session doesn't run. */
   othersOf(goals) {
-    const mine = this.engine?.state.goal.slug;
+    const mine = this.engine?.work.goal.slug;
     return goals.filter((entry) => entry.slug !== mine);
   }
   /** The repository's goals this session doesn't run, oldest first. */
@@ -11869,10 +11799,10 @@ var Session = class {
   async leave() {
     const was = this.engine;
     if (!was) return;
-    const { goal } = was.state;
+    const { goal } = was.work;
     if (goal.status === "active")
       throw new Error(
-        `This session's goal "${goal.name}" is under way, and a session runs one goal: ask the user whether to pause it first (goal_action pause), or to run the other in another session`
+        `This session's goal "${goal.name}" is under way, and a session runs one goal.`
       );
     this.engine = void 0;
     this.changed(void 0);
@@ -11884,10 +11814,274 @@ var Session = class {
   run(engine) {
     this.engine = engine;
     this.movedAway = void 0;
+    this.openedCount++;
     this.changed(engine);
     return engine;
   }
 };
+var noGoalForModel = (moved) => moved ? `The goal "${moved}" moved to another Claude Code session. The user brings it back with /openplan resume.` : "This session runs no goal: start one (start_goal), or the user takes one up with /openplan resume.";
+
+// src/plugin/tools.ts
+import { z as z9 } from "zod";
+
+// src/plugin/status.ts
+function subtaskLine(subtask2, { waits, redone }, work) {
+  const parts = [STATUS_WORDS[subtask2.status]];
+  const step2 = subtask2.status === "running" && stepText(subtask2.progress);
+  if (step2) parts.push(step2);
+  parts.push(...waits.map((w) => waitText(w, work)));
+  if (redone.length)
+    parts.push(redoneText(redone.map((id) => work.subtasks.find((s) => s.id === id)?.title ?? "")));
+  if (subtask2.error) parts.push(`error: ${subtask2.error}`);
+  return `    - ${subtask2.title} [${subtask2.id}], ${subtask2.assignee}: ${parts.join(", ")}`;
+}
+function questionLine(question, work) {
+  const { headline, detail } = needWords(question, work);
+  const asks = question.kind === "choices" ? ` ${question.choices.map((c) => c.question).join(" ")}` : "";
+  const then = question.kind === "decision" ? ` Options: ${question.decision.options.join(", ")}.` : " Answered in /openplan.";
+  return `  - [${question.id}] ${headline}${asks}${detail ? ` (${detail})` : ""}${then}`;
+}
+function statusText(work) {
+  const derived = derive(work);
+  const busy = new Set(derived.busy);
+  const { goal } = work;
+  const lines = [
+    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)}`,
+    `Team: ${work.members.map((m) => busy.has(m) ? `${m} (busy)` : m).join(", ")}`
+  ];
+  for (const meeting2 of work.meetings.filter((m) => m.status !== "approved"))
+    lines.push(
+      `  Meeting [${meeting2.id}], ${hostText(meeting2)}: ${meetingStatus(meeting2, work.meetingsNow[meeting2.id])}${derived.resumable.includes(meeting2.id) ? "; it can go on" : ""}`
+    );
+  for (const task of work.tasks) {
+    lines.push(
+      `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", accepted by the user" : ""}`
+    );
+    for (const subtask2 of work.subtasks.filter((s) => s.taskId === task.id))
+      lines.push(
+        subtaskLine(subtask2, derived.subtasks[subtask2.id] ?? { waits: [], redone: [] }, work)
+      );
+  }
+  const open2 = work.questions.filter(toYou);
+  if (open2.length)
+    lines.push("", "Waiting for answers:", ...open2.map((q) => questionLine(q, work)));
+  return lines.join("\n");
+}
+function othersText(others) {
+  if (!others.length) return void 0;
+  return [
+    "The repository's other goals, taken up here with /openplan resume:",
+    ...resumableOf(others).map((o) => `  - ${o.label}`)
+  ].join("\n");
+}
+var redoneText = (titles) => `built on ${titles.map((t) => `"${t}"`).join(", ")}, redone since: redo it to take that in`;
+
+// src/plugin/tools.ts
+var meeting = z9.string().describe("The meeting's id");
+var subtask = z9.string().describe("The subtask's id");
+var goalActionInput = z9.object({ action: z9.enum(GOAL_ACTIONS) });
+function memberName(members2) {
+  if (!members2) return z9.string().describe("A member's name");
+  const names = members2.map((m) => m.name);
+  return z9.enum(names).describe(`One of the team: ${rosterOf(members2)}`);
+}
+var meetingInput = (member) => ({
+  agenda: z9.string().trim().min(1).describe("What to plan, with everything the user said about it"),
+  size: z9.enum(MEETING_SIZES).optional().describe("How long the discussion runs; the team's default when left out"),
+  attendees: z9.array(member).default([]).describe("The host first; everyone when empty"),
+  host_only: z9.boolean().default(false).describe(
+    "True when the host only runs the meeting: no view of their own and no work in the plan. Leave it out for a host who also takes part from their role, the usual"
+  )
+});
+var changePlanInput = (member) => ({ meeting, plan: planSchema(member) });
+var assignInput = (member) => ({
+  assignee: member,
+  title: z9.string().trim().min(1),
+  description: z9.string().trim().describe("Everything the user said about it"),
+  acceptance: z9.string().trim().default("").describe("When it counts as done")
+});
+function addTools(server2, session2) {
+  server2.registerTool(
+    "status",
+    {
+      description: "Where this session's goal stands: its meetings, tasks and subtasks, who is busy, and what waits on the user; and the repository's other goals. Ids are in brackets.",
+      annotations: { readOnlyHint: true }
+    },
+    async () => {
+      const engine = session2.current;
+      const others = othersText(await session2.others());
+      return toolText(
+        [engine ? statusText(engine.work) : session2.none, ...others ? [others] : []].join("\n\n")
+      );
+    }
+  );
+  server2.registerTool(
+    "start_goal",
+    {
+      description: "Start a goal in this session: something the user wants done. It gets its own branch, cut from the repository's HEAD, and its own copy of the team. A session runs one goal: refused while its goal is under way. Then hold a meeting to plan it, or assign work directly.",
+      inputSchema: { name: z9.string().trim().min(1).describe("A few words for what is wanted") }
+    },
+    async ({ name }) => {
+      const { goal } = (await session2.start(name)).work;
+      return toolText(`Started the goal "${goal.name}" on branch ${goalBranch(goal.slug)}.`);
+    }
+  );
+  const meetingTool = server2.registerTool(
+    "hold_meeting",
+    {
+      description: "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and the session is told when its plan waits for the user. Hold one only once the user has agreed who attends.",
+      inputSchema: meetingInput(memberName())
+    },
+    ({ agenda, size, attendees, host_only }) => {
+      const engine = session2.goal;
+      const held = engine.meetings.start({
+        agenda,
+        size: size ?? engine.meetingSize,
+        attendees,
+        hostOnly: host_only
+      });
+      return toolText(`The meeting [${held.id}] has begun: ${attendanceText(held)}.`);
+    }
+  );
+  server2.registerTool(
+    "show_plan",
+    {
+      description: "A meeting's plan in full: its document and its tasks and subtasks, in the shape change_plan takes.",
+      inputSchema: { meeting },
+      annotations: { readOnlyHint: true }
+    },
+    ({ meeting: id }) => {
+      const found = session2.goal.work.meetings.find((m) => m.id === id);
+      if (!found?.plan) throw new Error("That meeting has no plan");
+      return toolText(JSON.stringify(writtenPlan(found.plan), null, 2));
+    }
+  );
+  const changePlanTool = server2.registerTool(
+    "change_plan",
+    {
+      description: "Replace a plan under review with the user's changes: the whole plan, as show_plan gives it, changed. Any member can be given work. owner_accepts marks a task the user accepts themselves once done; none is, unless they say.",
+      inputSchema: changePlanInput(memberName())
+    },
+    ({ meeting: id, plan }) => {
+      session2.goal.meetings.change(id, plan);
+      return toolText("The plan is changed. It waits for the user's approval.");
+    }
+  );
+  server2.registerTool(
+    "approve_plan",
+    {
+      description: "Approve a plan under review, as the user said: its tasks and subtasks go to work, each starting once what it builds on is merged and its member is free.",
+      inputSchema: { meeting }
+    },
+    async ({ meeting: id }) => {
+      const added = await session2.goal.meetings.approve(id);
+      return toolText(`Approved: ${plural(added.length, "subtask goes", "subtasks go")} to work.`);
+    }
+  );
+  server2.registerTool(
+    "cancel_meeting",
+    {
+      description: "Stop a meeting under way, or drop a plan the user doesn't want.",
+      inputSchema: { meeting }
+    },
+    async ({ meeting: id }) => {
+      await session2.goal.meetings.cancel(id);
+      return toolText("Cancelled.");
+    }
+  );
+  server2.registerTool(
+    "resume_meeting",
+    {
+      description: "Go on with a meeting that failed or was cancelled before its plan, from where it stopped.",
+      inputSchema: { meeting }
+    },
+    ({ meeting: id }) => {
+      session2.goal.meetings.resume(id);
+      return toolText("The meeting goes on.");
+    }
+  );
+  const assignTool = server2.registerTool(
+    "assign",
+    {
+      description: "Give a member one subtask directly, without a meeting. It starts once they are free. Assign only once the user has agreed who takes it.",
+      inputSchema: assignInput(memberName())
+    },
+    (work) => {
+      const added = session2.goal.scheduler.assignOne(work);
+      return toolText(`Assigned "${work.title}" [${added.id}] to ${work.assignee}.`);
+    }
+  );
+  server2.registerTool(
+    "goal_action",
+    {
+      description: "Pause this session's goal (its runs stop, to go on later in their sessions), resume it, archive it, or delete it once archived: its folder, worktrees and subtask branches go, its own branch stays. Delete only when the user has confirmed it.",
+      inputSchema: goalActionInput.shape,
+      annotations: { destructiveHint: true }
+    },
+    async ({ action }) => {
+      const engine = session2.goal;
+      const { name } = engine.work.goal;
+      if (action === "delete") await session2.delete();
+      else await engine.goals[action]();
+      return toolText(`The goal "${name}": ${action} done.`);
+    }
+  );
+  server2.registerTool(
+    "subtask_action",
+    {
+      description: "Stop a subtask; continue a stopped or failed one in its session and worktree; retry one from the start; or redo a done one whose upstream was redone.",
+      inputSchema: { subtask, action: z9.enum(SUBTASK_ACTIONS) }
+    },
+    async ({ subtask: id, action }) => {
+      const engine = session2.goal;
+      await engine.scheduler.act(id, action);
+      const acted = engine.work.subtasks.find((s) => s.id === id);
+      return toolText(
+        acted ? `"${acted.title}" is ${STATUS_WORDS[acted.status]} now.` : "It is gone now."
+      );
+    }
+  );
+  server2.registerTool(
+    "message",
+    {
+      description: "Pass the user's words to the member working on a subtask: a running one takes them at once, in its session; one not started reads them first.",
+      inputSchema: { subtask, text: z9.string().trim().min(1) }
+    },
+    ({ subtask: id, text: text2 }) => {
+      const went = session2.goal.scheduler.carry(id, text2);
+      return toolText(
+        went === "goes" ? "Passed on." : went === "handedOver" ? "Not passed on: it is delivered and in review or being merged. Send its task back once it is done." : "Not passed on: its goal is paused or archived."
+      );
+    }
+  );
+  server2.registerTool(
+    "decide",
+    {
+      description: "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask), a stuck review (rereview, skip, sendBack; one that failed goes back only with a note), or a merge (ours, theirs, retry; one git failed on: retry, stop).",
+      inputSchema: {
+        question: z9.string().describe("The id of what waits on the user"),
+        decision: z9.enum(DECISION_OPTIONS),
+        note: z9.string().trim().optional().describe("What to change, in the user's words"),
+        sent_back: z9.string().optional().describe("The subtask a revised task goes back to")
+      }
+    },
+    async ({ question, decision, note, sent_back }) => {
+      await session2.goal.answer(question, {
+        kind: "decision",
+        option: decision,
+        note,
+        sentBack: sent_back
+      });
+      return toolText("Done.");
+    }
+  );
+  return ({ members: members2 }) => {
+    const member = memberName(members2);
+    meetingTool.update({ paramsSchema: meetingInput(member) });
+    changePlanTool.update({ paramsSchema: changePlanInput(member) });
+    assignTool.update({ paramsSchema: assignInput(member) });
+  };
+}
 
 // src/plugin/server.ts
 var say = (text2) => {
@@ -11959,15 +12153,18 @@ var server = new McpServer(
 var listMembers = addTools(server, session);
 addPaneTools(server, session, pane);
 async function listTeamFiles() {
-  let repo;
+  let goals;
   try {
-    repo = await openRepository(cwd);
+    goals = await RepositoryGoals.of(dataFolder, cwd);
   } catch (error) {
     if (error instanceof GitError) return;
     throw error;
   }
-  const team = await loadTeam(userTeam, repo.top).catch(() => void 0);
-  if (team) listMembers(team.team);
+  const team = await goals.team(userTeam).catch((error) => {
+    if (error instanceof TeamError || error instanceof SyntaxError) return void 0;
+    throw error;
+  });
+  if (team) listMembers(team);
 }
 await listTeamFiles();
 await server.connect(new StdioServerTransport());

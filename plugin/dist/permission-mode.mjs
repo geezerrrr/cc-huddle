@@ -12,18 +12,18 @@ chmodSync(folder, 448);
 var dataFolder = folder;
 
 // src/plugin/session-mode.ts
-import { readdir, rm } from "node:fs/promises";
-import path2 from "node:path";
+import { readdir as readdir2, rm } from "node:fs/promises";
+import path3 from "node:path";
 
-// src/engine/files.ts
-import { mkdir, rename, stat, writeFile } from "node:fs/promises";
+// src/shared/files.ts
+import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
-// src/engine/core.ts
+// src/shared/errors.ts
 var errorCode = (error) => error.code;
 
-// src/engine/files.ts
+// src/shared/files.ts
 var HELD = /* @__PURE__ */ new Set(["EPERM", "EACCES", "EBUSY"]);
 var HELD_WAIT_MS = 5e3;
 async function renameOver(from, to) {
@@ -48,15 +48,19 @@ async function writeWhole(file, text2, mode) {
   await renameOver(beside, file);
 }
 
-// src/engine/running.ts
+// src/shared/running.ts
 function running(pid) {
   try {
     process.kill(pid, 0);
     return true;
   } catch (error) {
-    return error.code === "EPERM";
+    return errorCode(error) === "EPERM";
   }
 }
+
+// src/shared/layout.ts
+import path2 from "node:path";
+var sessionsFolder = (dataFolder2) => path2.join(dataFolder2, "sessions");
 
 // src/plugin/session-mode.ts
 var MODES = [
@@ -66,15 +70,14 @@ var MODES = [
   "dontAsk",
   "bypassPermissions"
 ];
-var folderOf = (dataFolder2) => path2.join(dataFolder2, "sessions");
-var fileOf = (dataFolder2, session) => path2.join(folderOf(dataFolder2), `${String(session)}.mode`);
+var fileOf = (dataFolder2, session) => path3.join(sessionsFolder(dataFolder2), `${String(session)}.mode`);
 async function keepMode(dataFolder2, session, mode) {
   if (!MODES.includes(mode)) return;
   await writeWhole(fileOf(dataFolder2, session), mode);
-  for (const name of await readdir(folderOf(dataFolder2))) {
-    const { name: pid, ext } = path2.parse(name);
+  for (const name of await readdir2(sessionsFolder(dataFolder2))) {
+    const { name: pid, ext } = path3.parse(name);
     if (ext === ".mode" && !running(Number(pid)))
-      await rm(path2.join(folderOf(dataFolder2), name), { force: true });
+      await rm(path3.join(sessionsFolder(dataFolder2), name), { force: true });
   }
 }
 

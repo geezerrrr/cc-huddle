@@ -35,23 +35,23 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// src/engine/core.ts
-var workOf = (core) => ({
-  ...core.state,
-  members: core.team.members.map((m) => m.name),
-  underWay: core.underWay()
-});
-function spend(state, member, tokens) {
-  state.tokens[member] = (state.tokens[member] ?? 0) + tokens;
-}
+// src/shared/errors.ts
 var errorText = (error) => error instanceof Error ? error.message : String(error);
 var errorCode = (error) => error.code;
 
-// src/engine/files.ts
+// src/shared/files.ts
 import { readFileSync } from "node:fs";
-import { mkdir, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+async function ifThere(reading, missing) {
+  try {
+    return await reading;
+  } catch (error) {
+    if (errorCode(error) === "ENOENT" || errorCode(error) === "ENOTDIR") return missing;
+    throw error;
+  }
+}
 async function exists(file) {
   try {
     await stat(file);
@@ -66,6 +66,28 @@ function textIfThere(file) {
     return readFileSync(file, "utf8");
   } catch (error) {
     if (errorCode(error) === "ENOENT") return void 0;
+    throw error;
+  }
+}
+async function jsonIfThere(file) {
+  let text;
+  try {
+    text = await readFile(file, "utf8");
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return void 0;
+    throw error;
+  }
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new SyntaxError(`${file}: ${error.message}`, { cause: error });
+  }
+}
+async function namesIfThere(folder2) {
+  try {
+    return await readdir(folder2);
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return [];
     throw error;
   }
 }
@@ -93,15 +115,23 @@ async function writeWhole(file, text, mode) {
   await renameOver(beside, file);
 }
 
-// src/engine/running.ts
+// src/shared/running.ts
 function running(pid) {
   try {
     process.kill(pid, 0);
     return true;
   } catch (error) {
-    return error.code === "EPERM";
+    return errorCode(error) === "EPERM";
   }
 }
+var windowsProcessField = (pid, field) => [
+  "powershell.exe",
+  [
+    "-NoProfile",
+    "-Command",
+    `(Get-CimInstance Win32_Process -Filter "ProcessId=${String(pid)}").${field}`
+  ]
+];
 
 // src/plugin/data-folder.ts
 import { chmodSync, mkdirSync } from "node:fs";
@@ -111,18 +141,61 @@ mkdirSync(folder, { recursive: true });
 chmodSync(folder, 448);
 var dataFolder = folder;
 
+// src/shared/layout.ts
+import { createHash } from "node:crypto";
+import path2 from "node:path";
+function repoFolder(dataFolder2, repo) {
+  const name = path2.basename(repo.top).replace(/[^\w.-]+/g, "-");
+  const hash = createHash("sha256").update(repo.common).digest("hex").slice(0, 12);
+  return path2.join(dataFolder2, "repos", `${name}-${hash}`);
+}
+var goalsFolder = (repoFolder2) => path2.join(repoFolder2, "goals");
+var goalFolder = (repoFolder2, slug) => path2.join(goalsFolder(repoFolder2), slug);
+var sessionsFolder = (dataFolder2) => path2.join(dataFolder2, "sessions");
+var depsFolder = (dataFolder2) => path2.join(dataFolder2, "deps");
+var lockFiles = (lock) => ({
+  mine: (pid) => `${lock}.${String(pid)}`,
+  claim: (holder) => `${lock}.ended-${holder}`
+});
+var goalFiles = (folder2) => ({
+  state: path2.join(folder2, "state.json"),
+  lock: path2.join(folder2, "lock"),
+  members: path2.join(folder2, "members.json"),
+  /** The goal's copy of the team (team.ts copyTeam). */
+  team: path2.join(folder2, "team.json"),
+  /** A member's settings file (policy.ts writeSettings). */
+  settings: (member) => path2.join(folder2, "settings", `${member}.json`),
+  /** The worktree the goal's branch is checked out in. */
+  checkout: path2.join(folder2, "checkout"),
+  /** The worktree a subtask works in. */
+  desk: (subtaskId) => path2.join(folder2, "desks", subtaskId),
+  /** What a subtask's runs did (records.ts). */
+  record: (subtaskId) => path2.join(folder2, "records", `${subtaskId}.jsonl`),
+  /** An approved plan's document. */
+  plan: (meetingId) => path2.join(folder2, "plans", `${meetingId}.md`)
+});
+
 export {
   __require,
   __commonJS,
   __toESM,
-  workOf,
-  spend,
   errorText,
   errorCode,
+  ifThere,
   exists,
   textIfThere,
+  jsonIfThere,
+  namesIfThere,
   renameOver,
   writeWhole,
   running,
-  dataFolder
+  windowsProcessField,
+  dataFolder,
+  repoFolder,
+  goalsFolder,
+  goalFolder,
+  sessionsFolder,
+  depsFolder,
+  lockFiles,
+  goalFiles
 };

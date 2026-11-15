@@ -1,10 +1,11 @@
 import { createRequire } from "node:module"; const require = createRequire(import.meta.url);
 import {
   dataFolder,
+  depsFolder,
   exists,
   renameOver,
   running
-} from "./chunks/chunk-MJULA7R6.mjs";
+} from "./chunks/chunk-IDZG3QQQ.mjs";
 
 // src/plugin/bootstrap.ts
 import { execFile } from "node:child_process";
@@ -24,7 +25,7 @@ var manifests = await Promise.all(
     async (file) => [file, await readFile(path.join(here, file), "utf8")]
   )
 );
-var deps = path.join(dataFolder, "deps");
+var deps = depsFolder(dataFolder);
 var home = path.join(
   deps,
   manifests.reduce((hash, [, text]) => hash.update(text), createHash("sha256")).digest("hex").slice(0, 12)
@@ -62,4 +63,4 @@ registerHooks({
     return bare && context.parentURL?.startsWith(ours) ? next(specifier, { ...context, parentURL: from }) : next(specifier, context);
   }
 });
-await import("./chunks/server-APYN6EVS.mjs");
+await import("./chunks/server-6HJVHB6H.mjs");
