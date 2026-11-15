@@ -1,19 +1,17 @@
 /**
- * What openplan keeps in its data folder for a repository (docs/design.md
- * §3.2, §3.4): a folder for each goal, with its state, the lock that gives
- * the goal to one session, and where everything else of the goal goes.
+ * A repository's goals in the data folder (docs/design.md §3.4): each goal's
+ * state, read and written as this openplan's version has it, a new goal's
+ * folder, and the goals listed with who holds each.
  */
-import { link, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
-import { unlinkSync } from "node:fs";
-import { setTimeout as delay } from "node:timers/promises";
+import { mkdir, readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { errorCode, errorText } from "../shared/errors.ts";
-import { renameOver, textIfThere, writeWhole, namesIfThere } from "../shared/files.ts";
+import { writeWhole, namesIfThere } from "../shared/files.ts";
 import { goalFiles, goalsFolder, goalFolder } from "../shared/layout.ts";
 import { inOrder } from "../shared/serial.ts";
 import { slugFor } from "./git.ts";
-import { running } from "../shared/running.ts";
 import type { GoalState } from "./types.ts";
+import { holderOf, type Holder } from "./lock.ts";
 
 /** The version of `state.json` this openplan writes. */
 const STATE_VERSION = 2;
@@ -87,129 +85,6 @@ export function stateWriter(
   };
 }
 
-/** A process that runs a goal, or would: its session's pid, and where it is asked to let the goal go. */
-export interface Runner {
-  session: number;
-  address: string;
-}
-
-/**
- * Who has a goal: the process that runs it, the session that started that
- * process, and where it is asked to let the goal go.
- */
-export interface Holder extends Runner {
-  pid: number;
-}
-
-/** What a holder stopped as it let a goal go, for the session taking it up to resume: its meetings under way. */
-export interface HandedOver {
-  meetings: string[];
-}
-
-/** The holder a lock file names; undefined when there is none or it can't be read. */
-function readHolder(file: string): Holder | undefined {
-  const text = textIfThere(file);
-  try {
-    return text === undefined ? undefined : (JSON.parse(text) as Holder);
-  } catch (error) {
-    if (error instanceof SyntaxError) return undefined;
-    throw error;
-  }
-}
-
-/** Who holds a lock, while they run; undefined when nobody does. */
-export function holderOf(lock: string): Holder | undefined {
-  const holder = readHolder(lock);
-  return holder && running(holder.pid) ? holder : undefined;
-}
-
-/** This process as the holder, in a file of its own beside the lock, to be put in place whole. */
-async function holding(lock: string, me: Runner): Promise<string> {
-  await mkdir(path.dirname(lock), { recursive: true });
-  const file = `${lock}.${String(process.pid)}`;
-  const holder: Holder = { pid: process.pid, ...me };
-  await writeFile(file, JSON.stringify(holder));
-  return file;
-}
-
-/** How long a taker waits for another that is replacing an ended holder's lock. */
-const REPLACING_WAIT_MS = 10;
-
-/**
- * Takes a goal for this process as `me`. A holder that runs is asked to let
- * it go (`takeOver`), and what it stopped is given back; one that doesn't
- * answer (undefined) has ended, its pid another process's since. A lock is put in
- * place whole or not at all, so of several sessions starting at once one
- * takes it. A lock whose holder has ended is replaced by one taker only: the
- * one that claims that ending, which replaces the lock only if it is still
- * the ended holder's, so a lock taken meanwhile is never replaced.
- */
-export async function takeGoal(
-  lock: string,
-  me: Runner,
-  takeOver: (holder: Holder) => Promise<HandedOver | undefined>,
-): Promise<HandedOver> {
-  const mine = await holding(lock, me);
-  // What every holder asked stopped: another taker may get in between.
-  const handed: HandedOver = { meetings: [] };
-  try {
-    for (;;) {
-      try {
-        await link(mine, lock);
-        return handed;
-      } catch (error) {
-        if (errorCode(error) !== "EEXIST") throw error;
-      }
-      const ended = textIfThere(lock);
-      // Let go of meanwhile: try again.
-      if (ended === undefined) continue;
-      const holder = readHolder(lock);
-      if (holder && running(holder.pid)) {
-        if (holder.pid === process.pid) {
-          await renameOver(mine, lock);
-          return handed;
-        }
-        const stopped = await takeOver(holder);
-        if (stopped) {
-          handed.meetings.push(...stopped.meetings);
-          continue;
-        }
-        // Nothing answers where it is asked: its server ended, and its pid is another process's since.
-      }
-      const claim = `${lock}.ended-${String(holder?.pid ?? "unread")}`;
-      try {
-        await link(mine, claim);
-      } catch (error) {
-        if (errorCode(error) !== "EEXIST") throw error;
-        // Done with meanwhile: try again. Still there, its taker either replaces the lock or ended partway.
-        if (textIfThere(claim) === undefined) continue;
-        const replacing = readHolder(claim);
-        if (!replacing || !running(replacing.pid))
-          throw new Error(`A session taking this goal ended partway: delete ${lock} and ${claim}`, {
-            cause: error,
-          });
-        await delay(REPLACING_WAIT_MS);
-        continue;
-      }
-      try {
-        if (textIfThere(lock) === ended) {
-          await renameOver(mine, lock);
-          return handed;
-        }
-      } finally {
-        await rm(claim, { force: true });
-      }
-    }
-  } finally {
-    await rm(mine, { force: true });
-  }
-}
-
-/** Lets the goal go, as this process ends: at once, since it may be exiting. */
-export function releaseGoal(lock: string) {
-  if (holderOf(lock)?.pid === process.pid) unlinkSync(lock);
-}
-
 /**
  * Makes a new goal's folder in a repository's folder (`repoFolder`), named by
  * a slug from `name` that no goal has (`taken`, and every folder there): of
@@ -236,7 +111,6 @@ export async function newGoalFolder(
   }
 }
 
-/** A goal of a repository as its folder has it: its slug, its state, and who runs it, if anyone. */
 /** One of a repository's goals: its state, or why this openplan can't read it. */
 export type GoalEntry = { slug: string; holder?: Holder } & (
   { state: GoalState } | { unreadable: string }

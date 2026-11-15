@@ -16,10 +16,11 @@ import { text } from "node:stream/consumers";
 import { z } from "zod";
 import type { OpenplanTeam, OpenplanView } from "../../plugin/types/index.d.ts";
 import { errorCode, errorText } from "../shared/errors.ts";
-import type { GoalEntry, HandedOver } from "../engine/data.ts";
+import type { GoalEntry } from "../engine/data.ts";
 import { GitError } from "../engine/git.ts";
 import { paneTeam, shownMeeting, viewEntries, viewLive } from "./pane.ts";
 import type { Session } from "./session.ts";
+import { type HandedOver } from "../engine/engine.ts";
 
 const viewSchema = z.object({
   /** The revision the pane has. */

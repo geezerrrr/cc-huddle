@@ -9,17 +9,7 @@ import type { PermissionMode } from "@anthropic-ai/claude-agent-sdk";
 import { workOf, type Core, type Team } from "./core.ts";
 import { errorText } from "../shared/errors.ts";
 import type { Work } from "./derive.ts";
-import {
-  newGoalFolder,
-  readState,
-  releaseGoal,
-  stateWriter,
-  takeGoal,
-  type HandedOver,
-  type Holder,
-  type Runner,
-  type StateWriter,
-} from "./data.ts";
+import { newGoalFolder, readState, stateWriter, type StateWriter } from "./data.ts";
 import { goalFiles, repoFolder, goalFolder } from "../shared/layout.ts";
 import { openGoal, openRepository, takenSlugs, type Places } from "./git.ts";
 import { Goals } from "./goals.ts";
@@ -33,6 +23,12 @@ import { Scheduler } from "./scheduler.ts";
 import { serialBy } from "../shared/serial.ts";
 import { allowInCopy, allowInTeam, copyTeam, loadTeam, readCopy, type TeamFiles } from "./team.ts";
 import type { GoalState, MeetingSize, Question } from "./types.ts";
+import { releaseLock, takeLock, type Holder, type Runner } from "./lock.ts";
+
+/** What a session stopped as it let its goal go, for the session taking it up to resume: its meetings under way. */
+export interface HandedOver {
+  meetings: string[];
+}
 
 export interface EngineOptions {
   /** A folder in the repository. */
@@ -119,7 +115,7 @@ export class Engine {
     let engine: Engine | undefined;
     try {
       // A new folder: nobody else holds it.
-      await takeGoal(files.lock, me, (holder) => options.takeOver(holder, slug));
+      await takeLock(files.lock, me, (holder) => options.takeOver(holder, slug));
       await copyTeam(files.team, copy);
       const places: Places = { repo, slug, root: folder };
       await openGoal(places);
@@ -157,7 +153,8 @@ export class Engine {
     await readState(files.state);
     filledSettings(await readCopy(files.team), options);
     const me: Runner = { session: options.session, address: options.address };
-    const handed = await takeGoal(files.lock, me, (holder) => options.takeOver(holder, slug));
+    const handed = await takeLock(files.lock, me, (holder) => options.takeOver(holder, slug));
+    const stopped = handed.flatMap((h) => h.meetings);
     let engine: Engine | undefined;
     try {
       // Both again, as the session that let it go left them: it may have allowed a rule since.
@@ -166,7 +163,7 @@ export class Engine {
       engine = await Engine.ready(options, { repo, slug, root: folder }, files, copy, state);
       // A session killed outright couldn't pause it: it is paused first, as if it had.
       if (state.goal.status === "active") await engine.goals.pause();
-      await engine.goals.resume(handed.meetings);
+      await engine.goals.resume(stopped);
       await engine.writer.flush();
       return engine;
     } catch (error) {
@@ -180,7 +177,7 @@ export class Engine {
     if (engine) await engine.shut();
     else {
       await stopRecording();
-      releaseGoal(files.lock);
+      releaseLock(files.lock);
     }
   }
 
@@ -284,7 +281,7 @@ export class Engine {
    * take the goal up pauses what it left active.
    */
   abandon() {
-    releaseGoal(this.files.lock);
+    releaseLock(this.files.lock);
   }
 
   /**
@@ -298,7 +295,7 @@ export class Engine {
       await Promise.all([this.writer.close(), this.records.flush()]);
     } finally {
       await stopRecording();
-      releaseGoal(this.files.lock);
+      releaseLock(this.files.lock);
     }
   }
 

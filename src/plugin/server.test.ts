@@ -5,10 +5,10 @@ import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { holderOf } from "../engine/data.ts";
 import { goalFiles, goalsFolder, repoFolder } from "../shared/layout.ts";
 import { git, openRepository } from "../engine/git.ts";
 import { teamFolder } from "../engine/team.ts";
+import { holderOf } from "../engine/lock.ts";
 
 const SERVER = fileURLToPath(new URL("server.ts", import.meta.url));
 

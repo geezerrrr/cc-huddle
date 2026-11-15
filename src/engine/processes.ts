@@ -6,9 +6,7 @@
  * killed outright stops what it left.
  */
 import { execFile, type ChildProcess } from "node:child_process";
-
 import { setTimeout as delay } from "node:timers/promises";
-
 import { writeWhole, jsonIfThere } from "../shared/files.ts";
 import { running, windowsProcessField } from "../shared/running.ts";
 import { inOrder } from "../shared/serial.ts";

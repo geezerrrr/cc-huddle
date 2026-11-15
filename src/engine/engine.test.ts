@@ -7,13 +7,13 @@ import path from "node:path";
 import type { PermissionMode } from "@anthropic-ai/claude-agent-sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Core } from "./core.ts";
-import { holderOf } from "./data.ts";
 import { goalFiles, goalsFolder, repoFolder } from "../shared/layout.ts";
 import { Engine, type EngineOptions } from "./engine.ts";
 import { git, goalBranch, openRepository } from "./git.ts";
 import { Goals } from "./goals.ts";
 import { runSubtask, type RunOutcome } from "./run.ts";
 import { readCopy, teamFolder } from "./team.ts";
+import { holderOf } from "./lock.ts";
 
 vi.mock("./run.ts", () => ({ runSubtask: vi.fn() }));
 

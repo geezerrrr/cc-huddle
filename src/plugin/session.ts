@@ -4,9 +4,9 @@
  * asks that session to let it go; this one lets its own go the same way.
  * Each change to which goal it runs waits for the one before.
  */
-import type { HandedOver, GoalEntry } from "../engine/data.ts";
+import type { GoalEntry } from "../engine/data.ts";
 import { listGoals } from "../engine/data.ts";
-import { Engine, type EngineOptions } from "../engine/engine.ts";
+import { Engine, type EngineOptions, type HandedOver } from "../engine/engine.ts";
 import { openRepository } from "../engine/git.ts";
 import { serialBy } from "../shared/serial.ts";
 import { noGoalForModel } from "./words.ts";

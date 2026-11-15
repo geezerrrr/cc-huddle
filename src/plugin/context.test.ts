@@ -4,11 +4,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { type Holder } from "../engine/data.ts";
 import { goalFiles, goalsFolder, repoFolder } from "../shared/layout.ts";
 import { git, openRepository } from "../engine/git.ts";
 import { copyTeam, type TeamFiles } from "../engine/team.ts";
 import { sessionContext } from "./context.ts";
+import { type Holder } from "../engine/lock.ts";
 
 let dir: string;
 let repo: string;

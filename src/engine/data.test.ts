@@ -1,21 +1,11 @@
-import { spawn } from "node:child_process";
-import { once } from "node:events";
-import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { goalFiles, goalsFolder, repoFolder } from "../shared/layout.ts";
-import {
-  holderOf,
-  listGoals,
-  newGoalFolder,
-  readState,
-  releaseGoal,
-  stateWriter,
-  takeGoal,
-  type Holder,
-} from "./data.ts";
+import { listGoals, newGoalFolder, readState, stateWriter } from "./data.ts";
 import type { GoalState } from "./types.ts";
+import { releaseLock, takeLock } from "./lock.ts";
 
 let dir: string;
 
@@ -86,98 +76,6 @@ describe("the state file", () => {
   });
 });
 
-/** The session the goal is taken for, and where it is asked to let it go. */
-const SESSION = 41;
-const ME = { session: SESSION, address: "here" };
-
-/** A holder that won't let the goal go. */
-const refuse = (holder: Holder) => Promise.reject(new Error(`held by ${String(holder.session)}`));
-
-describe("the lock", () => {
-  it("gives the goal to one running process, and is let go of by its holder", async () => {
-    const lock = path.join(dir, "repo", "lock");
-    await takeGoal(lock, ME, refuse);
-    await takeGoal(lock, ME, refuse);
-    const other = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
-    await once(other, "spawn");
-    await writeFile(lock, JSON.stringify({ pid: other.pid, session: 7, address: "there" }));
-    releaseGoal(lock);
-    await expect(takeGoal(lock, ME, refuse)).rejects.toThrow("held by 7");
-    other.kill();
-    await once(other, "exit");
-    expect(holderOf(lock)).toBeUndefined();
-    await takeGoal(lock, ME, refuse);
-    const holder = { pid: process.pid, ...ME };
-    expect(holderOf(lock)).toEqual(holder);
-    releaseGoal(lock);
-    await expect(stat(lock)).rejects.toThrow();
-  });
-
-  it("asks a running holder to let the goal go, and gives back what it stopped", async () => {
-    const lock = path.join(dir, "repo", "lock");
-    const other = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
-    await once(other, "spawn");
-    await mkdir(path.dirname(lock), { recursive: true });
-    await writeFile(lock, JSON.stringify({ pid: other.pid, session: 7, address: "there" }));
-    const asked: string[] = [];
-    const handed = await takeGoal(lock, ME, async (holder) => {
-      asked.push(holder.address);
-      await rm(lock);
-      return { meetings: ["m1"] };
-    });
-    other.kill();
-    expect(asked).toEqual(["there"]);
-    expect(handed).toEqual({ meetings: ["m1"] });
-    expect(holderOf(lock)).toEqual({ pid: process.pid, ...ME });
-    releaseGoal(lock);
-  });
-
-  it("takes a goal over from a holder whose pid another process has taken since", async () => {
-    const lock = path.join(dir, "repo", "lock");
-    const other = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
-    await once(other, "spawn");
-    await mkdir(path.dirname(lock), { recursive: true });
-    await writeFile(lock, JSON.stringify({ pid: other.pid, session: 7, address: "gone" }));
-    // Nothing answers at its address.
-    expect(await takeGoal(lock, ME, () => Promise.resolve(undefined))).toEqual({ meetings: [] });
-    other.kill();
-    expect(holderOf(lock)).toEqual({ pid: process.pid, ...ME });
-    releaseGoal(lock);
-  });
-
-  it("goes to one of several sessions starting at once, also over one that has ended", async () => {
-    const lock = path.join(dir, "repo", "lock");
-    const take = `
-      import { takeGoal } from ${JSON.stringify(path.join(import.meta.dirname, "data.ts"))};
-      takeGoal(process.argv[1], { session: 1, address: "" }, () => Promise.reject(new Error("held"))).then(() => console.log("took"), () => console.log("refused"));
-      setTimeout(() => {}, 2000);
-    `;
-    const race = async () => {
-      const takers = Array.from({ length: 6 }, () =>
-        spawn(process.execPath, [
-          "--experimental-transform-types",
-          "--no-warnings",
-          "--input-type=module",
-          "-e",
-          take,
-          lock,
-        ]),
-      );
-      const said = await Promise.all(
-        takers.map(async (taker) => {
-          const [line] = (await once(taker.stdout, "data")) as [Buffer];
-          return line.toString().trim();
-        }),
-      );
-      // Ended once all have tried, the taker leaves the lock behind.
-      for (const taker of takers) taker.kill();
-      await Promise.all(takers.map((taker) => once(taker, "exit")));
-      return said.filter((word) => word === "took").length;
-    };
-    expect([await race(), await race()]).toEqual([1, 1]);
-  });
-});
-
 describe("a repository's goals", () => {
   it("each get a folder of their own, named by a slug no goal has", async () => {
     const repo = path.join(dir, "repo");
@@ -207,13 +105,14 @@ describe("a repository's goals", () => {
     const old = goalFiles(path.join(goalsFolder(repo), "old"));
     await mkdir(path.dirname(old.state));
     await writeFile(old.state, JSON.stringify({ version: 1, state: {} }));
-    await takeGoal(chess.lock, ME, refuse);
+    const me = { session: 41, address: "here" };
+    await takeLock(chess.lock, me, () => Promise.reject(new Error("held")));
     expect(await listGoals(repo)).toEqual([
       { slug: "dice", state: fresh("dice", 1) },
-      { slug: "chess", state: fresh("chess", 2), holder: { pid: process.pid, ...ME } },
+      { slug: "chess", state: fresh("chess", 2), holder: { pid: process.pid, ...me } },
       // One that can't be read is listed last, with why, the rest all the same.
       { slug: "old", unreadable: expect.stringContaining("before its first release") as string },
     ]);
-    releaseGoal(chess.lock);
+    releaseLock(chess.lock);
   });
 });
