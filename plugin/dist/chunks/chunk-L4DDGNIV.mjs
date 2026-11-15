@@ -121,7 +121,9 @@ function running(pid) {
     process.kill(pid, 0);
     return true;
   } catch (error) {
-    return errorCode(error) === "EPERM";
+    if (errorCode(error) === "ESRCH") return false;
+    if (errorCode(error) === "EPERM") return true;
+    throw error;
   }
 }
 var windowsProcessField = (pid, field) => [
@@ -151,8 +153,33 @@ function repoFolder(dataFolder2, repo) {
 }
 var goalsFolder = (repoFolder2) => path2.join(repoFolder2, "goals");
 var goalFolder = (repoFolder2, slug) => path2.join(goalsFolder(repoFolder2), slug);
-var sessionsFolder = (dataFolder2) => path2.join(dataFolder2, "sessions");
-var depsFolder = (dataFolder2) => path2.join(dataFolder2, "deps");
+function sessionModes(dataFolder2) {
+  const folder2 = path2.join(dataFolder2, "sessions");
+  return {
+    folder: folder2,
+    file: (pid) => path2.join(folder2, `${String(pid)}.mode`),
+    /** The session a file in the folder is kept for; undefined for a file that isn't a mode. */
+    pidOf: (name) => {
+      const { name: pid, ext } = path2.parse(name);
+      return ext === ".mode" ? Number(pid) : void 0;
+    }
+  };
+}
+function depsFolders(dataFolder2) {
+  const folder2 = path2.join(dataFolder2, "deps");
+  return {
+    folder: folder2,
+    /** A version's dependencies, by the hash of what it locks. */
+    version: (hash) => path2.join(folder2, hash.slice(0, 12)),
+    /** Where process `pid` installs a version, beside it, before it moves in whole. */
+    draft: (version, pid) => `${version}.${String(pid)}`,
+    /** The process installing in a folder there; undefined for a version's own folder. */
+    pidOf: (name) => {
+      const [, pid] = name.split(".");
+      return pid === void 0 ? void 0 : Number(pid);
+    }
+  };
+}
 var lockFiles = (lock) => ({
   mine: (pid) => `${lock}.${String(pid)}`,
   claim: (holder) => `${lock}.ended-${holder}`
@@ -194,8 +221,8 @@ export {
   repoFolder,
   goalsFolder,
   goalFolder,
-  sessionsFolder,
-  depsFolder,
+  sessionModes,
+  depsFolders,
   lockFiles,
   goalFiles
 };

@@ -17,11 +17,11 @@ import {
   renameOver,
   repoFolder,
   running,
-  sessionsFolder,
+  sessionModes,
   textIfThere,
   windowsProcessField,
   writeWhole
-} from "./chunk-IDZG3QQQ.mjs";
+} from "./chunk-L4DDGNIV.mjs";
 
 // node_modules/.pnpm/yaml@2.9.1/node_modules/yaml/dist/nodes/identity.js
 var require_identity = __commonJS({
@@ -100,17 +100,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path8) {
-      const ctrl = callVisitor(key, node, visitor, path8);
+    function visit_(key, node, visitor, path7) {
+      const ctrl = callVisitor(key, node, visitor, path7);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path8, ctrl);
-        return visit_(key, ctrl, visitor, path8);
+        replaceNode(key, path7, ctrl);
+        return visit_(key, ctrl, visitor, path7);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path8 = Object.freeze(path8.concat(node));
+          path7 = Object.freeze(path7.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path8);
+            const ci = visit_(i, node.items[i], visitor, path7);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -121,13 +121,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path8 = Object.freeze(path8.concat(node));
-          const ck = visit_("key", node.key, visitor, path8);
+          path7 = Object.freeze(path7.concat(node));
+          const ck = visit_("key", node.key, visitor, path7);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path8);
+          const cv = visit_("value", node.value, visitor, path7);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -148,17 +148,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path8) {
-      const ctrl = await callVisitor(key, node, visitor, path8);
+    async function visitAsync_(key, node, visitor, path7) {
+      const ctrl = await callVisitor(key, node, visitor, path7);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path8, ctrl);
-        return visitAsync_(key, ctrl, visitor, path8);
+        replaceNode(key, path7, ctrl);
+        return visitAsync_(key, ctrl, visitor, path7);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path8 = Object.freeze(path8.concat(node));
+          path7 = Object.freeze(path7.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path8);
+            const ci = await visitAsync_(i, node.items[i], visitor, path7);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -169,13 +169,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path8 = Object.freeze(path8.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path8);
+          path7 = Object.freeze(path7.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path7);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path8);
+          const cv = await visitAsync_("value", node.value, visitor, path7);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -202,23 +202,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path8) {
+    function callVisitor(key, node, visitor, path7) {
       if (typeof visitor === "function")
-        return visitor(key, node, path8);
+        return visitor(key, node, path7);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path8);
+        return visitor.Map?.(key, node, path7);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path8);
+        return visitor.Seq?.(key, node, path7);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path8);
+        return visitor.Pair?.(key, node, path7);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path8);
+        return visitor.Scalar?.(key, node, path7);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path8);
+        return visitor.Alias?.(key, node, path7);
       return void 0;
     }
-    function replaceNode(key, path8, node) {
-      const parent = path8[path8.length - 1];
+    function replaceNode(key, path7, node) {
+      const parent = path7[path7.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -830,10 +830,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path8, value) {
+    function collectionFromPath(schema, path7, value) {
       let v = value;
-      for (let i = path8.length - 1; i >= 0; --i) {
-        const k = path8[i];
+      for (let i = path7.length - 1; i >= 0; --i) {
+        const k = path7[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -852,7 +852,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path8) => path8 == null || typeof path8 === "object" && !!path8[Symbol.iterator]().next().done;
+    var isEmptyPath = (path7) => path7 == null || typeof path7 === "object" && !!path7[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -882,11 +882,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path8, value) {
-        if (isEmptyPath(path8))
+      addIn(path7, value) {
+        if (isEmptyPath(path7))
           this.add(value);
         else {
-          const [key, ...rest] = path8;
+          const [key, ...rest] = path7;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -900,8 +900,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path8) {
-        const [key, ...rest] = path8;
+      deleteIn(path7) {
+        const [key, ...rest] = path7;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -915,8 +915,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path8, keepScalar) {
-        const [key, ...rest] = path8;
+      getIn(path7, keepScalar) {
+        const [key, ...rest] = path7;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -934,8 +934,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path8) {
-        const [key, ...rest] = path8;
+      hasIn(path7) {
+        const [key, ...rest] = path7;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -945,8 +945,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path8, value) {
-        const [key, ...rest] = path8;
+      setIn(path7, value) {
+        const [key, ...rest] = path7;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -3461,9 +3461,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path8, value) {
+      addIn(path7, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path8, value);
+          this.contents.addIn(path7, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3538,14 +3538,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path8) {
-        if (Collection.isEmptyPath(path8)) {
+      deleteIn(path7) {
+        if (Collection.isEmptyPath(path7)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path8) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path7) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3560,10 +3560,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path8, keepScalar) {
-        if (Collection.isEmptyPath(path8))
+      getIn(path7, keepScalar) {
+        if (Collection.isEmptyPath(path7))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path8, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path7, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3574,10 +3574,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path8) {
-        if (Collection.isEmptyPath(path8))
+      hasIn(path7) {
+        if (Collection.isEmptyPath(path7))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path8) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path7) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3594,13 +3594,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path8, value) {
-        if (Collection.isEmptyPath(path8)) {
+      setIn(path7, value) {
+        if (Collection.isEmptyPath(path7)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path8), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path7), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path8, value);
+          this.contents.setIn(path7, value);
         }
       }
       /**
@@ -5561,9 +5561,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path8) => {
+    visit.itemAtPath = (cst, path7) => {
       let item = cst;
-      for (const [field, index] of path8) {
+      for (const [field, index] of path7) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5572,23 +5572,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path8) => {
-      const parent = visit.itemAtPath(cst, path8.slice(0, -1));
-      const field = path8[path8.length - 1][0];
+    visit.parentCollection = (cst, path7) => {
+      const parent = visit.itemAtPath(cst, path7.slice(0, -1));
+      const field = path7[path7.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path8, item, visitor) {
-      let ctrl = visitor(item, path8);
+    function _visit(path7, item, visitor) {
+      let ctrl = visitor(item, path7);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path8.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path7.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -5599,10 +5599,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path8);
+            ctrl = ctrl(item, path7);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path8) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path7) : ctrl;
     }
     exports.visit = visit;
   }
@@ -7607,7 +7607,7 @@ function waitsIn(state, subtask2, busy) {
       const could = state.subtasks.filter(
         (s) => s.status === "pending" && s.assignee === subtask2.assignee && !startWaits(state, s, busy).length
       );
-      const first = could.find((s) => s.goOn) ?? could[0];
+      const first = could.find((s) => s.session !== void 0) ?? could[0];
       return first && first !== subtask2 ? [{ kind: "after", subtaskId: first.id }] : [];
     }
     // A done subtask, the last of its task, carries the task's acceptance waiting on you.
@@ -7707,6 +7707,10 @@ var workOf = (core) => ({
   underWay: core.underWay(),
   meetingsNow: core.meetingsNow()
 });
+var REFUSED = {
+  archived: (goal) => `The goal "${goal.name}" is archived: resume it first`,
+  noMember: (name) => `There is no member called "${name}"`
+};
 function spend(state, member, tokens) {
   state.tokens[member] = (state.tokens[member] ?? 0) + tokens;
 }
@@ -8077,7 +8081,7 @@ function releaseLock(lock) {
 }
 
 // src/engine/data.ts
-var STATE_VERSION = 4;
+var STATE_VERSION = 5;
 var SAVE_DELAY_MS = 200;
 async function readState(file) {
   const text2 = await readFile2(file, "utf8");
@@ -8181,8 +8185,7 @@ var Goals = class {
     return this.life(LIFE, () => {
       const { goal } = this;
       if (goal.status === "paused") return;
-      if (goal.status === "archived")
-        throw new Error(`The goal "${goal.name}" is archived: resume it first`);
+      if (goal.status === "archived") throw new Error(REFUSED.archived(goal));
       goal.status = step(GOAL_MACHINE, goal.status, "pause");
       this.hold(false);
     });
@@ -9142,7 +9145,6 @@ var MeetingRun = class {
     this.meeting.turns.push({
       speaker: speaker.name,
       text: text2,
-      at: Date.now(),
       phase,
       ...calls !== void 0 && { calls }
     });
@@ -9247,7 +9249,7 @@ var Meetings = class {
   /** Calls a meeting, or throws why it can't be held now. */
   start(call) {
     const { core } = this;
-    const named = [...new Set(call.attendees.map((name) => name.trim()))];
+    const named = [...new Set(call.attendees)];
     const attendees = named.length ? named : core.team.members.map((m) => m.name).sort((a, b) => a.localeCompare(b));
     const participants = this.admit(attendees);
     if (call.hostOnly && participants.length < 2)
@@ -9359,7 +9361,7 @@ var Meetings = class {
     if (host === void 0) throw new Error("The team has no members");
     const names = new Set(core.team.members.map((m) => m.name));
     const stranger = attendees.find((name) => !names.has(name));
-    if (stranger) throw new Error(`There is no member called "${stranger}"`);
+    if (stranger) throw new Error(REFUSED.noMember(stranger));
     const busy = busyMembers(workOf(core));
     const taken = attendees.find((name) => busy.has(name));
     if (taken) throw new Error(`${taken} is busy: working, reviewing, or at another meeting`);
@@ -9487,7 +9489,6 @@ function memberOptions(seat, from, mode) {
     env: { ...env, ...authorEnv(memberSigner(member.name)) },
     systemPrompt: { type: "preset", preset: "claude_code", append: seat.system },
     includePartialMessages: true,
-    toolConfig: { askUserQuestion: { previewFormat: "markdown" } },
     extraArgs: { name: `openplan-${member.name}` },
     pathToClaudeCodeExecutable: seat.claude
   };
@@ -9552,7 +9553,7 @@ var Questions = class {
   /**
    * A member asks a teammate: the question is open while `answering` runs
    * (the teammate's read-only turn), so the asker shows as waiting on them,
-   * and leaves the state when it settles. Its subtask's run stopping calls it
+   * and is closed when it settles. Its subtask's run stopping calls it
    * off (cancelFor) and should stop `answering` too.
    */
   async toTeammate(asker, to, text2, answering) {
@@ -9626,11 +9627,7 @@ var Questions = class {
     const choices = input.questions.map((q) => ({
       question: q.question,
       header: q.header,
-      options: q.options.map((o) => ({
-        label: o.label,
-        description: o.description,
-        ...o.preview !== void 0 && { preview: o.preview }
-      })),
+      options: q.options.map((o) => ({ label: o.label, description: o.description })),
       multiSelect: q.multiSelect
     }));
     const answer = await this.wait(asker, {
@@ -9713,8 +9710,8 @@ var liveOf = (now) => ({
 });
 function tracking(now, keep) {
   return {
-    session: (session2, model) => {
-      keep({ at: Date.now(), kind: "run", session: session2, model });
+    session: (_session, model) => {
+      keep({ kind: "run", model });
     },
     thinking: (delta) => {
       now.streaming = delta === "" || now.streaming?.kind !== "thinking" ? { kind: "thinking", text: delta } : { kind: "thinking", text: now.streaming.text + delta };
@@ -9732,12 +9729,11 @@ function tracking(now, keep) {
         return;
       }
       if (now.streaming?.kind === block.kind) now.streaming = void 0;
-      keep({ at: Date.now(), kind: block.kind, text: block.text });
+      keep({ kind: block.kind, text: block.text });
     },
     toolDone: (call) => {
       now.running.delete(call.id);
       keep({
-        at: Date.now(),
         kind: "tool",
         name: call.name,
         input: call.input,
@@ -9746,10 +9742,10 @@ function tracking(now, keep) {
       });
     },
     steps: (steps) => {
-      keep({ at: Date.now(), kind: "steps", steps });
+      keep({ kind: "steps", steps });
     },
     notice: (notice) => {
-      keep({ at: Date.now(), kind: "notice", notice });
+      keep({ kind: "notice", notice });
     }
   };
 }
@@ -10085,10 +10081,9 @@ var Scheduler = class {
    */
   assignOne(work) {
     const { goal } = this;
-    if (goal.status === "archived")
-      throw new Error(`The goal "${goal.name}" is archived: resume it first`);
+    if (goal.status === "archived") throw new Error(REFUSED.archived(goal));
     if (!this.core.team.members.some((m) => m.name === work.assignee))
-      throw new Error(`There is no member called "${work.assignee}"`);
+      throw new Error(REFUSED.noMember(work.assignee));
     const [added] = this.assign([
       {
         title: work.title,
@@ -10145,8 +10140,9 @@ var Scheduler = class {
   }
   /**
    * Does what you asked to a subtask (§4.3): stop it, have it go on, retry it,
-   * or redo it. Throws when there is no such subtask, or when it can't be
-   * done where the subtask stands (derive.ts actionsOf).
+   * or redo it: the subtask, where that left it. Throws when there is no
+   * such subtask, or when it can't be done where the subtask stands
+   * (derive.ts actionsOf).
    */
   async act(subtaskId, action) {
     const subtask2 = this.subtask(subtaskId);
@@ -10156,6 +10152,7 @@ var Scheduler = class {
       throw new Error(`"${subtask2.title}" can't ${action} while ${subtask2.status}`);
     if (action === "continue") this.continue(subtask2, event);
     else await this[action](subtask2);
+    return subtask2;
   }
   /**
    * Lets go of work about to be deleted: what waits to start won't, what runs
@@ -10476,7 +10473,7 @@ ${outcome.handover.summary}`
       const rounds = (subtask2.review?.rounds ?? 0) + (verdict.pass ? 0 : 1);
       subtask2.review = { rounds, notes: verdict.notes };
       if (verdict.pass) this.move(subtask2, "merge");
-      else if (rounds >= REVIEW_ROUNDS) this.ask(subtask2, DECISIONS.stuckReview(), verdict.notes);
+      else if (rounds >= REVIEW_ROUNDS) this.ask(subtask2, DECISIONS.stuckReview(), "");
       else {
         this.move(subtask2, "reject");
         if (subtask2.session) goOnWith(subtask2, { why: "rejected", note: verdict.notes });
@@ -10603,11 +10600,7 @@ async function loadTeam(userTeam2, top) {
   const folders = [userTeam2, teamFolder(top)];
   for (const folder of folders) {
     for (const { name, file, data, body } of await markdownFiles(path4.join(folder, "roles")))
-      roles.set(name, {
-        id: name,
-        title: parsed(roleSchema, data, file).title,
-        duties: body.trim()
-      });
+      roles.set(name, { title: parsed(roleSchema, data, file).title, duties: body.trim() });
     for (const { name, file, data } of await markdownFiles(path4.join(folder, "members")))
       written2.set(name, { file, data });
     const teamFile = path4.join(folder, "team.json");
@@ -11042,9 +11035,9 @@ var STATUS_WORDS = {
   pending: "pending",
   running: "running",
   reviewing: "in review",
-  waitingInReview: "in review, waits for a decision",
+  waitingInReview: "stuck in review",
   merging: "being merged",
-  waitingInMerge: "being merged, waits for a decision",
+  waitingInMerge: "stuck while merging",
   done: "done",
   failed: "failed",
   stopped: "stopped",
@@ -11084,7 +11077,8 @@ function callText(permission) {
   return main ? `${permission.tool}: ${main}` : permission.tool;
 }
 function needWords(question, work) {
-  const title = work.subtasks.find((s) => s.id === question.subtaskId)?.title;
+  const subtask2 = work.subtasks.find((s) => s.id === question.subtaskId);
+  const title = subtask2?.title;
   const about = title ? ` for "${title}"` : "";
   switch (question.kind) {
     case "permission":
@@ -11096,20 +11090,18 @@ function needWords(question, work) {
       return { headline: `${question.from} asks${about}:` };
     case "decision":
       switch (question.decision.kind) {
-        case "review":
+        case "review": {
+          const detail = question.text || subtask2?.review?.notes;
           return {
             headline: `The review of "${title ?? ""}" is stuck. What now?`,
-            detail: question.text
+            ...detail && { detail }
           };
+        }
         case "conflict":
-          return {
-            headline: `Merging "${title ?? ""}" is stuck. What now?`,
-            detail: question.decision.files.join(", ")
-          };
         case "merge":
           return {
             headline: `Merging "${title ?? ""}" is stuck. What now?`,
-            detail: question.text
+            detail: question.decision.kind === "conflict" ? question.decision.files.join(", ") : question.text
           };
         case "delivery":
           return { headline: `The task "${question.text}" is done. Accept it?` };
@@ -11123,6 +11115,8 @@ var WHERE_WORDS = {
   archived: "archived",
   paused: "paused"
 };
+var goalsWhere = (count, where) => `${plural(count, "goal", "goals")} ${WHERE_WORDS[where]}`;
+var SENT_BACK_FIELD = "The subtask a revised task goes back to";
 function progressOf2({ subtasks, meetings }) {
   const done = subtasks.filter((s) => s.status === "done").length;
   return subtasks.length ? `${String(done)}/${String(subtasks.length)} subtasks done` : meetings.some((m) => m.status === "review") ? PLAN_TO_REVIEW : "no plan yet";
@@ -11346,14 +11340,13 @@ function bandText(work, needs) {
   return parts.join(" \xB7 ");
 }
 function othersBand(others) {
-  const paused = others.filter((e) => whereOf(e) === "paused").length;
-  const elsewhere = others.filter((e) => whereOf(e) === "elsewhere").length;
-  const parts = [
-    ...paused ? [plural(paused, "goal paused", "goals paused")] : [],
-    ...elsewhere ? [`${plural(elsewhere, "goal", "goals")} in another session`] : []
-  ];
+  const parts = ["paused", "elsewhere"].flatMap((where) => {
+    const count = others.filter((e) => whereOf(e) === where).length;
+    return count ? [goalsWhere(count, where)] : [];
+  });
   return parts.length ? parts.join(" \xB7 ") : void 0;
 }
+var TYPED_ANSWERS_NONE = "openplan: what you typed answers none of it; it waits in Needs you";
 var NOTHING_TO_RESUME = "No goal to resume.";
 function paneTeam(mine, others, session2) {
   const { opened } = session2;
@@ -11371,7 +11364,8 @@ function paneTeam(mine, others, session2) {
       prompts: [],
       resumable: resumableOf(others),
       ...!others.length && { resumeRefused: NOTHING_TO_RESUME },
-      pauseRefused: noGoal
+      pauseRefused: noGoal,
+      typedAnswersNone: TYPED_ANSWERS_NONE
     };
   }
   const { work, members: members2 } = mine;
@@ -11390,7 +11384,8 @@ function paneTeam(mine, others, session2) {
     milestones: milestones(work),
     prompts: prompts(work),
     resumable: [...here, ...resumableOf(others)],
-    ...goal.status === "active" ? { resumeRefused: resumeRefusal(goal.name) } : { pauseRefused: `"${goal.name}" isn't under way: it is ${goal.status}.` }
+    ...goal.status === "active" ? { resumeRefused: resumeRefusal(goal.name) } : { pauseRefused: `"${goal.name}" isn't under way: it is ${goal.status}.` },
+    typedAnswersNone: TYPED_ANSWERS_NONE
   };
 }
 var callOf = (name, input) => {
@@ -11595,10 +11590,8 @@ function askToLetGo(address, slug) {
 }
 
 // src/plugin/session-mode.ts
-import path7 from "node:path";
-var fileOf = (dataFolder2, session2) => path7.join(sessionsFolder(dataFolder2), `${String(session2)}.mode`);
 function modeOf(dataFolder2, session2) {
-  return textIfThere(fileOf(dataFolder2, session2));
+  return textIfThere(sessionModes(dataFolder2).file(session2));
 }
 
 // src/plugin/pane-tools.ts
@@ -11610,7 +11603,7 @@ var answerSchema = z8.discriminatedUnion("kind", [
     kind: z8.literal("option"),
     option: z8.enum([...PERMISSION_OPTIONS, ...DECISION_OPTIONS]),
     note: z8.string().trim().optional().describe("Why it is denied, or what to change"),
-    sentBack: z8.string().optional().describe("The subtask a revised task goes back to")
+    sentBack: z8.string().optional().describe(SENT_BACK_FIELD)
   }),
   z8.object({
     kind: z8.literal("choices"),
@@ -11881,7 +11874,7 @@ var meeting = z9.string().describe("The meeting's id");
 var subtask = z9.string().describe("The subtask's id");
 var goalActionInput = z9.object({ action: z9.enum(GOAL_ACTIONS) });
 function memberName(members2) {
-  if (!members2) return z9.string().describe("A member's name");
+  if (!members2) return z9.string().trim().describe("A member's name");
   const names = members2.map((m) => m.name);
   return z9.enum(names).describe(`One of the team: ${rosterOf(members2)}`);
 }
@@ -12034,11 +12027,8 @@ function addTools(server2, session2) {
     },
     async ({ subtask: id, action }) => {
       const engine = session2.goal;
-      await engine.scheduler.act(id, action);
-      const acted = engine.work.subtasks.find((s) => s.id === id);
-      return toolText(
-        acted ? `"${acted.title}" is ${STATUS_WORDS[acted.status]} now.` : "It is gone now."
-      );
+      const acted = await engine.scheduler.act(id, action);
+      return toolText(`"${acted.title}" is ${STATUS_WORDS[acted.status]} now.`);
     }
   );
   server2.registerTool(
@@ -12062,7 +12052,7 @@ function addTools(server2, session2) {
         question: z9.string().describe("The id of what waits on the user"),
         decision: z9.enum(DECISION_OPTIONS),
         note: z9.string().trim().optional().describe("What to change, in the user's words"),
-        sent_back: z9.string().optional().describe("The subtask a revised task goes back to")
+        sent_back: z9.string().optional().describe(SENT_BACK_FIELD)
       }
     },
     async ({ question, decision, note, sent_back }) => {

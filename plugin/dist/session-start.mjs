@@ -7482,7 +7482,7 @@ function waitsIn(state, subtask, busy) {
       const could = state.subtasks.filter(
         (s) => s.status === "pending" && s.assignee === subtask.assignee && !startWaits(state, s, busy).length
       );
-      const first = could.find((s) => s.goOn) ?? could[0];
+      const first = could.find((s) => s.session !== void 0) ?? could[0];
       return first && first !== subtask ? [{ kind: "after", subtaskId: first.id }] : [];
     }
     // A done subtask, the last of its task, carries the task's acceptance waiting on you.
@@ -7703,7 +7703,9 @@ function running(pid) {
     process.kill(pid, 0);
     return true;
   } catch (error62) {
-    return errorCode(error62) === "EPERM";
+    if (errorCode(error62) === "ESRCH") return false;
+    if (errorCode(error62) === "EPERM") return true;
+    throw error62;
   }
 }
 
@@ -7723,7 +7725,7 @@ function holderOf(lock) {
 }
 
 // src/engine/data.ts
-var STATE_VERSION = 4;
+var STATE_VERSION = 5;
 async function readState(file2) {
   const text2 = await readFile3(file2, "utf8");
   let saved;
@@ -53427,11 +53429,7 @@ async function loadTeam(userTeam, top) {
   const folders = [userTeam, teamFolder(top)];
   for (const folder2 of folders) {
     for (const { name, file: file2, data, body } of await markdownFiles(path3.join(folder2, "roles")))
-      roles.set(name, {
-        id: name,
-        title: parsed(roleSchema, data, file2).title,
-        duties: body.trim()
-      });
+      roles.set(name, { title: parsed(roleSchema, data, file2).title, duties: body.trim() });
     for (const { name, file: file2, data } of await markdownFiles(path3.join(folder2, "members")))
       written.set(name, { file: file2, data });
     const teamFile = path3.join(folder2, "team.json");
@@ -53542,9 +53540,9 @@ var STATUS_WORDS = {
   pending: "pending",
   running: "running",
   reviewing: "in review",
-  waitingInReview: "in review, waits for a decision",
+  waitingInReview: "stuck in review",
   merging: "being merged",
-  waitingInMerge: "being merged, waits for a decision",
+  waitingInMerge: "stuck while merging",
   done: "done",
   failed: "failed",
   stopped: "stopped",
@@ -53584,7 +53582,8 @@ function callText(permission) {
   return main ? `${permission.tool}: ${main}` : permission.tool;
 }
 function needWords(question, work) {
-  const title = work.subtasks.find((s) => s.id === question.subtaskId)?.title;
+  const subtask = work.subtasks.find((s) => s.id === question.subtaskId);
+  const title = subtask?.title;
   const about = title ? ` for "${title}"` : "";
   switch (question.kind) {
     case "permission":
@@ -53596,20 +53595,18 @@ function needWords(question, work) {
       return { headline: `${question.from} asks${about}:` };
     case "decision":
       switch (question.decision.kind) {
-        case "review":
+        case "review": {
+          const detail = question.text || subtask?.review?.notes;
           return {
             headline: `The review of "${title ?? ""}" is stuck. What now?`,
-            detail: question.text
+            ...detail && { detail }
           };
+        }
         case "conflict":
-          return {
-            headline: `Merging "${title ?? ""}" is stuck. What now?`,
-            detail: question.decision.files.join(", ")
-          };
         case "merge":
           return {
             headline: `Merging "${title ?? ""}" is stuck. What now?`,
-            detail: question.text
+            detail: question.decision.kind === "conflict" ? question.decision.files.join(", ") : question.text
           };
         case "delivery":
           return { headline: `The task "${question.text}" is done. Accept it?` };
