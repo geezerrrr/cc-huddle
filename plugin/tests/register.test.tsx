@@ -92,7 +92,7 @@ function serve(on: On, views: OpenplanView[]) {
   });
   on("command.register", (_, e) => ({ value: { command: e.name } }));
   on("ui.open", (_, e) => {
-    calls.push({ tool: "ui.open", args: { id: e.id } });
+    calls.push({ tool: "ui.open", args: { id: e.id, focus: e.focus } });
     return { value: { isPlaced: true } };
   });
   on("session.start", (_, e) => ({ cwd: e.cwd }));
@@ -358,6 +358,20 @@ test("the model can't call the pane's tools", async ($) => {
     input: { question: "q1", option: "always" },
   });
   expect(decision).toBe("deny");
+});
+
+test("/openplan opens the pane with the keyboard", async ($, on) => {
+  const calls = serve(on, [{ revision: 1, team: TEAM }]);
+  await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
+  await $.command.run({
+    command: "openplan",
+    args: "",
+    origin: { kind: "composer" },
+    presentation: { isFullscreen: true, columns: 120 },
+  });
+  expect(calls.filter((c) => c.tool === "ui.open")).toEqual([
+    { tool: "ui.open", args: { id: "openplan", focus: true } },
+  ]);
 });
 
 test("/openplan status prints where the team stands", async ($, on) => {

@@ -217,8 +217,9 @@ function watch($: $) {
   ticking ??= $.clock.every(POLL_MS, () => void poll($));
 }
 
+/** Opens the pane with the keyboard: only ever on the person's command or press. */
 function openPane($: $) {
-  return $.ui.open({ id: PANE, title: "openplan" });
+  return $.ui.open({ id: PANE, title: "openplan", focus: true });
 }
 
 /** Answers a need as it was pressed; what the team refuses is shown. */

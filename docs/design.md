@@ -232,7 +232,7 @@ A member session loads your user and project settings like any session of yours.
 
 ### 7.2 What you see
 
-- **Pane** (`/openplan`), beside the transcript in a wide fullscreen terminal, above the prompt otherwise. Three tabs:
+- **Pane** (`/openplan`, or pressing the band), beside the transcript in a wide fullscreen terminal, above the prompt otherwise. It opens with the keyboard, so Tab and Enter work in it at once; Esc gives the keys back to the prompt. Three tabs:
   - **Meeting**: the discussion word by word, who speaks, raised hands, whom the host calls. The first judgments are formed all at once, so they don't stream: the pane says the members are forming them, and each shows once given.
   - **Team**: one line per member: what they do, which step, whom they wait on, tokens. Select a member to follow their record live: thinking, tool calls, files changed.
   - **Needs you**: each open question with its options as buttons: the ones dismissed from their ask, and every one while it waits. Pressing one answers it. Nothing goes through a model, so a permission is granted only by you.
