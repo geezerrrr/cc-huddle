@@ -277,8 +277,24 @@ async function picked<T extends { label: string }>($: $, listed: T[]): Promise<T
 }
 
 /** Opens the pane with the keyboard: only ever on the person's command or press. */
-function openPane($: $) {
-  return $.ui.open({ id: PANE, title: "openplan", focus: true });
+async function openPane($: $) {
+  await $.ui.open({ id: PANE, title: "openplan", focus: true });
+  await showTab($, await read($, tab));
+}
+
+/**
+ * Shows a tab from its start, but the meeting from its end, where it keeps
+ * up as the members speak, the way the transcript does; scrolling away lets
+ * it go, scrolling back to the end keeps it again (the `ui.scroll` hook).
+ */
+async function showTab($: $, shown: OpenplanTab) {
+  await update($, tab, () => shown);
+  scrollPane($, shown === "meeting" ? "end" : "start");
+}
+
+/** Moves the pane's window; one the engine can't move stays where it is, all a scroll can lose. */
+function scrollPane($: $, to: "start" | "end") {
+  $.ui.scroll({ in: PANE, to }).catch(() => undefined);
 }
 
 /** Answers a need as it was pressed; what the team refuses is shown. */
@@ -728,6 +744,13 @@ export const register: Register = (on) => {
     );
   });
 
+  on("ui.scroll", { requestId: PANE, origin: { kind: "person" } }, async ($, e, next) => {
+    const moved = await next(e);
+    if (e.offset >= e.contentRows - e.bodyRows && (await read($, tab)) === "meeting")
+      scrollPane($, "end");
+    return moved;
+  });
+
   on("ui.render", { component: "Pane", requestId: PANE }, async ($, e) => {
     const ui: Ui = $.ui.resolve(e);
     const { Box, Button, Text } = ui;
@@ -760,7 +783,7 @@ export const register: Register = (on) => {
                 t.tab === "needs" && now.needs.length ? `${t.label} (${now.needs.length})` : t.label
               }
               variant={t.tab === shown ? "primary" : "secondary"}
-              onPress={() => update($, tab, () => t.tab)}
+              onPress={() => showTab($, t.tab)}
             />
           ))}
         </Box>

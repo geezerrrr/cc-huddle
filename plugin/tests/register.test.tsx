@@ -184,6 +184,50 @@ test("the pane follows a member's record as it grows", async ($, on) => {
   await pane.unmount();
 });
 
+test("the meeting shows, and your scrolling it reaches the window as you moved it", async ($, on) => {
+  const clock = mock.clock(on);
+  serve(on, [
+    {
+      revision: 1,
+      team: {
+        ...TEAM,
+        meeting: {
+          id: "m1",
+          about: "Dice",
+          agenda: "Plan the game",
+          status: "glm speaks",
+          participants: ["glm", "sonnet"],
+          turns: [{ speaker: "glm", text: "A grid board" }],
+          hands: [],
+        },
+      },
+    },
+  ]);
+  const moved: number[] = [];
+  on("ui.scroll", (_, e) => {
+    moved.push(e.offset);
+    return {};
+  });
+  await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
+  await clock.advance(500);
+  const pane = await $.ui.mount({ ...PANE, surface: "terminal" });
+  await pane.press({ key: "tab-meeting" });
+  expect((await pane.find({ key: "said-0" }))?.text).toBe("A grid board");
+  // Away from the end, then back at it, where the meeting is kept in sight again.
+  for (const offset of [30, 60])
+    await $.ui.scroll({
+      component: "Pane",
+      requestId: "openplan",
+      offset,
+      by: offset === 30 ? -30 : 30,
+      bodyRows: 40,
+      contentRows: 100,
+      origin: { kind: "person" },
+    });
+  expect(moved).toEqual([30, 60]);
+  await pane.unmount();
+});
+
 test("a new milestone is a transcript row, a new prompt your session's; what was there before is not news", async ($, on) => {
   const clock = mock.clock(on);
   const rows: string[] = [];
