@@ -4,10 +4,11 @@ import { mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { recordMembersIn, stopMembers, watchMember } from "./processes.ts";
+import { recordMembersIn, stopMembers, stopRecording, watchMember } from "./processes.ts";
 
 let dir: string;
 let file: string;
+const failed = vi.fn();
 const started: ChildProcess[] = [];
 
 /** A process that runs until it is stopped, with `args` on its command line. */
@@ -25,11 +26,15 @@ const written = async (): Promise<unknown> => JSON.parse(await readFile(file, "u
 beforeEach(async () => {
   dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-processes-")));
   file = path.join(dir, "members.json");
-  await recordMembersIn(file);
+  await recordMembersIn(file, failed);
 });
 
 afterEach(async () => {
-  for (const child of started.splice(0)) child.kill("SIGKILL");
+  const children = started.splice(0);
+  for (const child of children) child.kill("SIGKILL");
+  // Their exits are written down before the record stops.
+  await Promise.all(children.map(ended));
+  await stopRecording();
   await rm(dir, { recursive: true, force: true });
 });
 
@@ -38,7 +43,9 @@ describe("member processes", () => {
     const settings = path.join(dir, "glm.json");
     const child = lasting();
     watchMember(child, settings);
-    expect(await written()).toEqual([{ pid: child.pid, settings }]);
+    await vi.waitFor(async () => {
+      expect(await written()).toEqual([{ pid: child.pid, settings }]);
+    });
     child.kill();
     await ended(child);
     await vi.waitFor(async () => {
@@ -66,10 +73,14 @@ describe("member processes", () => {
         { pid: stranger.pid, settings },
       ]),
     );
-    await recordMembersIn(file);
+    // Settled once it has exited, so none still writes a session that goes on.
+    await recordMembersIn(file, failed);
     await ended(left);
     expect(left.signalCode).toBe("SIGTERM");
     expect(stranger.exitCode ?? stranger.signalCode).toBeNull();
-    expect(await written()).toEqual([]);
+    await vi.waitFor(async () => {
+      expect(await written()).toEqual([]);
+    });
+    expect(failed).not.toHaveBeenCalled();
   });
 });

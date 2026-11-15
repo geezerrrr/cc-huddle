@@ -27,7 +27,7 @@ import { openGoal, openRepository, takenSlugs, type Places } from "./git.ts";
 import { Goals } from "./goals.ts";
 import { Meetings } from "./meetings.ts";
 import { memberSettings, sessionOptions, writeSettings } from "./policy.ts";
-import { recordMembersIn, stopMembers, stopRecording } from "./processes.ts";
+import { recordMembersIn, stopRecording } from "./processes.ts";
 import { systemPrompt } from "./prompts.ts";
 import { Questions, type Answer } from "./questions.ts";
 import { Records } from "./records.ts";
@@ -180,7 +180,7 @@ export class Engine {
   private static async leave(engine: Engine | undefined, files: Files) {
     if (engine) await engine.shut();
     else {
-      stopRecording();
+      await stopRecording();
       releaseGoal(files.lock);
     }
   }
@@ -193,7 +193,7 @@ export class Engine {
     copy: TeamFiles,
     state: GoalState,
   ): Promise<Engine> {
-    await recordMembersIn(files.members);
+    await recordMembersIn(files.members, options.failed);
     const writer = stateWriter(files.state, () => state, options.failed);
     const records = new Records(places, options.failed);
     // Its calls reach into the engine, made just below.
@@ -279,12 +279,12 @@ export class Engine {
   }
 
   /**
-   * Lets the goal go at once, as the process dies of an error: its members
-   * are stopped and the lock released. The state stays as last written, and
-   * the next session to take the goal up pauses what it left active.
+   * Lets the goal go at once, as the process dies of an error: the lock is
+   * released, and its members are stopped as the process exits
+   * (stopMembers). The state stays as last written, and the next session to
+   * take the goal up pauses what it left active.
    */
   abandon() {
-    stopMembers();
     releaseGoal(this.files.lock);
   }
 
@@ -298,7 +298,7 @@ export class Engine {
       await Promise.all([this.scheduler.close(), this.meetings.close()]);
       await Promise.all([this.writer.close(), this.records.flush()]);
     } finally {
-      stopRecording();
+      await stopRecording();
       releaseGoal(this.files.lock);
     }
   }

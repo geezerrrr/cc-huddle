@@ -3,7 +3,6 @@
  * or a crash never finds it half written. Renaming over, as all of openplan
  * does it.
  */
-import { renameSync, writeFileSync } from "node:fs";
 import { mkdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -32,17 +31,14 @@ export async function renameOver(from: string, to: string): Promise<void> {
   }
 }
 
-const fresh = (file: string) => `${file}.${String(process.pid)}.new`;
+/** How many files this process has written whole: each write has a new file of its own beside. */
+let writes = 0;
+const fresh = (file: string) => `${file}.${String(process.pid)}.${String((writes += 1))}.new`;
 
 /** Writes `text` to `file` whole, its folder made if need be; `mode` for a file only you may read. */
 export async function writeWhole(file: string, text: string, mode?: number): Promise<void> {
   await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(fresh(file), text, { mode });
-  await renameOver(fresh(file), file);
-}
-
-/** writeWhole, at once: for a process that may be exiting. */
-export function writeWholeSync(file: string, text: string): void {
-  writeFileSync(fresh(file), text);
-  renameSync(fresh(file), file);
+  const beside = fresh(file);
+  await writeFile(beside, text, { mode });
+  await renameOver(beside, file);
 }
