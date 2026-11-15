@@ -107,8 +107,11 @@ export interface Seat {
   teamMode: boolean;
 }
 
+/** A member turn's options: always with its settings file, which tells its process from others (processes.ts). */
+export type MemberOptions = Options & { settings: string };
+
 /** The options of a member's turn of `kind`: working (workOptions) or reading only (readOnlyOptions). */
-export const sessionOptions = (seat: Seat, kind: SessionKind, from: Env): Options =>
+export const sessionOptions = (seat: Seat, kind: SessionKind, from: Env): MemberOptions =>
   kind === "work" ? workOptions(seat, from) : readOnlyOptions(seat, from);
 
 /**
@@ -118,12 +121,12 @@ export const sessionOptions = (seat: Seat, kind: SessionKind, from: Env): Option
  * prompt with ours appended, the reply streamed as it is written, their name
  * on the commits they make and in `claude agents`.
  */
-function workOptions(seat: Seat, from: Env): Options {
+function workOptions(seat: Seat, from: Env): MemberOptions {
   return memberOptions(seat, from, seat.teamMode ? undefined : seat.sessionMode);
 }
 
 /** What every member turn runs with, in permission mode `mode` (Claude Code's default for none). */
-function memberOptions(seat: Seat, from: Env, mode: PermissionMode | undefined): Options {
+function memberOptions(seat: Seat, from: Env, mode: PermissionMode | undefined): MemberOptions {
   const { member } = seat;
   const env = Object.fromEntries(
     Object.entries(from).filter(([name]) => !SESSION_VARS.includes(name)),
@@ -159,7 +162,7 @@ function memberOptions(seat: Seat, from: Env, mode: PermissionMode | undefined):
  * through each turn, its tools change and the conversation's prompt cache is
  * written again whole, turn after turn.
  */
-function readOnlyOptions(seat: Seat, from: Env): Options {
+function readOnlyOptions(seat: Seat, from: Env): MemberOptions {
   return {
     ...memberOptions(seat, from, "dontAsk"),
     tools: READ_ONLY_TOOLS,

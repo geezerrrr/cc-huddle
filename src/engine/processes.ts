@@ -28,12 +28,11 @@ function save() {
   writeWholeSync(record, JSON.stringify(written));
 }
 
-/** Keeps a member's Claude Code while it runs. `args`: its command line, naming its settings file. */
-export function watchMember(child: ChildProcess, args: readonly string[]) {
+/** Keeps a member's Claude Code while it runs, with the settings file it runs under. */
+export function watchMember(child: ChildProcess, settings: string) {
   const { pid } = child;
-  const at = args.indexOf("--settings");
-  const settings = at < 0 ? undefined : args[at + 1];
-  if (pid === undefined || settings === undefined) return;
+  // It didn't start: there is nothing to stop.
+  if (pid === undefined) return;
   running.set(pid, { child, settings });
   save();
   child.once("exit", () => {

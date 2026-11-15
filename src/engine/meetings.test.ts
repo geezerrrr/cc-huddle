@@ -59,7 +59,7 @@ beforeEach(async () => {
     places: { repo: await openRepository(repo), root: path.join(dir, "data") },
     changed: vi.fn(),
     allowAlways: vi.fn(),
-    options: (m, kind, cwd) => ({ cwd, model: `${m.name}/${kind}` }),
+    options: (m, kind, cwd) => ({ cwd, model: `${m.name}/${kind}`, settings: `${m.name}.json` }),
     recorder: () => ({}),
     speech: () => ({}),
     underWay: () => [],
@@ -224,6 +224,7 @@ describe("Meetings", () => {
     expect(asks[0]?.options).toEqual({
       cwd: goalFolder(core.places),
       model: "glm/readOnly",
+      settings: "glm.json",
     });
     const hand = asks.find((a) => a.prompt.includes("Would you speak next?"));
     expect(hand?.options).toMatchObject({
@@ -442,6 +443,16 @@ describe("A plan under review", () => {
     );
     expect(assign).toHaveBeenCalledWith(meeting.plan?.tasks, meeting.id);
     await expect(meetings.approve(meeting.id)).rejects.toThrow("no plan under review");
+  });
+
+  it("is cancelled once, and nothing else is: a meeting over, or none", async () => {
+    const meeting = await reviewed();
+    await meetings.cancel(meeting.id);
+    expect(meeting.status).toBe("cancelled");
+    await expect(meetings.cancel(meeting.id)).rejects.toThrow(
+      "The meeting is cancelled: there is nothing to cancel",
+    );
+    await expect(meetings.cancel("m9")).rejects.toThrow("There is no such meeting");
   });
 
   it("isn't approved once called off while its document is written, or with its goal paused", async () => {

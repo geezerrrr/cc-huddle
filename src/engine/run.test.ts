@@ -70,7 +70,7 @@ const collaboration = (refuse?: string): Collaboration => ({
 
 const run = (fields: Partial<Parameters<typeof runSubtask>[0]> = {}) =>
   runSubtask({
-    options: { cwd: "/desk" },
+    options: { cwd: "/desk", settings: "glm.json" },
     opening: "Your subtask: Scoreboard",
     gate: () => Promise.resolve({ behavior: "deny", message: "no" }),
     collaboration: collaboration(),

@@ -220,17 +220,21 @@ export class Meetings {
 
   /**
    * Cancels a plan in review at once, or stops a meeting under way: it is
-   * cancelled as its run ends, which the promise returned waits for.
+   * cancelled as its run ends, which this waits for. Throws when there is no
+   * such meeting, or it is over.
    */
-  cancel(id: string): Promise<void> | undefined {
+  async cancel(id: string): Promise<void> {
     const meeting = this.core.state.meetings.find((m) => m.id === id);
-    if (meeting?.status === "review") {
+    if (!meeting) throw new Error("There is no such meeting");
+    if (!can(MEETING_MACHINE, meeting.status, "cancel"))
+      throw new Error(`The meeting is ${meeting.status}: there is nothing to cancel`);
+    if (meeting.status === "review") {
       meeting.status = step(MEETING_MACHINE, meeting.status, "cancel");
       this.core.changed();
       return;
     }
     this.aborts.get(id)?.abort();
-    return this.ongoing.get(id);
+    await this.ongoing.get(id);
   }
 
   /**

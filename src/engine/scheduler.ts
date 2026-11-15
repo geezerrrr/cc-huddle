@@ -235,16 +235,18 @@ export class Scheduler {
   }
 
   /**
-   * You stop a subtask: one not started, a run (it ends as stopped), a
-   * review, a merge waiting on your decision (its half-done merge undone). One
-   * handed over keeps its delivery and the stage it stopped in, to go on from.
+   * You stop a subtask: one not started, a run (this waits until it has ended
+   * as stopped), a review, a merge waiting on your decision (its half-done
+   * merge undone). One handed over keeps its delivery and the stage it
+   * stopped in, to go on from.
    */
   private async stop(subtask: Subtask) {
     const live = this.live.get(subtask.id);
     if (live?.kind === "run") {
-      // Your stop wins over going on.
+      // Your stop wins over going on. Its run ends it as stopped, or as what it came to first.
       this.held.delete(subtask.id);
       live.abort.abort();
+      await live.ended;
       return;
     }
     // Deleted work, stopped already: nothing to stop.

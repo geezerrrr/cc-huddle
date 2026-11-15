@@ -3,14 +3,10 @@
  * until it delivers. A turn that ends without delivering is reminded once in
  * the same session; a second fails the run.
  */
-import {
-  createSdkMcpServer,
-  tool,
-  type CanUseTool,
-  type Options,
-} from "@anthropic-ai/claude-agent-sdk";
+import { createSdkMcpServer, tool, type CanUseTool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { errorText } from "./core.ts";
+import type { MemberOptions } from "./policy.ts";
 import { DELIVER_REMINDER, SESSION_ONLY } from "./prompts.ts";
 import {
   runTurn,
@@ -90,7 +86,7 @@ function teamServer(collaboration: Collaboration, delivered: (handover: Handover
  * through `gate`.
  */
 export async function runSubtask(params: {
-  options: Options;
+  options: MemberOptions;
   opening: string;
   resume?: string;
   gate: CanUseTool;

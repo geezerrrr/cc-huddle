@@ -3,9 +3,9 @@
  * where the work lives, and how a member's turn is set up and followed. The
  * engine makes one per repository.
  */
-import type { Options } from "@anthropic-ai/claude-agent-sdk";
 import type { Work } from "./derive.ts";
 import type { Places } from "./git.ts";
+import type { MemberOptions } from "./policy.ts";
 import type { SessionKind } from "./prompts.ts";
 import type { Inbox } from "./questions.ts";
 import type { TurnListener } from "./turns.ts";
@@ -23,7 +23,7 @@ export interface Core extends Inbox {
   team: Team;
   places: Places;
   /** The Agent SDK options of a member's turn of `kind` in `cwd`: their settings and system prompt. */
-  options(member: Member, kind: SessionKind, cwd: string): Options;
+  options(member: Member, kind: SessionKind, cwd: string): MemberOptions;
   /** Where what a subtask's runs do is told: its record and the pane. */
   recorder(subtask: Subtask): TurnListener;
   /** Where what is said at a meeting is told as it is said: the pane. */

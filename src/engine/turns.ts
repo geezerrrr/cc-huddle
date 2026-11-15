@@ -5,7 +5,6 @@
 import { spawn } from "node:child_process";
 import {
   query,
-  type Options,
   type SDKMessage,
   type SDKResultMessage,
   type SpawnedProcess,
@@ -14,6 +13,7 @@ import {
 import type { TodoWriteInput } from "@anthropic-ai/claude-agent-sdk/sdk-tools";
 import { z } from "zod";
 import { errorText } from "./core.ts";
+import type { MemberOptions } from "./policy.ts";
 import { watchMember } from "./processes.ts";
 
 /** The in-process MCP server that gives a member's turn openplan's tools. */
@@ -316,16 +316,17 @@ const STDERR_TAIL = 2000;
  * `spawnClaudeCodeProcess`; it does what the SDK's own spawn does), so a
  * stopped turn can be waited on until its process has exited (`gone`), a
  * failed one says what Claude Code last wrote to stderr (`failure`), and the
- * process is kept with the others (processes.ts).
+ * process is kept with the others, by the settings file it runs under
+ * (`settings`, processes.ts).
  */
-export function claudeProcess() {
+export function claudeProcess(settings: string) {
   let exited = Promise.resolve();
   let stderr = "";
   return {
     spawn: ({ command, args, cwd, env, signal }: SpawnOptions): SpawnedProcess => {
       // The SDK's signal fires only after Claude Code had its chance to shut down on its own.
       const child = spawn(command, args, { cwd, env, signal, stdio: "pipe", windowsHide: true });
-      watchMember(child, args);
+      watchMember(child, settings);
       exited = new Promise((resolve) => {
         child.once("close", () => {
           resolve();
@@ -357,7 +358,7 @@ export function claudeProcess() {
  */
 export async function runTurn(
   prompt: string,
-  options: Options,
+  options: MemberOptions,
   signal: AbortSignal,
   decode: (message: SDKMessage) => TurnOutcome | undefined,
 ): Promise<TurnOutcome> {
@@ -368,7 +369,7 @@ export async function runTurn(
     abortController.abort();
   };
   signal.addEventListener("abort", stop, { once: true });
-  const claude = claudeProcess();
+  const claude = claudeProcess(options.settings);
   const run = query({
     prompt,
     options: { ...options, abortController, spawnClaudeCodeProcess: claude.spawn },
@@ -405,7 +406,7 @@ export interface Reply {
  */
 export async function askOnce(params: {
   prompt: string;
-  options: Options;
+  options: MemberOptions;
   schema?: z.ZodType;
   signal: AbortSignal;
   listener?: TurnListener;

@@ -67,7 +67,7 @@ beforeEach(async () => {
     places: { repo: await openRepository(repo), root: path.join(dir, "data") },
     changed: vi.fn(),
     allowAlways: vi.fn(),
-    options: (_, kind, cwd) => ({ cwd, model: kind }),
+    options: (m, kind, cwd) => ({ cwd, model: kind, settings: `${m.name}.json` }),
     recorder: () => ({}),
     speech: () => ({}),
     underWay: () => scheduler.underWay(),
@@ -318,6 +318,7 @@ describe("Scheduler", () => {
     expect(vi.mocked(askOnce).mock.lastCall?.[0].options).toEqual({
       cwd: goalFolder(core.places),
       model: "readOnly",
+      settings: "sonnet.json",
     });
     expect(s1.tokens).toBe(5);
   });
@@ -343,6 +344,7 @@ describe("Scheduler", () => {
       expect(review?.options).toEqual({
         cwd: path.join(core.places.root, "desks", "s1"),
         model: "readOnly",
+        settings: "sonnet.json",
       });
       expect(review?.prompt).toContain("Acceptance criteria: Shows both scores");
       expect(review?.schema?.safeParse({ pass: true, notes: "Fine." }).success).toBe(true);
@@ -412,7 +414,7 @@ describe("Scheduler", () => {
         expect(runs()).toHaveLength(1);
       });
       await scheduler.act("s1", "stop");
-      await settled(s1, "stopped");
+      expect(s1.status).toBe("stopped");
       await scheduler.act("s1", "continue");
       await settled(s1, "done");
       expect(runs()[1]).toMatchObject({

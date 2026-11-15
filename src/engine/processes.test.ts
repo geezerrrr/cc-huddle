@@ -37,8 +37,7 @@ describe("member processes", () => {
   it("are written down while they run, with their settings file", async () => {
     const settings = path.join(dir, "glm.json");
     const child = lasting();
-    watchMember(child, ["--verbose", "--settings", settings]);
-    watchMember(lasting(), ["--verbose"]);
+    watchMember(child, settings);
     expect(await written()).toEqual([{ pid: child.pid, settings }]);
     child.kill();
     await ended(child);
@@ -49,7 +48,7 @@ describe("member processes", () => {
 
   it("are stopped together as the server exits", async () => {
     const children = [lasting(), lasting()];
-    for (const child of children) watchMember(child, ["--settings", "x.json"]);
+    for (const child of children) watchMember(child, "x.json");
     stopMembers();
     await Promise.all(children.map(ended));
     expect(children.map((c) => c.signalCode)).toEqual(["SIGTERM", "SIGTERM"]);

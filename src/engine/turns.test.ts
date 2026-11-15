@@ -207,7 +207,7 @@ describe("turnDecoder", () => {
 
 describe("claudeProcess", () => {
   const run = (script: string) => {
-    const claude = claudeProcess();
+    const claude = claudeProcess("glm.json");
     const child = claude.spawn({
       command: process.execPath,
       args: ["-e", script],
@@ -251,7 +251,12 @@ describe("askOnce", () => {
   };
   const init = msg({ type: "system", subtype: "init", session_id: "s1", model: "glm-5" });
   const ask = (schema?: z.ZodType, signal = new AbortController().signal) =>
-    askOnce({ prompt: "Review it", options: { cwd: "/desk" }, schema, signal });
+    askOnce({
+      prompt: "Review it",
+      options: { cwd: "/desk", settings: "glm.json" },
+      schema,
+      signal,
+    });
 
   it("gives the turn's words, its session and its tokens, and closes the query", async () => {
     const close = streams(
