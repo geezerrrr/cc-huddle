@@ -166,6 +166,7 @@ function needOf(question: QuestionToYou, work: Work): OpenplanNeed {
       return {
         ...head,
         kind: "decision",
+        of: question.decision.kind,
         options: question.decision.options,
         ...(question.decision.kind === "delivery" && {
           sendBack: done.map((s) => ({ id: s.id, title: s.title })),

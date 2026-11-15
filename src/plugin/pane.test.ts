@@ -204,6 +204,7 @@ describe("paneTeam", () => {
         about: "board",
         text: "Game",
         kind: "decision",
+        of: "delivery",
         options: ["accept", "revise"],
         sendBack: [{ id: "board", title: "board" }],
       },

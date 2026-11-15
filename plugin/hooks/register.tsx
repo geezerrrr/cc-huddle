@@ -1,6 +1,6 @@
 /**
  * openplan's mod (docs/design.md §7.2): the pane, the band above the prompt,
- * toasts for what needs you, transcript rows for milestones, prompts to your
+ * asks for what needs you, transcript rows for milestones, prompts to your
  * session for what needs a conversation, and the `/openplan` command, which
  * hands the team a task. It draws what the MCP server serves on the pane's
  * socket, which the `pane` tool names, and answers through the `answer`
@@ -66,14 +66,13 @@ let server: string | undefined;
 let socket: string | undefined;
 /** The revision of the team the pane has. */
 let revision: number | undefined;
-/** Needs, milestones and prompts told already; those there at the first look are not news. */
+/** Milestones and prompts told already; those there at the first look are not news. */
 let told: Set<string> | undefined;
 let polling = false;
-/**
- * Whether the surface docks a pane beside the transcript, as the band was
- * last drawn: only there does a pane opened unasked not take the screen over.
- */
-let docks = false;
+/** Needs put to you in a question dialog already; one dismissed waits in the pane. */
+const asked = new Set<string>();
+/** The asks, one after another in the order the needs came. */
+let asking = Promise.resolve();
 /**
  * The poll, while it runs. It stops when the server can't open the team (no
  * team in the repository, another session's), and starts again when you or
@@ -99,16 +98,68 @@ function callLine(name: string, input: unknown): string {
   return main ? `${name} ${clip(String(main))}` : name;
 }
 
-/** What a need asks, in a line, for a toast. */
-function needLine(need: OpenplanNeed): string {
+/** A question dialog's chip holds this many characters. */
+const ASK_HEADER = 12;
+
+/**
+ * Puts a need to you in Claude Code's question dialog, and gives what the
+ * `answer` tool takes for what you said; undefined when what you typed
+ * answers nothing. Rejects when you dismiss it.
+ */
+async function askedAnswer($: $, need: OpenplanNeed): Promise<Record<string, unknown> | undefined> {
+  const header = need.from.slice(0, ASK_HEADER);
+  const about = need.about && ` for "${need.about}"`;
   switch (need.kind) {
-    case "permission":
-      return `${need.from} asks to use ${need.call}`;
-    case "choices":
-      return `${need.from} asks: ${need.choices.map((c) => c.question).join(" ")}`;
-    case "decision":
-      return need.text ? `${need.from}: ${need.text}` : `${need.about} waits on you`;
+    case "permission": {
+      const said = await $.ui.ask(`${need.from} asks to use ${need.call}${about}. Allow it?`, {
+        options: need.options.map((o) => PERMISSIONS[o]),
+        header,
+      });
+      const option = need.options.find((o) => PERMISSIONS[o] === said);
+      // What you type instead is why it is denied.
+      return option ? { option } : { option: "deny", note: said };
+    }
+    case "choices": {
+      const chosen: string[] = [];
+      for (const choice of need.choices)
+        chosen.push(
+          await $.ui.ask(`${need.from} asks: ${choice.question}`, {
+            options: choice.options,
+            header: (choice.header || need.from).slice(0, ASK_HEADER),
+            ...(choice.multiSelect && { multiSelect: true as const }),
+          }),
+        );
+      return { picks: chosen };
+    }
+    case "decision": {
+      const what =
+        need.of === "merge"
+          ? `Merging "${need.about}" needs you: ${need.text.split("\n").join(", ")}.`
+          : `The review of "${need.about}" is stuck: ${clip(need.text)}`;
+      const said = await $.ui.ask(`${what} What now?`, {
+        options: need.options.map((o) => DECISIONS[o] ?? o),
+        header,
+      });
+      const decision = need.options.find((o) => (DECISIONS[o] ?? o) === said);
+      if (decision) return { decision };
+      // What you type instead goes back with the work, where it can.
+      return need.options.includes("sendBack") ? { decision: "sendBack", note: said } : undefined;
+    }
   }
+}
+
+/** Asks a need that is still open, and answers it as you said; dismissed, it waits in the pane. */
+async function askNeed($: $, need: OpenplanNeed) {
+  // Answered meanwhile, in the pane: nothing left to ask.
+  if (!(await read($, team))?.needs.some((n) => n.id === need.id)) return;
+  let args;
+  try {
+    args = await askedAnswer($, need);
+  } catch {
+    // Dismissed: it waits in "Needs you".
+    return;
+  }
+  if (args) await answer($, need, args);
 }
 
 /** Calls one of openplan's server's tools: its text, or its error thrown. */
@@ -178,21 +229,18 @@ async function answer($: $, need: OpenplanNeed, args: Record<string, unknown>) {
 }
 
 /**
- * Tells what is new since the last look: a toast for what needs you, a row
- * for a milestone, and a prompt to your session for what needs a conversation.
+ * Tells what is new: each need not asked yet is asked, in turn, but a task to
+ * accept, which is your session's to ask; since the last look, a row for a
+ * milestone and a prompt to your session for what needs a conversation.
  */
 function tell($: $, now: OpenplanTeam) {
-  const keys = [
-    ...now.needs.map((n) => `need:${n.id}`),
-    ...now.milestones.map((m) => m.key),
-    ...now.prompts.map((p) => p.key),
-  ];
+  for (const need of now.needs) {
+    if (asked.has(need.id) || (need.kind === "decision" && need.of === "delivery")) continue;
+    asked.add(need.id);
+    asking = asking.then(() => askNeed($, need));
+  }
+  const keys = [...now.milestones.map((m) => m.key), ...now.prompts.map((p) => p.key)];
   if (told) {
-    for (const need of now.needs)
-      if (!told.has(`need:${need.id}`)) {
-        $.ui.toast(`openplan: ${needLine(need)}. Answer it in /openplan.`);
-        if (docks) void openPane($);
-      }
     for (const milestone of now.milestones)
       if (!told.has(milestone.key)) $.ui.log(`openplan: ${milestone.text}`);
     for (const prompt of now.prompts)
@@ -238,8 +286,9 @@ async function poll($: $) {
     revision = now.revision;
     await update($, problem, () => null);
     if (now.team) {
-      tell($, now.team);
+      // Kept first: an ask looks there for whether its need is still open.
       await update($, team, () => now.team ?? null);
+      tell($, now.team);
     }
     const said = now.speaking ?? null;
     await update($, speaking, (was) => (JSON.stringify(was) === JSON.stringify(said) ? was : said));
@@ -600,7 +649,6 @@ export const register: Register = (on) => {
   }));
 
   on("ui.render", { component: "AbovePrompt" }, async ($, e, next) => {
-    docks = e.viewport?.isFullscreen === true;
     const now = await read($, team);
     if (!now?.band || e.props.hasSurvey) return next(e);
     const { Box, Button, Text } = $.ui.resolve(e);

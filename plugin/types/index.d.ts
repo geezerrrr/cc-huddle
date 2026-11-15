@@ -66,6 +66,8 @@ export type OpenplanNeed = {
     }
   | {
       kind: "decision";
+      /** What it decides: a stuck review, a merge, a task done that you accept. */
+      of: "review" | "merge" | "delivery";
       options: string[];
       /** The subtasks a task can be sent back to, for `revise`. */
       sendBack?: { id: string; title: string }[];

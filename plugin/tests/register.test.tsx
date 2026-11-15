@@ -167,23 +167,19 @@ test("the pane follows a member's record as it grows", async ($, on) => {
   await pane.unmount();
 });
 
-test("a new need is a toast, a new milestone a transcript row, a new prompt your session's; what was there before is not news", async ($, on) => {
+test("a new milestone is a transcript row, a new prompt your session's; what was there before is not news", async ($, on) => {
   const clock = mock.clock(on);
-  const toasts: string[] = [];
   const rows: string[] = [];
   const prompts: string[] = [];
   on("prompt.submit", (_, e) => {
     prompts.push(e.text);
     return { text: e.text };
   });
-  on("ui.toast", (_, e) => {
-    toasts.push(e.text);
-    return { value: undefined };
-  });
   on("ui.log", (_, e) => {
     rows.push(e.text);
     return { value: undefined };
   });
+  on("tool.call", { tool: "AskUserQuestion" }, () => ({ deny: "dismissed" }));
   serve(on, [
     {
       revision: 1,
@@ -197,7 +193,6 @@ test("a new need is a toast, a new milestone a transcript row, a new prompt your
       revision: 2,
       team: {
         ...TEAM,
-        needs: [...TEAM.needs, { ...NEED, id: "q2", call: "Bash: rm -rf dist" }],
         milestones: [
           { key: "plan:m1", text: 'Plan approved: "Dice"' },
           { key: "done:s1", text: '"Rules" by glm is merged' },
@@ -211,34 +206,78 @@ test("a new need is a toast, a new milestone a transcript row, a new prompt your
   ]);
   await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
   await clock.advance(1000);
-  expect(toasts).toEqual(["openplan: glm asks to use Bash: rm -rf dist. Answer it in /openplan."]);
   expect(rows).toEqual(['openplan: "Rules" by glm is merged']);
   expect(prompts).toEqual(["A task to accept"]);
 });
 
-test("a new need opens the pane where it docks beside the transcript, not over it", async ($, on) => {
+test("each need is asked as it comes, in turn, and answered as you said; a task to accept is your session's", async ($, on) => {
   const clock = mock.clock(on);
+  const questions: string[] = [];
+  const said = ["Allow once", "don't touch dist", "Grid", "Review again"];
+  on("tool.call", { tool: "AskUserQuestion" }, (_, e) => {
+    const [question] = e.questions as { question: string }[];
+    questions.push(question?.question ?? "");
+    return { result: { answers: { [question?.question ?? ""]: said.shift() ?? "" } } };
+  });
   const calls = serve(on, [
-    { revision: 1, team: { ...TEAM, needs: [] } },
-    { revision: 2, team: TEAM },
-    { revision: 3, team: { ...TEAM, needs: [] } },
-    { revision: 4, team: { ...TEAM, needs: [{ ...NEED, id: "q2" }] } },
+    {
+      revision: 1,
+      team: {
+        ...TEAM,
+        needs: [
+          NEED,
+          { ...NEED, id: "q2", call: "Bash: rm -rf dist" },
+          {
+            id: "q3",
+            from: "glm",
+            about: "",
+            text: "",
+            kind: "choices",
+            choices: [
+              {
+                question: "Which board?",
+                header: "Board",
+                options: ["Grid", "Hex"],
+                multiSelect: false,
+              },
+            ],
+          },
+          {
+            id: "q4",
+            from: "sonnet",
+            about: "Rules",
+            text: "Too small",
+            kind: "decision",
+            of: "review",
+            options: ["rereview", "skip", "sendBack"],
+          },
+          {
+            id: "q5",
+            from: "glm",
+            about: "",
+            text: "Game",
+            kind: "decision",
+            of: "delivery",
+            options: ["accept", "revise"],
+          },
+        ],
+      },
+    },
   ]);
-  const opened = () => calls.filter((c) => c.tool === "ui.open").length;
   await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
-  await clock.advance(500);
-  const band = (isFullscreen: boolean) =>
-    $.ui.mount({
-      ...BAND,
-      surface: "terminal",
-      viewport: { columns: 120, rows: 40, isFullscreen },
-    });
-  await (await band(false)).unmount();
-  await clock.advance(500);
-  expect(opened()).toBe(0);
-  await (await band(true)).unmount();
   await clock.advance(1000);
-  expect(opened()).toBe(1);
+  expect(questions).toEqual([
+    'glm asks to use Bash: npm test for "Rules". Allow it?',
+    'glm asks to use Bash: rm -rf dist for "Rules". Allow it?',
+    "glm asks: Which board?",
+    'The review of "Rules" is stuck: Too small What now?',
+  ]);
+  expect(calls.filter((c) => c.tool === "answer").map((c) => c.args)).toEqual([
+    { question: "q1", option: "once" },
+    { question: "q2", option: "deny", note: "don't touch dist" },
+    { question: "q3", picks: ["Grid"] },
+    { question: "q4", decision: "rereview" },
+  ]);
 });
 
 test("the pane stops asking a team that can't be opened, until you or your session turn to it", async ($, on) => {
