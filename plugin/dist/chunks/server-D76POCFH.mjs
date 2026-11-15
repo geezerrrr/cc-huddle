@@ -11563,7 +11563,12 @@ var pane = await servePane(team, letGo);
 process.once("exit", () => {
   pane.close();
 });
-var server = new McpServer({ name: "openplan", version: plugin_default.version });
+var server = new McpServer(
+  { name: "openplan", version: plugin_default.version },
+  {
+    instructions: "Talk to the user in the language they write to you in, whatever language openplan's messages and tool results are in."
+  }
+);
 var use = () => team(true);
 var listMembers = addTools(server, use);
 addPaneTools(server, use, pane);
