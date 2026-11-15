@@ -4,8 +4,11 @@ import { createRequire } from "node:module"; const require = createRequire(impor
 import { text } from "node:stream/consumers";
 
 // src/plugin/data-folder.ts
+import { chmodSync, mkdirSync } from "node:fs";
 var folder = process.env.CLAUDE_PLUGIN_DATA;
 if (!folder) throw new Error("openplan runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA");
+mkdirSync(folder, { recursive: true });
+chmodSync(folder, 448);
 var dataFolder = folder;
 
 // src/plugin/session-mode.ts
@@ -13,7 +16,7 @@ import { readdir, rm } from "node:fs/promises";
 import path2 from "node:path";
 
 // src/engine/files.ts
-import { mkdir, rename, writeFile } from "node:fs/promises";
+import { mkdir, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
@@ -36,11 +39,13 @@ async function renameOver(from, to) {
     }
   }
 }
-var fresh = (file) => `${file}.${String(process.pid)}.new`;
+var writes = 0;
+var fresh = (file) => `${file}.${String(process.pid)}.${String(writes += 1)}.new`;
 async function writeWhole(file, text2, mode) {
   await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(fresh(file), text2, { mode });
-  await renameOver(fresh(file), file);
+  const beside = fresh(file);
+  await writeFile(beside, text2, { mode });
+  await renameOver(beside, file);
 }
 
 // src/engine/running.ts

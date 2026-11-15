@@ -1,14 +1,15 @@
 import { createRequire } from "node:module"; const require = createRequire(import.meta.url);
 import {
   dataFolder,
+  exists,
   renameOver,
   running
-} from "./chunks/chunk-RMXRUWYN.mjs";
+} from "./chunks/chunk-MJULA7R6.mjs";
 
 // src/plugin/bootstrap.ts
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import * as nodeModule from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -27,10 +28,6 @@ var deps = path.join(dataFolder, "deps");
 var home = path.join(
   deps,
   manifests.reduce((hash, [, text]) => hash.update(text), createHash("sha256")).digest("hex").slice(0, 12)
-);
-var exists = (file) => stat(file).then(
-  () => true,
-  () => false
 );
 var installed = () => exists(path.join(home, "node_modules"));
 if (!await installed()) {
@@ -65,4 +62,4 @@ registerHooks({
     return bare && context.parentURL?.startsWith(ours) ? next(specifier, { ...context, parentURL: from }) : next(specifier, context);
   }
 });
-await import("./chunks/server-5ULKTV3T.mjs");
+await import("./chunks/server-APYN6EVS.mjs");

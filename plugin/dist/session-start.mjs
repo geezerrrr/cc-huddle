@@ -7387,8 +7387,18 @@ var errorCode = (error62) => error62.code;
 // src/engine/data.ts
 import { createHash } from "node:crypto";
 import { link, mkdir, readdir as readdir2, readFile as readFile2, rm as rm2, writeFile } from "node:fs/promises";
-import { readFileSync, unlinkSync } from "node:fs";
 import path3 from "node:path";
+
+// src/engine/files.ts
+import { readFileSync } from "node:fs";
+function textIfThere(file2) {
+  try {
+    return readFileSync(file2, "utf8");
+  } catch (error62) {
+    if (errorCode(error62) === "ENOENT") return void 0;
+    throw error62;
+  }
+}
 
 // src/engine/goal-files.ts
 import path from "node:path";
@@ -7426,7 +7436,7 @@ function serialBy() {
 
 // src/engine/git.ts
 import { spawn } from "node:child_process";
-import { readdir, readFile, realpath, rm, stat } from "node:fs/promises";
+import { readdir, readFile, realpath, rm } from "node:fs/promises";
 import path2 from "node:path";
 var FLAGS = [
   "-c",
@@ -7525,15 +7535,8 @@ async function readState(file2) {
     );
   return saved.state;
 }
-function lockText(file2) {
-  try {
-    return readFileSync(file2, "utf8");
-  } catch {
-    return void 0;
-  }
-}
 function readHolder(file2) {
-  const text2 = lockText(file2);
+  const text2 = textIfThere(file2);
   try {
     return text2 === void 0 ? void 0 : JSON.parse(text2);
   } catch {
@@ -7544,6 +7547,7 @@ function holderOf(lock) {
   const holder = readHolder(lock);
   return holder && running(holder.pid) ? holder : void 0;
 }
+var startedAt = (entry) => "state" in entry ? entry.state.goal.createdAt : Number.POSITIVE_INFINITY;
 async function listGoals(repoFolder2) {
   const folder2 = goalsFolder(repoFolder2);
   let slugs;
@@ -7556,18 +7560,17 @@ async function listGoals(repoFolder2) {
   const found = await Promise.all(
     slugs.map(async (slug) => {
       const files = goalFiles(path3.join(folder2, slug));
-      let state;
+      const holder = holderOf(files.lock);
+      const held = holder && { holder };
       try {
-        state = await readState(files.state);
+        return { slug, state: await readState(files.state), ...held };
       } catch (error62) {
         if (errorCode(error62) === "ENOENT" || errorCode(error62) === "ENOTDIR") return void 0;
-        throw error62;
+        return { slug, unreadable: errorText(error62), ...held };
       }
-      const holder = holderOf(files.lock);
-      return { slug, state, ...holder && { holder } };
     })
   );
-  return found.filter((entry) => entry !== void 0).sort((a, b) => a.state.goal.createdAt - b.state.goal.createdAt);
+  return found.filter((entry) => entry !== void 0).sort((a, b) => startedAt(a) - startedAt(b));
 }
 
 // src/engine/team.ts
@@ -27295,8 +27298,6 @@ function date4(params) {
 var isHalted = (status) => status === "failed" || status === "stopped";
 var MEETING_SIZES = ["small", "discussion", "large"];
 var toYou = (question) => question.kind !== "teammate";
-var SUBTASK_ACTIONS = ["stop", "continue", "retry", "redo"];
-var GOAL_ACTIONS = ["pause", "resume", "archive", "delete"];
 
 // src/engine/team.ts
 var EFFORTS = ["low", "medium", "high", "xhigh", "max"];
@@ -27319,12 +27320,6 @@ async function readCopy(file2) {
 }
 
 // src/engine/machines.ts
-var GOAL_MACHINE = {
-  pause: { from: ["active"], to: "paused" },
-  archive: { from: ["active", "paused"], to: "archived" },
-  resume: { from: ["paused", "archived"], to: "active" },
-  delete: { from: ["archived"], to: "removed" }
-};
 var MEETING_MACHINE = {
   plan: { from: ["running"], to: "review" },
   fail: { from: ["running"], to: "failed" },
@@ -27332,33 +27327,6 @@ var MEETING_MACHINE = {
   change: { from: ["review"], to: "review" },
   approve: { from: ["review"], to: "approved" },
   resume: { from: ["failed", "cancelled"], to: "running" }
-};
-var SUBTASK_MACHINE = {
-  /** The scheduler starts it: upstream merged, its assignee free, its goal active. */
-  start: { from: ["pending"], to: "running" },
-  /** Merging only while it waits on your call; a merge under way finishes first. */
-  stop: { from: ["pending", "running", "reviewing", "merging"], to: "stopped" },
-  /** Delivered with review on. */
-  review: { from: ["running"], to: "reviewing" },
-  /** Delivered with review off, or the review passed or was skipped. */
-  merge: { from: ["running", "reviewing"], to: "merging" },
-  fail: { from: ["running"], to: "failed" },
-  /** Its goal paused, or you added to it: it goes on in its session. */
-  hold: { from: ["running"], to: "pending" },
-  /** The reviewer, or you, sent it back. */
-  reject: { from: ["reviewing"], to: "pending" },
-  merged: { from: ["merging"], to: "done" },
-  /** Merging it left text conflicts for its assignee to resolve. */
-  conflict: { from: ["merging"], to: "pending" },
-  /** From the start: no session, delivery or worktree. */
-  retry: { from: ["failed", "stopped"], to: "pending" },
-  /** Where it stopped: its session and worktree. */
-  continue: { from: ["failed", "stopped"], to: "pending" },
-  /** Stopped after delivery (Subtask.stoppedIn): its review, or its merge, again. */
-  reviewAgain: { from: ["stopped"], to: "reviewing" },
-  mergeAgain: { from: ["stopped"], to: "merging" },
-  /** Done, then redone in its session: its upstream changed, you added to it, or you sent its task back. */
-  redo: { from: ["done"], to: "pending" }
 };
 function can(machine, state, event) {
   return machine[event]?.from.includes(state) ?? false;
@@ -27467,24 +27435,15 @@ function waitsIn(state, subtask, busy) {
   }
 }
 function redoneUpstream(state, subtask) {
-  const startedAt = subtask.startedAt;
-  if (subtask.status !== "done" || startedAt === void 0) return [];
+  const startedAt2 = subtask.startedAt;
+  if (subtask.status !== "done" || startedAt2 === void 0) return [];
   return subtask.dependsOn.flatMap((id) => {
     const d = state.subtasks.find((s) => s.id === id);
-    return d?.status === "done" && (d.finishedAt ?? 0) > startedAt ? [d] : [];
+    return d?.status === "done" && (d.finishedAt ?? 0) > startedAt2 ? [d] : [];
   });
 }
-function actionsOf(state, subtask) {
-  const deciding = openQuestions(state, subtask.id).length > 0;
-  return SUBTASK_ACTIONS.filter(
-    (action) => can(SUBTASK_MACHINE, subtask.status, action) && (action !== "stop" || subtask.status !== "merging" || deciding) && (action !== "redo" || redoneUpstream(state, subtask).length > 0)
-  );
-}
-function goalActions(goal) {
-  return GOAL_ACTIONS.filter((event) => can(GOAL_MACHINE, goal.status, event));
-}
 function meetingResumes(state, meeting) {
-  return can(MEETING_MACHINE, meeting.status, "resume") && !meeting.plan && isActive(state) && meeting.participants.every((m) => state.members.includes(m));
+  return can(MEETING_MACHINE, meeting.status, "resume") && !meeting.plan && isActive(state);
 }
 function derive(state) {
   const busy = busyMembers(state);
@@ -27497,14 +27456,12 @@ function derive(state) {
           s.id,
           {
             waits: waitsIn(state, s, busy),
-            actions: actionsOf(state, s),
             redone,
             ...reviewed && { reviewedBy: reviewerOf(state, s) }
           }
         ];
       })
     ),
-    goal: goalActions(state.goal),
     busy: [...busy],
     resumable: state.meetings.filter((m) => meetingResumes(state, m)).map((m) => m.id)
   };
@@ -27512,6 +27469,7 @@ function derive(state) {
 
 // src/plugin/words.ts
 var PLAN_TO_REVIEW = "plan to review";
+var hostText = (meeting) => `hosted by ${meeting.host}${meeting.hostOnly ? ", who only runs it" : ""}`;
 function waitText(wait, work) {
   switch (wait.kind) {
     case "goal":
@@ -27534,6 +27492,7 @@ function waitText(wait, work) {
       return "waits until you accept the task it builds on";
   }
 }
+var redoneText = (titles) => `built on ${titles.map((t) => `"${t}"`).join(", ")}, redone since: redo it to take that in`;
 function stepText({ done, total, current }) {
   if (!total) return void 0;
   const step = `step ${String(Math.min(done + 1, total))} of ${String(total)}`;
@@ -27592,19 +27551,22 @@ function needWords(question, work) {
       }
   }
 }
-var whereOf = (entry) => entry.holder ? "in another session" : entry.state.goal.status === "archived" ? "archived" : "paused";
+var whereOf = (entry) => entry.holder ? "in another session" : !("state" in entry) ? "unreadable" : entry.state.goal.status === "archived" ? "archived" : "paused";
 function progressOf({ subtasks, meetings }) {
   const done = subtasks.filter((s) => s.status === "done").length;
   return subtasks.length ? `${String(done)}/${String(subtasks.length)} subtasks done` : meetings.some((m) => m.status === "review") ? PLAN_TO_REVIEW : "no plan yet";
 }
 var goalLabel = (state, where) => `${state.goal.name} \xB7 ${progressOf(state)} \xB7 ${where}`;
+var entryLabel = (entry) => "state" in entry ? goalLabel(entry.state, whereOf(entry)) : `${entry.slug} \xB7 can't be read: ${entry.unreadable}`;
 
 // src/plugin/status.ts
-function subtaskLine(subtask, waits, work) {
+function subtaskLine(subtask, { waits, redone }, work) {
   const parts = [subtask.status];
   const step = subtask.status === "running" && stepText(subtask.progress);
   if (step) parts.push(step);
   parts.push(...waits.map((w) => waitText(w, work)));
+  if (redone.length)
+    parts.push(redoneText(redone.map((id) => work.subtasks.find((s) => s.id === id)?.title ?? "")));
   if (subtask.error) parts.push(`error: ${subtask.error}`);
   return `    - ${subtask.title} [${subtask.id}], ${subtask.assignee}: ${parts.join(", ")}`;
 }
@@ -27624,14 +27586,16 @@ function statusText(work) {
   ];
   for (const meeting of work.meetings.filter((m) => m.status !== "approved"))
     lines.push(
-      `  Meeting [${meeting.id}], hosted by ${meeting.host}${meeting.hostOnly ? ", who only runs it" : ""}: ${meetingStatus(meeting)}${meeting.status === "review" ? ": approve it, change it, or cancel it" : ""}${derived2.resumable.includes(meeting.id) ? "; it can go on" : ""}`
+      `  Meeting [${meeting.id}], ${hostText(meeting)}: ${meetingStatus(meeting)}${meeting.status === "review" ? ": approve it, change it, or cancel it" : ""}${derived2.resumable.includes(meeting.id) ? "; it can go on" : ""}`
     );
   for (const task of work.tasks) {
     lines.push(
       `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", the user accepts it" : ""}`
     );
     for (const subtask of work.subtasks.filter((s) => s.taskId === task.id))
-      lines.push(subtaskLine(subtask, derived2.subtasks[subtask.id]?.waits ?? [], work));
+      lines.push(
+        subtaskLine(subtask, derived2.subtasks[subtask.id] ?? { waits: [], redone: [] }, work)
+      );
   }
   const open2 = work.questions.filter(toYou);
   if (open2.length) lines.push("", "Waiting on you:", ...open2.map((q) => questionLine(q, work)));
@@ -27639,7 +27603,7 @@ function statusText(work) {
 }
 var resumableOf = (others) => others.map((entry) => ({
   slug: entry.slug,
-  label: goalLabel(entry.state, whereOf(entry))
+  label: entryLabel(entry)
 }));
 function othersText(others) {
   if (!others.length) return void 0;
@@ -27654,14 +27618,15 @@ async function sessionContext(cwd, dataFolder2, session) {
   let repo;
   try {
     repo = await openRepository(cwd);
-  } catch {
-    return void 0;
+  } catch (error62) {
+    if (error62 instanceof GitError) return void 0;
+    throw error62;
   }
   const root = repoFolder(dataFolder2, repo);
   const goals = await listGoals(root);
   const mine = goals.find((g) => g.holder?.session === session);
   const parts = [];
-  if (mine) {
+  if (mine && "state" in mine) {
     const { team } = await readCopy(goalFiles(path4.join(goalsFolder(root), mine.slug)).team);
     const status = statusText(workOf({ state: mine.state, team, underWay: () => [] }));
     parts.push(
@@ -27676,8 +27641,11 @@ ${status}`
 }
 
 // src/plugin/data-folder.ts
+import { chmodSync, mkdirSync } from "node:fs";
 var folder = process.env.CLAUDE_PLUGIN_DATA;
 if (!folder) throw new Error("openplan runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA");
+mkdirSync(folder, { recursive: true });
+chmodSync(folder, 448);
 var dataFolder = folder;
 
 // src/plugin/session-start.ts

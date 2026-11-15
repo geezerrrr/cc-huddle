@@ -48,10 +48,27 @@ var errorText = (error) => error instanceof Error ? error.message : String(error
 var errorCode = (error) => error.code;
 
 // src/engine/files.ts
-import { renameSync, writeFileSync } from "node:fs";
-import { mkdir, rename, writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
+import { mkdir, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+async function exists(file) {
+  try {
+    await stat(file);
+    return true;
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return false;
+    throw error;
+  }
+}
+function textIfThere(file) {
+  try {
+    return readFileSync(file, "utf8");
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return void 0;
+    throw error;
+  }
+}
 var HELD = /* @__PURE__ */ new Set(["EPERM", "EACCES", "EBUSY"]);
 var HELD_WAIT_MS = 5e3;
 async function renameOver(from, to) {
@@ -67,15 +84,13 @@ async function renameOver(from, to) {
     }
   }
 }
-var fresh = (file) => `${file}.${String(process.pid)}.new`;
+var writes = 0;
+var fresh = (file) => `${file}.${String(process.pid)}.${String(writes += 1)}.new`;
 async function writeWhole(file, text, mode) {
   await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(fresh(file), text, { mode });
-  await renameOver(fresh(file), file);
-}
-function writeWholeSync(file, text) {
-  writeFileSync(fresh(file), text);
-  renameSync(fresh(file), file);
+  const beside = fresh(file);
+  await writeFile(beside, text, { mode });
+  await renameOver(beside, file);
 }
 
 // src/engine/running.ts
@@ -89,8 +104,11 @@ function running(pid) {
 }
 
 // src/plugin/data-folder.ts
+import { chmodSync, mkdirSync } from "node:fs";
 var folder = process.env.CLAUDE_PLUGIN_DATA;
 if (!folder) throw new Error("openplan runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA");
+mkdirSync(folder, { recursive: true });
+chmodSync(folder, 448);
 var dataFolder = folder;
 
 export {
@@ -101,9 +119,10 @@ export {
   spend,
   errorText,
   errorCode,
+  exists,
+  textIfThere,
   renameOver,
   writeWhole,
-  writeWholeSync,
   running,
   dataFolder
 };

@@ -6,13 +6,14 @@ import {
   dataFolder,
   errorCode,
   errorText,
+  exists,
   renameOver,
   running,
   spend,
+  textIfThere,
   workOf,
-  writeWhole,
-  writeWholeSync
-} from "./chunk-RMXRUWYN.mjs";
+  writeWhole
+} from "./chunk-MJULA7R6.mjs";
 
 // node_modules/.pnpm/yaml@2.9.1/node_modules/yaml/dist/nodes/identity.js
 var require_identity = __commonJS({
@@ -7364,7 +7365,7 @@ var plugin_default = {
 
 // src/engine/git.ts
 import { spawn } from "node:child_process";
-import { readdir, readFile, realpath, rm, stat } from "node:fs/promises";
+import { readdir, readFile, realpath, rm } from "node:fs/promises";
 import path2 from "node:path";
 
 // src/engine/goal-files.ts
@@ -7480,7 +7481,6 @@ async function openRepository(folder) {
 var BRANCHES = "openplan/";
 var goalBranches = (slug) => `${BRANCHES}${slug}/`;
 var goalBranch = (slug) => `${goalBranches(slug)}main`;
-var goalFolder = (places) => goalFiles(places.root).checkout;
 async function takenSlugs(repo) {
   const refs = await git({ cwd: repo.top }, [
     "for-each-ref",
@@ -7497,10 +7497,6 @@ function slugFor(name, taken) {
     if (!taken.has(slug)) return slug;
   }
 }
-var exists = (file) => stat(file).then(
-  () => true,
-  () => false
-);
 var unlist = (repo, folder) => git({ cwd: repo.top }, ["worktree", "remove", "--force", folder], { allow: [128] });
 async function hasBranch(repo, branch) {
   const found = await git({ cwd: repo.top }, ["rev-parse", "--verify", "-q", branch], {
@@ -7516,13 +7512,12 @@ async function checkOut(repo, folder, branch, from) {
   );
 }
 var subtaskBranch = (slug, subtaskId) => `${goalBranches(slug)}${subtaskId}`;
-var deskFolder = (places, subtaskId) => goalFiles(places.root).desk(subtaskId);
 var serial = serialBy();
-var perGoal = (places, task) => serial(goalFolder(places), task);
+var perGoal = (places, task) => serial(goalFiles(places.root).checkout, task);
 async function setUpGoal(places, slug) {
   const { repo } = places;
   const branch = goalBranch(slug);
-  const folder = goalFolder(places);
+  const folder = goalFiles(places.root).checkout;
   if (!await hasBranch(repo, branch)) await git({ cwd: repo.top }, ["branch", branch, "HEAD"]);
   if (!await exists(folder)) await checkOut(repo, folder, branch);
   return folder;
@@ -7531,7 +7526,7 @@ var openGoal = (places, slug) => perGoal(places, () => setUpGoal(places, slug));
 function openDesk(places, slug, subtaskId) {
   return perGoal(places, async () => {
     const { repo } = places;
-    const desk = deskFolder(places, subtaskId);
+    const desk = goalFiles(places.root).desk(subtaskId);
     await setUpGoal(places, slug);
     if (await exists(path2.join(desk, ".git"))) return desk;
     await rm(desk, { recursive: true, force: true });
@@ -7563,7 +7558,7 @@ async function worktreeAt(repo, tree) {
 var merging = async (at) => (await git(at, ["rev-parse", "-q", "--verify", "MERGE_HEAD"], { allow: [1] })).code === 0;
 function commitDesk(places, slug, subtaskId, by, message) {
   return perGoal(places, async () => {
-    const at = await worktreeAt(places.repo, deskFolder(places, subtaskId));
+    const at = await worktreeAt(places.repo, goalFiles(places.root).desk(subtaskId));
     const signed = { ...at, env: { ...at.env, ...authorEnv(by) } };
     await git(signed, ["add", "-A"]);
     const staged = await git(signed, ["diff", "--cached", "--quiet"], { allow: [1] });
@@ -7573,7 +7568,7 @@ function commitDesk(places, slug, subtaskId, by, message) {
 }
 var MARKERS = /^<{7} [\s\S]*?^={7}\r?$[\s\S]*?^>{7} /m;
 async function unresolved(places, subtaskId, files) {
-  const desk = deskFolder(places, subtaskId);
+  const desk = goalFiles(places.root).desk(subtaskId);
   const marked = await Promise.all(
     files.map(
       (file) => readFile(path2.join(desk, file), "utf8").then(
@@ -7592,7 +7587,7 @@ async function conflicts(places, subtaskId, at) {
   return { kind: "conflict", text: text2, other: files.filter((file) => !text2.includes(file)) };
 }
 async function removeDesk(places, slug, subtaskId) {
-  const desk = deskFolder(places, subtaskId);
+  const desk = goalFiles(places.root).desk(subtaskId);
   await unlist(places.repo, desk);
   await rm(desk, { recursive: true, force: true });
   await git({ cwd: places.repo.top }, ["branch", "-q", "-D", subtaskBranch(slug, subtaskId)], {
@@ -7602,7 +7597,7 @@ async function removeDesk(places, slug, subtaskId) {
 function mergeDesk(places, slug, subtaskId, by) {
   return perGoal(places, async () => {
     const { repo } = places;
-    const folder = deskFolder(places, subtaskId);
+    const folder = goalFiles(places.root).desk(subtaskId);
     if (!await exists(folder)) {
       const branch = subtaskBranch(slug, subtaskId);
       if (!await hasBranch(repo, branch)) return { kind: "merged" };
@@ -7634,9 +7629,9 @@ function mergeDesk(places, slug, subtaskId, by) {
   });
 }
 var literally = (file) => `:(literal)${file}`;
-function pickSide(places, slug, subtaskId, files, side) {
+function pickSide(places, subtaskId, files, side) {
   return perGoal(places, async () => {
-    const desk = await worktreeAt(places.repo, deskFolder(places, subtaskId));
+    const desk = await worktreeAt(places.repo, goalFiles(places.root).desk(subtaskId));
     const stages = await git(desk, ["ls-files", "-u", "-z", "--", ...files.map(literally)]);
     const wanted = side === "ours" ? "2" : "3";
     const kept = new Set(
@@ -7650,9 +7645,9 @@ function pickSide(places, slug, subtaskId, files, side) {
     }
   });
 }
-function abortMerge(places, slug, subtaskId) {
+function abortMerge(places, subtaskId) {
   return perGoal(places, async () => {
-    const desk = await worktreeAt(places.repo, deskFolder(places, subtaskId));
+    const desk = await worktreeAt(places.repo, goalFiles(places.root).desk(subtaskId));
     if (await merging(desk)) await git(desk, ["merge", "--abort"]);
   });
 }
@@ -7670,7 +7665,7 @@ function removeGoal(places, slug) {
     for (const id of refs.stdout.split("\n")) {
       if (id && id !== "main") await removeDesk(places, slug, id);
     }
-    const folder = goalFolder(places);
+    const folder = goalFiles(places.root).checkout;
     await unlist(repo, folder);
     await rm(folder, { recursive: true, force: true });
   });
@@ -7679,12 +7674,14 @@ function removeGoal(places, slug) {
 // src/engine/processes.ts
 import { execFile } from "node:child_process";
 import { readFile as readFile2 } from "node:fs/promises";
+import { setTimeout as delay } from "node:timers/promises";
 var running2 = /* @__PURE__ */ new Map();
 var record;
 function save() {
-  if (record === void 0) return;
+  if (!record) return;
+  const { file, writes } = record;
   const written2 = [...running2].map(([pid, { settings }]) => ({ pid, settings }));
-  writeWholeSync(record, JSON.stringify(written2));
+  writes.run(() => writeWhole(file, JSON.stringify(written2)));
 }
 function watchMember(child, settings) {
   const { pid } = child;
@@ -7715,26 +7712,46 @@ var commandLine = (pid) => new Promise((resolve) => {
 async function written(file) {
   try {
     return JSON.parse(await readFile2(file, "utf8"));
-  } catch {
-    return [];
+  } catch (error) {
+    if (errorCode(error) === "ENOENT") return [];
+    throw error;
   }
 }
-async function recordMembersIn(file) {
+var LEFT_EXIT_MS = 5e3;
+async function exits(pid, ms) {
+  const until = Date.now() + ms;
+  while (running(pid)) {
+    if (Date.now() > until) return false;
+    await delay(50);
+  }
+  return true;
+}
+async function stopLeft(pid) {
+  const signal = (name) => {
+    try {
+      process.kill(pid, name);
+    } catch {
+    }
+  };
+  signal("SIGTERM");
+  if (await exits(pid, LEFT_EXIT_MS)) return;
+  signal("SIGKILL");
+  await exits(pid, LEFT_EXIT_MS);
+}
+async function recordMembersIn(file, failed) {
   const left = await written(file);
   await Promise.all(
     left.map(async ({ pid, settings }) => {
-      if (!(await commandLine(pid))?.includes(settings)) return;
-      try {
-        process.kill(pid, "SIGTERM");
-      } catch {
-      }
+      if ((await commandLine(pid))?.includes(settings)) await stopLeft(pid);
     })
   );
-  record = file;
+  record = { file, writes: inOrder(failed) };
   save();
 }
-function stopRecording() {
+async function stopRecording() {
+  const was = record;
   record = void 0;
+  await was?.writes.idle();
 }
 
 // src/engine/team.ts
@@ -7754,18 +7771,39 @@ var DECISION_OPTIONS = [
   "ours",
   "theirs",
   "retry",
+  "stop",
   "accept",
   "revise"
 ];
 var DECISIONS = {
-  review: { options: ["rereview", "skip", "sendBack"], note: { option: "sendBack" } },
-  merge: { options: ["ours", "theirs", "retry"] },
-  delivery: { options: ["accept", "revise"], note: { option: "revise", needed: true } }
+  /** A review that sent the delivery back too often: send it back with its notes, and your words if you add some. */
+  stuckReview: () => ({
+    kind: "review",
+    options: ["rereview", "skip", "sendBack"],
+    note: { option: "sendBack" }
+  }),
+  /** A review that failed: with no notes of its own, it goes back only with your words. */
+  failedReview: () => ({
+    kind: "review",
+    options: ["rereview", "skip", "sendBack"],
+    note: { option: "sendBack", needed: true }
+  }),
+  /** Files a merge can't take line by line: keep one side, or merge again. */
+  mergeFiles: (files) => ({
+    kind: "merge",
+    options: ["ours", "theirs", "retry"],
+    files
+  }),
+  /** A merge git failed on: try again, or stop the subtask, its delivery standing. */
+  failedMerge: () => ({ kind: "merge", options: ["retry", "stop"] }),
+  /** A task done that you accept: accept it, or send it back saying what to change. */
+  delivery: () => ({
+    kind: "delivery",
+    options: ["accept", "revise"],
+    note: { option: "revise", needed: true }
+  })
 };
-function noteNeeded(kind, option) {
-  const { note } = DECISIONS[kind];
-  return note?.option === option && note.needed === true;
-}
+var noteNeeded = (decision, option) => decision.note?.option === option && decision.note.needed === true;
 var PERMISSION_OPTIONS = ["once", "always", "deny"];
 var PERMISSION_NOTE = "deny";
 var toYou = (question) => question.kind !== "teammate";
@@ -8140,11 +8178,11 @@ function waitsIn(state, subtask2, busy) {
   }
 }
 function redoneUpstream(state, subtask2) {
-  const startedAt = subtask2.startedAt;
-  if (subtask2.status !== "done" || startedAt === void 0) return [];
+  const startedAt2 = subtask2.startedAt;
+  if (subtask2.status !== "done" || startedAt2 === void 0) return [];
   return subtask2.dependsOn.flatMap((id) => {
     const d = state.subtasks.find((s) => s.id === id);
-    return d?.status === "done" && (d.finishedAt ?? 0) > startedAt ? [d] : [];
+    return d?.status === "done" && (d.finishedAt ?? 0) > startedAt2 ? [d] : [];
   });
 }
 function actionsOf(state, subtask2) {
@@ -8153,11 +8191,8 @@ function actionsOf(state, subtask2) {
     (action) => can(SUBTASK_MACHINE, subtask2.status, action) && (action !== "stop" || subtask2.status !== "merging" || deciding) && (action !== "redo" || redoneUpstream(state, subtask2).length > 0)
   );
 }
-function goalActions(goal) {
-  return GOAL_ACTIONS.filter((event) => can(GOAL_MACHINE, goal.status, event));
-}
 function meetingResumes(state, meeting2) {
-  return can(MEETING_MACHINE, meeting2.status, "resume") && !meeting2.plan && isActive(state) && meeting2.participants.every((m) => state.members.includes(m));
+  return can(MEETING_MACHINE, meeting2.status, "resume") && !meeting2.plan && isActive(state);
 }
 function derive(state) {
   const busy = busyMembers(state);
@@ -8170,23 +8205,266 @@ function derive(state) {
           s.id,
           {
             waits: waitsIn(state, s, busy),
-            actions: actionsOf(state, s),
             redone,
             ...reviewed && { reviewedBy: reviewerOf(state, s) }
           }
         ];
       })
     ),
-    goal: goalActions(state.goal),
     busy: [...busy],
     resumable: state.meetings.filter((m) => meetingResumes(state, m)).map((m) => m.id)
   };
+}
+
+// src/engine/prompts.ts
+var listOf = (items) => new Intl.ListFormat("en", { type: "conjunction" }).format(items);
+var called = (member) => `${member.name} (${member.role.title})`;
+var TASK_WAYS = `# How you work on a subtask
+- You work in a git worktree of your own, on a branch cut from the goal's branch, which is merged into the goal's branch once you deliver. Teammates working at the same time each have theirs, so you never get in each other's way. Stay in yours.
+- You needn't commit: delivering commits whatever you leave uncommitted, under your name.
+- When you need information or a decision from a teammate (an interface, a design detail), ask them with ask_teammate. It waits for their answer.
+- When you need the user to decide something or give you what only they have, ask with AskUserQuestion, offering options, and wait for the answer. Don't just write that you are waiting: the user may not be watching.
+- When you are done, call deliver with a summary of a few sentences (what you did, anything to watch out for) and the files that are the result. Your subtask isn't done until you deliver; then end your turn.`;
+function systemPrompt(kind, member, team) {
+  const others = team.filter((m) => m.name !== member.name).map(called);
+  const who = `# Who you are
+You are ${member.name}, the ${member.role.title} on a team of Claude Code sessions working on this repository. Each member is a session of its own, often on another model. The user directs the team from their own Claude Code session.
+${others.length ? `Your teammates: ${others.join(", ")}.` : "You are the only member."}
+
+# Your duties
+${member.role.duties.trim()}`;
+  return kind === "work" ? `${who}
+
+${TASK_WAYS}` : who;
+}
+function taskBrief(input) {
+  const { goal, task, subtask: subtask2 } = input;
+  const lines = [
+    `Goal: ${goal.name}`,
+    `Task: ${task.title}${task.outcome && task.outcome !== task.title ? `. ${task.outcome}` : ""}`,
+    "",
+    `Your subtask: ${subtask2.title}`,
+    ...subtask2.description && subtask2.description !== subtask2.title ? [subtask2.description] : [],
+    ...subtask2.acceptance ? ["", `Acceptance criteria: ${subtask2.acceptance}`] : [],
+    "",
+    `Your worktree is ${input.cwd}, on branch ${input.branch}.`
+  ];
+  if (input.plan)
+    lines.push("", "The plan your team agreed on, which this subtask is part of:", "", input.plan);
+  const delivered = (s) => `- ${s.title}, by ${s.assignee}: ${s.delivery?.summary ?? ""}${s.delivery?.files.length ? ` Files: ${s.delivery.files.join(", ")}` : ""}`;
+  const direct = input.upstream.filter((u) => u.direct).map((u) => delivered(u.subtask));
+  const further = input.upstream.filter((u) => !u.direct).map((u) => delivered(u.subtask));
+  if (direct.length)
+    lines.push("", "It builds on this work, merged into the goal's branch:", ...direct);
+  if (further.length) lines.push("", "Which built on:", ...further);
+  for (const { why, note } of input.notes)
+    if (why === "revised")
+      lines.push("", `The user sent this task back before, asking for:
+${note ?? ""}`);
+    else if (why === "carried") lines.push("", `The user adds to your subtask:
+${note ?? ""}`);
+  return lines.join("\n");
+}
+function goOnMessage(reasons, subtask2) {
+  const said = ({ why, note = "" }) => {
+    switch (why) {
+      case "held":
+        return "Your work was paused and now goes on. Pick up where you left off.";
+      case "carried":
+        return `The user adds to your subtask:
+${note}`;
+      case "continued":
+        return "The user asks you to go on from where you stopped.";
+      case "rejected":
+        return `The review sent your delivery back. Fix what it says, then deliver again:
+${note}`;
+      case "conflict":
+        return `Merging your delivery into the goal's branch left conflicts in ${subtask2.conflict?.files.join(", ") ?? ""}. The merge is under way in your worktree, the conflict markers in those files. Resolve them, keeping what both sides meant, then deliver again.`;
+      case "redo":
+        return `Work you build on was redone after you delivered: ${note}. Your worktree now starts from the goal's branch as it stands. Check your part against it, change what needs changing, and deliver again.`;
+      case "revised":
+        return `The user sent your task back, asking for:
+${note}
+Make those changes, then deliver again.`;
+    }
+  };
+  return [...new Set(reasons.map(said))].join("\n\n");
+}
+var DELIVER_REMINDER = "You haven't delivered yet. If the work is finished, call deliver now with a summary and the files that are the result. If you can't finish it, say what stands in the way.";
+var SESSION_ONLY = "Only the session that started you asks teammates and delivers this subtask: do your own part and report back to it.";
+function reviewPrompt(input) {
+  const { task, subtask: subtask2, delivery } = input;
+  const files = delivery.files.length ? delivery.files.join(", ") : "none (the summary is the result)";
+  return `You're reviewing a teammate's delivery before it is merged into the goal's branch.
+
+Task: ${task.title}
+Subtask: ${subtask2.title}
+${subtask2.description && subtask2.description !== subtask2.title ? `${subtask2.description}
+` : ""}Acceptance criteria: ${subtask2.acceptance || "none given: judge whether the subtask is done as described"}
+
+${subtask2.assignee} delivered:
+${delivery.summary}
+Files: ${files}
+
+Their worktree is ${input.cwd}. Read the files, and whatever else you need there, to check the work against the criteria, and stop once you can tell. Pass it when it meets them, even if you would have done it differently; send it back only for what really falls short, and say exactly what to fix.`;
+}
+function teammateQuestion(input) {
+  const own = input.own.map(
+    (s) => `- ${s.title} (${s.status})${s.delivery ? `: ${s.delivery.summary}` : ""}`
+  );
+  return `Your teammate ${called(input.from)} asks you this while working on "${input.subtask.title}":
+${input.question}
+
+${own.length ? `Your own work on this goal:
+${own.join("\n")}` : "You have no work of your own on this goal yet."}
+
+Look up only what the answer needs, then answer briefly from your role. Where you're unsure, make a suggestion and state your assumptions.`;
+}
+function news({ meeting: meeting2 }, member) {
+  const heard = meeting2.seats?.[member.name]?.heard ?? 0;
+  const fresh = meeting2.turns.slice(heard).filter((t) => t.speaker !== member.name);
+  return fresh.map((t) => `[${t.speaker}] ${t.text}`).join("\n\n") || "(nothing new)";
+}
+var SPOKEN = "Say it as you would out loud in a meeting: a few sentences, no headings or lists. Say only what hasn't been said yet, your conclusion and its reason; don't repeat others or tell how you got there.";
+var MEETING_SCOPE = "A meeting is for lining up, not for working out details. It settles the direction (what to make and the few choices that shape it), who does which piece, and which interfaces there are between the pieces (names, conventions or formats one piece defines and another uses) and who defines each. What an interface holds, and how anyone builds their piece, is worked out afterwards by whoever does it; whoever needs it asks them then. Don't tie pieces together that needn't be: every tie is one more interface to define and to get wrong.";
+var MEETING_KINDS = {
+  small: {
+    how: "This is a short meeting: everyone gives their judgment once, then only the real conflicts between those judgments get talked through.",
+    raise: "your judgment conflicts with someone else's, or someone has put a question straight to you",
+    settled: "every conflict between people's judgments has been talked through"
+  },
+  discussion: {
+    how: "This is a working discussion: everyone gives their judgment, then you talk through whatever would change the plan.",
+    raise: "the plan would come out differently if you didn't say it",
+    settled: "each thing the meeting set out to decide has had its options compared, with reasons given"
+  },
+  large: {
+    how: "This is an open discussion: everyone gives their judgment, then you test the assumptions and weigh the alternatives before the plan is written.",
+    raise: "the plan would come out differently if you didn't say it, or you doubt an assumption nobody has questioned, or you see another way of doing it",
+    settled: "each thing the meeting set out to decide has had its options compared, with reasons given, and every assumption the plan rests on has been questioned by someone"
+  }
+};
+var MEETING_TOOLS = {
+  raiseHand: {
+    what: "Puts your hand up to speak next at the meeting. Not calling it leaves your hand down.",
+    point: "What you would say, in one line",
+    to: "Whom it is for, by name, if it is for someone",
+    done: "Your hand is up."
+  },
+  giveFloor: {
+    what: "Gives one attendee the floor: they speak next.",
+    member: "Who speaks next, by name",
+    quiet: "True when you have nothing to say yourself before they speak",
+    done: "They have the floor."
+  }
+};
+function briefing(ctx, member) {
+  const { meeting: meeting2 } = ctx;
+  if (meeting2.seats?.[member.name]) return "";
+  const part = member.name !== meeting2.host ? "taking part in a" : meeting2.hostOnly ? "only running this; you're not one of its members and take no work in the" : "hosting this, and you also take part in it from your role, as one of its members; as the host you run the";
+  return `You're ${part} planning meeting.
+Goal: ${ctx.goal.name}
+To plan: ${meeting2.agenda}
+The goal's worktree: ${ctx.cwd} (look at what is there; this meeting is read-only)
+Attending: ${listOf(ctx.attendees.map(called))}
+${MEETING_KINDS[meeting2.size].how}
+${MEETING_SCOPE}
+
+`;
+}
+function meetingOpening(ctx) {
+  return `${briefing(ctx, ctx.attendees[0])}Open the meeting: restate the goal and the scope, then list the things this meeting has to decide. Put them to everyone as open questions: don't answer them or suggest answers yet, and don't hand topics out by role. You'll give your own view later. Don't write the plan. ${SPOKEN}`;
+}
+function meetingRound(ctx, member) {
+  const opened = member.name === ctx.meeting.host ? "You opened with" : "The host opened with";
+  return `${briefing(ctx, member)}${opened}:
+${ctx.meeting.turns[0]?.text ?? ""}
+
+Everyone now gives a first judgment without hearing each other, so you haven't heard what the others think. Give your own: what you would do about each of the things to decide, not only those nearest your role, and why, which interfaces the pieces of work will need between them (which ones and between whom, not what they hold), and what could go wrong. Your role is the angle you see it from, not the limit of what you may speak to, so if you have a view on something outside it, say it. Don't say who takes which work; that comes when the plan is written. ${SPOKEN}`;
+}
+function meetingHand(ctx, member) {
+  return `${briefing(ctx, member)}Said since you last took it in:
+${news(ctx, member)}
+
+Would you speak next? Raise your hand only if ${MEETING_KINDS[ctx.meeting.size].raise}. Agreeing with what was said is no reason to, and neither is what an interface holds or how a piece is built: that is for after the meeting, with whoever defines it. If you would, call raise_hand. If not, don't call it. Either way this isn't your turn to speak: nothing you write besides the call is heard.`;
+}
+function meetingAnswer(ctx, member, point) {
+  return `${briefing(ctx, member)}Said since you last took it in:
+${news(ctx, member)}
+
+You have the floor${point ? `, for what you raised your hand about: ${point}` : ": the host has called on you"}. Say it to the person it's for and take up what they actually said. Agree only where you have a reason of your own; if you disagree, say so and why; don't make up a disagreement. Keep to what the meeting settles: don't add what an interface should hold or how you'll build your piece. ${SPOKEN}`;
+}
+function meetingSteer(ctx, left) {
+  const { meeting: meeting2, attendees } = ctx;
+  const host = attendees[0];
+  const hands = (meeting2.hands ?? []).map(
+    (h) => `- ${h.member}${h.to ? ` (to ${h.to})` : ""}: ${h.point}`
+  );
+  const had = attendees.slice(1).map(
+    (m) => `${m.name} ${String(meeting2.turns.filter((t) => t.phase === "answer" && t.speaker === m.name).length)}`
+  );
+  const first = !meeting2.turns.some((t) => t.phase === "steer" || t.phase === "answer");
+  return `${briefing(ctx, host)}Said since you last took it in:
+${news(ctx, host)}
+
+${hands.length ? `Hands up:
+${hands.join("\n")}` : "Nobody has a hand up."}
+Times each has had the floor in the discussion: ${listOf(had)}.
+You can give the floor ${String(left)} more time${left === 1 ? "" : "s"} at most.
+
+${first ? `You have now heard everyone's first judgment. ${meeting2.hostOnly ? "Say how they differ, without taking a side: you only run this meeting." : "Say how they differ, yours among them: weigh your own against the others by what was said, like anyone's, not as the host's choice."}` : "Say something yourself only if you have something to add."}
+${meeting2.hostOnly ? "" : "You're also a member: when someone questions or asks about your own piece, answer it yourself here, as a member, not by ruling on it.\n"}A hand is worth the floor only if it is about the direction, who does which piece, or which interfaces there are and who defines each. A hand about what an interface holds or how a piece is built isn't: don't give it the floor, and don't take it up or settle it yourself; at most say in a sentence whose it is to settle after the meeting. Among the hands worth it, give the floor to whoever has been challenged first, otherwise whoever has spoken least. You may also give it to someone without a hand up who should answer. When you give someone the floor, say what you need from them: a decision on the direction or on who does what, never what an interface holds or how they will build their piece.
+With no hand worth the floor, go back over what you set out to decide: is it true that ${MEETING_KINDS[meeting2.size].settled}? Check it one thing at a time against what was actually said, not by whether anyone objects: nobody objecting isn't it, and a thing only one way was put forward for hasn't had its options compared. If not, give the floor to the one who should take up what's missing. If so and you haven't yet put the split to the room, put it now: the pieces of work, who takes each, and which interfaces there are and who defines each; give the floor to whoever relies most on others, to say whether that works for them. Anyone whose piece or needs are wrong will raise a hand. Once that is settled too, don't give the floor, whatever hands are up: close the talk in a sentence, and you'll write the plan after.
+Not calling give_floor closes the talk. What you write before and after the call is said to the room. ${SPOKEN}`;
+}
+function meetingClosing(ctx) {
+  const { attendees, members } = ctx;
+  return `${briefing(ctx, attendees[0])}Said since you last took it in:
+${news(ctx, attendees[0])}
+
+You're the host: turn the discussion into the final plan.
+Members (subtasks can only go to them): ${listOf(members.map(called))}${ctx.meeting.hostOnly ? "\nYou only ran the meeting: you take no work in it." : ""}
+
+Requirements:
+- Break the work into 1\u20134 tasks with 1\u20134 subtasks each; every subtask goes to exactly one member, whose name goes in assignee: ${listOf(members.map((m) => `"${m.name}"`))}. Who takes what is the split put to the room; where it wasn't, you decide, from their roles.
+- Split by what each piece of work needs from another. In depends_on (the keys of other subtasks) a subtask names only the subtasks whose results it actually uses; it starts as soon as they are merged. Don't make sequential what can run in parallel.
+- When others wait only on something small and quick to make, such as an interface, types, a config or a skeleton, make it a subtask of its own, so they can start soon; its assignee defines that interface.
+- Every interface the meeting said someone defines and others use is defined in such a quick subtask at the start, by whoever defines it. A subtask that only needs to know an interface depends on the subtask defining it, not on the work behind it. Putting the real pieces together and checking the whole is a subtask of its own at the end.
+- Beyond that, don't split finer: one person's piece is one subtask, and one person's pieces that nobody waits on separately are one subtask. Every subtask carries a fixed cost (a new session getting to know the repository, a review, a merge).
+- Dependencies must not loop: no subtask may wait, directly or through others, on itself or on a subtask that waits on it.
+- Give every subtask a clear description and acceptance criteria: its member reads them, and the plan document, before starting.
+- In the description of every subtask that defines or uses an interface, name the interface and who defines it.
+- plan_markdown is the plan document for the user and the team: the goal and scope; what was decided, why, and what was turned down; where people didn't agree and how you ruled; what the meeting didn't get to; then who does what, dependencies and risks.
+- summary states the outcome in one sentence.`;
 }
 
 // src/plugin/words.ts
 var plural = (n, one, many) => `${String(n)} ${n === 1 ? one : many}`;
 var PLAN_TO_REVIEW = "plan to review";
 var rosterOf = (members) => members.map((m) => `${m.name} (${m.role.title})`).join(", ");
+var hostText = (meeting2) => `hosted by ${meeting2.host}${meeting2.hostOnly ? ", who only runs it" : ""}`;
+var attendanceText = (meeting2) => `${listOf(meeting2.participants)}, ${hostText(meeting2)}`;
+function noticeText(notice) {
+  const seconds = (ms) => `${String(Math.round(ms / 1e3))}s`;
+  switch (notice.kind) {
+    case "retry":
+      return `the API call failed: attempt ${String(notice.attempt)} of ${String(notice.max)} in ${seconds(notice.delayMs)}`;
+    case "subagent-retry":
+      return `a subagent's API call failed: attempt ${String(notice.attempt)} of ${String(notice.max)} in ${seconds(notice.delayMs)}`;
+    case "compacted":
+      return `the conversation was compacted from ${notice.before.toLocaleString()} tokens${notice.after === void 0 ? "" : ` to ${notice.after.toLocaleString()}`}`;
+    case "compaction-failed":
+      return `compacting the conversation failed${notice.error ? `: ${notice.error}` : ""}`;
+    case "fallback":
+      return `${notice.from} declined: ${notice.to} goes on`;
+    case "refusal":
+      return `${notice.model} declined, with no model to go on`;
+    case "task":
+      return `background task "${notice.title}" ${notice.state}`;
+    case "rate-limit":
+      return notice.status === "rejected" ? "rate limited" : "close to the rate limit";
+  }
+}
 function waitText(wait, work) {
   switch (wait.kind) {
     case "goal":
@@ -8209,11 +8487,13 @@ function waitText(wait, work) {
       return "waits until you accept the task it builds on";
   }
 }
+var redoneText = (titles) => `built on ${titles.map((t) => `"${t}"`).join(", ")}, redone since: redo it to take that in`;
 function stepText({ done, total, current }) {
   if (!total) return void 0;
   const step2 = `step ${String(Math.min(done + 1, total))} of ${String(total)}`;
   return current ? `${step2}: ${current}` : step2;
 }
+var isUnderWay = (subtask2) => subtask2.status === "running" || subtask2.status === "reviewing" || subtask2.status === "merging";
 function underWay(subtask2) {
   switch (subtask2.status) {
     case "running": {
@@ -8224,8 +8504,6 @@ function underWay(subtask2) {
       return `"${subtask2.title}" in review`;
     case "merging":
       return `"${subtask2.title}" being merged`;
-    default:
-      return void 0;
   }
 }
 function meetingStatus(meeting2) {
@@ -8263,6 +8541,7 @@ var OPTION_LABELS = {
   ours: "Keep ours",
   theirs: "Take theirs",
   retry: "Retry",
+  stop: "Stop",
   accept: "Accept",
   revise: "Send back"
 };
@@ -8299,13 +8578,15 @@ function needWords(question, work) {
       }
   }
 }
-var whereOf = (entry) => entry.holder ? "in another session" : entry.state.goal.status === "archived" ? "archived" : "paused";
+var whereOf = (entry) => entry.holder ? "in another session" : !("state" in entry) ? "unreadable" : entry.state.goal.status === "archived" ? "archived" : "paused";
 function progressOf({ subtasks, meetings }) {
   const done = subtasks.filter((s) => s.status === "done").length;
   return subtasks.length ? `${String(done)}/${String(subtasks.length)} subtasks done` : meetings.some((m) => m.status === "review") ? PLAN_TO_REVIEW : "no plan yet";
 }
 var goalLabel = (state, where) => `${state.goal.name} \xB7 ${progressOf(state)} \xB7 ${where}`;
+var entryLabel = (entry) => "state" in entry ? goalLabel(entry.state, whereOf(entry)) : `${entry.slug} \xB7 can't be read: ${entry.unreadable}`;
 var noGoalText = (moved) => moved ? `"${moved}" moved to another Claude Code session. Bring it back here with /openplan resume.` : "This session runs no goal. Hand the team a task with /openplan <task>, or take a goal up with /openplan resume.";
+var noGoalForModel = (moved) => moved ? `The goal "${moved}" moved to another Claude Code session. The user brings it back with /openplan resume.` : "This session runs no goal: start one (start_goal), or the user takes one up with /openplan resume.";
 function handOffText(task, mine) {
   const goal = mine ? `This session runs the goal "${mine.goal.name}", ${mine.goal.status === "active" ? "under way" : mine.goal.status}. The team: ${rosterOf(mine.members)}.` : "This session runs no goal yet.";
   return [
@@ -8319,11 +8600,13 @@ function handOffText(task, mine) {
 var resumeRefusal = (name) => `"${name}" is under way in this session, which runs one goal: /openplan pause it first, or take the other up in another session.`;
 
 // src/plugin/status.ts
-function subtaskLine(subtask2, waits, work) {
+function subtaskLine(subtask2, { waits, redone }, work) {
   const parts = [subtask2.status];
   const step2 = subtask2.status === "running" && stepText(subtask2.progress);
   if (step2) parts.push(step2);
   parts.push(...waits.map((w) => waitText(w, work)));
+  if (redone.length)
+    parts.push(redoneText(redone.map((id) => work.subtasks.find((s) => s.id === id)?.title ?? "")));
   if (subtask2.error) parts.push(`error: ${subtask2.error}`);
   return `    - ${subtask2.title} [${subtask2.id}], ${subtask2.assignee}: ${parts.join(", ")}`;
 }
@@ -8343,14 +8626,16 @@ function statusText(work) {
   ];
   for (const meeting2 of work.meetings.filter((m) => m.status !== "approved"))
     lines.push(
-      `  Meeting [${meeting2.id}], hosted by ${meeting2.host}${meeting2.hostOnly ? ", who only runs it" : ""}: ${meetingStatus(meeting2)}${meeting2.status === "review" ? ": approve it, change it, or cancel it" : ""}${derived.resumable.includes(meeting2.id) ? "; it can go on" : ""}`
+      `  Meeting [${meeting2.id}], ${hostText(meeting2)}: ${meetingStatus(meeting2)}${meeting2.status === "review" ? ": approve it, change it, or cancel it" : ""}${derived.resumable.includes(meeting2.id) ? "; it can go on" : ""}`
     );
   for (const task of work.tasks) {
     lines.push(
       `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", the user accepts it" : ""}`
     );
     for (const subtask2 of work.subtasks.filter((s) => s.taskId === task.id))
-      lines.push(subtaskLine(subtask2, derived.subtasks[subtask2.id]?.waits ?? [], work));
+      lines.push(
+        subtaskLine(subtask2, derived.subtasks[subtask2.id] ?? { waits: [], redone: [] }, work)
+      );
   }
   const open2 = work.questions.filter(toYou);
   if (open2.length) lines.push("", "Waiting on you:", ...open2.map((q) => questionLine(q, work)));
@@ -8358,7 +8643,7 @@ function statusText(work) {
 }
 var resumableOf = (others) => others.map((entry) => ({
   slug: entry.slug,
-  label: goalLabel(entry.state, whereOf(entry))
+  label: entryLabel(entry)
 }));
 function othersText(others) {
   if (!others.length) return void 0;
@@ -8378,8 +8663,7 @@ var meetingOf = (meeting2, work) => ({
   about: work.goal.name,
   agenda: meeting2.agenda,
   status: meetingStatus(meeting2),
-  host: meeting2.host,
-  participants: meeting2.participants,
+  attendance: attendanceText(meeting2),
   turns: meeting2.turns.map((t) => ({
     speaker: t.speaker,
     text: t.text,
@@ -8390,14 +8674,14 @@ var meetingOf = (meeting2, work) => ({
 });
 function memberOf(member, work, derived) {
   const own = work.subtasks.filter((s) => s.assignee === member.name);
-  const at = (status) => own.find((s) => s.status === status);
+  const at = (...statuses) => own.find((s) => isUnderWay(s) && statuses.includes(s.status));
   const reviewing = work.subtasks.find(
     (s) => s.assignee !== member.name && derived.subtasks[s.id]?.reviewedBy === member.name
   );
   const meeting2 = work.meetings.find(
     (m) => m.status === "running" && m.participants.includes(member.name)
   );
-  const next = at("pending");
+  const next = own.find((s) => s.status === "pending");
   const running3 = at("running");
   const handedOver = at("reviewing") ?? at("merging");
   let doing;
@@ -8414,7 +8698,7 @@ function memberOf(member, work, derived) {
     name: member.name,
     role: member.role.title,
     ...member.model && { model: member.model },
-    doing: doing ?? "free",
+    doing,
     ...followed && { subtask: followed.id },
     tokens: work.tokens[member.name] ?? 0
   };
@@ -8423,12 +8707,16 @@ var optionOf = (value) => ({
   value,
   label: OPTION_LABELS[value]
 });
-function noteOf(options, note) {
-  if (!note || !options.includes(note.option)) return void 0;
+function answersOf(options, note) {
   return {
-    option: note.option,
-    prompt: NOTE_PROMPTS[note.option] ?? OPTION_LABELS[note.option],
-    needed: note.needed === true
+    options: options.filter((o) => !(note?.needed && o === note.option)).map(optionOf),
+    ...note && {
+      note: {
+        option: note.option,
+        label: OPTION_LABELS[note.option],
+        prompt: NOTE_PROMPTS[note.option]
+      }
+    }
   };
 }
 function needOf(question, work) {
@@ -8442,14 +8730,13 @@ function needOf(question, work) {
   };
   switch (question.kind) {
     case "permission": {
-      const { options } = question.permission;
-      const note = noteOf(options, { option: PERMISSION_NOTE });
+      const { options, note } = answersOf(question.permission.options, { option: PERMISSION_NOTE });
       return {
         ...head,
         kind: "options",
         options: options.map((o) => ({
-          ...optionOf(o),
-          ...o === "once" && { primary: true }
+          ...o,
+          ...o.value === "once" && { primary: true }
         })),
         ...note && { note }
       };
@@ -8461,20 +8748,21 @@ function needOf(question, work) {
         choices: question.choices.map((c) => ({
           question: c.question,
           header: c.header,
-          options: c.options.map((o) => o.label),
+          options: c.options.map((o) => ({
+            label: o.label,
+            ...o.description && { description: o.description }
+          })),
           multiSelect: c.multiSelect
         }))
       };
     case "decision": {
-      const { kind, options } = question.decision;
-      const note = noteOf(options, DECISIONS[kind].note);
+      const { kind } = question.decision;
       const subtask2 = work.subtasks.find((s) => s.id === question.subtaskId);
       const done = work.subtasks.filter((s) => s.taskId === subtask2?.taskId && s.status === "done");
       return {
         ...head,
         kind: "options",
-        options: options.map(optionOf),
-        ...note && { note },
+        ...answersOf(question.decision.options, question.decision.note),
         ...kind === "delivery" && {
           sendBack: done.map((s) => ({ id: s.id, title: s.title }))
         }
@@ -8531,16 +8819,12 @@ function prompts(work) {
 }
 var BAND_TASKS = 5;
 function taskWhere(work, derived, subtasks) {
-  const at = subtasks.find(
-    (s) => s.status === "running" || s.status === "reviewing" || s.status === "merging"
-  ) ?? subtasks.find((s) => s.status !== "done");
+  const going = subtasks.find(isUnderWay);
+  if (going)
+    return going.status === "running" ? `${going.assignee} ${underWay(going)}` : underWay(going);
+  const at = subtasks.find((s) => s.status !== "done");
   if (!at) return void 0;
   switch (at.status) {
-    case "running":
-      return `${at.assignee} ${underWay(at) ?? ""}`;
-    case "reviewing":
-    case "merging":
-      return underWay(at);
     case "pending": {
       const [wait] = derived.subtasks[at.id]?.waits ?? [];
       return `"${at.title}" ${wait ? waitText(wait, work) : "starts next"}`;
@@ -8622,11 +8906,27 @@ var callOf = (name, input) => {
   const argument = mainArgument(input);
   return { name, ...argument !== void 0 && { argument } };
 };
-var viewEntries = (entries) => entries.map((entry) => {
-  if (entry.kind !== "tool") return entry;
-  const { input, name, ...rest } = entry;
-  return { ...rest, ...callOf(name, input) };
-});
+function viewEntry(entry) {
+  switch (entry.kind) {
+    case "run":
+      return { kind: "run", model: entry.model };
+    case "thinking":
+    case "text":
+      return { kind: entry.kind, text: entry.text };
+    case "tool":
+      return {
+        kind: "tool",
+        state: entry.state,
+        output: entry.output,
+        ...callOf(entry.name, entry.input)
+      };
+    case "steps":
+      return { kind: "steps", steps: entry.steps };
+    case "notice":
+      return { kind: "notice", text: noticeText(entry.notice) };
+  }
+}
+var viewEntries = (entries) => entries.map(viewEntry);
 var viewLive = (live) => ({
   ...live.streaming && { streaming: live.streaming },
   ...live.starting && { starting: live.starting },
@@ -8712,7 +9012,8 @@ async function servePane(session2) {
         response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(answer));
       },
       (error) => {
-        response.writeHead(409, { "content-type": "text/plain" }).end(errorText(error));
+        const status = error instanceof z2.ZodError || error instanceof SyntaxError ? 400 : error instanceof GitError ? 409 : 500;
+        response.writeHead(status, { "content-type": "text/plain" }).end(errorText(error));
       }
     );
   });
@@ -8735,21 +9036,20 @@ function askToLetGo(address, slug) {
         else reject(new Error(body));
       }, reject);
     });
-    asking.once("error", reject).end(JSON.stringify({ goal: slug }));
+    asking.once("error", (error) => {
+      if (errorCode(error) === "ENOENT" || errorCode(error) === "ECONNREFUSED")
+        resolve(void 0);
+      else reject(error);
+    }).end(JSON.stringify({ goal: slug }));
   });
 }
 
 // src/plugin/session-mode.ts
-import { readFileSync } from "node:fs";
 import path6 from "node:path";
 var folderOf = (dataFolder2) => path6.join(dataFolder2, "sessions");
 var fileOf = (dataFolder2, session2) => path6.join(folderOf(dataFolder2), `${String(session2)}.mode`);
 function modeOf(dataFolder2, session2) {
-  try {
-    return readFileSync(fileOf(dataFolder2, session2), "utf8");
-  } catch {
-    return void 0;
-  }
+  return textIfThere(fileOf(dataFolder2, session2));
 }
 
 // src/plugin/pane-tools.ts
@@ -9010,7 +9310,7 @@ async function runTurn(prompt, options, signal, decode) {
   }
 }
 async function askOnce(params) {
-  const { prompt, options, schema, signal, listener = {} } = params;
+  const { prompt, options, schema, signal, spent, listener = {} } = params;
   let session2 = "";
   const outcome = await runTurn(
     prompt,
@@ -9026,10 +9326,11 @@ async function askOnce(params) {
     signal,
     turnDecoder(keepingSession(listener, (id) => session2 = id))
   );
+  spent(outcome.tokens);
   if (!outcome.ok) throw new Error(outcome.error);
   if (schema && outcome.structured === void 0)
     throw new Error("The model answered in words instead of the result asked for");
-  return { text: outcome.text, structured: outcome.structured, session: session2, tokens: outcome.tokens };
+  return { text: outcome.text, structured: outcome.structured, session: session2 };
 }
 
 // src/plugin/tools.ts
@@ -9124,228 +9425,6 @@ function soundPlan(plan, loops) {
   return { summary: plan.summary, markdown: plan.plan_markdown, tasks };
 }
 
-// src/engine/prompts.ts
-var listOf = (items) => new Intl.ListFormat("en", { type: "conjunction" }).format(items);
-var called = (member) => `${member.name} (${member.role.title})`;
-var TASK_WAYS = `# How you work on a subtask
-- You work in a git worktree of your own, on a branch cut from the goal's branch, which is merged into the goal's branch once you deliver. Teammates working at the same time each have theirs, so you never get in each other's way. Stay in yours.
-- You needn't commit: delivering commits whatever you leave uncommitted, under your name.
-- When you need information or a decision from a teammate (an interface, a design detail), ask them with ask_teammate. It waits for their answer.
-- When you need the user to decide something or give you what only they have, ask with AskUserQuestion, offering options, and wait for the answer. Don't just write that you are waiting: the user may not be watching.
-- When you are done, call deliver with a summary of a few sentences (what you did, anything to watch out for) and the files that are the result. Your subtask isn't done until you deliver; then end your turn.`;
-function systemPrompt(kind, member, team) {
-  const others = team.filter((m) => m.name !== member.name).map(called);
-  const who = `# Who you are
-You are ${member.name}, the ${member.role.title} on a team of Claude Code sessions working on this repository. Each member is a session of its own, often on another model. The user directs the team from their own Claude Code session.
-${others.length ? `Your teammates: ${others.join(", ")}.` : "You are the only member."}
-
-# Your duties
-${member.role.duties.trim()}`;
-  return kind === "work" ? `${who}
-
-${TASK_WAYS}` : who;
-}
-function taskBrief(input) {
-  const { goal, task, subtask: subtask2 } = input;
-  const lines = [
-    `Goal: ${goal.name}`,
-    `Task: ${task.title}${task.outcome && task.outcome !== task.title ? `. ${task.outcome}` : ""}`,
-    "",
-    `Your subtask: ${subtask2.title}`,
-    ...subtask2.description && subtask2.description !== subtask2.title ? [subtask2.description] : [],
-    ...subtask2.acceptance ? ["", `Acceptance criteria: ${subtask2.acceptance}`] : [],
-    "",
-    `Your worktree is ${input.cwd}, on branch ${input.branch}.`
-  ];
-  if (input.plan)
-    lines.push("", "The plan your team agreed on, which this subtask is part of:", "", input.plan);
-  const delivered = (s) => `- ${s.title}, by ${s.assignee}: ${s.delivery?.summary ?? ""}${s.delivery?.files.length ? ` Files: ${s.delivery.files.join(", ")}` : ""}`;
-  const direct = input.upstream.filter((u) => u.direct).map((u) => delivered(u.subtask));
-  const further = input.upstream.filter((u) => !u.direct).map((u) => delivered(u.subtask));
-  if (direct.length)
-    lines.push("", "It builds on this work, merged into the goal's branch:", ...direct);
-  if (further.length) lines.push("", "Which built on:", ...further);
-  for (const { why, note } of input.notes)
-    if (why === "revised")
-      lines.push("", `The user sent this task back before, asking for:
-${note ?? ""}`);
-    else if (why === "carried") lines.push("", `The user adds to your subtask:
-${note ?? ""}`);
-  return lines.join("\n");
-}
-function goOnMessage(reasons, subtask2) {
-  const said = ({ why, note = "" }) => {
-    switch (why) {
-      case "held":
-        return "Your work was paused and now goes on. Pick up where you left off.";
-      case "carried":
-        return `The user adds to your subtask:
-${note}`;
-      case "continued":
-        return "The user asks you to go on from where you stopped.";
-      case "rejected":
-        return `The review sent your delivery back. Fix what it says, then deliver again:
-${note}`;
-      case "conflict":
-        return `Merging your delivery into the goal's branch left conflicts in ${subtask2.conflict?.files.join(", ") ?? ""}. The merge is under way in your worktree, the conflict markers in those files. Resolve them, keeping what both sides meant, then deliver again.`;
-      case "redo":
-        return `Work you build on was redone after you delivered: ${note}. Your worktree now starts from the goal's branch as it stands. Check your part against it, change what needs changing, and deliver again.`;
-      case "revised":
-        return `The user sent your task back, asking for:
-${note}
-Make those changes, then deliver again.`;
-    }
-  };
-  return [...new Set(reasons.map(said))].join("\n\n");
-}
-var DELIVER_REMINDER = "You haven't delivered yet. If the work is finished, call deliver now with a summary and the files that are the result. If you can't finish it, say what stands in the way.";
-var SESSION_ONLY = "Only the session that started you asks teammates and delivers this subtask: do your own part and report back to it.";
-function reviewPrompt(input) {
-  const { task, subtask: subtask2, delivery } = input;
-  const files = delivery.files.length ? delivery.files.join(", ") : "none (the summary is the result)";
-  return `You're reviewing a teammate's delivery before it is merged into the goal's branch.
-
-Task: ${task.title}
-Subtask: ${subtask2.title}
-${subtask2.description && subtask2.description !== subtask2.title ? `${subtask2.description}
-` : ""}Acceptance criteria: ${subtask2.acceptance || "none given: judge whether the subtask is done as described"}
-
-${subtask2.assignee} delivered:
-${delivery.summary}
-Files: ${files}
-
-Their worktree is ${input.cwd}. Read the files, and whatever else you need there, to check the work against the criteria, and stop once you can tell. Pass it when it meets them, even if you would have done it differently; send it back only for what really falls short, and say exactly what to fix.`;
-}
-function teammateQuestion(input) {
-  const own = input.own.map(
-    (s) => `- ${s.title} (${s.status})${s.delivery ? `: ${s.delivery.summary}` : ""}`
-  );
-  return `Your teammate ${called(input.from)} asks you this while working on "${input.subtask.title}":
-${input.question}
-
-${own.length ? `Your own work on this goal:
-${own.join("\n")}` : "You have no work of your own on this goal yet."}
-
-Look up only what the answer needs, then answer briefly from your role. Where you're unsure, make a suggestion and state your assumptions.`;
-}
-function news({ meeting: meeting2 }, member) {
-  const heard = meeting2.seats?.[member.name]?.heard ?? 0;
-  const fresh = meeting2.turns.slice(heard).filter((t) => t.speaker !== member.name);
-  return fresh.map((t) => `[${t.speaker}] ${t.text}`).join("\n\n") || "(nothing new)";
-}
-var SPOKEN = "Say it as you would out loud in a meeting: a few sentences, no headings or lists. Say only what hasn't been said yet, your conclusion and its reason; don't repeat others or tell how you got there.";
-var MEETING_SCOPE = "A meeting is for lining up, not for working out details. It settles the direction (what to make and the few choices that shape it), who does which piece, and which interfaces there are between the pieces (names, conventions or formats one piece defines and another uses) and who defines each. What an interface holds, and how anyone builds their piece, is worked out afterwards by whoever does it; whoever needs it asks them then. Don't tie pieces together that needn't be: every tie is one more interface to define and to get wrong.";
-var MEETING_KINDS = {
-  small: {
-    how: "This is a short meeting: everyone gives their judgment once, then only the real conflicts between those judgments get talked through.",
-    raise: "your judgment conflicts with someone else's, or someone has put a question straight to you",
-    settled: "every conflict between people's judgments has been talked through"
-  },
-  discussion: {
-    how: "This is a working discussion: everyone gives their judgment, then you talk through whatever would change the plan.",
-    raise: "the plan would come out differently if you didn't say it",
-    settled: "each thing the meeting set out to decide has had its options compared, with reasons given"
-  },
-  large: {
-    how: "This is an open discussion: everyone gives their judgment, then you test the assumptions and weigh the alternatives before the plan is written.",
-    raise: "the plan would come out differently if you didn't say it, or you doubt an assumption nobody has questioned, or you see another way of doing it",
-    settled: "each thing the meeting set out to decide has had its options compared, with reasons given, and every assumption the plan rests on has been questioned by someone"
-  }
-};
-var MEETING_TOOLS = {
-  raiseHand: {
-    what: "Puts your hand up to speak next at the meeting. Not calling it leaves your hand down.",
-    point: "What you would say, in one line",
-    to: "Whom it is for, by name, if it is for someone",
-    done: "Your hand is up."
-  },
-  giveFloor: {
-    what: "Gives one attendee the floor: they speak next.",
-    member: "Who speaks next, by name",
-    quiet: "True when you have nothing to say yourself before they speak",
-    done: "They have the floor."
-  }
-};
-function briefing(ctx, member) {
-  const { meeting: meeting2 } = ctx;
-  if (meeting2.seats?.[member.name]) return "";
-  const part = member.name !== meeting2.host ? "taking part in a" : meeting2.hostOnly ? "only running this; you're not one of its members and take no work in the" : "hosting this, and you also take part in it from your role, as one of its members; as the host you run the";
-  return `You're ${part} planning meeting.
-Goal: ${ctx.goal.name}
-To plan: ${meeting2.agenda}
-The goal's worktree: ${ctx.cwd} (look at what is there; this meeting is read-only)
-Attending: ${listOf(ctx.attendees.map(called))}
-${MEETING_KINDS[meeting2.size].how}
-${MEETING_SCOPE}
-
-`;
-}
-function meetingOpening(ctx) {
-  return `${briefing(ctx, ctx.attendees[0])}Open the meeting: restate the goal and the scope, then list the things this meeting has to decide. Put them to everyone as open questions: don't answer them or suggest answers yet, and don't hand topics out by role. You'll give your own view later. Don't write the plan. ${SPOKEN}`;
-}
-function meetingRound(ctx, member) {
-  const opened = member.name === ctx.meeting.host ? "You opened with" : "The host opened with";
-  return `${briefing(ctx, member)}${opened}:
-${ctx.meeting.turns[0]?.text ?? ""}
-
-Everyone now gives a first judgment without hearing each other, so you haven't heard what the others think. Give your own: what you would do about each of the things to decide, not only those nearest your role, and why, which interfaces the pieces of work will need between them (which ones and between whom, not what they hold), and what could go wrong. Your role is the angle you see it from, not the limit of what you may speak to, so if you have a view on something outside it, say it. Don't say who takes which work; that comes when the plan is written. ${SPOKEN}`;
-}
-function meetingHand(ctx, member) {
-  return `${briefing(ctx, member)}Said since you last took it in:
-${news(ctx, member)}
-
-Would you speak next? Raise your hand only if ${MEETING_KINDS[ctx.meeting.size].raise}. Agreeing with what was said is no reason to, and neither is what an interface holds or how a piece is built: that is for after the meeting, with whoever defines it. If you would, call raise_hand. If not, don't call it. Either way this isn't your turn to speak: nothing you write besides the call is heard.`;
-}
-function meetingAnswer(ctx, member, point) {
-  return `${briefing(ctx, member)}Said since you last took it in:
-${news(ctx, member)}
-
-You have the floor${point ? `, for what you raised your hand about: ${point}` : ": the host has called on you"}. Say it to the person it's for and take up what they actually said. Agree only where you have a reason of your own; if you disagree, say so and why; don't make up a disagreement. Keep to what the meeting settles: don't add what an interface should hold or how you'll build your piece. ${SPOKEN}`;
-}
-function meetingSteer(ctx, left) {
-  const { meeting: meeting2, attendees } = ctx;
-  const host = attendees[0];
-  const hands = (meeting2.hands ?? []).map(
-    (h) => `- ${h.member}${h.to ? ` (to ${h.to})` : ""}: ${h.point}`
-  );
-  const had = attendees.slice(1).map(
-    (m) => `${m.name} ${String(meeting2.turns.filter((t) => t.phase === "answer" && t.speaker === m.name).length)}`
-  );
-  const first = !meeting2.turns.some((t) => t.phase === "steer" || t.phase === "answer");
-  return `${briefing(ctx, host)}Said since you last took it in:
-${news(ctx, host)}
-
-${hands.length ? `Hands up:
-${hands.join("\n")}` : "Nobody has a hand up."}
-Times each has had the floor in the discussion: ${listOf(had)}.
-You can give the floor ${String(left)} more time${left === 1 ? "" : "s"} at most.
-
-${first ? `You have now heard everyone's first judgment. ${meeting2.hostOnly ? "Say how they differ, without taking a side: you only run this meeting." : "Say how they differ, yours among them: weigh your own against the others by what was said, like anyone's, not as the host's choice."}` : "Say something yourself only if you have something to add."}
-${meeting2.hostOnly ? "" : "You're also a member: when someone questions or asks about your own piece, answer it yourself here, as a member, not by ruling on it.\n"}A hand is worth the floor only if it is about the direction, who does which piece, or which interfaces there are and who defines each. A hand about what an interface holds or how a piece is built isn't: don't give it the floor, and don't take it up or settle it yourself; at most say in a sentence whose it is to settle after the meeting. Among the hands worth it, give the floor to whoever has been challenged first, otherwise whoever has spoken least. You may also give it to someone without a hand up who should answer. When you give someone the floor, say what you need from them: a decision on the direction or on who does what, never what an interface holds or how they will build their piece.
-With no hand worth the floor, go back over what you set out to decide: is it true that ${MEETING_KINDS[meeting2.size].settled}? Check it one thing at a time against what was actually said, not by whether anyone objects: nobody objecting isn't it, and a thing only one way was put forward for hasn't had its options compared. If not, give the floor to the one who should take up what's missing. If so and you haven't yet put the split to the room, put it now: the pieces of work, who takes each, and which interfaces there are and who defines each; give the floor to whoever relies most on others, to say whether that works for them. Anyone whose piece or needs are wrong will raise a hand. Once that is settled too, don't give the floor, whatever hands are up: close the talk in a sentence, and you'll write the plan after.
-Not calling give_floor closes the talk. What you write before and after the call is said to the room. ${SPOKEN}`;
-}
-function meetingClosing(ctx) {
-  const { attendees, members } = ctx;
-  return `${briefing(ctx, attendees[0])}Said since you last took it in:
-${news(ctx, attendees[0])}
-
-You're the host: turn the discussion into the final plan.
-Members (subtasks can only go to them): ${listOf(members.map(called))}${ctx.meeting.hostOnly ? "\nYou only ran the meeting: you take no work in it." : ""}
-
-Requirements:
-- Break the work into 1\u20134 tasks with 1\u20134 subtasks each; every subtask goes to exactly one member, whose name goes in assignee: ${listOf(members.map((m) => `"${m.name}"`))}. Who takes what is the split put to the room; where it wasn't, you decide, from their roles.
-- Split by what each piece of work needs from another. In depends_on (the keys of other subtasks) a subtask names only the subtasks whose results it actually uses; it starts as soon as they are merged. Don't make sequential what can run in parallel.
-- When others wait only on something small and quick to make, such as an interface, types, a config or a skeleton, make it a subtask of its own, so they can start soon; its assignee defines that interface.
-- Every interface the meeting said someone defines and others use is defined in such a quick subtask at the start, by whoever defines it. A subtask that only needs to know an interface depends on the subtask defining it, not on the work behind it. Putting the real pieces together and checking the whole is a subtask of its own at the end.
-- Beyond that, don't split finer: one person's piece is one subtask, and one person's pieces that nobody waits on separately are one subtask. Every subtask carries a fixed cost (a new session getting to know the repository, a review, a merge).
-- Dependencies must not loop: no subtask may wait, directly or through others, on itself or on a subtask that waits on it.
-- Give every subtask a clear description and acceptance criteria: its member reads them, and the plan document, before starting.
-- In the description of every subtask that defines or uses an interface, name the interface and who defines it.
-- plan_markdown is the plan document for the user and the team: the goal and scope; what was decided, why, and what was turned down; where people didn't agree and how you ruled; what the meeting didn't get to; then who does what, dependencies and risks.
-- summary states the outcome in one sentence.`;
-}
-
 // src/plugin/tools.ts
 var decisionOf = (decision, note, sentBack) => ({
   decision,
@@ -9427,9 +9506,7 @@ function addTools(server2, session2) {
         attendees,
         hostOnly: host_only
       });
-      return toolText(
-        `The meeting [${held.id}] has begun: ${listOf(held.participants)}, hosted by ${held.host}${held.hostOnly ? ", who only runs it" : ""}.`
-      );
+      return toolText(`The meeting [${held.id}] has begun: ${attendanceText(held)}.`);
     }
   );
   server2.registerTool(
@@ -9464,9 +9541,7 @@ function addTools(server2, session2) {
     },
     async ({ meeting: id }) => {
       const added = await session2.goal.meetings.approve(id);
-      return toolText(
-        `Approved: ${String(added.length)} ${added.length === 1 ? "subtask goes" : "subtasks go"} to work.`
-      );
+      return toolText(`Approved: ${plural(added.length, "subtask goes", "subtasks go")} to work.`);
     }
   );
   server2.registerTool(
@@ -9546,7 +9621,7 @@ function addTools(server2, session2) {
   server2.registerTool(
     "decide",
     {
-      description: "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask), a stuck review (rereview, skip, sendBack), or a merge (ours, theirs, retry).",
+      description: "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask), a stuck review (rereview, skip, sendBack; one that failed goes back only with a note), or a merge (ours, theirs, retry; one git failed on: retry, stop).",
       inputSchema: {
         question: z5.string().describe("The id of what waits on the user"),
         decision: z5.enum(DECISION_OPTIONS),
@@ -9632,8 +9707,8 @@ function addPaneTools(server2, session2, pane2) {
 // src/engine/data.ts
 import { createHash } from "node:crypto";
 import { link, mkdir, readdir as readdir3, readFile as readFile5, rm as rm2, writeFile } from "node:fs/promises";
-import { readFileSync as readFileSync2, unlinkSync } from "node:fs";
-import { setTimeout as delay } from "node:timers/promises";
+import { unlinkSync } from "node:fs";
+import { setTimeout as delay2 } from "node:timers/promises";
 import path7 from "node:path";
 function repoFolder(dataFolder2, repo) {
   const name = path7.basename(repo.top).replace(/[^\w.-]+/g, "-");
@@ -9688,15 +9763,8 @@ function stateWriter(file, state, failed) {
     }
   };
 }
-function lockText(file) {
-  try {
-    return readFileSync2(file, "utf8");
-  } catch {
-    return void 0;
-  }
-}
 function readHolder(file) {
-  const text2 = lockText(file);
+  const text2 = textIfThere(file);
   try {
     return text2 === void 0 ? void 0 : JSON.parse(text2);
   } catch {
@@ -9707,16 +9775,16 @@ function holderOf(lock) {
   const holder = readHolder(lock);
   return holder && running(holder.pid) ? holder : void 0;
 }
-async function holding(lock, me, open2) {
+async function holding(lock, me) {
   await mkdir(path7.dirname(lock), { recursive: true });
   const file = `${lock}.${String(process.pid)}`;
-  const holder = { pid: process.pid, ...me, open: open2 };
+  const holder = { pid: process.pid, ...me };
   await writeFile(file, JSON.stringify(holder));
   return file;
 }
 var REPLACING_WAIT_MS = 10;
 async function takeGoal(lock, me, takeOver) {
-  const mine = await holding(lock, me, false);
+  const mine = await holding(lock, me);
   const handed = { meetings: [] };
   try {
     for (; ; ) {
@@ -9726,7 +9794,7 @@ async function takeGoal(lock, me, takeOver) {
       } catch (error) {
         if (errorCode(error) !== "EEXIST") throw error;
       }
-      const ended = lockText(lock);
+      const ended = textIfThere(lock);
       if (ended === void 0) continue;
       const holder = readHolder(lock);
       if (holder && running(holder.pid)) {
@@ -9735,25 +9803,27 @@ async function takeGoal(lock, me, takeOver) {
           return handed;
         }
         const stopped = await takeOver(holder);
-        handed.meetings.push(...stopped.meetings);
-        continue;
+        if (stopped) {
+          handed.meetings.push(...stopped.meetings);
+          continue;
+        }
       }
       const claim = `${lock}.ended-${String(holder?.pid ?? "unread")}`;
       try {
         await link(mine, claim);
       } catch (error) {
         if (errorCode(error) !== "EEXIST") throw error;
-        if (lockText(claim) === void 0) continue;
+        if (textIfThere(claim) === void 0) continue;
         const replacing = readHolder(claim);
         if (!replacing || !running(replacing.pid))
           throw new Error(`A session taking this goal ended partway: delete ${lock} and ${claim}`, {
             cause: error
           });
-        await delay(REPLACING_WAIT_MS);
+        await delay2(REPLACING_WAIT_MS);
         continue;
       }
       try {
-        if (lockText(lock) === ended) {
+        if (textIfThere(lock) === ended) {
           await renameOver(mine, lock);
           return handed;
         }
@@ -9764,9 +9834,6 @@ async function takeGoal(lock, me, takeOver) {
   } finally {
     await rm2(mine, { force: true });
   }
-}
-async function openedGoal(lock, me) {
-  await renameOver(await holding(lock, me, true), lock);
 }
 function releaseGoal(lock) {
   if (holderOf(lock)?.pid === process.pid) unlinkSync(lock);
@@ -9787,6 +9854,7 @@ async function newGoalFolder(repoFolder2, name, taken) {
     }
   }
 }
+var startedAt = (entry) => "state" in entry ? entry.state.goal.createdAt : Number.POSITIVE_INFINITY;
 async function listGoals(repoFolder2) {
   const folder = goalsFolder(repoFolder2);
   let slugs;
@@ -9799,18 +9867,17 @@ async function listGoals(repoFolder2) {
   const found = await Promise.all(
     slugs.map(async (slug) => {
       const files = goalFiles(path7.join(folder, slug));
-      let state;
+      const holder = holderOf(files.lock);
+      const held = holder && { holder };
       try {
-        state = await readState(files.state);
+        return { slug, state: await readState(files.state), ...held };
       } catch (error) {
         if (errorCode(error) === "ENOENT" || errorCode(error) === "ENOTDIR") return void 0;
-        throw error;
+        return { slug, unreadable: errorText(error), ...held };
       }
-      const holder = holderOf(files.lock);
-      return { slug, state, ...holder && { holder } };
     })
   );
-  return found.filter((entry) => entry !== void 0).sort((a, b) => a.state.goal.createdAt - b.state.goal.createdAt);
+  return found.filter((entry) => entry !== void 0).sort((a, b) => startedAt(a) - startedAt(b));
 }
 
 // src/engine/engine.ts
@@ -10173,10 +10240,12 @@ var Meetings = class {
           },
           ...turn.schema && { schema: turn.schema },
           signal: turn.signal ?? signal,
+          spent: (tokens) => {
+            spend(core.state, member2.name, tokens);
+          },
           ...turn.listener && { listener: turn.listener }
         });
         meeting2.seats = { ...meeting2.seats, [member2.name]: { session: reply.session, heard } };
-        spend(core.state, member2.name, reply.tokens);
         return reply;
       };
       const speak = async (member2, prompt, turn = {}) => {
@@ -10471,8 +10540,8 @@ var Questions = class {
    */
   openDecision(subtask2, decision, text2) {
     this.open(
-      { from: subtask2.assignee, subtaskId: subtask2.id },
-      { text: text2, kind: "decision", decision }
+      { from: subtask2.assignee },
+      { text: text2, kind: "decision", decision, subtaskId: subtask2.id }
     );
   }
   /**
@@ -10493,7 +10562,7 @@ var Questions = class {
       this.inbox.state.subtasks.filter((s) => s.taskId === taskId).map((s) => s.id)
     );
     this.cancelAll(
-      (q) => q.kind === "decision" && q.decision.kind === "delivery" && inTask.has(q.subtaskId ?? "")
+      (q) => q.kind === "decision" && q.decision.kind === "delivery" && inTask.has(q.subtaskId)
     );
   }
   /** A call the member's rules don't cover: allowed once, always, or denied. */
@@ -10558,7 +10627,7 @@ var Questions = class {
       case "choices":
         return "picks" in answer && answer.picks.length === question.choices.length;
       case "decision":
-        return "decision" in answer && question.decision.options.includes(answer.decision) && (answer.note !== void 0 || !noteNeeded(question.decision.kind, answer.decision)) && (answer.decision !== "revise" || this.revisable(question, answer));
+        return "decision" in answer && question.decision.options.includes(answer.decision) && (answer.note !== void 0 || !noteNeeded(question.decision, answer.decision)) && (answer.decision !== "revise" || this.revisable(question, answer));
       case "teammate":
         return false;
     }
@@ -10666,7 +10735,6 @@ function tracking(now, keep) {
     }
   };
 }
-var recordFile = (places, subtaskId) => goalFiles(places.root).record(subtaskId);
 var Records = class {
   constructor(places, failed) {
     this.places = places;
@@ -10682,7 +10750,7 @@ var Records = class {
   recorder(subtaskId) {
     const now = { running: /* @__PURE__ */ new Map() };
     this.live.set(subtaskId, now);
-    const file = recordFile(this.places, subtaskId);
+    const file = goalFiles(this.places.root).record(subtaskId);
     const write = (entry) => {
       this.writing.run(async () => {
         await mkdir3(path9.dirname(file), { recursive: true });
@@ -10701,7 +10769,7 @@ var Records = class {
     const live = now && liveOf(now);
     let handle;
     try {
-      handle = await open(recordFile(this.places, subtaskId));
+      handle = await open(goalFiles(this.places.root).record(subtaskId));
     } catch (error) {
       if (errorCode(error) !== "ENOENT") throw error;
       return { entries: [], next: 0, ...live && { live } };
@@ -10748,7 +10816,7 @@ var Records = class {
 
 // src/engine/scheduler.ts
 import { randomUUID as randomUUID3 } from "node:crypto";
-import { stat as stat2 } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import path10 from "node:path";
 import { z as z9 } from "zod";
 
@@ -10846,7 +10914,6 @@ var progressOf2 = (steps) => {
     ...current !== void 0 && { current }
   };
 };
-var handedAt = (subtask2) => subtask2.status === "reviewing" || subtask2.status === "merging" ? subtask2.delivery?.at ?? 0 : 0;
 var TAKEN_UP = ["pending", "reviewing", "merging"];
 var Scheduler = class {
   constructor(core, questions) {
@@ -10857,7 +10924,7 @@ var Scheduler = class {
   questions;
   /** Subtask id → its stage under way. */
   live = /* @__PURE__ */ new Map();
-  /** Closing: nothing starts, and what stopped work still reports goes nowhere. */
+  /** Closing: nothing starts. */
   closed = false;
   /**
    * Runs stopped to go on in their sessions (their goal was paused, or you
@@ -11006,7 +11073,7 @@ var Scheduler = class {
     if (!can(SUBTASK_MACHINE, subtask2.status, "stop")) return;
     if (subtask2.status === "merging") {
       if (live) return;
-      await abortMerge(this.core.places, this.goal.slug, subtask2.id);
+      await abortMerge(this.core.places, subtask2.id);
       if (!can(SUBTASK_MACHINE, subtask2.status, "stop")) return;
     }
     live?.abort.abort();
@@ -11067,7 +11134,7 @@ var Scheduler = class {
    * back with what to change).
    */
   async decide(question, answer) {
-    const subtask2 = this.subtask(question.subtaskId ?? "");
+    const subtask2 = this.subtask(question.subtaskId);
     if (!subtask2) return;
     const { decision: pick, note = "" } = answer;
     if (question.decision.kind === "delivery") {
@@ -11082,15 +11149,16 @@ var Scheduler = class {
       else if (pick === "sendBack") {
         this.move(subtask2, "reject");
         if (subtask2.session) {
-          goOnWith(subtask2, { why: "rejected", note: subtask2.review.notes ?? "" });
+          const { notes } = subtask2.review;
+          if (notes) goOnWith(subtask2, { why: "rejected", note: notes });
           if (note) goOnWith(subtask2, { why: "carried", note });
         }
       }
     } else if (subtask2.status === "merging") {
-      const { slug } = this.goal;
-      if (pick === "retry") await abortMerge(this.core.places, slug, subtask2.id);
+      if (pick === "retry") await abortMerge(this.core.places, subtask2.id);
+      else if (pick === "stop") await this.stop(subtask2);
       else if (pick === "ours" || pick === "theirs")
-        await pickSide(this.core.places, slug, subtask2.id, question.decision.files ?? [], pick);
+        await pickSide(this.core.places, subtask2.id, question.decision.files ?? [], pick);
     }
     this.core.changed();
     this.pump();
@@ -11104,7 +11172,7 @@ var Scheduler = class {
   pump() {
     if (this.closed) return;
     const order = [...this.core.state.subtasks].sort(
-      (a, b) => Number(Boolean(b.goOn)) - Number(Boolean(a.goOn)) || handedAt(a) - handedAt(b)
+      (a, b) => Number(Boolean(b.goOn)) - Number(Boolean(a.goOn))
     );
     for (; ; ) {
       const work = workOf(this.core);
@@ -11150,10 +11218,10 @@ var Scheduler = class {
   planOf(task) {
     return this.core.state.meetings.find((m) => m.id === task.meetingId)?.plan?.markdown;
   }
-  /** A member by name: one taken off the team since can't work or review. */
+  /** A member by name, as the plan or `assign` checked it against the goal's team, which stays as it was (§6). */
   memberOf(name) {
     const member = this.core.team.members.find((m) => m.name === name);
-    if (!member) throw new Error(`${name} is no longer on the team`);
+    if (!member) throw new Error(`${name} isn't on the goal's team`);
     return member;
   }
   /** Registers a stage under way; `end` settles its `ended`. */
@@ -11258,14 +11326,13 @@ var Scheduler = class {
 ${outcome.handover.summary}`
         );
     } catch (error) {
-      outcome = { status: "failed", error: errorText(error), tokens: 0 };
+      outcome = { status: "failed", error: errorText(error), tokens: outcome?.tokens ?? 0 };
     }
     this.questions.cancelFor(subtask2.id);
     end2();
     spend(core.state, subtask2.assignee, outcome.tokens);
     const held = this.held.get(subtask2.id);
     this.held.delete(subtask2.id);
-    if (this.closed) return;
     if (held && (outcome.status === "stopped" || held.some((g) => g.why === "carried"))) {
       this.move(subtask2, "hold");
       for (const reason of held) goOnWith(subtask2, reason);
@@ -11304,10 +11371,12 @@ ${outcome.handover.summary}`
             own: core.state.subtasks.filter((s) => s.assignee === target.name)
           }),
           options: core.options(target, "readOnly", await openGoal(core.places, this.goal.slug)),
-          signal
+          signal,
+          spent: (tokens) => {
+            spend(core.state, target.name, tokens);
+          }
         })
       );
-      spend(core.state, target.name, reply.tokens);
       core.changed();
       return `${target.name} answered: ${reply.text}`;
     } catch (error) {
@@ -11324,7 +11393,7 @@ ${outcome.handover.summary}`
     for (const file of files) {
       const relative = path10.relative(desk, path10.resolve(desk, file));
       const inside = relative !== "" && !relative.startsWith("..") && !path10.isAbsolute(relative);
-      const there = inside && await stat2(path10.join(desk, relative)).then(
+      const there = inside && await stat(path10.join(desk, relative)).then(
         (found) => found.isFile(),
         () => false
       );
@@ -11365,37 +11434,30 @@ ${outcome.handover.summary}`
         }),
         options: core.options(reviewer, "readOnly", desk),
         schema: verdictSchema,
-        signal: abort.signal
+        signal: abort.signal,
+        spent: (tokens) => {
+          spend(core.state, reviewer.name, tokens);
+        }
       });
-      spend(core.state, reviewer.name, reply.tokens);
       if (subtask2.status !== "reviewing") return;
       const verdict = verdictSchema.parse(reply.structured);
       const rounds = (subtask2.review?.rounds ?? 0) + (verdict.pass ? 0 : 1);
       subtask2.review = { rounds, notes: verdict.notes };
       if (verdict.pass) this.move(subtask2, "merge");
       else if (rounds >= REVIEW_ROUNDS)
-        this.questions.openDecision(
-          subtask2,
-          { kind: "review", options: [...DECISIONS.review.options] },
-          verdict.notes
-        );
+        this.questions.openDecision(subtask2, DECISIONS.stuckReview(), verdict.notes);
       else {
         this.move(subtask2, "reject");
         if (subtask2.session) goOnWith(subtask2, { why: "rejected", note: verdict.notes });
       }
     } catch (error) {
       if (abort.signal.aborted || subtask2.status !== "reviewing") return;
-      this.questions.openDecision(
-        subtask2,
-        { kind: "review", options: [...DECISIONS.review.options] },
-        errorText(error)
-      );
+      subtask2.review = { rounds: subtask2.review?.rounds ?? 0 };
+      this.questions.openDecision(subtask2, DECISIONS.failedReview(), errorText(error));
     } finally {
       end2();
-      if (!this.closed) {
-        core.changed();
-        this.pump();
-      }
+      core.changed();
+      this.pump();
     }
   }
   /**
@@ -11422,7 +11484,7 @@ ${outcome.handover.summary}`
       } else if (merged.other.length) {
         this.questions.openDecision(
           subtask2,
-          { kind: "merge", options: [...DECISIONS.merge.options], files: merged.other },
+          DECISIONS.mergeFiles(merged.other),
           merged.other.join("\n")
         );
       } else {
@@ -11431,13 +11493,11 @@ ${outcome.handover.summary}`
         if (subtask2.session) goOnWith(subtask2, { why: "conflict" });
       }
     } catch (error) {
-      this.questions.openDecision(subtask2, { kind: "merge", options: ["retry"] }, errorText(error));
+      this.questions.openDecision(subtask2, DECISIONS.failedMerge(), errorText(error));
     } finally {
       end2();
-      if (!this.closed) {
-        core.changed();
-        this.pump();
-      }
+      core.changed();
+      this.pump();
     }
   }
   /**
@@ -11448,11 +11508,7 @@ ${outcome.handover.summary}`
     subtask2.finishedAt = Date.now();
     subtask2.progress = { done: subtask2.progress.total, total: subtask2.progress.total };
     if (!taskDone(this.core.state, subtask2.taskId) || !this.taskOf(subtask2).ownerAccepts) return;
-    this.questions.openDecision(
-      subtask2,
-      { kind: "delivery", options: [...DECISIONS.delivery.options] },
-      this.taskOf(subtask2).title
-    );
+    this.questions.openDecision(subtask2, DECISIONS.delivery(), this.taskOf(subtask2).title);
   }
 };
 
@@ -11507,6 +11563,7 @@ var Engine = class _Engine {
     );
     const files = goalFiles(folder);
     const me = { session: options.session, address: options.address };
+    let engine;
     try {
       await takeGoal(files.lock, me, (holder) => options.takeOver(holder, slug));
       await copyTeam(files.team, copy);
@@ -11520,13 +11577,12 @@ var Engine = class _Engine {
         questions: [],
         tokens: {}
       };
-      const engine = await _Engine.ready(options, places, files, copy, state);
+      engine = await _Engine.ready(options, places, files, copy, state);
       engine.core.changed();
       await engine.writer.flush();
-      await openedGoal(files.lock, me);
       return engine;
     } catch (error) {
-      releaseGoal(files.lock);
+      await _Engine.leave(engine, files);
       await rm3(folder, { recursive: true, force: true });
       throw error;
     }
@@ -11542,30 +11598,35 @@ var Engine = class _Engine {
     const folder = path11.join(goalsFolder(repoFolder(options.dataFolder, repo)), slug);
     const files = goalFiles(folder);
     if (!existsSync(files.state)) throw new Error(`There is no goal "${slug}" in this repository`);
+    await readState(files.state);
+    filledSettings(await readCopy(files.team), options);
     const me = { session: options.session, address: options.address };
     const handed = await takeGoal(files.lock, me, (holder) => options.takeOver(holder, slug));
+    let engine;
     try {
       const state = await readState(files.state);
-      const engine = await _Engine.ready(
-        options,
-        { repo, root: folder },
-        files,
-        await readCopy(files.team),
-        state
-      );
+      const copy = await readCopy(files.team);
+      engine = await _Engine.ready(options, { repo, root: folder }, files, copy, state);
       if (state.goal.status === "active") await engine.goals.pause();
       await engine.goals.resume(handed.meetings);
       await engine.writer.flush();
-      await openedGoal(files.lock, me);
       return engine;
     } catch (error) {
-      releaseGoal(files.lock);
+      await _Engine.leave(engine, files);
       throw error;
+    }
+  }
+  /** Lets a goal go that failed to open: what of its engine was made is shut, or else the lock and the record of members let go. */
+  static async leave(engine, files) {
+    if (engine) await engine.shut();
+    else {
+      await stopRecording();
+      releaseGoal(files.lock);
     }
   }
   /** The engine of a goal whose lock this process holds, put together; what a server before left running is stopped. */
   static async ready(options, places, files, copy, state) {
-    await recordMembersIn(files.members);
+    await recordMembersIn(files.members, options.failed);
     const writer = stateWriter(files.state, () => state, options.failed);
     const records = new Records(places, options.failed);
     const core = {
@@ -11642,12 +11703,12 @@ var Engine = class _Engine {
     await rm3(this.core.places.root, { recursive: true, force: true });
   }
   /**
-   * Lets the goal go at once, as the process dies of an error: its members
-   * are stopped and the lock released. The state stays as last written, and
-   * the next session to take the goal up pauses what it left active.
+   * Lets the goal go at once, as the process dies of an error: the lock is
+   * released, and its members are stopped as the process exits
+   * (stopMembers). The state stays as last written, and the next session to
+   * take the goal up pauses what it left active.
    */
   abandon() {
-    stopMembers();
     releaseGoal(this.files.lock);
   }
   /**
@@ -11660,19 +11721,23 @@ var Engine = class _Engine {
       await Promise.all([this.scheduler.close(), this.meetings.close()]);
       await Promise.all([this.writer.close(), this.records.flush()]);
     } finally {
-      stopRecording();
+      await stopRecording();
       releaseGoal(this.files.lock);
     }
   }
   /**
    * Allows rules always (Questions): in the repository's team settings, for
    * goals started after, and in the goal's copy, for its members' next turns.
+   * One at a time, so members' settings files end as the copy does.
    */
-  async allow(rules) {
-    await allowInTeam(this.core.places.repo.top, rules);
-    this.copy = await allowInCopy(this.files.team, rules);
-    await this.writeMemberSettings(this.copy);
+  allow(rules) {
+    return this.allowing("allow", async () => {
+      await allowInTeam(this.core.places.repo.top, rules);
+      this.copy = await allowInCopy(this.files.team, rules);
+      await this.writeMemberSettings(this.copy);
+    });
   }
+  allowing = serialBy();
   /** Writes each member's settings file (filledSettings); throws before writing any when one can't be filled in. */
   async writeMemberSettings(copy) {
     for (const [name, filled] of filledSettings(copy, this.options))
@@ -11731,7 +11796,7 @@ var Session = class {
   }
   /** Why the session runs no goal, and what to do. */
   get none() {
-    return this.movedAway ? `The goal "${this.movedAway}" moved to another Claude Code session. The user brings it back with /openplan resume.` : "This session runs no goal: start one (start_goal), or the user takes one up with /openplan resume.";
+    return noGoalForModel(this.movedAway);
   }
   /** Starts a goal here: refused while this session's goal is active; a paused or archived one is let go. */
   start(name) {
@@ -11894,11 +11959,15 @@ var server = new McpServer(
 var listMembers = addTools(server, session);
 addPaneTools(server, session, pane);
 async function listTeamFiles() {
+  let repo;
   try {
-    const repo = await openRepository(cwd);
-    listMembers((await loadTeam(userTeam, repo.top)).team);
-  } catch {
+    repo = await openRepository(cwd);
+  } catch (error) {
+    if (error instanceof GitError) return;
+    throw error;
   }
+  const team = await loadTeam(userTeam, repo.top).catch(() => void 0);
+  if (team) listMembers(team.team);
 }
 await listTeamFiles();
 await server.connect(new StdioServerTransport());
