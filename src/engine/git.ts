@@ -195,20 +195,6 @@ async function checkOut(repo: Repository, folder: string, branch: string, from?:
   );
 }
 
-/**
- * Sets a goal up in git, or again what of it is missing: its branch cut from
- * your HEAD, checked out in its own worktree (again, if the folder was
- * deleted by hand).
- */
-export async function openGoal(places: Places, slug: string): Promise<string> {
-  const { repo } = places;
-  const branch = goalBranch(slug);
-  const folder = goalFolder(places);
-  if (!(await hasBranch(repo, branch))) await git({ cwd: repo.top }, ["branch", branch, "HEAD"]);
-  if (!(await exists(folder))) await checkOut(repo, folder, branch);
-  return folder;
-}
-
 /** The branch a subtask works on. */
 export const subtaskBranch = (slug: string, subtaskId: string) =>
   `${goalBranches(slug)}${subtaskId}`;
@@ -222,6 +208,24 @@ const serial = serialBy();
 const perGoal = <T>(places: Places, task: () => Promise<T>) => serial(goalFolder(places), task);
 
 /**
+ * Sets a goal up in git, or again what of it is missing: its branch cut from
+ * your HEAD, checked out in its own worktree (again, if the folder was
+ * deleted by hand). Inside a goal's git operation (perGoal).
+ */
+async function setUpGoal(places: Places, slug: string): Promise<string> {
+  const { repo } = places;
+  const branch = goalBranch(slug);
+  const folder = goalFolder(places);
+  if (!(await hasBranch(repo, branch))) await git({ cwd: repo.top }, ["branch", branch, "HEAD"]);
+  if (!(await exists(folder))) await checkOut(repo, folder, branch);
+  return folder;
+}
+
+/** The goal's worktree, set up again first where it needs it (setUpGoal), as one of the goal's git operations. */
+export const openGoal = (places: Places, slug: string) =>
+  perGoal(places, () => setUpGoal(places, slug));
+
+/**
  * A subtask's worktree: its own if there (a run going on keeps it), its
  * branch checked out again if only that is (the folder deleted by hand), else
  * a new branch cut from the goal's branch as it stands now.
@@ -230,7 +234,7 @@ export function openDesk(places: Places, slug: string, subtaskId: string): Promi
   return perGoal(places, async () => {
     const { repo } = places;
     const desk = deskFolder(places, subtaskId);
-    await openGoal(places, slug);
+    await setUpGoal(places, slug);
     if (await exists(path.join(desk, ".git"))) return desk;
     await rm(desk, { recursive: true, force: true });
     const branch = subtaskBranch(slug, subtaskId);
@@ -387,7 +391,7 @@ export function mergeDesk(
       }
     }
     const head = (await git(desk, ["rev-parse", "HEAD"])).stdout.trim();
-    const goal = await worktreeAt(repo, await openGoal(places, slug));
+    const goal = await worktreeAt(repo, await setUpGoal(places, slug));
     await git(goal, ["merge", "-q", "--ff-only", head]);
     await removeDesk(places, slug, subtaskId);
     return { kind: "merged" };

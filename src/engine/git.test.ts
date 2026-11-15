@@ -122,7 +122,8 @@ describe("goals", () => {
     const places = await placesOf();
     const folder = await openGoal(places, "dice");
     await rm(folder, { recursive: true });
-    await openGoal(places, "dice");
+    // Two at once (a review and a meeting, say) check it out once, not twice.
+    await Promise.all([openGoal(places, "dice"), openGoal(places, "dice")]);
     const checkedOut = await git({ cwd: folder }, ["branch", "--show-current"]);
     expect(checkedOut.stdout.trim()).toBe("openplan/dice/main");
   });
