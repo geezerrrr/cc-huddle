@@ -39,7 +39,6 @@ const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
   dependsOn: [],
   status: "pending",
   progress: { done: 0, total: 0 },
-  tokens: 0,
   ...fields,
 });
 
@@ -62,6 +61,7 @@ beforeEach(async () => {
       subtasks: [],
       meetings: [],
       questions: [],
+      tokens: {},
     },
     team: { members: [member("glm"), member("sonnet")], review: false },
     places: { repo: await openRepository(repo), root: path.join(dir, "data") },
@@ -142,7 +142,8 @@ describe("Scheduler", () => {
       goalBranch("dice"),
     ]);
     expect(log.stdout.trim()).toBe("glm\nMake s1");
-    expect(s1).toMatchObject({ tokens: 3, delivery: { summary: "Done.", files: ["score.txt"] } });
+    expect(s1).toMatchObject({ delivery: { summary: "Done.", files: ["score.txt"] } });
+    expect(core.state.tokens).toEqual({ glm: 3 });
     expect(core.state.questions).toMatchObject([
       {
         subtaskId: "s1",
@@ -235,7 +236,6 @@ describe("Scheduler", () => {
       status: "approved",
       turns: [],
       plan: { summary: "Dice", markdown: "# Dice\n\nTwo players.", tasks: [] },
-      tokens: 0,
     });
     core.state.tasks = [
       {
@@ -320,7 +320,8 @@ describe("Scheduler", () => {
       model: "readOnly",
       settings: "sonnet.json",
     });
-    expect(s1.tokens).toBe(5);
+    // The answer's tokens are the one who answered.
+    expect(core.state.tokens.sonnet).toBe(5);
   });
 
   describe("with review on", () => {
@@ -348,7 +349,9 @@ describe("Scheduler", () => {
       });
       expect(review?.prompt).toContain("Acceptance criteria: Shows both scores");
       expect(review?.schema?.safeParse({ pass: true, notes: "Fine." }).success).toBe(true);
-      expect(s1).toMatchObject({ tokens: 10, review: { rounds: 0, notes: "Fine." } });
+      expect(s1).toMatchObject({ review: { rounds: 0, notes: "Fine." } });
+      // The run is the author's, the review the reviewer's.
+      expect(core.state.tokens).toEqual({ glm: 3, sonnet: 7 });
     });
 
     it("sends it back with the notes twice, then puts it to you, to send back with your words", async () => {

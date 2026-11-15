@@ -12,7 +12,6 @@ const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
   dependsOn: [],
   status: "pending",
   progress: { done: 0, total: 0 },
-  tokens: 0,
   ...fields,
 });
 
@@ -24,7 +23,6 @@ const meeting = (fields: Partial<Meeting> = {}): Meeting => ({
   host: "host",
   status: "approved",
   turns: [],
-  tokens: 0,
   ...fields,
 });
 
@@ -50,6 +48,7 @@ const work = (fields: Partial<Work> = {}): Work => ({
   subtasks: [],
   meetings: [meeting()],
   questions: [],
+  tokens: {},
   ...fields,
 });
 

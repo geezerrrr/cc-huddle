@@ -106,8 +106,6 @@ export interface Subtask {
   conflict?: { files: string[] };
   /** Stopped after it was handed over: the stage going on takes up again, its delivery standing. */
   stoppedIn?: "reviewing" | "merging";
-  /** Tokens its runs, reviews and questions to teammates have used. */
-  tokens: number;
   error?: string;
   /** The session its last run was in. */
   session?: string;
@@ -151,7 +149,6 @@ export interface MeetingTurn {
   at: number;
   /** Which part of the meeting it belongs to: how far the meeting got is read off these. */
   phase: "opening" | "round" | "steer" | "answer" | "summary";
-  tokens: number;
   /** Whom the host gave the floor to (a steer turn). */
   calls?: string;
 }
@@ -195,7 +192,6 @@ export interface Meeting {
   hands?: MeetingHand[];
   seats?: Record<string, MeetingSeat>;
   plan?: Plan;
-  tokens: number;
   error?: string;
 }
 
@@ -298,6 +294,8 @@ export interface GoalState {
   subtasks: Subtask[];
   meetings: Meeting[];
   questions: Question[];
+  /** The tokens each member's sessions have used, by name: their runs, reviews, answers to teammates and meeting turns. */
+  tokens: Record<string, number>;
 }
 
 /** What a subtask waits on now (§4.5). `halted`: the upstream failed or was stopped. */

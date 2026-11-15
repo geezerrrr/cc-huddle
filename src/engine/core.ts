@@ -9,7 +9,7 @@ import type { MemberOptions } from "./policy.ts";
 import type { SessionKind } from "./prompts.ts";
 import type { Inbox } from "./questions.ts";
 import type { TurnListener } from "./turns.ts";
-import type { Meeting, Member, Subtask, GoalState } from "./types.ts";
+import type { GoalState, Meeting, Member, Subtask } from "./types.ts";
 
 /** The team as configured (§6): its members in order, and openplan's own settings. */
 export interface Team {
@@ -38,6 +38,11 @@ export const workOf = (core: Pick<Core, "state" | "team" | "underWay">): Work =>
   members: core.team.members.map((m) => m.name),
   underWay: core.underWay(),
 });
+
+/** Counts `tokens` to the member whose session used them. */
+export function spend(state: GoalState, member: string, tokens: number) {
+  state.tokens[member] = (state.tokens[member] ?? 0) + tokens;
+}
 
 /** An error in words. */
 export const errorText = (error: unknown) =>

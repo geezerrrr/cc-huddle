@@ -30,7 +30,7 @@ export function repoFolder(dataFolder: string, repo: Repository): string {
 export const goalsFolder = (repoFolder: string) => path.join(repoFolder, "goals");
 
 /** The version of `state.json` this openplan writes. */
-const STATE_VERSION = 1;
+const STATE_VERSION = 2;
 
 /** How long after a change the state is written: a burst of changes is written once. */
 const SAVE_DELAY_MS = 200;
@@ -48,6 +48,10 @@ export async function readState(file: string): Promise<GoalState> {
   }
   if (saved.version > STATE_VERSION)
     throw new Error(`${file} was written by a newer openplan: update openplan to go on`);
+  if (saved.version < STATE_VERSION)
+    throw new Error(
+      `${file} was written by an openplan before its first release: move it away to start over`,
+    );
   return saved.state;
 }
 

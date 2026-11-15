@@ -36,6 +36,7 @@ const fresh = (slug = "dice", createdAt = 0): GoalState => ({
   subtasks: [],
   meetings: [],
   questions: [],
+  tokens: {},
 });
 
 describe("repoFolder", () => {
@@ -67,7 +68,7 @@ describe("the state file", () => {
     writer.changed();
     await writer.flush();
     expect((await readState(file)).goal.status).toBe("paused");
-    expect(JSON.parse(await readFile(file, "utf8"))).toMatchObject({ version: 1 });
+    expect(JSON.parse(await readFile(file, "utf8"))).toMatchObject({ version: 2 });
   });
 
   it("tells a write that failed", async () => {
@@ -83,7 +84,7 @@ describe("the state file", () => {
     const file = path.join(dir, "state.json");
     await writeFile(file, "{");
     await expect(readState(file)).rejects.toThrow("can't be read");
-    await writeFile(file, JSON.stringify({ version: 2, state: fresh() }));
+    await writeFile(file, JSON.stringify({ version: 3, state: fresh() }));
     await expect(readState(file)).rejects.toThrow("written by a newer openplan");
   });
 });

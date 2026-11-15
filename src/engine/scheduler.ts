@@ -10,7 +10,7 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
 import { actionsOf, busyMembers, redoneUpstream, reviewerOf, taskDone, waitsIn } from "./derive.ts";
-import { errorText, workOf, type Core } from "./core.ts";
+import { errorText, spend, workOf, type Core } from "./core.ts";
 import {
   abortMerge,
   commitDesk,
@@ -145,7 +145,6 @@ export class Scheduler {
           taskId: task.id,
           status: "pending",
           progress: { done: 0, total: 0 },
-          tokens: 0,
         };
       });
     });
@@ -540,7 +539,7 @@ export class Scheduler {
     // Nothing waits on your answers any more.
     this.questions.cancelFor(subtask.id);
     end();
-    subtask.tokens += outcome.tokens;
+    spend(core.state, subtask.assignee, outcome.tokens);
     const held = this.held.get(subtask.id);
     this.held.delete(subtask.id);
     if (this.closed) return;
@@ -596,7 +595,7 @@ export class Scheduler {
             signal,
           }),
       );
-      subtask.tokens += reply.tokens;
+      spend(core.state, target.name, reply.tokens);
       core.changed();
       return `${target.name} answered: ${reply.text}`;
     } catch (error) {
@@ -662,7 +661,7 @@ export class Scheduler {
         schema: verdictSchema,
         signal: abort.signal,
       });
-      subtask.tokens += reply.tokens;
+      spend(core.state, reviewer.name, reply.tokens);
       if (subtask.status !== "reviewing") return;
       const verdict = verdictSchema.parse(reply.structured);
       const rounds = (subtask.review?.rounds ?? 0) + (verdict.pass ? 0 : 1);

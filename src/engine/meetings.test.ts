@@ -54,6 +54,7 @@ beforeEach(async () => {
       subtasks: [],
       meetings: [],
       questions: [],
+      tokens: {},
     },
     team: { members: [member("sonnet", "Programmer"), member("glm", "UI designer")], review: true },
     places: { repo: await openRepository(repo), root: path.join(dir, "data") },
@@ -156,7 +157,6 @@ describe("nextMove", () => {
     speaker,
     text: "",
     at: 0,
-    tokens: 0,
     ...(calls && { calls }),
   });
   const at = (turns: MeetingTurn[], hostOnly?: boolean) =>
@@ -395,7 +395,6 @@ describe("Meetings", () => {
       dependsOn: [],
       status: "running",
       progress: { done: 0, total: 0 },
-      tokens: 0,
     });
     const call = (attendees: string[]) => () =>
       meetings.start({ agenda: "x", size: "small", attendees });

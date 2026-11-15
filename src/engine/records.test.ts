@@ -126,7 +126,7 @@ describe("Records", () => {
       ],
       live: { streaming: { kind: "text", text: "Two dice, one reroll." }, running: [] },
     });
-    meeting.turns.push({ speaker: "glm", text: "", at: 0, phase: "opening", tokens: 0 });
+    meeting.turns.push({ speaker: "glm", text: "", at: 0, phase: "opening" });
     expect(records.speaking(meeting)).toBeUndefined();
     vi.useRealTimers();
   });

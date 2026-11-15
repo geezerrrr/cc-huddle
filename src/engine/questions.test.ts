@@ -210,7 +210,6 @@ const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
   dependsOn: [],
   status: "done",
   progress: { done: 0, total: 0 },
-  tokens: 0,
   ...fields,
 });
 

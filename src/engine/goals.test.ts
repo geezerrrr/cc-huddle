@@ -39,7 +39,6 @@ const meeting = (id: string, status: Meeting["status"]): Meeting => ({
   host: "glm",
   status,
   turns: [],
-  tokens: 0,
 });
 
 let dir: string;
@@ -71,6 +70,7 @@ beforeEach(async () => {
       subtasks: [],
       meetings: [],
       questions: [],
+      tokens: {},
     },
     team: { members: [member("glm")], review: false },
     places: { repo: await openRepository(repo), root: path.join(dir, "data") },
@@ -150,7 +150,6 @@ describe("Goals", () => {
       dependsOn: [],
       status: "stopped",
       progress: { done: 0, total: 0 },
-      tokens: 0,
     });
 
     await expect(goals.delete()).rejects.toThrow("isn't archived");

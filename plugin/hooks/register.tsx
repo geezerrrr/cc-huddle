@@ -757,12 +757,11 @@ export const register: Register = (on) => {
   on("ui.render", { component: "AbovePrompt" }, async ($, e, next) => {
     const now = await read($, team);
     if (!now?.band || e.props.hasSurvey) return next(e);
-    const { Box, Button, Text } = $.ui.resolve(e);
+    // Plain text, not a button: a button above the prompt takes ctrl+x and tab before the pane does.
+    const { Box, Text } = $.ui.resolve(e);
     return (
       <Box flexDirection="column">
-        <Button key="openplan" plain onPress={() => void openPane($)}>
-          <Text dimColor>openplan · {now.band}</Text>
-        </Button>
+        <Text dimColor>openplan · {now.band}</Text>
         {now.tasks.map((line, i) => (
           <Text key={`task-${String(i)}`} dimColor>
             {"  "}

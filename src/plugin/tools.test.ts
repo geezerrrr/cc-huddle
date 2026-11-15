@@ -164,7 +164,6 @@ describe("tools", () => {
         markdown: "# Dice",
         tasks: [{ title: "Game", outcome: "", ownerAccepts: true, subtasks: [subtask] }],
       },
-      tokens: 0,
     });
     const shown = JSON.parse((await call("show_plan", { meeting: "m1" })).text) as {
       tasks: { subtasks: { assignee: string; depends_on: string[] }[] }[];

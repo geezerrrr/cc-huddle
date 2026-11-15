@@ -24,7 +24,6 @@ const subtask = (id: string, fields: Partial<Subtask>): Subtask => ({
   dependsOn: [],
   status: "pending",
   progress: { done: 0, total: 0 },
-  tokens: 0,
   ...fields,
 });
 
@@ -35,9 +34,8 @@ const meeting: Meeting = {
   participants: ["sonnet", "glm"],
   host: "sonnet",
   status: "approved",
-  turns: [{ speaker: "sonnet", text: "Two dice.", at: 0, phase: "opening", tokens: 30 }],
+  turns: [{ speaker: "sonnet", text: "Two dice.", at: 0, phase: "opening" }],
   plan: { summary: "A dice game", markdown: "", tasks: [] },
-  tokens: 30,
 };
 
 const question = (
@@ -70,7 +68,6 @@ const work = (): Work => ({
       status: "running",
       startedAt: 1,
       progress: { done: 1, total: 3, current: "Write the reroll" },
-      tokens: 100,
     }),
     subtask("board", {
       assignee: "sonnet",
@@ -111,6 +108,7 @@ const work = (): Work => ({
     }),
     question("q4", { kind: "teammate", to: "sonnet", text: "Which colour?" }),
   ],
+  tokens: { glm: 100, sonnet: 30 },
 });
 
 describe("paneTeam", () => {

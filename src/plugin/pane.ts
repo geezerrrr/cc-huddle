@@ -93,17 +93,13 @@ function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>
   const followed =
     running ??
     own.filter((s) => s.startedAt).sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0))[0];
-  const spoken = work.meetings
-    .flatMap((m) => m.turns)
-    .filter((t) => t.speaker === member.name)
-    .reduce((sum, t) => sum + t.tokens, 0);
   return {
     name: member.name,
     role: member.role.title,
     ...(member.model && { model: member.model }),
     doing: doing ?? "free",
     ...(followed && { subtask: followed.id }),
-    tokens: own.reduce((sum, s) => sum + s.tokens, 0) + spoken,
+    tokens: work.tokens[member.name] ?? 0,
   };
 }
 

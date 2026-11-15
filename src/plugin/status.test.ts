@@ -12,7 +12,6 @@ const subtask = (id: string, fields: Partial<Subtask>): Subtask => ({
   dependsOn: [],
   status: "pending",
   progress: { done: 0, total: 0 },
-  tokens: 0,
   ...fields,
 });
 
@@ -41,7 +40,6 @@ describe("statusText", () => {
           host: "sonnet",
           status: "review",
           turns: [],
-          tokens: 0,
         },
       ],
       tasks: [{ id: "t1", title: "Game", outcome: "", ownerAccepts: true }],
@@ -66,6 +64,7 @@ describe("statusText", () => {
           decision: { kind: "delivery", options: ["accept", "revise"] },
         }),
       ],
+      tokens: {},
     });
     expect(text).toBe(`Goal "Dice": active, on branch openplan/dice/main
 Team: glm (busy), sonnet

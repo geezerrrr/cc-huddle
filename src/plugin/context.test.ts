@@ -56,13 +56,14 @@ async function writeGoal(slug: string, status = "paused") {
   await writeFile(
     files.state,
     JSON.stringify({
-      version: 1,
+      version: 2,
       state: {
-        goal: { id: slug, name: slug, slug, status, createdAt: slug.length },
+        goal: { name: slug, slug, status, createdAt: slug.length },
         tasks: [],
         subtasks: [],
         meetings: [],
         questions: [],
+        tokens: {},
       },
     }),
   );

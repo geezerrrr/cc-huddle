@@ -130,6 +130,7 @@ export class Engine {
         subtasks: [],
         meetings: [],
         questions: [],
+        tokens: {},
       };
       const engine = await Engine.ready(options, places, files, copy, state);
       engine.core.changed();

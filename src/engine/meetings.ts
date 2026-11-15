@@ -16,7 +16,7 @@ import {
   type SdkMcpToolDefinition,
 } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
-import { errorText, workOf, type Core } from "./core.ts";
+import { errorText, spend, workOf, type Core } from "./core.ts";
 import { busyMembers, meetingResumes } from "./derive.ts";
 import { openGoal } from "./git.ts";
 import { goalFiles } from "./goal-files.ts";
@@ -197,7 +197,6 @@ export class Meetings {
       ...(call.hostOnly && { hostOnly: true }),
       status: "running",
       turns: [],
-      tokens: 0,
     };
     core.state.meetings.push(meeting);
     core.changed();
@@ -387,7 +386,7 @@ export class Meetings {
           ...(turn.listener && { listener: turn.listener }),
         });
         meeting.seats = { ...meeting.seats, [member.name]: { session: reply.session, heard } };
-        meeting.tokens += reply.tokens;
+        spend(core.state, member.name, reply.tokens);
         return reply;
       };
       /**
@@ -429,18 +428,12 @@ export class Meetings {
           meeting.planning = undefined;
         }
       };
-      const said = (
-        speaker: Member,
-        { text, tokens }: { text: string; tokens: number },
-        phase: MeetingTurn["phase"],
-        calls?: string,
-      ) => {
+      const said = (speaker: Member, text: string, phase: MeetingTurn["phase"], calls?: string) => {
         meeting.turns.push({
           speaker: speaker.name,
           text,
           at: Date.now(),
           phase,
-          tokens,
           ...(calls !== undefined && { calls }),
         });
         core.changed();
@@ -457,7 +450,7 @@ export class Meetings {
         const member = attendee(name);
         const point = meeting.hands?.find((hand) => hand.member === name)?.point;
         meeting.hands = undefined;
-        said(member, await speak(member, meetingAnswer(ctx, member, point)), "answer");
+        said(member, (await speak(member, meetingAnswer(ctx, member, point))).text, "answer");
       };
       /**
        * Each of `who` at once, with `flag` up meanwhile: one failing stops
@@ -508,11 +501,11 @@ export class Meetings {
       const round = (who: Member[]) =>
         allAtOnce(who, "drafting", async (member, drafting) => {
           // What they heard is the opening alone: the others' first judgments reach them after.
-          said(
-            member,
-            await ask(member, meetingRound(ctx, member), { heard: 1, signal: drafting }),
-            "round",
-          );
+          const judged = await ask(member, meetingRound(ctx, member), {
+            heard: 1,
+            signal: drafting,
+          });
+          said(member, judged.text, "round");
         });
       /** A step of the discussion: hands go up, the host gives the floor or ends it. False once it is over. */
       const discuss = async (left: number) => {
@@ -535,7 +528,7 @@ export class Meetings {
         const after = steer.text.trim();
         const text =
           before && before !== after ? [before, after].filter(Boolean).join("\n\n") : after;
-        if (text && !floor?.quiet) said(host, { text, tokens: steer.tokens }, "steer", called);
+        if (text && !floor?.quiet) said(host, text, "steer", called);
         else if (called) await answer(called);
         else return false;
         return true;
@@ -548,7 +541,7 @@ export class Meetings {
       ) {
         switch (move.kind) {
           case "open":
-            said(host, await speak(host, meetingOpening(ctx)), "opening");
+            said(host, (await speak(host, meetingOpening(ctx))).text, "opening");
             break;
           case "round":
             await round(move.members.map(attendee));
@@ -568,7 +561,7 @@ export class Meetings {
       // Stopped as the plan came in: there is no plan, and it ends as any stop does.
       signal.throwIfAborted();
       meeting.plan = soundPlan(hostWritten(schema.parse(closing.structured)), "drop");
-      said(host, { text: meeting.plan.summary, tokens: closing.tokens }, "summary");
+      said(host, meeting.plan.summary, "summary");
       meeting.status = step(MEETING_MACHINE, meeting.status, "plan");
       // With its plan out a meeting can't go on: the sessions it kept have served.
       meeting.seats = undefined;

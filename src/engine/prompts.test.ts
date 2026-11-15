@@ -32,7 +32,6 @@ const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
   dependsOn: [],
   status: "done",
   progress: { done: 0, total: 0 },
-  tokens: 0,
   ...fields,
 });
 
@@ -150,7 +149,6 @@ describe("meeting prompts", () => {
     host: "sonnet",
     status: "running",
     turns: [],
-    tokens: 0,
     ...fields,
   });
   const brief = (fields: Partial<Meeting> = {}): MeetingBrief => ({
@@ -165,7 +163,6 @@ describe("meeting prompts", () => {
     text,
     at: 0,
     phase,
-    tokens: 0,
   });
 
   it("brief an attendee the first time only", () => {
