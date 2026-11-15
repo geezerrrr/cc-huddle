@@ -34,8 +34,13 @@ const PANE_ONLY_REASON = "This tool is the user's, in /openplan.";
 const POLL_MS = 500;
 /** How many of a followed record's entries the pane keeps. */
 const RECORD_KEEP = 200;
-/** How much of a member's thinking, or of a tool's argument, a row shows. */
+/** How much of a tool's argument, or of what is stuck, a row shows. */
 const ROW_TEXT = 300;
+/** How many lines of a tool's output its row shows. */
+const OUTPUT_LINES = 3;
+/** The keys that work in the pane, its last line. */
+const KEYS =
+  "1 meeting · 2 team · 3 needs you · tab or ↑/↓ to select · enter to press · esc to the prompt";
 
 const team = atom({ plugin: "openplan", key: "team" } as const, null, { shape: "team-2" });
 const speaking = atom({ plugin: "openplan", key: "speaking" } as const, null);
@@ -44,10 +49,10 @@ const problem = atom({ plugin: "openplan", key: "problem" } as const, null);
 const tab = atom({ plugin: "openplan", key: "tab" } as const, "team");
 const picks = atom({ plugin: "openplan", key: "picks" } as const, {});
 
-const TABS: { tab: OpenplanTab; label: string }[] = [
-  { tab: "meeting", label: "Meeting" },
-  { tab: "team", label: "Team" },
-  { tab: "needs", label: "Needs you" },
+const TABS: { tab: OpenplanTab; label: string; hotkey: string }[] = [
+  { tab: "meeting", label: "Meeting", hotkey: "1" },
+  { tab: "team", label: "Team", hotkey: "2" },
+  { tab: "needs", label: "Needs you", hotkey: "3" },
 ];
 
 const DECISIONS: Record<string, string> = {
@@ -95,14 +100,17 @@ const clip = (text: string) => (text.length > ROW_TEXT ? `${text.slice(0, ROW_TE
 
 const words = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
-/** A tool call in a line: its name and its main argument. */
-function callLine(name: string, input: unknown): string {
+/** A tool call's main argument, the one its row shows. */
+function mainArgument(input: unknown): string | undefined {
   const fields = (input ?? {}) as Record<string, unknown>;
   const main = ["command", "file_path", "path", "pattern", "url", "description"]
     .map((key) => fields[key])
     .find((value) => typeof value === "string");
-  return main ? `${name} ${clip(String(main))}` : name;
+  return main === undefined ? undefined : clip(String(main));
 }
+
+/** Text in one line, its runs of space and line breaks one space each. */
+const oneLine = (text: string) => text.replace(/\s+/g, " ").trim();
 
 /** A question dialog's chip holds this many characters. */
 const ASK_HEADER = 12;
@@ -278,18 +286,38 @@ async function picked<T extends { label: string }>($: $, listed: T[]): Promise<T
 
 /** Opens the pane with the keyboard: only ever on the person's command or press. */
 async function openPane($: $) {
-  await $.ui.open({ id: PANE, title: "openplan", focus: true });
-  await showTab($, await read($, tab));
+  const shown = await read($, record);
+  await $.ui.open({ id: PANE, title: paneTitle(shown), focus: true });
+  scrollPane($, (await following($)) ? "end" : "start");
 }
 
+/** The pane's title: whose record it shows, when it shows one. */
+const paneTitle = (shown: OpenplanRecord | null) =>
+  shown ? `openplan · ${shown.member}` : "openplan";
+
 /**
- * Shows a tab from its start, but the meeting from its end, where it keeps
- * up as the members speak, the way the transcript does; scrolling away lets
- * it go, scrolling back to the end keeps it again (the `ui.scroll` hook).
+ * Whether the pane shows what keeps coming, the meeting or a member's
+ * record: shown from its end, where it keeps up the way the transcript does;
+ * scrolling away lets it go, scrolling back to the end keeps it again (the
+ * `ui.scroll` hook). Anything else shows from its start.
  */
+async function following($: $) {
+  const shown = await read($, tab);
+  return shown === "meeting" || (shown === "team" && (await read($, record)) !== null);
+}
+
+/** Shows a tab, leaving the record it showed. */
 async function showTab($: $, shown: OpenplanTab) {
   await update($, tab, () => shown);
-  scrollPane($, shown === "meeting" ? "end" : "start");
+  await showRecord($, null);
+}
+
+/** Shows a member's record in place of the team, or (null) the team again. */
+async function showRecord($: $, shown: OpenplanRecord | null) {
+  const was = await read($, record);
+  await update($, record, () => shown);
+  if (was?.member !== shown?.member) await $.ui.open({ id: PANE, title: paneTitle(shown) });
+  scrollPane($, (await following($)) ? "end" : "start");
 }
 
 /** Moves the pane's window; one the engine can't move stays where it is, all a scroll can lose. */
@@ -426,32 +454,78 @@ async function meetingTab($: $, ui: Ui, meeting: OpenplanMeeting | undefined) {
   );
 }
 
+/** A tool call's row: its name and main argument, then the first lines of what it gave. */
+function toolRow(
+  ui: Ui,
+  key: string,
+  call: { name: string; input: unknown; state?: "done" | "error"; output?: string },
+) {
+  const { Box, Text } = ui;
+  const argument = mainArgument(call.input);
+  const lines = call.output?.trimEnd().split("\n") ?? [];
+  const more = lines.length - OUTPUT_LINES;
+  return (
+    <Box key={key} flexDirection="column">
+      <Text
+        wrap="truncate-end"
+        dimColor={!call.state}
+        color={call.state === "error" ? "red" : undefined}
+      >
+        <Text bold>⏺ {call.name}</Text>
+        {argument === undefined ? "" : `(${argument})`}
+        {call.state ? "" : " …"}
+      </Text>
+      {lines.slice(0, OUTPUT_LINES).map((line, n) => (
+        <Text key={`${key}-${n}`} dimColor wrap="truncate-end">
+          {n === 0 ? "  ⎿  " : "     "}
+          {line}
+        </Text>
+      ))}
+      {more > 0 && (
+        <Text key={`${key}-more`} dimColor>
+          {"     "}… +{more} lines
+        </Text>
+      )}
+    </Box>
+  );
+}
+
+/** Words a member said: marked, drawn as Markdown. */
+function saidRow(ui: Ui, key: string, text: string, dimColor = false) {
+  const { Box, Markdown, Text } = ui;
+  return (
+    <Box key={key} flexDirection="row">
+      <Text dimColor={dimColor}>⏺ </Text>
+      <Box flexDirection="column" flexGrow={1}>
+        <Markdown key={`${key}-md`} text={text} dimColor={dimColor} />
+      </Box>
+    </Box>
+  );
+}
+
 function entryRow(ui: Ui, entry: OpenplanEntry, i: number) {
-  const { Markdown, Text } = ui;
+  const { Text } = ui;
+  const key = `e-${i}`;
   switch (entry.kind) {
     case "run":
       return (
-        <Text key={`e-${i}`} dimColor>
+        <Text key={key} dimColor>
           ── a run on {entry.model}
         </Text>
       );
     case "thinking":
       return (
-        <Text key={`e-${i}`} dimColor italic>
-          {clip(entry.text)}
+        <Text key={key} dimColor italic wrap="truncate-end">
+          ∴ {oneLine(entry.text)}
         </Text>
       );
     case "text":
-      return <Markdown key={`e-${i}`} text={entry.text} />;
+      return saidRow(ui, key, entry.text);
     case "tool":
-      return (
-        <Text key={`e-${i}`} color={entry.state === "error" ? "red" : undefined}>
-          {entry.state === "error" ? "✗" : "✓"} {callLine(entry.name, entry.input)}
-        </Text>
-      );
+      return toolRow(ui, key, entry);
     case "steps":
       return (
-        <Text key={`e-${i}`} dimColor>
+        <Text key={key} dimColor>
           {entry.steps
             .map(
               (s) =>
@@ -462,74 +536,90 @@ function entryRow(ui: Ui, entry: OpenplanEntry, i: number) {
       );
     case "notice":
       return (
-        <Text key={`e-${i}`} dimColor>
+        <Text key={key} dimColor>
           · {entry.notice.kind}
         </Text>
       );
   }
 }
 
-function recordView($: $, ui: Ui, shown: OpenplanRecord) {
+/** A member's record in place of the team: what their runs did, then what goes on now. */
+function recordPage($: $, ui: Ui, now: OpenplanTeam, shown: OpenplanRecord) {
   const { Box, Button, Text } = ui;
+  const member = now.members.find((m) => m.name === shown.member);
   const { live } = shown;
   return (
-    <Box flexDirection="column">
-      <Box gap={1}>
-        <Text bold>{shown.member}'s record</Text>
-        <Button key="unfollow" label="Close" onPress={() => update($, record, () => null)} />
+    <Box flexDirection="column" gap={1}>
+      <Box flexDirection="column">
+        <Box gap={1}>
+          <Button key="back" label="Back" hotkey="b" onPress={() => showRecord($, null)} />
+          <Text bold>{shown.member}</Text>
+          {member && <Text dimColor>{memberLine(member)}</Text>}
+        </Box>
+        {member && <Text>{member.doing}</Text>}
       </Box>
-      {shown.entries.map((entry, i) => entryRow(ui, entry, i))}
-      {live?.running.map((run, i) => (
-        <Text key={`run-${i}`} dimColor>
-          … {callLine(run.name, run.input)}
-        </Text>
-      ))}
-      {live?.starting && <Text dimColor>… {live.starting}</Text>}
-      {live?.streaming && (
-        <Text dimColor italic={live.streaming.kind === "thinking"}>
-          {clip(live.streaming.text)}
-        </Text>
-      )}
+      <Box flexDirection="column">
+        {shown.entries.map((entry, i) => entryRow(ui, entry, i))}
+        {live?.running.map((call, i) => toolRow(ui, `run-${i}`, call))}
+        {live?.starting && (
+          <Text dimColor>
+            <Text bold>⏺ {live.starting}</Text> …
+          </Text>
+        )}
+        {live?.streaming?.kind === "text" && saidRow(ui, "streaming", live.streaming.text, true)}
+        {live?.streaming?.kind === "thinking" && (
+          <Box flexDirection="row">
+            <Text dimColor italic>
+              ∴{" "}
+            </Text>
+            <Text dimColor italic wrap="truncate-start">
+              {oneLine(live.streaming.text)}
+            </Text>
+          </Box>
+        )}
+      </Box>
     </Box>
   );
 }
 
-async function teamTab($: $, ui: Ui, now: OpenplanTeam) {
+/** A member's role, model and tokens, in a line. */
+const memberLine = (member: OpenplanTeam["members"][number]) =>
+  `${member.role}${member.model ? ` · ${member.model}` : ""} · ${member.tokens.toLocaleString()} tokens`;
+
+function teamTab($: $, ui: Ui, now: OpenplanTeam) {
   const { Box, Button, Text } = ui;
-  const shown = await read($, record);
   return (
     <Box flexDirection="column" gap={1}>
-      {now.members.map((member) => (
-        <Box key={`m-${member.name}`} flexDirection="column">
-          <Button
-            key={`follow-${member.name}`}
-            plain
-            onPress={() => {
-              const { subtask } = member;
-              if (subtask)
-                void update($, record, () => ({
-                  member: member.name,
-                  subtask,
-                  entries: [],
-                  next: 0,
-                }));
-            }}
-          >
-            <Text bold>{member.name}</Text>
-            <Text dimColor>
-              {" "}
-              {member.role}
-              {member.model ? ` · ${member.model}` : ""} · {member.tokens.toLocaleString()} tokens
-            </Text>
-          </Button>
-          <Text>{member.doing}</Text>
-        </Box>
-      ))}
-      {shown ? (
-        recordView($, ui, shown)
-      ) : (
-        <Text dimColor>Select a member to follow their record.</Text>
-      )}
+      {now.members.map((member) => {
+        const { subtask } = member;
+        const name = [
+          <Text key="name" bold>
+            {member.name}
+          </Text>,
+          <Text key="line" dimColor>
+            {" "}
+            {memberLine(member)}
+          </Text>,
+        ];
+        return (
+          <Box key={`m-${member.name}`} flexDirection="column">
+            {subtask ? (
+              <Button
+                key={`follow-${member.name}`}
+                plain
+                onPress={() =>
+                  showRecord($, { member: member.name, subtask, entries: [], next: 0 })
+                }
+              >
+                {name}
+              </Button>
+            ) : (
+              <Text>{name}</Text>
+            )}
+            <Text>{member.doing}</Text>
+          </Box>
+        );
+      })}
     </Box>
   );
 }
@@ -746,8 +836,7 @@ export const register: Register = (on) => {
 
   on("ui.scroll", { requestId: PANE, origin: { kind: "person" } }, async ($, e, next) => {
     const moved = await next(e);
-    if (e.offset >= e.contentRows - e.bodyRows && (await read($, tab)) === "meeting")
-      scrollPane($, "end");
+    if (e.offset >= e.contentRows - e.bodyRows && (await following($))) scrollPane($, "end");
     return moved;
   });
 
@@ -773,6 +862,7 @@ export const register: Register = (on) => {
         </Box>
       );
     const shown = await read($, tab);
+    const followed = shown === "team" ? await read($, record) : null;
     return (
       <Box flexDirection="column" gap={1}>
         <Box gap={1}>
@@ -782,6 +872,7 @@ export const register: Register = (on) => {
               label={
                 t.tab === "needs" && now.needs.length ? `${t.label} (${now.needs.length})` : t.label
               }
+              hotkey={t.hotkey}
               variant={t.tab === shown ? "primary" : "secondary"}
               onPress={() => showTab($, t.tab)}
             />
@@ -790,9 +881,14 @@ export const register: Register = (on) => {
         {why && <Text color="red">{why}</Text>}
         {shown === "meeting"
           ? await meetingTab($, ui, now.meeting)
-          : shown === "team"
-            ? await teamTab($, ui, now)
-            : await needsTab($, ui, now.needs)}
+          : followed
+            ? recordPage($, ui, now, followed)
+            : shown === "team"
+              ? teamTab($, ui, now)
+              : await needsTab($, ui, now.needs)}
+        <Text dimColor italic>
+          {followed ? `b back to the team · ${KEYS}` : KEYS}
+        </Text>
       </Box>
     );
   });

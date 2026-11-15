@@ -109,7 +109,7 @@ function serve(on: On, views: OpenplanView[]) {
   });
   on("command.register", (_, e) => ({ value: { command: e.name } }));
   on("ui.open", (_, e) => {
-    calls.push({ tool: "ui.open", args: { id: e.id, focus: e.focus } });
+    calls.push({ tool: "ui.open", args: { id: e.id, title: e.title, focus: e.focus } });
     return { value: { isPlaced: true } };
   });
   on("session.start", (_, e) => ({ cwd: e.cwd }));
@@ -147,7 +147,7 @@ test("the band and the pane show the team, and a press answers what needs you", 
   expect(calls.find((c) => c.tool === "view")?.args).toEqual({});
 });
 
-test("the pane follows a member's record as it grows", async ($, on) => {
+test("a member's record shows in place of the team as it grows, and Back shows the team again", async ($, on) => {
   const clock = mock.clock(on);
   const calls = serve(on, [
     { revision: 1, team: TEAM },
@@ -156,13 +156,14 @@ test("the pane follows a member's record as it grows", async ($, on) => {
       record: {
         subtask: "s1",
         entries: [
+          { at: 0, kind: "thinking", text: "Look at\nthe rules" },
           {
             at: 0,
             kind: "tool",
             name: "Read",
             input: { file_path: "README.md" },
             state: "done",
-            output: "",
+            output: "one\ntwo\nthree\nfour\nfive\n",
           },
         ],
         next: 120,
@@ -173,14 +174,32 @@ test("the pane follows a member's record as it grows", async ($, on) => {
   await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
   await clock.advance(500);
   const pane = await $.ui.mount({ ...PANE, surface: "terminal" });
+  await pane.press({ key: "tab-team" });
   await pane.press({ key: "follow-glm" });
   await clock.advance(500);
   expect(calls.at(-1)).toEqual({
     tool: "view",
     args: { revision: 1, record: { subtask: "s1", from: 0 } },
   });
-  expect(await pane.find({ type: "Text", text: "✓ Read README.md" })).toBeDefined();
-  expect(await pane.find({ type: "Text", text: "Reading it" })).toBeDefined();
+  const opened = () => calls.filter((c) => c.tool === "ui.open").map((c) => c.args.title);
+  expect(opened()).toEqual(["openplan · glm"]);
+  expect(await pane.find({ key: "follow-glm" })).toBeUndefined();
+  const texts = (await pane.findAll({ type: "Text" })).map((t) => t.text);
+  expect(texts).toEqual(
+    expect.arrayContaining([
+      "∴ Look at the rules",
+      "⏺ Read(README.md)",
+      "  ⎿  one",
+      "     three",
+      "     … +2 lines",
+    ]),
+  );
+  expect(texts).not.toContain("     four");
+  expect((await pane.find({ key: "streaming-md" }))?.text).toBe("Reading it");
+  expect(texts.at(-1)).toMatch(/^b back to the team · 1 meeting/);
+  await pane.press({ key: "back" });
+  expect(opened()).toEqual(["openplan · glm", "openplan"]);
+  expect(await pane.find({ key: "follow-glm" })).toBeDefined();
   await pane.unmount();
 });
 
@@ -420,7 +439,7 @@ test("/openplan opens the pane with the keyboard", async ($, on) => {
     presentation: { isFullscreen: true, columns: 120 },
   });
   expect(calls.filter((c) => c.tool === "ui.open")).toEqual([
-    { tool: "ui.open", args: { id: "openplan", focus: true } },
+    { tool: "ui.open", args: { id: "openplan", title: "openplan", focus: true } },
   ]);
 });
 
