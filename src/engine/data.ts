@@ -4,12 +4,12 @@
  * the goal to one session, and where everything else of the goal goes.
  */
 import { createHash } from "node:crypto";
-import { link, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { link, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { readFileSync, unlinkSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 import path from "node:path";
 import { errorCode, errorText } from "./core.ts";
-import { writeWhole } from "./files.ts";
+import { renameOver, writeWhole } from "./files.ts";
 import { goalFiles } from "./goal-files.ts";
 import { inOrder } from "./serial.ts";
 import { slugFor, type Repository } from "./git.ts";
@@ -185,7 +185,7 @@ export async function takeGoal(
       const holder = readHolder(lock);
       if (holder && running(holder.pid)) {
         if (holder.pid === process.pid) {
-          await rename(mine, lock);
+          await renameOver(mine, lock);
           return handed;
         }
         const stopped = await takeOver(holder);
@@ -209,7 +209,7 @@ export async function takeGoal(
       }
       try {
         if (lockText(lock) === ended) {
-          await rename(mine, lock);
+          await renameOver(mine, lock);
           return handed;
         }
       } finally {
@@ -223,7 +223,7 @@ export async function takeGoal(
 
 /** Tells the lock that this process has opened the goal: its state is the goal's as it goes on. */
 export async function openedGoal(lock: string, me: Runner): Promise<void> {
-  await rename(await holding(lock, me, true), lock);
+  await renameOver(await holding(lock, me, true), lock);
 }
 
 /** Lets the goal go, as this process ends: at once, since it may be exiting. */

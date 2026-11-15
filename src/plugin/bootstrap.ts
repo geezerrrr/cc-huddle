@@ -7,12 +7,13 @@
  */
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 // Whole, so an older Node.js gets to say what it lacks.
 import * as nodeModule from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
+import { renameOver } from "../engine/files.ts";
 import { running } from "../engine/running.ts";
 import { dataFolder } from "./data-folder.ts";
 
@@ -59,7 +60,7 @@ if (!(await installed())) {
       ["ci", "--omit=optional", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund"],
       { cwd: draft, shell: process.platform === "win32", timeout: INSTALL_TIMEOUT_MS },
     );
-    await rename(draft, home);
+    await renameOver(draft, home);
   } catch (error) {
     await rm(draft, { recursive: true, force: true });
     // Another session's install got there first.
