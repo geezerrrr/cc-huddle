@@ -7688,13 +7688,14 @@ async function openRepository(folder2) {
   const [top, common] = found.stdout.split("\n");
   if (found.code !== 0 || !top || !common)
     throw new GitError("rev-parse", `${folder2} is not in a git repository`);
-  const head = await git(at2, ["rev-parse", "--verify", "-q", "HEAD"], { allow: [1] });
-  if (head.code !== 0) throw new GitError("rev-parse", `${top} has no commit to start from yet`);
+  if (!await verifies(at2, "HEAD"))
+    throw new GitError("rev-parse", `${top} has no commit to start from yet`);
   return { top: await realpath(top), common: await realpath(path2.resolve(folder2, common)) };
 }
 var BRANCHES = "openplan/";
 var goalBranches = (slug) => `${BRANCHES}${slug}/`;
 var goalBranch = (slug) => `${goalBranches(slug)}main`;
+var verifies = async (at2, ref) => (await git(at2, ["rev-parse", "--verify", "-q", ref], { allow: [1] })).code === 0;
 var serial = serialBy();
 
 // src/shared/running.ts
@@ -53603,10 +53604,14 @@ function needWords(question, work) {
           };
         }
         case "conflict":
+          return {
+            headline: `Merging "${title ?? ""}" is stuck. What now?`,
+            detail: question.decision.files.join(", ")
+          };
         case "merge":
           return {
             headline: `Merging "${title ?? ""}" is stuck. What now?`,
-            detail: question.decision.kind === "conflict" ? question.decision.files.join(", ") : question.text
+            detail: question.text
           };
         case "delivery":
           return { headline: `The task "${question.text}" is done. Accept it?` };

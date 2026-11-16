@@ -7800,8 +7800,8 @@ async function openRepository(folder) {
   const [top, common] = found.stdout.split("\n");
   if (found.code !== 0 || !top || !common)
     throw new GitError("rev-parse", `${folder} is not in a git repository`);
-  const head = await git(at, ["rev-parse", "--verify", "-q", "HEAD"], { allow: [1] });
-  if (head.code !== 0) throw new GitError("rev-parse", `${top} has no commit to start from yet`);
+  if (!await verifies(at, "HEAD"))
+    throw new GitError("rev-parse", `${top} has no commit to start from yet`);
   return { top: await realpath(top), common: await realpath(path.resolve(folder, common)) };
 }
 var BRANCHES = "openplan/";
@@ -7825,12 +7825,8 @@ function slugFor(name, taken) {
   }
 }
 var unlist = (repo, folder) => git({ cwd: repo.top }, ["worktree", "remove", "--force", folder], { allow: [128] });
-async function hasBranch(repo, branch) {
-  const found = await git({ cwd: repo.top }, ["rev-parse", "--verify", "-q", branch], {
-    allow: [1]
-  });
-  return found.code === 0;
-}
+var verifies = async (at, ref) => (await git(at, ["rev-parse", "--verify", "-q", ref], { allow: [1] })).code === 0;
+var hasBranch = (repo, branch) => verifies({ cwd: repo.top }, branch);
 async function checkOut(repo, folder, branch, from) {
   await unlist(repo, folder);
   await git(
@@ -7882,7 +7878,7 @@ async function worktreeAt(repo, tree) {
   if (!entry) throw new GitError("worktree", `${tree} isn't a worktree of ${repo.top}`);
   return { cwd: tree, env: { GIT_DIR: entry, GIT_WORK_TREE: tree } };
 }
-var merging = async (at) => (await git(at, ["rev-parse", "-q", "--verify", "MERGE_HEAD"], { allow: [1] })).code === 0;
+var merging = (at) => verifies(at, "MERGE_HEAD");
 function commitDesk(places, subtaskId, by, message) {
   return perGoal(places, async () => {
     const at = await worktreeAt(places.repo, goalFiles(places.root).desk(subtaskId));
@@ -8279,7 +8275,7 @@ You are ${member.name}, the ${member.role.title} on a team of Claude Code sessio
 ${others.length ? `Your teammates: ${others.join(", ")}.` : "You are the only member."}
 
 # Your duties
-${member.role.duties.trim()}`;
+${member.role.duties}`;
   return kind === "work" ? `${who}
 
 ${TASK_WAYS}` : who;
@@ -8815,10 +8811,7 @@ function turnDecoder(listener) {
         if (message.rate_limit_info.status !== "allowed")
           notify({
             kind: "rate-limit",
-            status: message.rate_limit_info.status === "rejected" ? "rejected" : "warning",
-            ...message.rate_limit_info.resetsAt !== void 0 && {
-              resetsAt: message.rate_limit_info.resetsAt
-            }
+            status: message.rate_limit_info.status === "rejected" ? "rejected" : "warning"
           });
         return;
       case "tool_progress":
@@ -10498,8 +10491,14 @@ ${outcome.handover.summary}`
     const { core } = this;
     const { end: end2 } = this.begin(subtask2, "merge");
     try {
-      const merged = await mergeDesk(core.places, subtask2.id, memberSigner(subtask2.assignee));
-      if (merged.kind === "merged") {
+      const merged = await mergeDesk(core.places, subtask2.id, memberSigner(subtask2.assignee)).catch(
+        (error) => {
+          if (error instanceof GitError) return error;
+          throw error;
+        }
+      );
+      if (merged instanceof GitError) this.ask(subtask2, DECISIONS.failedMerge(), errorText(merged));
+      else if (merged.kind === "merged") {
         this.move(subtask2, "merged");
         subtask2.conflict = void 0;
         this.finished(subtask2);
@@ -10510,8 +10509,6 @@ ${outcome.handover.summary}`
         subtask2.conflict = { files: merged.text };
         if (subtask2.session) goOnWith(subtask2, { why: "conflict" });
       }
-    } catch (error) {
-      this.ask(subtask2, DECISIONS.failedMerge(), errorText(error));
     } finally {
       end2();
       core.changed();
@@ -11098,10 +11095,14 @@ function needWords(question, work) {
           };
         }
         case "conflict":
+          return {
+            headline: `Merging "${title ?? ""}" is stuck. What now?`,
+            detail: question.decision.files.join(", ")
+          };
         case "merge":
           return {
             headline: `Merging "${title ?? ""}" is stuck. What now?`,
-            detail: question.decision.kind === "conflict" ? question.decision.files.join(", ") : question.text
+            detail: question.text
           };
         case "delivery":
           return { headline: `The task "${question.text}" is done. Accept it?` };
@@ -11115,8 +11116,6 @@ var WHERE_WORDS = {
   archived: "archived",
   paused: "paused"
 };
-var goalsWhere = (count, where) => `${plural(count, "goal", "goals")} ${WHERE_WORDS[where]}`;
-var SENT_BACK_FIELD = "The subtask a revised task goes back to";
 function progressOf2({ subtasks, meetings }) {
   const done = subtasks.filter((s) => s.status === "done").length;
   return subtasks.length ? `${String(done)}/${String(subtasks.length)} subtasks done` : meetings.some((m) => m.status === "review") ? PLAN_TO_REVIEW : "no plan yet";
@@ -11340,10 +11339,12 @@ function bandText(work, needs) {
   return parts.join(" \xB7 ");
 }
 function othersBand(others) {
-  const parts = ["paused", "elsewhere"].flatMap((where) => {
-    const count = others.filter((e) => whereOf(e) === where).length;
-    return count ? [goalsWhere(count, where)] : [];
-  });
+  const paused = others.filter((e) => whereOf(e) === "paused").length;
+  const elsewhere = others.filter((e) => whereOf(e) === "elsewhere").length;
+  const parts = [
+    ...paused ? [plural(paused, "goal paused", "goals paused")] : [],
+    ...elsewhere ? [`${plural(elsewhere, "goal", "goals")} in another session`] : []
+  ];
   return parts.length ? parts.join(" \xB7 ") : void 0;
 }
 var TYPED_ANSWERS_NONE = "openplan: what you typed answers none of it; it waits in Needs you";
@@ -11603,7 +11604,7 @@ var answerSchema = z8.discriminatedUnion("kind", [
     kind: z8.literal("option"),
     option: z8.enum([...PERMISSION_OPTIONS, ...DECISION_OPTIONS]),
     note: z8.string().trim().optional().describe("Why it is denied, or what to change"),
-    sentBack: z8.string().optional().describe(SENT_BACK_FIELD)
+    sentBack: z8.string().optional().describe("The subtask a revised task goes back to")
   }),
   z8.object({
     kind: z8.literal("choices"),
@@ -12052,7 +12053,7 @@ function addTools(server2, session2) {
         question: z9.string().describe("The id of what waits on the user"),
         decision: z9.enum(DECISION_OPTIONS),
         note: z9.string().trim().optional().describe("What to change, in the user's words"),
-        sent_back: z9.string().optional().describe(SENT_BACK_FIELD)
+        sent_back: z9.string().optional().describe("The subtask a revised task goes back to")
       }
     },
     async ({ question, decision, note, sent_back }) => {
