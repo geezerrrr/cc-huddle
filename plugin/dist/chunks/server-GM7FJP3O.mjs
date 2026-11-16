@@ -8289,6 +8289,7 @@ ${member.role.duties}`;
 
 ${TASK_WAYS}` : who;
 }
+var OWNER_CHECKS = "The user accepts this task themselves once it is done. In your delivery's summary, tell them how to check your part: what to run or open, or what to look at.";
 function taskBrief(input) {
   const { goal, task, subtask: subtask2 } = input;
   const lines = [
@@ -8298,6 +8299,7 @@ function taskBrief(input) {
     `Your subtask: ${subtask2.title}`,
     ...subtask2.description && subtask2.description !== subtask2.title ? [subtask2.description] : [],
     ...subtask2.acceptance ? ["", `Acceptance criteria: ${subtask2.acceptance}`] : [],
+    ...task.ownerAccepts ? ["", OWNER_CHECKS] : [],
     "",
     `Your worktree is ${input.cwd}, on branch ${input.branch}.`
   ];
@@ -10977,6 +10979,9 @@ import path6 from "node:path";
 import { text } from "node:stream/consumers";
 import { z as z7 } from "zod";
 
+// src/plugin/pane.ts
+import { createHash } from "node:crypto";
+
 // src/plugin/words.ts
 var plural = (n, one, many) => `${String(n)} ${n === 1 ? one : many}`;
 var PLAN_TO_REVIEW = "plan to review";
@@ -11085,10 +11090,29 @@ function needWords(question, work) {
             headline: `Merging "${title ?? ""}" is stuck. What now?`,
             detail: question.text
           };
-        case "delivery":
-          return { headline: `The task "${question.text}" is done. Accept it?` };
+        case "delivery": {
+          const delivered = work.subtasks.filter((s) => s.taskId === subtask2?.taskId && s.delivery).map((s) => `- ${s.title}, by ${s.assignee}: ${s.delivery?.summary ?? ""}`);
+          return {
+            headline: `The task "${question.text}" is done. Accept it?`,
+            ...delivered.length && { detail: delivered.join("\n") }
+          };
+        }
       }
   }
+}
+function planWords(plan, work) {
+  const titles = new Map(plan.tasks.flatMap((t) => t.subtasks.map((s) => [s.key, s.title])));
+  const lines = plan.tasks.map((task, i) => {
+    const subtasks = task.subtasks.map((s) => {
+      const after = s.dependsOn.map((key) => `"${titles.get(key) ?? key}"`);
+      return `${s.title} (${s.assignee}${after.length ? `, after ${after.join(", ")}` : ""})`;
+    });
+    return `${String(i + 1)}. ${task.title}${task.ownerAccepts ? " (you accept it)" : ""}: ${subtasks.join("; ")}`;
+  });
+  return {
+    headline: `The plan for "${work.goal.name}" waits for you: ${plan.summary}`,
+    detail: lines.join("\n")
+  };
 }
 var whereOf = (entry) => entry.holder ? "elsewhere" : !("state" in entry) ? "unreadable" : entry.state.goal.status === "archived" ? "archived" : "paused";
 var WHERE_WORDS = {
@@ -11185,8 +11209,7 @@ function needOf(question, work) {
     id: question.id,
     from: question.from,
     headline,
-    ...detail && { detail },
-    ask: !isAcceptance(question)
+    ...detail && { detail }
   };
   switch (question.kind) {
     case "permission": {
@@ -11255,29 +11278,19 @@ function milestones(work) {
       said.push({ key: `task:${task.id}`, text: `The task "${task.title}" is done` });
   return said;
 }
-var AS_THE_SKILL_SAYS = "Take it to the user as cc-huddle's team skill says.";
-function prompts(work) {
-  const asked2 = [];
-  for (const meeting2 of work.meetings)
-    if (meeting2.status === "review" && meeting2.plan)
-      asked2.push({
-        key: `review:${meeting2.id}`,
-        text: `The meeting [${meeting2.id}] on "${work.goal.name}" has a plan for review: ${meeting2.plan.summary}. ${AS_THE_SKILL_SAYS}`
-      });
-  for (const question of work.questions) {
-    if (!isAcceptance(question)) continue;
-    const subtask2 = work.subtasks.find((s) => s.id === question.subtaskId);
-    const delivered = work.subtasks.filter((s) => s.taskId === subtask2?.taskId && s.delivery).map((s) => `- ${s.title}, by ${s.assignee}: ${s.delivery?.summary ?? ""}`);
-    asked2.push({
-      key: `accept:${question.id}`,
-      text: [
-        `The task "${question.text}" is done [${question.id}], merged into its goal's branch:`,
-        ...delivered,
-        AS_THE_SKILL_SAYS
-      ].join("\n")
-    });
-  }
-  return asked2;
+function planNeed(meeting2, plan, work) {
+  const { headline, detail } = planWords(plan, work);
+  const version = createHash("sha256").update(JSON.stringify(plan)).digest("hex").slice(0, 12);
+  return {
+    id: `${meeting2.id}:${version}`,
+    from: "Plan",
+    headline,
+    detail,
+    kind: "plan",
+    meeting: meeting2.id,
+    document: plan.markdown,
+    tasks: plan.tasks.map((t) => t.title)
+  };
 }
 var BAND_TASKS = 5;
 function taskWhere(work, derived, subtasks) {
@@ -11342,7 +11355,6 @@ function paneTeam(mine, others, session2) {
       members: [],
       needs: [],
       milestones: [],
-      prompts: [],
       resumable: resumableOf(others),
       ...!others.length && { resumeRefused: NOTHING_TO_RESUME },
       pauseRefused: noGoal
@@ -11350,19 +11362,21 @@ function paneTeam(mine, others, session2) {
   }
   const { work, members: members2 } = mine;
   const derived = derive(work);
-  const needs = work.questions.filter(toYou).map((q) => needOf(q, work));
+  const asked2 = work.questions.filter(toYou).map((q) => needOf(q, work));
+  const plans = work.meetings.flatMap(
+    (m) => m.status === "review" && m.plan ? [planNeed(m, m.plan, work)] : []
+  );
   const meeting2 = shownMeeting(work);
   const { goal } = work;
   const here = goal.status === "active" ? [] : [{ slug: goal.slug, label: goalLabel(work, `${goal.status}, in this session`) }];
   return {
     opened,
-    band: bandText(work, needs.length),
+    band: bandText(work, asked2.length),
     tasks: taskLines(work, derived),
     ...meeting2 && { meeting: meetingOf(meeting2, work) },
     members: members2.map((m) => memberOf(m, work, derived)),
-    needs,
+    needs: [...plans, ...asked2],
     milestones: milestones(work),
-    prompts: prompts(work),
     resumable: [...here, ...resumableOf(others)],
     ...goal.status === "active" ? { resumeRefused: resumeRefusal(goal.name) } : { pauseRefused: `"${goal.name}" isn't under way: it is ${goal.status}.` }
   };
@@ -11595,6 +11609,12 @@ var answerInput = z8.object({
   question: z8.string(),
   answer: answerSchema
 });
+var reviewInput = z8.object({
+  meeting: z8.string(),
+  decision: z8.enum(["approve", "drop", "change"]),
+  accept: z8.array(z8.number().int().min(0)).optional().describe("The tasks you accept, by place"),
+  change: z8.string().trim().optional().describe("The change you want, as you typed it")
+});
 var handOffInput = z8.object({ task: z8.string().trim().min(1) });
 var resumeInput = z8.object({
   goal: z8.string().regex(SLUG).describe("The goal's slug")
@@ -11624,6 +11644,38 @@ function addPaneTools(server2, session2, pane2) {
         answer.kind === "choices" ? answer : isPermission(answer.option) ? { kind: "permission", option: answer.option, note: answer.note } : { ...answer, kind: "decision", option: answer.option }
       );
       return toolText(`Answered ${question}.`);
+    }
+  );
+  server2.registerTool(
+    "review_plan",
+    {
+      description: `${PANE_ONLY} Approves, drops or changes a plan out for review, as the user decided.`,
+      inputSchema: reviewInput.shape
+    },
+    async ({ meeting: id, decision, accept, change }) => {
+      const { meetings } = session2.goal;
+      switch (decision) {
+        case "drop":
+          await meetings.cancel(id);
+          return toolText("Dropped.");
+        case "change":
+          if (!change) throw new Error("Say what to change");
+          return toolText(changeText(id, session2.goal.work.goal.name, change));
+        case "approve": {
+          const plan = session2.goal.work.meetings.find((m) => m.id === id)?.plan;
+          if (accept && plan) {
+            const written2 = writtenPlan(plan);
+            meetings.change(id, {
+              ...written2,
+              tasks: written2.tasks.map((t, i) => ({ ...t, owner_accepts: accept.includes(i) }))
+            });
+          }
+          const added = await meetings.approve(id);
+          return toolText(
+            `Approved: ${plural(added.length, "subtask goes", "subtasks go")} to work.`
+          );
+        }
+      }
     }
   );
   server2.registerTool(
@@ -11670,6 +11722,15 @@ function handOffText(task, goal, members2) {
     task,
     "",
     `${runs} The team: ${rosterOf(members2)}.`
+  ].join("\n");
+}
+function changeText(meeting2, goal, change) {
+  return [
+    `The user wants the plan of the meeting [${meeting2}] on "${goal}" changed:`,
+    "",
+    change,
+    "",
+    "Get it with show_plan, rewrite it with their words and change_plan. cc-huddle then asks them about the changed plan: don't ask them yourself."
   ].join("\n");
 }
 function switchedText(change, now, runsGoal) {
@@ -11956,7 +12017,7 @@ function addTools(server2, session2) {
   const meetingTool = server2.registerTool(
     "hold_meeting",
     {
-      description: "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and the session is told when its plan waits for the user. Hold one only once the user has agreed who attends.",
+      description: "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and cc-huddle asks the user about its plan when it is ready. Hold one only once the user has agreed who attends.",
       inputSchema: meetingInput(memberName())
     },
     ({ agenda, size, attendees, host_only }) => {

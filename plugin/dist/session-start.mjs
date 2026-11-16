@@ -53594,8 +53594,13 @@ function needWords(question, work) {
             headline: `Merging "${title ?? ""}" is stuck. What now?`,
             detail: question.text
           };
-        case "delivery":
-          return { headline: `The task "${question.text}" is done. Accept it?` };
+        case "delivery": {
+          const delivered = work.subtasks.filter((s) => s.taskId === subtask?.taskId && s.delivery).map((s) => `- ${s.title}, by ${s.assignee}: ${s.delivery?.summary ?? ""}`);
+          return {
+            headline: `The task "${question.text}" is done. Accept it?`,
+            ...delivered.length && { detail: delivered.join("\n") }
+          };
+        }
       }
   }
 }
