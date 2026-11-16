@@ -36,10 +36,10 @@ A member is busy while a subtask of theirs runs or waits on its review, while th
 Two layers. The engine knows nothing of the plugin.
 
 ```
-┌─────────────────── Claude Code (your session) ───────────────────┐
-│  mod: asks, pane, band, /huddle            skill               │
+┌─────────────────── Claude Code (your session) ────────────────────┐
+│  mod: asks, pane, band, /huddle            skill                  │
 │        │ socket: view    $.mcp.call: pane, answer                 │
-│  MCP server `huddle`: tools ── engine: state machines ·         │
+│  MCP server `huddle`: tools ── engine: state machines ·           │
 │                                  scheduler · meetings · questions │
 │                                  · worktrees and merges           │
 └────────────────────────────────┬──────────────────────────────────┘

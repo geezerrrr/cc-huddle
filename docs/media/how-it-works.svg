@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="290" viewBox="0 0 960 290" role="img" aria-label="A task goes to a meeting, a plan you approve, parallel work, review and merge into the goal's branch">
+  <style>
+    .box { fill: #f6f8fa; stroke: #d0d7de; stroke-width: 1.5; }
+    .you { fill: #fbeee8; stroke: #d97757; stroke-width: 2; }
+    .line { stroke: #8c959f; stroke-width: 1.5; fill: none; }
+    .head { fill: #8c959f; }
+    .title { font: 600 16px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #1f2328; }
+    .sub { font: 13px -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; fill: #59636e; }
+    .mono { font: 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #59636e; }
+    .monotitle { font: 600 14px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #1f2328; }
+    .accent { fill: #c4643f; }
+    @media (prefers-color-scheme: dark) {
+      .box { fill: #161b22; stroke: #3d444d; }
+      .you { fill: #2d1f1a; stroke: #e08a66; }
+      .line { stroke: #6e7681; }
+      .head { fill: #6e7681; }
+      .title, .monotitle { fill: #e6edf3; }
+      .sub, .mono { fill: #9198a1; }
+      .accent { fill: #e08a66; }
+    }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" class="head" />
+    </marker>
+  </defs>
+
+  <!-- Stages -->
+  <rect class="box" x="15" y="30" width="130" height="64" rx="10" />
+  <text class="title" x="80" y="57" text-anchor="middle">Task</text>
+  <text class="mono" x="80" y="78" text-anchor="middle">/huddle …</text>
+
+  <rect class="box" x="175" y="30" width="130" height="64" rx="10" />
+  <text class="title" x="240" y="57" text-anchor="middle">Meeting</text>
+  <text class="sub" x="240" y="78" text-anchor="middle">members discuss</text>
+
+  <rect class="you" x="335" y="30" width="130" height="64" rx="10" />
+  <text class="title" x="400" y="57" text-anchor="middle">Plan</text>
+  <text class="sub accent" x="400" y="78" text-anchor="middle">you approve</text>
+
+  <rect class="box" x="495" y="30" width="130" height="64" rx="10" />
+  <text class="title" x="560" y="57" text-anchor="middle">Work</text>
+  <text class="sub" x="560" y="78" text-anchor="middle">in parallel</text>
+
+  <rect class="box" x="655" y="30" width="130" height="64" rx="10" />
+  <text class="title" x="720" y="57" text-anchor="middle">Review</text>
+  <text class="sub" x="720" y="78" text-anchor="middle">pass or notes</text>
+
+  <rect class="box" x="815" y="30" width="130" height="64" rx="10" />
+  <text class="title" x="880" y="57" text-anchor="middle">Merge</text>
+  <text class="sub" x="880" y="78" text-anchor="middle">one at a time</text>
+
+  <path class="line" d="M145 62 H173" marker-end="url(#arrow)" />
+  <path class="line" d="M305 62 H333" marker-end="url(#arrow)" />
+  <path class="line" d="M465 62 H493" marker-end="url(#arrow)" />
+  <path class="line" d="M625 62 H653" marker-end="url(#arrow)" />
+  <path class="line" d="M785 62 H813" marker-end="url(#arrow)" />
+
+  <!-- Sent back -->
+  <path class="line" d="M720 96 C720 138 560 138 560 98" marker-end="url(#arrow)" />
+  <text class="sub" x="640" y="146" text-anchor="middle">sent back with notes</text>
+
+  <!-- Members -->
+  <text class="sub" x="15" y="190">Each subtask: its own git worktree, a Claude Code session on its member's model</text>
+  <rect class="box" x="15" y="204" width="165" height="52" rx="26" />
+  <text class="monotitle" x="97" y="228" text-anchor="middle">sonnet</text>
+  <text class="sub" x="97" y="246" text-anchor="middle">developer</text>
+  <rect class="box" x="195" y="204" width="165" height="52" rx="26" />
+  <text class="monotitle" x="277" y="228" text-anchor="middle">glm</text>
+  <text class="sub" x="277" y="246" text-anchor="middle">designer</text>
+  <rect class="box" x="375" y="204" width="165" height="52" rx="26" />
+  <text class="monotitle" x="457" y="228" text-anchor="middle">opus</text>
+  <text class="sub" x="457" y="246" text-anchor="middle">reviewer</text>
+
+  <!-- Goal branch -->
+  <path class="line" d="M880 94 V202" marker-end="url(#arrow)" />
+  <rect class="you" x="655" y="204" width="290" height="52" rx="10" />
+  <text class="monotitle" x="800" y="228" text-anchor="middle">huddle/&lt;goal&gt;/main</text>
+  <text class="sub accent" x="800" y="246" text-anchor="middle">yours to review and merge</text>
+</svg>
