@@ -50,6 +50,27 @@ describe("systemPrompt", () => {
 });
 
 describe("taskBrief", () => {
+  it("asks for how to check it only in a task the user accepts", () => {
+    const brief = (ownerAccepts: boolean) =>
+      taskBrief({
+        goal: {
+          name: "Dice game",
+          slug: "dice-game",
+          status: "active",
+          createdAt: 0,
+          settings: { review: true, meetingSize: "discussion" },
+        },
+        task: { id: "t1", title: "Board", outcome: "", ownerAccepts },
+        subtask: subtask("Scoreboard"),
+        cwd: "/desks/s2",
+        branch: "huddle/dice-game/s2",
+        upstream: [],
+        notes: [],
+      });
+    expect(brief(true)).toContain("tell them how to check your part");
+    expect(brief(false)).not.toContain("how to check");
+  });
+
   it("gives the work, where to do it, its plan, what it builds on, and your words for it", () => {
     const brief = taskBrief({
       goal: {
@@ -91,6 +112,8 @@ Task: Board. A board to roll on
 Your subtask: Scoreboard
 
 Acceptance criteria: Shows both scores
+
+The user accepts this task themselves once it is done. In your delivery's summary, tell them how to check your part: what to run or open, or what to look at.
 
 Your worktree is /desks/s2, on branch huddle/dice-game/s2.
 

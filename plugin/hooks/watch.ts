@@ -1,11 +1,11 @@
 /**
  * The mod keeping up with the team: it polls the view, keeps what changed
- * for the drawings, and tells what is new: a need is asked, a milestone is a
- * transcript row, and what needs a conversation is a prompt to your session.
+ * for the drawings, and tells what is new: a need is asked, and a milestone
+ * is a transcript row.
  */
 import type { EngineInterface, Timer } from "claude-code";
-import type { HuddleAnswer, HuddleNeed, HuddleRun, HuddleTeam } from "../types";
-import { askNeed } from "./ask";
+import type { HuddleAnswer, HuddleNeed, HuddlePlanDecision, HuddleRun, HuddleTeam } from "../types";
+import { askNeed, type PlanNeed } from "./ask";
 import { NoRepository, call, view } from "./server";
 import {
   changeFollowed,
@@ -26,7 +26,7 @@ const RUN_KEEP = 200;
 
 /** The revision of the team the pane has. */
 let revision: number | undefined;
-/** Milestones and prompts told already; those there at the first look are not news. */
+/** Milestones told already; those there at the first look are not news. */
 let told: Set<string> | undefined;
 /** How many goals the session had opened at the last look (HuddleTeam.opened). */
 let opened: number | undefined;
@@ -57,6 +57,30 @@ export async function answer($: EngineInterface, need: HuddleNeed, given: Huddle
     $.ui.toast(`cc-huddle: ${words(error)}`);
     return;
   }
+  await answered($, need);
+}
+
+/**
+ * Carries out what you decided on a plan out for review, as `answer` does;
+ * a change you typed goes to your session, which makes it (§7.3).
+ */
+export async function decide($: EngineInterface, need: PlanNeed, decided: HuddlePlanDecision) {
+  let text;
+  try {
+    text = await call($, "review_plan", { meeting: need.meeting, ...decided });
+  } catch (error) {
+    $.ui.toast(`cc-huddle: ${words(error)}`);
+    return;
+  }
+  if (decided.decision === "change")
+    $.prompt.submit({ text }).catch((error: unknown) => {
+      $.ui.toast(`cc-huddle: your session couldn't be given the change: ${words(error)}`);
+    });
+  await answered($, need);
+}
+
+/** Lets go of what you picked for a need you answered, and looks again at once. */
+async function answered($: EngineInterface, need: HuddleNeed) {
   const left = <T>(all: Record<string, T>) =>
     Object.fromEntries(Object.entries(all).filter(([id]) => id !== need.id));
   await changePicks($, left);
@@ -65,34 +89,29 @@ export async function answer($: EngineInterface, need: HuddleNeed, given: Huddle
 }
 
 /**
- * Tells what is new: each need not asked yet is asked, in turn, but a task to
- * accept, which is your session's to ask; since the last look, a row for a
- * milestone and a prompt to your session for what needs a conversation. In
- * a goal just opened here, the milestones so far are not news.
+ * Tells what is new: each need not asked yet is asked, in turn, and since the
+ * last look, a row for each milestone. In a goal just opened here, the
+ * milestones so far are not news.
  */
 function tell($: EngineInterface, now: HuddleTeam) {
   for (const need of now.needs) {
-    if (asked.has(need.id) || !need.ask) continue;
+    if (asked.has(need.id)) continue;
     asked.add(need.id);
-    asking = asking.then(() => askNeed($, need, (given) => answer($, need, given)));
+    asking = asking.then(() =>
+      askNeed(
+        $,
+        need,
+        (given) => answer($, need, given),
+        (plan, decided) => decide($, plan, decided),
+      ),
+    );
   }
   const fresh = now.opened !== opened;
   opened = now.opened;
-  if (told) {
-    if (!fresh)
-      for (const milestone of now.milestones)
-        if (!told.has(milestone.key)) $.ui.log(`cc-huddle: ${milestone.text}`);
-    for (const prompt of now.prompts)
-      if (!told.has(prompt.key))
-        $.prompt.submit({ text: prompt.text }).catch((error: unknown) => {
-          $.ui.toast(`cc-huddle: your session couldn't be told: ${words(error)}`);
-        });
-  }
-  told = new Set([
-    ...(told ?? []),
-    ...now.milestones.map((m) => m.key),
-    ...now.prompts.map((p) => p.key),
-  ]);
+  if (told && !fresh)
+    for (const milestone of now.milestones)
+      if (!told.has(milestone.key)) $.ui.log(`cc-huddle: ${milestone.text}`);
+  told = new Set([...(told ?? []), ...now.milestones.map((m) => m.key)]);
 }
 
 /**

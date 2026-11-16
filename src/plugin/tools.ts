@@ -106,7 +106,7 @@ export function addTools(server: McpServer, session: Session) {
     "hold_meeting",
     {
       description:
-        "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and the session is told when its plan waits for the user. Hold one only once the user has agreed who attends.",
+        "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and cc-huddle asks the user about its plan when it is ready. Hold one only once the user has agreed who attends.",
       inputSchema: meetingInput(memberName()),
     },
     ({ agenda, size, attendees, host_only }) => {

@@ -1,10 +1,10 @@
 /**
  * cc-huddle's mod (docs/design.md §7.2): the pane, the band above the prompt,
- * asks for what needs you, transcript rows for milestones, prompts to your
- * session for what needs a conversation, and the `/huddle` command, which
- * hands the team a task. It draws what the MCP server serves on the pane's
- * socket, which the `pane` tool names, and answers through the `answer`
- * tool, with no model in between; the model is kept from both tools.
+ * asks for what needs you, transcript rows for milestones, and the `/huddle`
+ * command, which hands the team a task. It draws what the MCP server serves
+ * on the pane's socket, which the `pane` tool names, and answers through the
+ * `answer` and `review_plan` tools, with no model in between; the model is
+ * kept from them.
  */
 import type { Register } from "claude-code";
 import { pauseGoal, resumeGoal } from "./goals";
@@ -20,7 +20,7 @@ import { watch } from "./watch";
 const TOOLS = /^mcp__plugin_cc-huddle_huddle__/;
 /** The tools only the mod calls, as the model would name them. */
 const PANE_ONLY =
-  /^mcp__plugin_cc-huddle_huddle__(pane|answer|hand_off|resume_goal|switch_settings)$/;
+  /^mcp__plugin_cc-huddle_huddle__(pane|answer|review_plan|hand_off|resume_goal|switch_settings)$/;
 const PANE_ONLY_REASON = "This tool is the user's, in /huddle.";
 
 export const register: Register = (on) => {

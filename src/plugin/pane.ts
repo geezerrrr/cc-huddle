@@ -1,10 +1,11 @@
 /**
  * The team as cc-huddle's pane shows it (docs/design.md §7.2), worked out here
  * from the state so the mod only draws: the band's words, the meeting, each
- * member at what they do, what waits on you with the answers it takes, the
- * milestones the transcript keeps, what your session is asked to talk over,
- * and a member's record with each call in its line.
+ * member at what they do, what waits on you with the answers it takes (a
+ * plan out for review among them), the milestones the transcript keeps, and
+ * a member's record with each call in its line.
  */
+import { createHash } from "node:crypto";
 import type {
   HuddleCall,
   HuddleEntry,
@@ -22,6 +23,7 @@ import {
   inProgress,
   type LiveRun,
   type Meeting,
+  type Plan,
   type Member,
   type PermissionOption,
   type QuestionToYou,
@@ -32,7 +34,6 @@ import {
   type Work,
   type Notice,
   acceptanceOf,
-  isAcceptance,
 } from "../engine/index.ts";
 import {
   attendanceText,
@@ -40,6 +41,7 @@ import {
   mainArgument,
   meetingStatus,
   needWords,
+  planWords,
   PLAN_TO_REVIEW,
   plural,
   resumableOf,
@@ -150,7 +152,6 @@ function needOf(question: QuestionToYou, work: Work): HuddleNeed {
     from: question.from,
     headline,
     ...(detail && { detail }),
-    ask: !isAcceptance(question),
   };
   switch (question.kind) {
     case "permission": {
@@ -223,37 +224,24 @@ function milestones(work: Work): HuddleTeam["milestones"] {
   return said;
 }
 
-/** Where a prompt to your session points for what to do with it. */
-const AS_THE_SKILL_SAYS = "Take it to the user as cc-huddle's team skill says.";
-
 /**
- * What needs a conversation (§7.3): each plan out for review, and each task
- * done, waiting to be accepted. The mod submits each new one to your session.
+ * A plan out for review, as you are asked it (§7.1): its tasks to pick from
+ * for those you accept, and its document for the pane. Its id names the plan
+ * as it stands, so a plan you had changed is asked again.
  */
-function prompts(work: Work): HuddleTeam["prompts"] {
-  const asked: HuddleTeam["prompts"] = [];
-  for (const meeting of work.meetings)
-    if (meeting.status === "review" && meeting.plan)
-      asked.push({
-        key: `review:${meeting.id}`,
-        text: `The meeting [${meeting.id}] on "${work.goal.name}" has a plan for review: ${meeting.plan.summary}. ${AS_THE_SKILL_SAYS}`,
-      });
-  for (const question of work.questions) {
-    if (!isAcceptance(question)) continue;
-    const subtask = work.subtasks.find((s) => s.id === question.subtaskId);
-    const delivered = work.subtasks
-      .filter((s) => s.taskId === subtask?.taskId && s.delivery)
-      .map((s) => `- ${s.title}, by ${s.assignee}: ${s.delivery?.summary ?? ""}`);
-    asked.push({
-      key: `accept:${question.id}`,
-      text: [
-        `The task "${question.text}" is done [${question.id}], merged into its goal's branch:`,
-        ...delivered,
-        AS_THE_SKILL_SAYS,
-      ].join("\n"),
-    });
-  }
-  return asked;
+function planNeed(meeting: Meeting, plan: Plan, work: Work): HuddleNeed {
+  const { headline, detail } = planWords(plan, work);
+  const version = createHash("sha256").update(JSON.stringify(plan)).digest("hex").slice(0, 12);
+  return {
+    id: `${meeting.id}:${version}`,
+    from: "Plan",
+    headline,
+    detail,
+    kind: "plan",
+    meeting: meeting.id,
+    document: plan.markdown,
+    tasks: plan.tasks.map((t) => t.title),
+  };
 }
 
 /** How many tasks the band lists, one a line; more are counted. */
@@ -349,7 +337,6 @@ export function paneTeam(
       members: [],
       needs: [],
       milestones: [],
-      prompts: [],
       resumable: resumableOf(others),
       ...(!others.length && { resumeRefused: NOTHING_TO_RESUME }),
       pauseRefused: noGoal,
@@ -357,7 +344,10 @@ export function paneTeam(
   }
   const { work, members } = mine;
   const derived = derive(work);
-  const needs = work.questions.filter(toYou).map((q) => needOf(q, work));
+  const asked = work.questions.filter(toYou).map((q) => needOf(q, work));
+  const plans = work.meetings.flatMap((m) =>
+    m.status === "review" && m.plan ? [planNeed(m, m.plan, work)] : [],
+  );
   const meeting = shownMeeting(work);
   const { goal } = work;
   const here =
@@ -366,13 +356,12 @@ export function paneTeam(
       : [{ slug: goal.slug, label: goalLabel(work, `${goal.status}, in this session`) }];
   return {
     opened,
-    band: bandText(work, needs.length),
+    band: bandText(work, asked.length),
     tasks: taskLines(work, derived),
     ...(meeting && { meeting: meetingOf(meeting, work) }),
     members: members.map((m) => memberOf(m, work, derived)),
-    needs,
+    needs: [...plans, ...asked],
     milestones: milestones(work),
-    prompts: prompts(work),
     resumable: [...here, ...resumableOf(others)],
     ...(goal.status === "active"
       ? { resumeRefused: resumeRefusal(goal.name) }

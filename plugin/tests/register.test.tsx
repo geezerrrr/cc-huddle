@@ -38,7 +38,6 @@ const permission = (id: string, call: string): HuddleNeed => ({
   id,
   from: "glm",
   headline: `glm asks to use ${call} for "Rules". Allow it?`,
-  ask: true,
   kind: "options",
   options: [
     { value: "once", label: "Allow once", primary: true },
@@ -63,7 +62,6 @@ const TEAM: HuddleTeam = {
   ],
   needs: [NEED],
   milestones: [],
-  prompts: [],
   resumable: [],
   resumeRefused:
     '"Dice" is under way in this session, which runs one goal: /huddle pause it first, or take the other up in another session.',
@@ -77,7 +75,6 @@ const NO_GOAL: HuddleTeam = {
   members: [],
   needs: [],
   milestones: [],
-  prompts: [],
   resumable: [],
 };
 
@@ -106,7 +103,9 @@ function serve(on: On, views: HuddleView[]) {
             ? `For the team: ${String(e.args.task)}`
             : e.tool === "switch_settings"
               ? `Switched ${JSON.stringify(e.args)}.`
-              : "Team: glm";
+              : e.tool === "review_plan"
+                ? `Change it: ${String(e.args.change)}`
+                : "Team: glm";
     return { value: { content: [{ type: "text", text }], isError: false } };
   });
   on("http.fetch", (_, e) => {
@@ -327,14 +326,9 @@ test("the meeting shows the turn being spoken as a record, and your scrolling re
   await pane.unmount();
 });
 
-test("a new milestone is a transcript row, a new prompt your session's; what was there before is not news", async ($, on) => {
+test("a new milestone is a transcript row; what was there before is not news", async ($, on) => {
   const clock = mock.clock(on);
   const rows: string[] = [];
-  const prompts: string[] = [];
-  on("prompt.submit", (_, e) => {
-    prompts.push(e.text);
-    return { text: e.text };
-  });
   on("ui.log", (_, e) => {
     rows.push(e.text);
     return { value: undefined };
@@ -346,7 +340,6 @@ test("a new milestone is a transcript row, a new prompt your session's; what was
       team: {
         ...TEAM,
         milestones: [{ key: "plan:m1", text: 'Plan approved: "Dice"' }],
-        prompts: [{ key: "review:m1", text: "A plan to review" }],
       },
     },
     {
@@ -357,23 +350,18 @@ test("a new milestone is a transcript row, a new prompt your session's; what was
           { key: "plan:m1", text: 'Plan approved: "Dice"' },
           { key: "done:s1", text: '"Rules" by glm is merged' },
         ],
-        prompts: [
-          { key: "review:m1", text: "A plan to review" },
-          { key: "accept:q2", text: "A task to accept" },
-        ],
       },
     },
   ]);
   await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
   await clock.advance(1000);
   expect(rows).toEqual(['cc-huddle: "Rules" by glm is merged']);
-  expect(prompts).toEqual(["A task to accept"]);
 });
 
-test("each need is asked as it comes, in turn, and answered as you said; a task to accept is your session's", async ($, on) => {
+test("each need is asked as it comes, in turn, and answered as you said", async ($, on) => {
   const clock = mock.clock(on);
   const questions: string[] = [];
-  const said = ["Allow once", "don't touch dist", "Grid", "make it bigger"];
+  const said = ["Allow once", "don't touch dist", "Grid", "make it bigger", "Accept"];
   on("tool.call", { tool: "AskUserQuestion" }, (_, e) => {
     const [question] = e.questions as { question: string }[];
     questions.push(question?.question ?? "");
@@ -391,7 +379,6 @@ test("each need is asked as it comes, in turn, and answered as you said; a task 
             id: "q3",
             from: "glm",
             headline: "glm asks:",
-            ask: true,
             kind: "choices",
             choices: [
               {
@@ -407,7 +394,6 @@ test("each need is asked as it comes, in turn, and answered as you said; a task 
             from: "sonnet",
             headline: 'The review of "Rules" is stuck. What now?',
             detail: "Too small",
-            ask: true,
             kind: "options",
             options: [
               { value: "rereview", label: "Review again" },
@@ -420,7 +406,7 @@ test("each need is asked as it comes, in turn, and answered as you said; a task 
             id: "q5",
             from: "glm",
             headline: 'The task "Game" is done. Accept it?',
-            ask: false,
+            detail: "- Board, by glm: Built it. To check it, open index.html.",
             kind: "options",
             options: [{ value: "accept", label: "Accept" }],
             note: { option: "revise", label: "Send back", prompt: "What to change" },
@@ -436,13 +422,61 @@ test("each need is asked as it comes, in turn, and answered as you said; a task 
     'glm asks to use Bash: rm -rf dist for "Rules". Allow it?',
     "glm asks: Which board?\n- Grid: Squares",
     'The review of "Rules" is stuck. What now?\nToo small',
+    'The task "Game" is done. Accept it?\n- Board, by glm: Built it. To check it, open index.html.',
   ]);
   expect(calls.filter((c) => c.tool === "answer").map((c) => c.args)).toEqual([
     { question: "q1", answer: { kind: "option", option: "once" } },
     { question: "q2", answer: { kind: "option", option: "deny", note: "don't touch dist" } },
     { question: "q3", answer: { kind: "choices", picks: ["Grid"] } },
     { question: "q4", answer: { kind: "option", option: "sendBack", note: "make it bigger" } },
+    { question: "q5", answer: { kind: "option", option: "accept" } },
   ]);
+});
+
+/** A plan out for review, as the server words it. */
+const plan = (id: string): HuddleNeed => ({
+  id,
+  from: "Plan",
+  headline: 'The plan for "Dice" waits for you: A dice game.',
+  detail: '1. Rules: Rules (glm)\n2. Board: Board (sonnet, after "Rules")',
+  kind: "plan",
+  meeting: "m1",
+  document: "# Dice",
+  tasks: ["Rules", "Board"],
+});
+
+test("a plan is approved with the tasks you pick, and a change you type goes to your session, the changed plan asked again", async ($, on) => {
+  const clock = mock.clock(on);
+  const questions: string[] = [];
+  const said = ["Approve, I'll accept some", "2: Board", "Use hexes"];
+  on("tool.call", { tool: "AskUserQuestion" }, (_, e) => {
+    const [question] = e.questions as { question: string; options: { label: string }[] }[];
+    questions.push(
+      `${question?.question ?? ""} [${(question?.options ?? []).map((o) => o.label).join(" | ")}]`,
+    );
+    return { result: { answers: { [question?.question ?? ""]: said.shift() ?? "" } } };
+  });
+  const prompts: string[] = [];
+  on("prompt.submit", (_, e) => {
+    prompts.push(e.text);
+    return { text: e.text };
+  });
+  const calls = serve(on, [
+    { revision: 1, team: { ...TEAM, needs: [plan("m1:a")] } },
+    { revision: 2, team: { ...TEAM, needs: [plan("m1:b")] } },
+  ]);
+  await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
+  await clock.advance(1000);
+  expect(questions).toEqual([
+    'The plan for "Dice" waits for you: A dice game.\n1. Rules: Rules (glm)\n2. Board: Board (sonnet, after "Rules")\nIts document is in full in /huddle, under Needs you. Type what to change instead, if anything. [Approve | Approve, I\'ll accept some | Drop]',
+    "Which tasks do you accept yourself once they are done? [1: Rules | 2: Board]",
+    'The plan for "Dice" waits for you: A dice game.\n1. Rules: Rules (glm)\n2. Board: Board (sonnet, after "Rules")\nIts document is in full in /huddle, under Needs you. Type what to change instead, if anything. [Approve | Approve, I\'ll accept some | Drop]',
+  ]);
+  expect(calls.filter((c) => c.tool === "review_plan").map((c) => c.args)).toEqual([
+    { meeting: "m1", decision: "approve", accept: [1] },
+    { meeting: "m1", decision: "change", change: "Use hexes" },
+  ]);
+  expect(prompts).toEqual(["Change it: Use hexes"]);
 });
 
 test("the pane stops asking when the goals can't be read, until you or your session turn to it", async ($, on) => {
@@ -655,13 +689,14 @@ test("/huddle resume lists more goals than the dialog holds, to pick by number",
   ]);
 });
 
-test("a goal taken up puts what waits in it to your session at once; its milestones so far are not news", async ($, on) => {
+test("a goal taken up asks what waits in it at once; its milestones so far are not news", async ($, on) => {
   const clock = mock.clock(on);
   const rows: string[] = [];
-  const prompts: string[] = [];
-  on("prompt.submit", (_, e) => {
-    prompts.push(e.text);
-    return { text: e.text };
+  const questions: string[] = [];
+  on("tool.call", { tool: "AskUserQuestion" }, (_, e) => {
+    const [question] = e.questions as { question: string }[];
+    questions.push(question?.question ?? "");
+    return { deny: "dismissed" };
   });
   on("ui.log", (_, e) => {
     rows.push(e.text);
@@ -669,10 +704,9 @@ test("a goal taken up puts what waits in it to your session at once; its milesto
   });
   const taken: HuddleTeam = {
     ...TEAM,
-    needs: [],
+    needs: [plan("m1:a")],
     opened: 2,
     milestones: [{ key: "plan:m1", text: 'Plan approved: "Dice"' }],
-    prompts: [{ key: "accept:q2", text: "A task to accept" }],
   };
   serve(on, [
     { revision: 1, team: { ...NO_GOAL, resumable: resumable(1) } },
@@ -684,7 +718,7 @@ test("a goal taken up puts what waits in it to your session at once; its milesto
   expect(await huddle($, "resume")).toBe("Resumed g1.");
   await clock.advance(500);
   expect(rows).toEqual([]);
-  expect(prompts).toEqual(["A task to accept"]);
+  expect(questions).toEqual([expect.stringContaining('The plan for "Dice" waits for you')]);
 });
 
 test("/huddle with a task hands your session the prompt the server makes for it", async ($, on) => {

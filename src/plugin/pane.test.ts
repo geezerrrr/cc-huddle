@@ -190,7 +190,6 @@ describe("paneTeam", () => {
         id: "q1",
         from: "glm",
         headline: 'glm asks to use Bash: npm test for "rules". Allow it?',
-        ask: true,
         kind: "options",
         options: [
           { value: "once", label: "Allow once", primary: true },
@@ -203,7 +202,6 @@ describe("paneTeam", () => {
         id: "q2",
         from: "glm",
         headline: 'glm asks for "rules":',
-        ask: true,
         kind: "choices",
         choices: [
           {
@@ -218,7 +216,7 @@ describe("paneTeam", () => {
         id: "q3",
         from: "sonnet",
         headline: 'The task "Game" is done. Accept it?',
-        ask: false,
+        detail: "- board, by sonnet: A grid board.",
         kind: "options",
         options: [{ value: "accept", label: "Accept" }],
         note: { option: "revise", label: "Send back", prompt: "What to change" },
@@ -243,14 +241,6 @@ describe("paneTeam", () => {
         { id: "score", title: "score" },
       ],
     });
-    expect(team.prompts).toEqual([
-      {
-        key: "accept:q3",
-        text: `The task "Game" is done [q3], merged into its goal's branch:
-- board, by sonnet: A grid board.
-Take it to the user as cc-huddle's team skill says.`,
-      },
-    ]);
   });
 
   it("says who speaks at a meeting under way, and a plan to review", () => {
@@ -276,15 +266,63 @@ Take it to the user as cc-huddle's team skill says.`,
     expect(paneTeam(now, members).meeting?.heading).toBe(
       "Dice · the members form their first judgments",
     );
-    now.meetings = [{ ...meeting, status: "review" }];
+    const plan = (ownerAccepts: boolean) => ({
+      summary: "A dice game",
+      markdown: "# Dice",
+      tasks: [
+        {
+          title: "Rules",
+          outcome: "",
+          ownerAccepts: false,
+          subtasks: [
+            {
+              key: "r",
+              title: "Rules",
+              description: "",
+              assignee: "glm",
+              dependsOn: [],
+              acceptance: "",
+            },
+          ],
+        },
+        {
+          title: "Board",
+          outcome: "",
+          ownerAccepts,
+          subtasks: [
+            {
+              key: "b",
+              title: "Board",
+              description: "",
+              assignee: "sonnet",
+              dependsOn: ["r"],
+              acceptance: "",
+            },
+          ],
+        },
+      ],
+    });
+    now.meetings = [{ ...meeting, status: "review", plan: plan(false) }];
     const review = paneTeam(now, members);
+    // The plan waits on you, but the band counts it apart from what members ask.
     expect(review.band).toBe("plan to review");
-    expect(review.prompts).toEqual([
+    expect(review.needs[0]?.id).toMatch(/^m1:[0-9a-f]{12}$/);
+    expect(review.needs).toMatchObject([
       {
-        key: "review:m1",
-        text: 'The meeting [m1] on "Dice" has a plan for review: A dice game. Take it to the user as cc-huddle\'s team skill says.',
+        from: "Plan",
+        headline: 'The plan for "Dice" waits for you: A dice game',
+        detail: '1. Rules: Rules (glm)\n2. Board: Board (sonnet, after "Rules")',
+        kind: "plan",
+        meeting: "m1",
+        document: "# Dice",
+        tasks: ["Rules", "Board"],
       },
     ]);
+    // Changed, it is another plan to ask you about, and says which tasks you accept.
+    now.meetings = [{ ...meeting, status: "review", plan: plan(true) }];
+    const [changed] = paneTeam(now, members).needs;
+    expect(changed?.id).not.toBe(review.needs[0]?.id);
+    expect(changed?.detail).toContain("2. Board (you accept it): Board");
   });
 
   it("says where the goal is when nothing goes on, and lists what /huddle resume takes up", () => {
@@ -344,7 +382,6 @@ Take it to the user as cc-huddle's team skill says.`,
       members: [],
       needs: [],
       milestones: [],
-      prompts: [],
       resumable: [],
       resumeRefused: "No goal to resume.",
       pauseRefused: none,
@@ -378,7 +415,6 @@ Take it to the user as cc-huddle's team skill says.`,
     expect(review).toMatchObject({
       headline: 'The review of "rules" is stuck. What now?',
       detail: "Too small",
-      ask: true,
       note: {
         option: "sendBack",
         label: "Send back",

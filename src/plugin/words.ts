@@ -11,6 +11,7 @@ import {
   type MeetingNow,
   type Member,
   type Permission,
+  type Plan,
   type QuestionToYou,
   type Subtask,
   type SubtaskStatus,
@@ -172,10 +173,37 @@ export function needWords(
             headline: `Merging "${title ?? ""}" is stuck. What now?`,
             detail: question.text,
           };
-        case "delivery":
-          return { headline: `The task "${question.text}" is done. Accept it?` };
+        case "delivery": {
+          // What each of its subtasks delivered, with how to check it, as its member said.
+          const delivered = work.subtasks
+            .filter((s) => s.taskId === subtask?.taskId && s.delivery)
+            .map((s) => `- ${s.title}, by ${s.assignee}: ${s.delivery?.summary ?? ""}`);
+          return {
+            headline: `The task "${question.text}" is done. Accept it?`,
+            ...(delivered.length && { detail: delivered.join("\n") }),
+          };
+        }
       }
   }
+}
+
+/**
+ * A plan out for review, in words: what it is for, then its tasks numbered,
+ * each subtask with who does it and what it waits on.
+ */
+export function planWords(plan: Plan, work: Work): { headline: string; detail: string } {
+  const titles = new Map(plan.tasks.flatMap((t) => t.subtasks.map((s) => [s.key, s.title])));
+  const lines = plan.tasks.map((task, i) => {
+    const subtasks = task.subtasks.map((s) => {
+      const after = s.dependsOn.map((key) => `"${titles.get(key) ?? key}"`);
+      return `${s.title} (${s.assignee}${after.length ? `, after ${after.join(", ")}` : ""})`;
+    });
+    return `${String(i + 1)}. ${task.title}${task.ownerAccepts ? " (you accept it)" : ""}: ${subtasks.join("; ")}`;
+  });
+  return {
+    headline: `The plan for "${work.goal.name}" waits for you: ${plan.summary}`,
+    detail: lines.join("\n"),
+  };
 }
 
 /** Where one of the repository's goals is: in another session, unreadable, archived, or paused, as a session that ended left it too. */

@@ -12,8 +12,7 @@ export type HuddleTeam = {
   noGoal?: string;
   /**
    * How many goals your session has taken up or started: a new count is a
-   * goal just opened here, whose milestones so far are not news but whose
-   * prompts are.
+   * goal just opened here, whose milestones so far are not news.
    */
   opened: number;
   /** The band's words: what goes on, and what waits on you. Absent with nothing to say. */
@@ -25,8 +24,6 @@ export type HuddleTeam = {
   needs: HuddleNeed[];
   /** Milestones so far, each told once, by a key that names it. */
   milestones: { key: string; text: string }[];
-  /** What needs a conversation with you, by a key that names it: your session is prompted with each new one. */
-  prompts: { key: string; text: string }[];
   /**
    * What `/huddle resume` picks from, each named with how far it got and
    * where it is: your session's goal while it isn't active, then the
@@ -72,8 +69,6 @@ export type HuddleNeed = {
   headline: string;
   /** More of it: what Claude Code says the call does, a stuck review's notes, the files a merge can't take. */
   detail?: string;
-  /** Whether it is put to you in a question dialog; a task to accept is your session's to ask. */
-  ask: boolean;
 } & (
   | {
       kind: "choices";
@@ -92,6 +87,16 @@ export type HuddleNeed = {
       note?: { option: HuddleOption; label: string; prompt: string };
       /** The subtasks a task can be sent back to, for its note's option, when there is more than one. */
       sendBack?: { id: string; title: string }[];
+    }
+  | {
+      /** A plan out for review: approve it, picking the tasks you accept by number, drop it, or type a change. */
+      kind: "plan";
+      /** The meeting whose plan it is, as `review_plan` takes it. */
+      meeting: string;
+      /** The plan's document in full, for the pane. */
+      document: string;
+      /** Its tasks' titles, in order: the ones you accept are picked by their place. */
+      tasks: string[];
     }
 );
 
@@ -119,11 +124,26 @@ export type HuddleAnswer =
   | { kind: "option"; option: HuddleOption; note?: string; sentBack?: string }
   | { kind: "choices"; picks: string[] };
 
+/** What you decided on a plan out for review, as `review_plan` takes it for its meeting. */
+export type HuddlePlanDecision = Omit<HuddleCalls["review_plan"], "meeting">;
+
 /** What the mod calls each of the server's tools with. */
 export type HuddleCalls = {
   pane: Record<string, never>;
   status: Record<string, never>;
   answer: { question: string; answer: HuddleAnswer };
+  /**
+   * A plan out for review, as you decided: approved, with `accept` the tasks
+   * you accept by their place from 0 where you picked them (else as the plan
+   * has them); dropped; or changed as you typed (`change`), which gives the
+   * prompt your session makes the change with.
+   */
+  review_plan: {
+    meeting: string;
+    decision: "approve" | "drop" | "change";
+    accept?: number[];
+    change?: string;
+  };
   hand_off: { task: string };
   resume_goal: { goal: string };
   switch_settings: { review?: boolean; meetingSize?: "small" | "discussion" | "large" };

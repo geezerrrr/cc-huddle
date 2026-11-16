@@ -21,8 +21,8 @@ import {
   readTeam,
   keepTab,
 } from "./state";
-import { words } from "./text";
-import { answer } from "./watch";
+import { taskPlaces, words } from "./text";
+import { answer, decide } from "./watch";
 
 type $ = EngineInterface;
 
@@ -232,6 +232,40 @@ async function needView($: $, ui: Ui, need: HuddleNeed) {
       </Box>
     );
   }
+  if (need.kind === "plan")
+    return (
+      <Box key={`n-${need.id}`} flexDirection="column" gap={1}>
+        {head}
+        <Box gap={1}>
+          <Button
+            key={`${need.id}-approve`}
+            label="Approve"
+            variant="primary"
+            onPress={() => decide($, need, { decision: "approve" })}
+          />
+          <Button
+            key={`${need.id}-drop`}
+            label="Drop"
+            onPress={() => decide($, need, { decision: "drop" })}
+          />
+        </Box>
+        <Input
+          key={`${need.id}-accept`}
+          placeholder="Or the numbers of the tasks you accept yourself: 1, 3"
+          submitLabel="Approve"
+          onSubmit={(text) =>
+            decide($, need, { decision: "approve", accept: taskPlaces(text, need.tasks.length) })
+          }
+        />
+        <Input
+          key={`${need.id}-change`}
+          placeholder="Or what to change"
+          submitLabel="Change"
+          onSubmit={(text) => decide($, need, { decision: "change", change: text })}
+        />
+        <Markdown key={`doc-${need.id}`} text={need.document} />
+      </Box>
+    );
   const { note, sendBack } = need;
   // A revised task goes back to the subtask that asked, unless you pick another.
   const back = (await readSentBack($))[need.id];

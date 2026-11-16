@@ -20,6 +20,8 @@ import type { Questions } from "../engine/questions.ts";
 import type { Records } from "../engine/records.ts";
 import type { Scheduler } from "../engine/scheduler.ts";
 
+vi.mock("../engine/run.ts", () => ({ runSubtask: vi.fn() }));
+
 /** The engine's own state and parts, which a test sets work up through. */
 const inside = (engine: Engine) =>
   engine as unknown as {
@@ -111,6 +113,62 @@ const view = async (args: HuddleAsk = {}) =>
   JSON.parse((await ask("/view", JSON.stringify(args))).text) as HuddleView;
 
 describe("the pane's socket and tools", () => {
+  it("approve a plan with the tasks you pick, drop one, or give your session the change you typed", async () => {
+    const dice = await session.start("Dice");
+    const subtask = (key: string) => ({
+      key,
+      title: key,
+      description: "",
+      assignee: "glm",
+      dependsOn: [],
+      acceptance: "",
+    });
+    const inReview = (id: string) =>
+      inside(dice).core.state.meetings.push({
+        id,
+        agenda: "Dice",
+        size: "small",
+        participants: ["glm"],
+        status: "review",
+        turns: [],
+        plan: {
+          summary: "Dice",
+          markdown: "# Dice",
+          tasks: [
+            { title: "Rules", outcome: "", ownerAccepts: true, subtasks: [subtask(`${id}r`)] },
+            { title: "Board", outcome: "", ownerAccepts: false, subtasks: [subtask(`${id}b`)] },
+          ],
+        },
+      });
+    inReview("m1");
+    const changed = await call("review_plan", {
+      meeting: "m1",
+      decision: "change",
+      change: "Hexes",
+    });
+    expect(changed.text).toBe(`The user wants the plan of the meeting [m1] on "Dice" changed:
+
+Hexes
+
+Get it with show_plan, rewrite it with their words and change_plan. cc-huddle then asks them about the changed plan: don't ask them yourself.`);
+    expect(dice.work.meetings[0]?.status).toBe("review");
+    expect((await call("review_plan", { meeting: "m1", decision: "change" })).error).toBe(true);
+    expect(
+      (await call("review_plan", { meeting: "m1", decision: "approve", accept: [1] })).text,
+    ).toBe("Approved: 2 subtasks go to work.");
+    expect(dice.work.tasks.map((t) => [t.title, t.ownerAccepts])).toEqual([
+      ["Rules", false],
+      ["Board", true],
+    ]);
+    inReview("m2");
+    await call("review_plan", { meeting: "m2", decision: "approve" });
+    // Approved as you didn't pick: as the plan has them.
+    expect(dice.work.tasks.slice(2).map((t) => t.ownerAccepts)).toEqual([true, false]);
+    inReview("m3");
+    expect((await call("review_plan", { meeting: "m3", decision: "drop" })).text).toBe("Dropped.");
+    expect(dice.work.meetings.find((m) => m.id === "m3")?.status).toBe("dropped");
+  });
+
   it("let the session's goal go to a session taking it up, and say what that stopped", async () => {
     await session.start("Dice");
     expect(await askToLetGo(pane.address, "chess")).toEqual({ meetings: [] });
@@ -211,7 +269,6 @@ describe("the pane's socket and tools", () => {
       members: [],
       needs: [],
       milestones: [],
-      prompts: [],
       resumable: [],
       opened: 0,
       resumeRefused: "No goal to resume.",

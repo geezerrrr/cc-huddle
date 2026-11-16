@@ -52,6 +52,10 @@ ${member.role.duties}`;
  * before it had a session to go on in (`notes`: you added to it, or sent its
  * task back).
  */
+/** What a subtask of a task the user accepts themselves is told: they check it from what its delivery says. */
+const OWNER_CHECKS =
+  "The user accepts this task themselves once it is done. In your delivery's summary, tell them how to check your part: what to run or open, or what to look at.";
+
 export function taskBrief(input: {
   goal: Goal;
   task: Task;
@@ -70,6 +74,7 @@ export function taskBrief(input: {
     `Your subtask: ${subtask.title}`,
     ...(subtask.description && subtask.description !== subtask.title ? [subtask.description] : []),
     ...(subtask.acceptance ? ["", `Acceptance criteria: ${subtask.acceptance}`] : []),
+    ...(task.ownerAccepts ? ["", OWNER_CHECKS] : []),
     "",
     `Your worktree is ${input.cwd}, on branch ${input.branch}.`,
   ];

@@ -40,7 +40,7 @@ For one focused job, a single session or a subagent is cheaper and quicker. cc-h
 - **Meeting.** The members you pick discuss the task in turns, read-only. The host writes a plan of tasks with owners, dependencies and acceptance criteria; you approve it, change it or drop it.
 - **Work.** Each subtask runs in its own worktree as a fresh Claude Code session, on its member's model, as soon as what it waits on is merged. Members can ask each other questions.
 - **Review and merge.** Another member checks each delivery against its acceptance criteria and passes it or sends it back with notes. Passed work merges into `huddle/<goal>/main` one subtask at a time; a conflict goes back to its author.
-- **You.** Permission requests and members' questions come to you, in Claude Code's dialog or the pane; your session's model can't answer them. The goal branch is yours to merge: cc-huddle never pushes or touches your working tree.
+- **You.** Plans to approve, finished tasks to accept, permission requests and members' questions come to you in Claude Code's dialog, or wait in the pane; your session's model can't answer them. A task you accept comes with what was done and how to check it. The goal branch is yours to merge: cc-huddle never pushes or touches your working tree.
 
 The full design, state machines included, is [docs/design.md](docs/design.md).
 
