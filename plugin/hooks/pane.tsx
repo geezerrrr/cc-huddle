@@ -26,10 +26,6 @@ import { answer } from "./watch";
 
 type $ = EngineInterface;
 
-/** The keys that work in the pane, its last line. */
-const KEYS =
-  "1 meeting · 2 team · 3 needs you · tab or ↑/↓ to select · enter to press · esc to the prompt";
-
 const TABS: { tab: HuddleTab; label: string; hotkey: string }[] = [
   { tab: "meeting", label: "Meeting", hotkey: "1" },
   { tab: "team", label: "Team", hotkey: "2" },
@@ -71,6 +67,25 @@ async function follow($: $, member: string | null) {
   await changeFollowed($, () => now);
   if ((was?.member ?? null) !== member) await $.ui.open({ id: PANE, title: paneTitle(now) });
   scrollPane($, (await following($)) ? "end" : "start");
+}
+
+/** Closes the pane, as its close mark does. */
+function closePane($: $) {
+  $.ui.close({ id: PANE }).catch((error: unknown) => {
+    $.ui.toast(`cc-huddle: the pane couldn't close: ${words(error)}`);
+  });
+}
+
+/** The pane's last line: the keys that work on the page, Back on a member's record. */
+function keysLine($: $, ui: Ui, back?: () => void) {
+  const { Box, Button, Text } = ui;
+  return (
+    <Box gap={2}>
+      <Text dimColor>↑/↓ scroll</Text>
+      {back && <Button key="back" label="Back" hotkey="b" plain dimColor onPress={back} />}
+      <Button key="close" label="Close" hotkey="x" plain dimColor onPress={() => closePane($)} />
+    </Box>
+  );
 }
 
 /** Shows a tab, leaving the record it showed. */
@@ -141,14 +156,13 @@ function teamTab($: $, ui: Ui, now: HuddleTeam) {
 
 /** A member's record in place of the team: what their runs did, then what goes on now. */
 async function recordPage($: $, ui: Ui, now: HuddleTeam, shown: string) {
-  const { Box, Button, Text } = ui;
+  const { Box, Text } = ui;
   const member = now.members.find((m) => m.name === shown);
   const record = (await readFollowed($))?.record;
   return (
     <Box flexDirection="column" gap={1}>
       <Box flexDirection="column">
         <Box gap={1}>
-          <Button key="back" label="Back" hotkey="b" onPress={() => follow($, null)} />
           <Text bold>{shown}</Text>
           {member && <Text dimColor>{member.line}</Text>}
         </Box>
@@ -290,13 +304,14 @@ export async function paneView($: $, ui: Ui) {
           </Text>
         ))}
         {why && <Text color="red">{why}</Text>}
+        {keysLine($, ui)}
       </Box>
     );
   const shown = await readTab($);
   const member = shown === "team" ? (await readFollowed($))?.member : undefined;
   return (
     <Box flexDirection="column" gap={1}>
-      <Box gap={1}>
+      <Box gap={2}>
         {TABS.map((t) => (
           <Button
             key={`tab-${t.tab}`}
@@ -304,7 +319,8 @@ export async function paneView($: $, ui: Ui) {
               t.tab === "needs" && now.needs.length ? `${t.label} (${now.needs.length})` : t.label
             }
             hotkey={t.hotkey}
-            variant={t.tab === shown ? "primary" : "secondary"}
+            plain
+            dimColor={t.tab !== shown}
             onPress={() => showTab($, t.tab)}
           />
         ))}
@@ -317,9 +333,7 @@ export async function paneView($: $, ui: Ui) {
           : shown === "team"
             ? teamTab($, ui, now)
             : await needsTab($, ui, now.needs)}
-      <Text dimColor italic>
-        {member !== undefined ? `b back to the team · ${KEYS}` : KEYS}
-      </Text>
+      {keysLine($, ui, member !== undefined ? () => follow($, null) : undefined)}
     </Box>
   );
 }

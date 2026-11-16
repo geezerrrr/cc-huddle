@@ -124,6 +124,10 @@ function serve(on: On, views: HuddleView[]) {
     calls.push({ tool: "ui.open", args: { id: e.id, title: e.title, focus: e.focus } });
     return { value: { isPlaced: true } };
   });
+  on("ui.close", (_, e) => {
+    calls.push({ tool: "ui.close", args: { id: e.id } });
+    return { value: undefined };
+  });
   on("session.start", (_, e) => ({ cwd: e.cwd }));
   return calls;
 }
@@ -164,7 +168,7 @@ test("the band and the pane show the team, and a press answers what needs you", 
   expect(calls.find((c) => c.tool === "view")?.args).toEqual({});
 });
 
-test("a member's record shows in place of the team as it grows, and Back shows the team again", async ($, on) => {
+test("a member's record shows in place of the team as it grows, Back shows the team again, and Close closes the pane", async ($, on) => {
   const clock = mock.clock(on);
   const calls = serve(on, [
     { revision: 1, team: TEAM },
@@ -220,7 +224,7 @@ test("a member's record shows in place of the team as it grows, and Back shows t
   );
   expect(texts).not.toContain("     four");
   expect((await pane.find({ key: "record-streaming-md" }))?.text).toBe("Reading it");
-  expect(texts.at(-1)).toMatch(/^b back to the team · 1 meeting/);
+  expect(texts.at(-1)).toBe("↑/↓ scroll");
   // Read on from where it left off, and added to what it has.
   await clock.advance(500);
   expect(calls.at(-1)?.args).toEqual({
@@ -235,6 +239,11 @@ test("a member's record shows in place of the team as it grows, and Back shows t
   await pane.press({ key: "back" });
   expect(opened()).toEqual(["cc-huddle · glm", "cc-huddle"]);
   expect(await pane.find({ key: "follow-glm" })).toBeDefined();
+  expect(await pane.find({ key: "back" })).toBeUndefined();
+  await pane.press({ key: "close" });
+  expect(calls.filter((c) => c.tool === "ui.close")).toEqual([
+    { tool: "ui.close", args: { id: "cc-huddle" } },
+  ]);
   await pane.unmount();
 });
 
