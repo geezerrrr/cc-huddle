@@ -1,18 +1,18 @@
 /**
- * The team as openplan's pane shows it (docs/design.md §7.2), worked out here
+ * The team as cc-huddle's pane shows it (docs/design.md §7.2), worked out here
  * from the state so the mod only draws: the band's words, the meeting, each
  * member at what they do, what waits on you with the answers it takes, the
  * milestones the transcript keeps, what your session is asked to talk over,
  * and a member's record with each call in its line.
  */
 import type {
-  OpenplanCall,
-  OpenplanEntry,
-  OpenplanLive,
-  OpenplanMeeting,
-  OpenplanMember,
-  OpenplanNeed,
-  OpenplanTeam,
+  HuddleCall,
+  HuddleEntry,
+  HuddleLive,
+  HuddleMeeting,
+  HuddleMember,
+  HuddleNeed,
+  HuddleTeam,
 } from "../../plugin/types/index.d.ts";
 import {
   type DecisionOption,
@@ -56,7 +56,7 @@ export function shownMeeting(work: Work): Meeting | undefined {
   return latest("running") ?? latest("review") ?? latest();
 }
 
-function meetingOf(meeting: Meeting, work: Work): OpenplanMeeting {
+function meetingOf(meeting: Meeting, work: Work): HuddleMeeting {
   const now = work.meetingsNow[meeting.id];
   const hands = now?.hands ?? [];
   return {
@@ -84,7 +84,7 @@ export function followedOf(member: string, work: Work): Subtask | undefined {
   );
 }
 
-function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>): OpenplanMember {
+function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>): HuddleMember {
   const own = work.subtasks.filter((s) => s.assignee === member.name);
   const at = (...statuses: Subtask["status"][]) => own.find((s) => statuses.includes(s.status));
   const reviewing = work.subtasks.find(
@@ -143,7 +143,7 @@ function answersOf(
   };
 }
 
-function needOf(question: QuestionToYou, work: Work): OpenplanNeed {
+function needOf(question: QuestionToYou, work: Work): HuddleNeed {
   const { headline, detail } = needWords(question, work);
   const head = {
     id: question.id,
@@ -198,8 +198,8 @@ function needOf(question: QuestionToYou, work: Work): OpenplanNeed {
 }
 
 /** What the transcript keeps a line of, each once. */
-function milestones(work: Work): OpenplanTeam["milestones"] {
-  const said: OpenplanTeam["milestones"] = [];
+function milestones(work: Work): HuddleTeam["milestones"] {
+  const said: HuddleTeam["milestones"] = [];
   for (const meeting of work.meetings)
     if (meeting.status === "approved")
       said.push({ key: `plan:${meeting.id}`, text: `Plan approved: "${work.goal.name}"` });
@@ -224,14 +224,14 @@ function milestones(work: Work): OpenplanTeam["milestones"] {
 }
 
 /** Where a prompt to your session points for what to do with it. */
-const AS_THE_SKILL_SAYS = "Take it to the user as openplan's team skill says.";
+const AS_THE_SKILL_SAYS = "Take it to the user as cc-huddle's team skill says.";
 
 /**
  * What needs a conversation (§7.3): each plan out for review, and each task
  * done, waiting to be accepted. The mod submits each new one to your session.
  */
-function prompts(work: Work): OpenplanTeam["prompts"] {
-  const asked: OpenplanTeam["prompts"] = [];
+function prompts(work: Work): HuddleTeam["prompts"] {
+  const asked: HuddleTeam["prompts"] = [];
   for (const meeting of work.meetings)
     if (meeting.status === "review" && meeting.plan)
       asked.push({
@@ -324,7 +324,7 @@ function othersBand(others: readonly GoalEntry[]): string | undefined {
   return parts.length ? parts.join(" · ") : undefined;
 }
 
-/** Why `/openplan resume` takes nothing up when the repository has no goal this session doesn't run. */
+/** Why `/huddle resume` takes nothing up when the repository has no goal this session doesn't run. */
 const NOTHING_TO_RESUME = "No goal to resume.";
 
 /**
@@ -336,7 +336,7 @@ export function paneTeam(
   mine: { work: Work; members: readonly Member[] } | undefined,
   others: readonly GoalEntry[],
   session: { moved: string | undefined; opened: number },
-): OpenplanTeam {
+): HuddleTeam {
   const { opened } = session;
   if (!mine) {
     const band = othersBand(others);
@@ -381,13 +381,13 @@ export function paneTeam(
 }
 
 /** A tool call as its line names it. */
-const callOf = (name: string, input: unknown): OpenplanCall => {
+const callOf = (name: string, input: unknown): HuddleCall => {
   const argument = mainArgument(input);
   return { name, ...(argument !== undefined && { argument }) };
 };
 
 /** A record's entry as the pane draws it: a tool call by its main argument, a notice in words. */
-function viewEntry(entry: RecordEntry): OpenplanEntry {
+function viewEntry(entry: RecordEntry): HuddleEntry {
   switch (entry.kind) {
     case "run":
       return { kind: "run", text: `a run on ${entry.model}` };
@@ -409,11 +409,11 @@ function viewEntry(entry: RecordEntry): OpenplanEntry {
 }
 
 /** A record's entries as the pane draws them. */
-export const viewEntries = (entries: readonly RecordEntry[]): OpenplanEntry[] =>
+export const viewEntries = (entries: readonly RecordEntry[]): HuddleEntry[] =>
   entries.map(viewEntry);
 
 /** What a run does now, as the pane draws it. */
-export const viewLive = (live: LiveRun): OpenplanLive => ({
+export const viewLive = (live: LiveRun): HuddleLive => ({
   ...(live.streaming && { streaming: live.streaming }),
   ...(live.starting && { starting: live.starting }),
   running: live.running.map((call) => callOf(call.name, call.input)),
@@ -486,9 +486,9 @@ const NOTE_PROMPTS: Record<NoteOption, string> = {
  */
 const noGoalText = (moved: string | undefined) =>
   moved
-    ? `"${moved}" moved to another Claude Code session. Bring it back here with /openplan resume.`
-    : "This session runs no goal. Hand the team a task with /openplan <task>, or take a goal up with /openplan resume.";
+    ? `"${moved}" moved to another Claude Code session. Bring it back here with /huddle resume.`
+    : "This session runs no goal. Hand the team a task with /huddle <task>, or take a goal up with /huddle resume.";
 
-/** Why `/openplan resume` takes nothing up while this session's goal (`name`) is under way. */
+/** Why `/huddle resume` takes nothing up while this session's goal (`name`) is under way. */
 const resumeRefusal = (name: string) =>
-  `"${name}" is under way in this session, which runs one goal: /openplan pause it first, or take the other up in another session.`;
+  `"${name}" is under way in this session, which runs one goal: /huddle pause it first, or take the other up in another session.`;

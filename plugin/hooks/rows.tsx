@@ -3,7 +3,7 @@
  * a meeting turn being spoken alike, a row for each thing it did.
  */
 import type { Elements } from "claude-code";
-import type { OpenplanCall, OpenplanEntry, OpenplanLive } from "../types";
+import type { HuddleCall, HuddleEntry, HuddleLive } from "../types";
 import { clip, oneLine } from "./text";
 
 export type Ui = Pick<
@@ -18,7 +18,7 @@ const OUTPUT_LINES = 3;
 function toolRow(
   ui: Ui,
   key: string,
-  call: OpenplanCall & { state?: "done" | "error"; output?: string },
+  call: HuddleCall & { state?: "done" | "error"; output?: string },
 ) {
   const { Box, Text } = ui;
   const { argument } = call;
@@ -63,7 +63,7 @@ function saidRow(ui: Ui, key: string, text: string, dimColor = false) {
   );
 }
 
-function entryRow(ui: Ui, entry: OpenplanEntry, key: string) {
+function entryRow(ui: Ui, entry: HuddleEntry, key: string) {
   const { Text } = ui;
   switch (entry.kind) {
     case "run":
@@ -103,12 +103,7 @@ function entryRow(ui: Ui, entry: OpenplanEntry, key: string) {
 }
 
 /** A run's rows: what it did (`entries`), then what it does now; `key` keeps one's rows apart from another's. */
-export function runRows(
-  ui: Ui,
-  key: string,
-  entries: OpenplanEntry[],
-  live: OpenplanLive | undefined,
-) {
+export function runRows(ui: Ui, key: string, entries: HuddleEntry[], live: HuddleLive | undefined) {
   const { Box, Text } = ui;
   const quiet = !entries.length && !live?.streaming && !live?.starting && !live?.running.length;
   return (

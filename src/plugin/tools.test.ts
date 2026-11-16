@@ -41,7 +41,7 @@ let client: Client;
 const goal = () => session.goal;
 
 beforeEach(async () => {
-  dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-tools-")));
+  dir = await realpath(await mkdtemp(path.join(tmpdir(), "huddle-tools-")));
   const repo = path.join(dir, "repo");
   await git({ cwd: dir }, ["init", "-q", "--initial-branch=main", repo]);
   await writeFile(path.join(repo, "README.md"), "hello\n");
@@ -56,16 +56,16 @@ beforeEach(async () => {
     await mkdir(path.dirname(file), { recursive: true });
     await writeFile(file, text);
   }
-  const server = new McpServer({ name: "openplan", version: "0.0.0" });
+  const server = new McpServer({ name: "huddle", version: "0.0.0" });
   session = new Session(
     {
       cwd: repo,
-      dataFolder: path.join(dir, "openplan-inline"),
+      dataFolder: path.join(dir, "cc-huddle-inline"),
       session: 41,
       address: "here",
       takeOver: () => Promise.reject(new Error("not asked")),
       sessionMode: () => undefined,
-      plugins: ["openplan@inline"],
+      plugins: ["cc-huddle@inline"],
       userTeam: path.join(dir, "user-team"),
       env: {},
       failed: vi.fn(),
@@ -127,7 +127,7 @@ describe("tools", () => {
 
   it("start a goal, assign work, pass a message, stop it, and tell where it stands", async () => {
     expect(await call("start_goal", { name: "Dice" })).toMatchObject({
-      text: expect.stringContaining("on branch openplan/dice/main") as string,
+      text: expect.stringContaining("on branch huddle/dice/main") as string,
     });
     const assigned = await call("assign", {
       assignee: "glm",
@@ -195,7 +195,7 @@ describe("tools", () => {
 
   it("act on the session's one goal: another starts only once it is paused, and it is deleted once archived", async () => {
     expect(await call("goal_action", { action: "pause" })).toEqual({
-      text: "This session runs no goal: start one (start_goal), or the user takes one up with /openplan resume.",
+      text: "This session runs no goal: start one (start_goal), or the user takes one up with /huddle resume.",
       error: true,
     });
     await call("start_goal", { name: "Dice" });

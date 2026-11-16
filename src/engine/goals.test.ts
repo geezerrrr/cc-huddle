@@ -48,7 +48,7 @@ const meetings = {
 };
 
 beforeEach(async () => {
-  dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-goals-")));
+  dir = await realpath(await mkdtemp(path.join(tmpdir(), "huddle-goals-")));
   const repo = path.join(dir, "repo");
   await git({ cwd: dir }, ["init", "-q", "--initial-branch=main", repo]);
   await writeFile(path.join(repo, "README.md"), "hello\n");
@@ -150,7 +150,7 @@ describe("Goals", () => {
     await goals.delete();
     expect(scheduler.release).toHaveBeenCalledWith(["s1"]);
     expect(meetings.settled).toHaveBeenCalled();
-    expect(await branches()).toEqual(["main", goalBranch("dice")]);
+    expect(await branches()).toEqual([goalBranch("dice"), "main"]);
     expect(await exists(goalFiles(core.places.root).desk("s1"))).toBe(false);
     expect(await exists(goalFiles(core.places.root).checkout)).toBe(false);
   });

@@ -77,7 +77,7 @@ const working: typeof runSubtask = (run) =>
   });
 
 beforeEach(async () => {
-  dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-engine-")));
+  dir = await realpath(await mkdtemp(path.join(tmpdir(), "huddle-engine-")));
   repo = path.join(dir, "repo");
   await git({ cwd: dir }, ["init", "-q", "--initial-branch=main", repo]);
   await writeFile(path.join(repo, "README.md"), "hello\n");
@@ -88,7 +88,7 @@ beforeEach(async () => {
     "members/glm.md",
     "---\nrole: dev\nenv:\n  ANTHROPIC_AUTH_TOKEN: ${GLM_KEY}\n---\n",
   );
-  const dataFolder = path.join(dir, "openplan-inline");
+  const dataFolder = path.join(dir, "cc-huddle-inline");
   options = {
     cwd: repo,
     dataFolder,
@@ -97,7 +97,7 @@ beforeEach(async () => {
     address: "here",
     takeOver: () => Promise.reject(new Error("not asked")),
     sessionMode: () => undefined,
-    plugins: ["openplan@inline"],
+    plugins: ["cc-huddle@inline"],
     userTeam: path.join(dir, "user-team"),
     env: { GLM_KEY: "key-1" },
     failed: vi.fn(),
@@ -125,7 +125,7 @@ describe("Engine", () => {
     });
     expect(JSON.parse(await readFile(files.settings("glm"), "utf8"))).toMatchObject({
       env: { ANTHROPIC_AUTH_TOKEN: "key-1" },
-      enabledPlugins: { "openplan@inline": false },
+      enabledPlugins: { "cc-huddle@inline": false },
     });
     expect(
       await readFile(
@@ -332,7 +332,7 @@ describe("Engine", () => {
       "--format=%(refname:short)",
       "refs/heads/",
     ]);
-    expect(refs.stdout.split("\n").filter(Boolean)).toEqual(["main", goalBranch("dice")]);
+    expect(refs.stdout.split("\n").filter(Boolean)).toEqual([goalBranch("dice"), "main"]);
   });
 
   it("answers a question put to you and carries out the decision", async () => {

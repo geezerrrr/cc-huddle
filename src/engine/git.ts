@@ -73,7 +73,7 @@ export function git(at: At, args: string[], options: GitOptions = {}): Promise<R
 
 /** Git's variables for a member as who a commit is by: those the engine makes for them, and their own. */
 export function authorEnv(member: string): Record<string, string> {
-  const email = `${member}@openplan.local`;
+  const email = `${member}@huddle.local`;
   return {
     GIT_AUTHOR_NAME: member,
     GIT_AUTHOR_EMAIL: email,
@@ -112,14 +112,14 @@ export interface Places {
   root: string;
 }
 
-/** Where openplan's branches are: each goal's under `openplan/<slug>/`, which no other branch shares. */
-const BRANCHES = "openplan/";
+/** Where cc-huddle's branches are: each goal's under `huddle/<slug>/`, which no other branch shares. */
+const BRANCHES = "huddle/";
 const goalBranches = (slug: string) => `${BRANCHES}${slug}/`;
 
 /** The branch a goal's work is merged into. */
 export const goalBranch = (slug: string) => `${goalBranches(slug)}main`;
 
-/** The slugs goals have taken in a repository: every name with a branch under `openplan/<slug>/`. */
+/** The slugs goals have taken in a repository: every name with a branch under `huddle/<slug>/`. */
 export async function takenSlugs(repo: Repository): Promise<Set<string>> {
   const refs = await git({ cwd: repo.top }, [
     "for-each-ref",
@@ -149,7 +149,7 @@ export function slugFor(name: string, taken: ReadonlySet<string>): string {
 }
 
 /**
- * Takes one of openplan's worktrees off the repository's list, there or not.
+ * Takes one of cc-huddle's worktrees off the repository's list, there or not.
  * Never `worktree prune`: it would also drop your own worktrees that are only
  * away, on a drive not plugged in.
  */
@@ -224,7 +224,7 @@ export function openDesk(places: Places, subtaskId: string): Promise<string> {
 }
 
 /**
- * How git runs in one of openplan's worktrees: pinned to its entry in the
+ * How git runs in one of cc-huddle's worktrees: pinned to its entry in the
  * repository's own `worktrees/` (the one whose `gitdir` names this folder),
  * never found through the `.git` file in the tree. A member can rewrite that
  * file; pointed at a repository of its own making, the engine would run what

@@ -49,7 +49,7 @@ let questions: Questions;
 let scheduler: Scheduler;
 
 beforeEach(async () => {
-  dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-scheduler-")));
+  dir = await realpath(await mkdtemp(path.join(tmpdir(), "huddle-scheduler-")));
   const repo = path.join(dir, "repo");
   await git({ cwd: dir }, ["init", "-q", "--initial-branch=main", repo]);
   await writeFile(path.join(repo, "README.md"), "hello\n");

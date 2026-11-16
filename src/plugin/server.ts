@@ -1,5 +1,5 @@
 /**
- * openplan's MCP server (docs/design.md §3.2, §3.3). Claude Code starts it
+ * cc-huddle's MCP server (docs/design.md §3.2, §3.3). Claude Code starts it
  * with your session and ends it with the session; it runs the goal your
  * session starts or takes up, and gives your session its tools and the pane
  * its socket.
@@ -26,7 +26,7 @@ import { Session } from "./session.ts";
 import { addTools } from "./tools.ts";
 
 const say = (text: string) => {
-  console.error(`openplan: ${text}`);
+  console.error(`cc-huddle: ${text}`);
 };
 
 const cwd = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
@@ -98,13 +98,13 @@ process.once("exit", () => {
   pane.close();
 });
 
-// openplan's prompts and tool results are in English, for the model; what it
+// cc-huddle's prompts and tool results are in English, for the model; what it
 // says to you follows your language, not theirs (§7.3).
 const server = new McpServer(
-  { name: "openplan", version: plugin.version },
+  { name: "huddle", version: plugin.version },
   {
     instructions:
-      "Talk to the user in the language they write to you in, whatever language openplan's messages and tool results are in.",
+      "Talk to the user in the language they write to you in, whatever language cc-huddle's messages and tool results are in.",
   },
 );
 const listMembers = addTools(server, session);

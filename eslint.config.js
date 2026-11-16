@@ -17,7 +17,9 @@ export default tseslint.config(
     rules: {
       "no-restricted-imports": [
         "error",
-        { patterns: [{ group: ["../*/*"], message: "src/shared imports nothing of openplan's." }] },
+        {
+          patterns: [{ group: ["../*/*"], message: "src/shared imports nothing of cc-huddle's." }],
+        },
       ],
     },
   },

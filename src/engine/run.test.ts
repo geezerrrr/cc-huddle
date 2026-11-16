@@ -24,7 +24,7 @@ function turns(...scripts: Script[]) {
   const seen: { prompt: string; options: Options }[] = [];
   vi.mocked(query).mockImplementation(({ prompt, options = {} }) => {
     seen.push({ prompt: prompt as string, options });
-    const server = options.mcpServers?.openplan as unknown as {
+    const server = options.mcpServers?.huddle as unknown as {
       tools: { name: string; handler: Handler }[];
     };
     const call = async (name: string, args: Record<string, unknown>) => {
@@ -160,7 +160,7 @@ describe("runSubtask", () => {
     const gate = vi.fn<CanUseTool>(() => Promise.resolve({ behavior: "allow" }));
     await run({ gate });
     const request = { signal: new AbortController().signal, toolUseID: "t", requestId: "r" };
-    const own = "mcp__openplan__deliver";
+    const own = "mcp__huddle__deliver";
     expect(await canUseTool?.(own, {}, request)).toEqual({ behavior: "allow", updatedInput: {} });
     expect(await canUseTool?.(own, {}, { ...request, agentID: "a1" })).toMatchObject({
       behavior: "deny",

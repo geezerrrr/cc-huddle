@@ -1,6 +1,6 @@
-# openplan
+# cc-huddle
 
-How openplan behaves is `docs/design.md`: change it first, then the code. This file is how the code is written: the rules a change keeps and a review checks. A review reports what breaks a rule here, and nothing else; a rule that turns out wrong is changed here first.
+How cc-huddle behaves is `docs/design.md`: change it first, then the code. This file is how the code is written: the rules a change keeps and a review checks. A review reports what breaks a rule here, and nothing else; a rule that turns out wrong is changed here first.
 
 ## Checks
 
@@ -8,7 +8,7 @@ How openplan behaves is `docs/design.md`: change it first, then the code. This f
 
 ## Layers and what may import what
 
-- `src/shared/`: leaves any part uses (errors, whole-file writes and reads, pids, serial queues, text). They import nothing of openplan's.
+- `src/shared/`: leaves any part uses (errors, whole-file writes and reads, pids, serial queues, text). They import nothing of cc-huddle's.
 - `src/engine/`: knows nothing of Claude Code's interface or of the plugin. Its modules import `src/shared/` and each other, never `src/plugin/`.
 - `src/plugin/`: imports the engine only from `src/engine/index.ts`, the engine's one public surface, and `src/shared/`; its tests may set work up through the engine's own modules. Lint enforces it.
 - `plugin/hooks/` (the mod): runs in Claude Code, imports `claude-code`, its own files and the types in `plugin/types/`; never `src/`. Its atoms are declared, read and changed in `state.ts` only, through function declarations: Claude Code's state scan reads an atom where it is declared, and follows `$` into another file only through one.
@@ -34,7 +34,7 @@ How openplan behaves is `docs/design.md`: change it first, then the code. This f
 
 - What a member's model reads: `src/engine/prompts.ts` only.
 - What your session's model reads and what you read: `src/plugin/words.ts` holds the words made from a kind (a status, a wait, a need, where a goal is), wherever they are said; any other sentence stays with what assembles it (`status.ts`, `pane.ts`, `tools.ts`), even when a like one is said elsewhere. Code never compares words: it compares kinds, and words are made from kinds.
-- The mod's own words are only its controls and labels, its tabs' empty states, the `/openplan resume` dialog, what it says before the server answers or when a call fails, and how it reacts to its own dialogs. Everything about the team is the server's, served as sentences: the mod draws, it doesn't compose.
+- The mod's own words are only its controls and labels, its tabs' empty states, the `/huddle resume` dialog, what it says before the server answers or when a call fails, and how it reacts to its own dialogs. Everything about the team is the server's, served as sentences: the mod draws, it doesn't compose.
 - What your session's skill says is not repeated in a prompt to it: a prompt gives the facts and ids, and points to the skill.
 
 ## Contracts

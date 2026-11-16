@@ -1,20 +1,20 @@
 /**
- * The ids openplan goes by in `enabledPlugins` (`openplan@<marketplace>`),
+ * The ids cc-huddle goes by in `enabledPlugins` (`cc-huddle@<marketplace>`),
  * to turn off in members' sessions. Its data folder is named after the id
  * that loaded it, with every character but letters, digits, `_` and `-`
  * turned into `-`; a marketplace's name may have a `.`, which doesn't read
- * back, so every openplan id your settings files enable is turned off too.
+ * back, so every cc-huddle id your settings files enable is turned off too.
  */
 import path from "node:path";
 import { jsonIfThere } from "../shared/files.ts";
 
-const PLUGIN = "openplan";
+const PLUGIN = "cc-huddle";
 
 /** The id read back from the data folder: right unless the marketplace's name has a `.`. */
 const pluginId = (dataFolder: string) =>
   `${PLUGIN}@${path.basename(dataFolder).slice(PLUGIN.length + 1)}`;
 
-/** The openplan ids a settings file enables or disables; none when it is missing or doesn't parse, as Claude Code skips it then. */
+/** The cc-huddle ids a settings file enables or disables; none when it is missing or doesn't parse, as Claude Code skips it then. */
 async function idsIn(file: string): Promise<string[]> {
   let settings: { enabledPlugins?: Record<string, unknown> } | undefined;
   try {
@@ -27,7 +27,7 @@ async function idsIn(file: string): Promise<string[]> {
 }
 
 /**
- * Every id of openplan's to turn off: the one read back from `dataFolder`,
+ * Every id of cc-huddle's to turn off: the one read back from `dataFolder`,
  * and those in your user settings (in `configFolder`) and the project's (at
  * `projectFolder`).
  */

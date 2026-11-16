@@ -19,7 +19,7 @@ import {
   writtenPlan,
 } from "../engine/index.ts";
 
-import type { OpenplanCalls } from "../../plugin/types/index.d.ts";
+import type { HuddleCalls } from "../../plugin/types/index.d.ts";
 import type { Session } from "./session.ts";
 import { othersText, statusText } from "./status.ts";
 import { attendanceText, plural, rosterOf, STATUS_WORDS } from "./words.ts";
@@ -29,7 +29,7 @@ const meeting = z.string().describe("The meeting's id");
 const subtask = z.string().describe("The subtask's id");
 
 const goalActionInput = z.object({ action: z.enum(GOAL_ACTIONS) }) satisfies z.ZodType<
-  OpenplanCalls["goal_action"]
+  HuddleCalls["goal_action"]
 >;
 
 /** A member's name: any, until the team is read; then one of its members, each with their role (§7.3). */

@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  # The Claude Code that validates and tests the mod: the version openplan is checked on.
+  # The Claude Code that validates and tests the mod: the version cc-huddle is checked on.
   CLAUDE_CODE_VERSION: 2.1.322
 
 jobs:

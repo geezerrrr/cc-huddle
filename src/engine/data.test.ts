@@ -10,7 +10,7 @@ import { releaseLock, takeLock } from "./lock.ts";
 let dir: string;
 
 beforeEach(async () => {
-  dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-data-")));
+  dir = await realpath(await mkdtemp(path.join(tmpdir(), "huddle-data-")));
 });
 
 afterEach(async () => {
@@ -67,12 +67,12 @@ describe("the state file", () => {
     expect(failed).toHaveBeenCalledOnce();
   });
 
-  it("isn't taken when it can't be read or comes from a newer openplan", async () => {
+  it("isn't taken when it can't be read or comes from a newer cc-huddle", async () => {
     const file = path.join(dir, "state.json");
     await writeFile(file, "{");
     await expect(readState(file)).rejects.toThrow("can't be read");
     await writeFile(file, JSON.stringify({ version: 6, state: fresh() }));
-    await expect(readState(file)).rejects.toThrow("written by a newer openplan");
+    await expect(readState(file)).rejects.toThrow("written by a newer cc-huddle");
   });
 });
 

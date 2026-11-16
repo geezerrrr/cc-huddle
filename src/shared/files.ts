@@ -1,5 +1,5 @@
 /**
- * Files as all of openplan reads and writes them: read when they are there,
+ * Files as all of cc-huddle reads and writes them: read when they are there,
  * and written whole (a new file beside, renamed over it), so a reader or a
  * crash never finds one half written. A leaf, for the bootstrap too.
  */

@@ -1,5 +1,5 @@
 /**
- * Where openplan keeps things in its data folder (docs/design.md §3.4),
+ * Where cc-huddle keeps things in its data folder (docs/design.md §3.4),
  * named here: each repository's goals, each goal's files, and the folders of
  * the session modes and the server's dependencies. A leaf, for the bootstrap too.
  */

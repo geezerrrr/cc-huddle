@@ -1,5 +1,5 @@
 /**
- * A repository's goals as openplan keeps them (docs/design.md §3.4): the
+ * A repository's goals as cc-huddle keeps them (docs/design.md §3.4): the
  * repository a folder is in, found once, and its goals in the data folder,
  * listed, and read as their files left them.
  */

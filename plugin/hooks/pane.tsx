@@ -1,10 +1,10 @@
 /**
- * openplan's pane (docs/design.md §7.2): the meeting, the team, a member's
+ * cc-huddle's pane (docs/design.md §7.2): the meeting, the team, a member's
  * record in place of the team, and what needs you with the controls that
  * answer it. It opens only on your command or press.
  */
 import type { EngineInterface } from "claude-code";
-import type { OpenplanMeeting, OpenplanNeed, OpenplanTab, OpenplanTeam } from "../types";
+import type { HuddleMeeting, HuddleNeed, HuddleTab, HuddleTeam } from "../types";
 import { runRows, type Ui } from "./rows";
 import {
   PANE,
@@ -30,7 +30,7 @@ type $ = EngineInterface;
 const KEYS =
   "1 meeting · 2 team · 3 needs you · tab or ↑/↓ to select · enter to press · esc to the prompt";
 
-const TABS: { tab: OpenplanTab; label: string; hotkey: string }[] = [
+const TABS: { tab: HuddleTab; label: string; hotkey: string }[] = [
   { tab: "meeting", label: "Meeting", hotkey: "1" },
   { tab: "team", label: "Team", hotkey: "2" },
   { tab: "needs", label: "Needs you", hotkey: "3" },
@@ -43,7 +43,7 @@ const paneTitle = (shown: { member: string } | null) =>
 /** Moves the pane's window; one the engine won't move (`deny`) stays where it is, all a scroll can lose. */
 export function scrollPane($: $, to: "start" | "end") {
   $.ui.scroll({ in: PANE, to }).catch((error: unknown) => {
-    $.ui.toast(`openplan: the pane couldn't scroll: ${words(error)}`);
+    $.ui.toast(`cc-huddle: the pane couldn't scroll: ${words(error)}`);
   });
 }
 
@@ -74,12 +74,12 @@ async function follow($: $, member: string | null) {
 }
 
 /** Shows a tab, leaving the record it showed. */
-async function showTab($: $, shown: OpenplanTab) {
+async function showTab($: $, shown: HuddleTab) {
   await keepTab($, shown);
   await follow($, null);
 }
 
-async function meetingTab($: $, ui: Ui, meeting: OpenplanMeeting | undefined) {
+async function meetingTab($: $, ui: Ui, meeting: HuddleMeeting | undefined) {
   const { Box, Markdown, Text } = ui;
   if (!meeting) return <Text dimColor>No meeting yet: ask your session to hold one.</Text>;
   const live = await readSpeaking($);
@@ -108,7 +108,7 @@ async function meetingTab($: $, ui: Ui, meeting: OpenplanMeeting | undefined) {
   );
 }
 
-function teamTab($: $, ui: Ui, now: OpenplanTeam) {
+function teamTab($: $, ui: Ui, now: HuddleTeam) {
   const { Box, Button, Text } = ui;
   return (
     <Box flexDirection="column" gap={1}>
@@ -140,7 +140,7 @@ function teamTab($: $, ui: Ui, now: OpenplanTeam) {
 }
 
 /** A member's record in place of the team: what their runs did, then what goes on now. */
-async function recordPage($: $, ui: Ui, now: OpenplanTeam, shown: string) {
+async function recordPage($: $, ui: Ui, now: HuddleTeam, shown: string) {
   const { Box, Button, Text } = ui;
   const member = now.members.find((m) => m.name === shown);
   const record = (await readFollowed($))?.record;
@@ -159,7 +159,7 @@ async function recordPage($: $, ui: Ui, now: OpenplanTeam, shown: string) {
   );
 }
 
-async function needView($: $, ui: Ui, need: OpenplanNeed) {
+async function needView($: $, ui: Ui, need: HuddleNeed) {
   const { Box, Button, Input, Markdown, Select, Text } = ui;
   const head = (
     <Box flexDirection="column">
@@ -262,7 +262,7 @@ async function needView($: $, ui: Ui, need: OpenplanNeed) {
   );
 }
 
-async function needsTab($: $, ui: Ui, needs: OpenplanNeed[]) {
+async function needsTab($: $, ui: Ui, needs: HuddleNeed[]) {
   const { Box, Text } = ui;
   if (!needs.length) return <Text dimColor>Nothing waits on you.</Text>;
   const views = [];

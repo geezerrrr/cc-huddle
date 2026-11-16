@@ -1,5 +1,5 @@
 name: Bug report
-description: Something openplan does wrong
+description: Something cc-huddle does wrong
 labels: [bug]
 body:
   - type: textarea
@@ -13,14 +13,14 @@ body:
     id: status
     attributes:
       label: Where the team stood
-      description: The output of `/openplan status`, if the team was open.
+      description: The output of `/huddle status`, if the team was open.
       render: text
   - type: input
     id: versions
     attributes:
       label: Versions
-      description: openplan (`/plugin`), Claude Code (`claude --version`) and Node.js (`node --version`).
-      placeholder: openplan 0.1.0, Claude Code 2.1.322, Node.js 24.21.0
+      description: cc-huddle (`/plugin`), Claude Code (`claude --version`) and Node.js (`node --version`).
+      placeholder: cc-huddle 0.1.0, Claude Code 2.1.322, Node.js 24.21.0
     validations:
       required: true
   - type: input
@@ -34,5 +34,5 @@ body:
     id: log
     attributes:
       label: Debug log
-      description: Lines from `claude --debug` that mention openplan. Check them for keys before you paste.
+      description: Lines from `claude --debug` that mention cc-huddle. Check them for keys before you paste.
       render: text

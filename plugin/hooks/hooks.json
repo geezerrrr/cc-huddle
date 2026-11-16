@@ -24,7 +24,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "mcp__plugin_openplan_openplan__.*",
+        "matcher": "mcp__plugin_cc-huddle_huddle__.*",
         "hooks": [
           {
             "type": "command",

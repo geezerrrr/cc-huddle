@@ -1,13 +1,13 @@
 /**
- * The contract between openplan's mod and its MCP server, both ways: what
- * the mod asks `POST /view` for (`OpenplanAsk`) and what it draws from the
+ * The contract between cc-huddle's mod and its MCP server, both ways: what
+ * the mod asks `POST /view` for (`HuddleAsk`) and what it draws from the
  * answer (src/plugin/pane.ts in the repository), all its words made there;
- * what the `answer` tool takes (`OpenplanAnswer`); and the values the mod
+ * what the `answer` tool takes (`HuddleAnswer`); and the values the mod
  * keeps for the session.
  */
 
 /** The team as the pane shows it; it comes again only when it changed. */
-export type OpenplanTeam = {
+export type HuddleTeam = {
   /** Why your session runs no goal, and what to do; absent while it runs one. */
   noGoal?: string;
   /**
@@ -20,26 +20,26 @@ export type OpenplanTeam = {
   band?: string;
   /** A line for each task not yet done, under the band: its title and where it stands. */
   tasks: string[];
-  meeting?: OpenplanMeeting;
-  members: OpenplanMember[];
-  needs: OpenplanNeed[];
+  meeting?: HuddleMeeting;
+  members: HuddleMember[];
+  needs: HuddleNeed[];
   /** Milestones so far, each told once, by a key that names it. */
   milestones: { key: string; text: string }[];
   /** What needs a conversation with you, by a key that names it: your session is prompted with each new one. */
   prompts: { key: string; text: string }[];
   /**
-   * What `/openplan resume` picks from, each named with how far it got and
+   * What `/huddle resume` picks from, each named with how far it got and
    * where it is: your session's goal while it isn't active, then the
    * repository's goals your session doesn't run, oldest first.
    */
   resumable: { slug: string; label: string }[];
-  /** Why `/openplan resume` takes nothing up now: your session's goal is under way, or there is none to take up. */
+  /** Why `/huddle resume` takes nothing up now: your session's goal is under way, or there is none to take up. */
   resumeRefused?: string;
-  /** Why `/openplan pause` pauses nothing now: your session runs no goal, or its goal isn't under way. */
+  /** Why `/huddle pause` pauses nothing now: your session runs no goal, or its goal isn't under way. */
   pauseRefused?: string;
 };
 
-export type OpenplanMeeting = {
+export type HuddleMeeting = {
   /** What it is about and where it is, in a line: its goal's name, who speaks, the plan out for review. */
   heading: string;
   /** Who is at it, and who hosts it, in words. */
@@ -54,7 +54,7 @@ export type OpenplanMeeting = {
   plan?: string;
 };
 
-export type OpenplanMember = {
+export type HuddleMember = {
   name: string;
   /** Their role, model and tokens, in a line. */
   line: string;
@@ -65,7 +65,7 @@ export type OpenplanMember = {
 };
 
 /** Something that waits on you, in words, with the answers it takes. */
-export type OpenplanNeed = {
+export type HuddleNeed = {
   id: string;
   from: string;
   /** What waits on you, in a sentence. */
@@ -87,16 +87,16 @@ export type OpenplanNeed = {
   | {
       kind: "options";
       /** The buttons: what the `answer` tool takes as `option`, and its label; the one to press first is `primary`. */
-      options: { value: OpenplanOption; label: string; primary?: true }[];
+      options: { value: HuddleOption; label: string; primary?: true }[];
       /** The option a note typed instead of a pick goes with, which may be no button: it is no answer without a note. */
-      note?: { option: OpenplanOption; label: string; prompt: string };
+      note?: { option: HuddleOption; label: string; prompt: string };
       /** The subtasks a task can be sent back to, for its note's option, when there is more than one. */
       sendBack?: { id: string; title: string }[];
     }
 );
 
 /** What a permission or a decision can be answered with. */
-export type OpenplanOption =
+export type HuddleOption =
   | "once"
   | "always"
   | "deny"
@@ -115,54 +115,54 @@ export type OpenplanOption =
  * option, with a note where you typed one and the subtask a revised task goes
  * back to where you picked one; or a pick for each question with choices.
  */
-export type OpenplanAnswer =
-  | { kind: "option"; option: OpenplanOption; note?: string; sentBack?: string }
+export type HuddleAnswer =
+  | { kind: "option"; option: HuddleOption; note?: string; sentBack?: string }
   | { kind: "choices"; picks: string[] };
 
 /** What the mod calls each of the server's tools with. */
-export type OpenplanCalls = {
+export type HuddleCalls = {
   pane: Record<string, never>;
   status: Record<string, never>;
-  answer: { question: string; answer: OpenplanAnswer };
+  answer: { question: string; answer: HuddleAnswer };
   hand_off: { task: string };
   resume_goal: { goal: string };
   goal_action: { action: "pause" | "resume" | "archive" | "delete" };
 };
 
 /** A tool call: its name and the argument its line shows. */
-export type OpenplanCall = { name: string; argument?: string };
+export type HuddleCall = { name: string; argument?: string };
 
 /** One whole thing a member's run did, as its record keeps it (src/engine/records.ts). */
-export type OpenplanEntry =
+export type HuddleEntry =
   /** A run's start, in words: the model it runs on. */
   | { kind: "run"; text: string }
   | { kind: "thinking" | "text"; text: string }
-  | ({ kind: "tool"; state: "done" | "error"; output: string } & OpenplanCall)
+  | ({ kind: "tool"; state: "done" | "error"; output: string } & HuddleCall)
   | { kind: "steps"; steps: { content: string; status: "pending" | "in_progress" | "completed" }[] }
   /** What the Agent SDK reported, in words. */
   | { kind: "notice"; text: string };
 
 /** What a run does now, not in its entries yet. */
-export type OpenplanLive = {
+export type HuddleLive = {
   streaming?: { kind: "thinking" | "text"; text: string };
   starting?: string;
-  running: OpenplanCall[];
+  running: HuddleCall[];
 };
 
 /** What a run did since the pane last read it, where the next read starts, and what it does now. */
-export type OpenplanRun = { entries: OpenplanEntry[]; next: number; live?: OpenplanLive };
+export type HuddleRun = { entries: HuddleEntry[]; next: number; live?: HuddleLive };
 
 /** A member's record: of the subtask they work on, or worked on last. */
-export type OpenplanRecord = OpenplanRun & { subtask: string };
+export type HuddleRecord = HuddleRun & { subtask: string };
 
 /** The meeting turn being spoken: which speech it is, and who speaks it. */
-export type OpenplanSpeaking = OpenplanRun & { speech: string; speaker: string };
+export type HuddleSpeaking = HuddleRun & { speech: string; speaker: string };
 
 /** The member whose record the pane follows, and the record as it has it, once read. */
-export type OpenplanFollowed = { member: string; record?: OpenplanRecord };
+export type HuddleFollowed = { member: string; record?: HuddleRecord };
 
 /** What the mod asks `POST /view` for. */
-export type OpenplanAsk = {
+export type HuddleAsk = {
   /** The revision of the team the pane has. */
   revision?: number;
   /** The member whose record the pane follows, and the run it read up to which byte, if it read one. */
@@ -172,27 +172,27 @@ export type OpenplanAsk = {
 };
 
 /** What `view` gives the pane. */
-export type OpenplanView = {
+export type HuddleView = {
   revision: number;
   /** Only when it isn't the revision the pane has. */
-  team?: OpenplanTeam;
+  team?: HuddleTeam;
   /** The turn being spoken at the meeting shown, as it is said. */
-  speaking?: OpenplanSpeaking;
+  speaking?: HuddleSpeaking;
   /** The followed member's record since the pane read it. */
-  record?: OpenplanRecord;
+  record?: HuddleRecord;
 };
 
-export type OpenplanTab = "meeting" | "team" | "needs";
+export type HuddleTab = "meeting" | "team" | "needs";
 
 declare module "claude-code" {
   interface PluginState {
-    openplan: {
-      team: Shaped<OpenplanTeam | null>;
-      speaking: Shaped<OpenplanSpeaking | null>;
-      followed: Shaped<OpenplanFollowed | null>;
+    "cc-huddle": {
+      team: Shaped<HuddleTeam | null>;
+      speaking: Shaped<HuddleSpeaking | null>;
+      followed: Shaped<HuddleFollowed | null>;
       /** Why there is no team to show. */
       problem: string | null;
-      tab: OpenplanTab;
+      tab: HuddleTab;
       /** Picks made on a question with choices not answered yet, by the need's id. */
       picks: Record<string, string[]>;
       /** The subtask a revised task goes back to, where you picked one, by the need's id. */

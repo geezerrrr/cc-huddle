@@ -242,7 +242,7 @@ describe("paneTeam", () => {
         key: "accept:q3",
         text: `The task "Game" is done [q3], merged into its goal's branch:
 - board, by sonnet: A grid board.
-Take it to the user as openplan's team skill says.`,
+Take it to the user as cc-huddle's team skill says.`,
       },
     ]);
   });
@@ -276,12 +276,12 @@ Take it to the user as openplan's team skill says.`,
     expect(review.prompts).toEqual([
       {
         key: "review:m1",
-        text: 'The meeting [m1] on "Dice" has a plan for review: A dice game. Take it to the user as openplan\'s team skill says.',
+        text: 'The meeting [m1] on "Dice" has a plan for review: A dice game. Take it to the user as cc-huddle\'s team skill says.',
       },
     ]);
   });
 
-  it("says where the goal is when nothing goes on, and lists what /openplan resume takes up", () => {
+  it("says where the goal is when nothing goes on, and lists what /huddle resume takes up", () => {
     const now = work();
     now.subtasks = [];
     now.questions = [];
@@ -308,7 +308,7 @@ Take it to the user as openplan's team skill says.`,
     ]);
     now.goal.status = "active";
     expect(paneTeam(now, members, others).resumeRefused).toBe(
-      '"Dice" is under way in this session, which runs one goal: /openplan pause it first, or take the other up in another session.',
+      '"Dice" is under way in this session, which runs one goal: /huddle pause it first, or take the other up in another session.',
     );
     expect(paneTeam(now, members, others).pauseRefused).toBeUndefined();
     expect(paneTeam(now, members, others).resumable.map((r) => r.slug)).toEqual([
@@ -330,7 +330,7 @@ Take it to the user as openplan's team skill says.`,
       ...(held && { holder: { pid: 1, session: 7, address: "there" } }),
     });
     const none =
-      "This session runs no goal. Hand the team a task with /openplan <task>, or take a goal up with /openplan resume.";
+      "This session runs no goal. Hand the team a task with /huddle <task>, or take a goal up with /huddle resume.";
     expect(noGoal()).toEqual({
       noGoal: none,
       opened: 0,
@@ -344,7 +344,7 @@ Take it to the user as openplan's team skill says.`,
       pauseRefused: none,
     });
     expect(noGoal([], "Dice").noGoal).toBe(
-      '"Dice" moved to another Claude Code session. Bring it back here with /openplan resume.',
+      '"Dice" moved to another Claude Code session. Bring it back here with /huddle resume.',
     );
     expect(noGoal([entry("old", "archived")]).band).toBeUndefined();
     expect(

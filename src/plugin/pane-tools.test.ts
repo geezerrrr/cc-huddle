@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { git } from "../engine/git.ts";
 import { teamFolder } from "../engine/team.ts";
 import { DECISIONS, type DecisionQuestion, type Subtask } from "../engine/types.ts";
-import type { OpenplanAsk, OpenplanView } from "../../plugin/types/index.d.ts";
+import type { HuddleAsk, HuddleView } from "../../plugin/types/index.d.ts";
 import { askToLetGo, servePane, type PaneServer } from "./pane-server.ts";
 import { addPaneTools } from "./pane-tools.ts";
 import { Session } from "./session.ts";
@@ -33,7 +33,7 @@ let client: Client;
 let pane: PaneServer;
 
 beforeEach(async () => {
-  dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-pane-")));
+  dir = await realpath(await mkdtemp(path.join(tmpdir(), "huddle-pane-")));
   const repo = path.join(dir, "repo");
   const me = {
     GIT_AUTHOR_NAME: "you",
@@ -53,18 +53,18 @@ beforeEach(async () => {
     await mkdir(path.dirname(file), { recursive: true });
     await writeFile(file, text);
   }
-  const server = new McpServer({ name: "openplan", version: "0.0.0" });
+  const server = new McpServer({ name: "huddle", version: "0.0.0" });
   pane = await servePane(() => session);
   session = new Session(
     {
       cwd: repo,
-      dataFolder: path.join(dir, "openplan-inline"),
+      dataFolder: path.join(dir, "cc-huddle-inline"),
       session: 41,
       address: pane.address,
       // Another session of the test, at the same socket.
       takeOver: (holder, slug) => askToLetGo(holder.address, slug),
       sessionMode: () => undefined,
-      plugins: ["openplan@inline"],
+      plugins: ["cc-huddle@inline"],
       userTeam: path.join(dir, "user-team"),
       env: {},
       failed: vi.fn(),
@@ -107,8 +107,8 @@ async function ask(path_: string, body: string) {
   });
 }
 
-const view = async (args: OpenplanAsk = {}) =>
-  JSON.parse((await ask("/view", JSON.stringify(args))).text) as OpenplanView;
+const view = async (args: HuddleAsk = {}) =>
+  JSON.parse((await ask("/view", JSON.stringify(args))).text) as HuddleView;
 
 describe("the pane's socket and tools", () => {
   it("let the session's goal go to a session taking it up, and say what that stopped", async () => {
@@ -147,7 +147,7 @@ describe("the pane's socket and tools", () => {
 
   it("hand the session a task for the team, with the goal it runs and its team", async () => {
     expect((await call("hand_off", { task: "Add a scoreboard" })).text).toBe(
-      "The user hands this to openplan's team: take it on as openplan's team skill says.\n\nAdd a scoreboard\n\nThis session runs no goal yet.",
+      "The user hands this to cc-huddle's team: take it on as cc-huddle's team skill says.\n\nAdd a scoreboard\n\nThis session runs no goal yet.",
     );
     await session.start("Dice");
     expect((await call("hand_off", { task: "Add a scoreboard" })).text).toContain(
@@ -181,7 +181,7 @@ describe("the pane's socket and tools", () => {
     const first = await view();
     expect(first.team).toEqual({
       noGoal:
-        "This session runs no goal. Hand the team a task with /openplan <task>, or take a goal up with /openplan resume.",
+        "This session runs no goal. Hand the team a task with /huddle <task>, or take a goal up with /huddle resume.",
       tasks: [],
       members: [],
       needs: [],
@@ -191,7 +191,7 @@ describe("the pane's socket and tools", () => {
       opened: 0,
       resumeRefused: "No goal to resume.",
       pauseRefused:
-        "This session runs no goal. Hand the team a task with /openplan <task>, or take a goal up with /openplan resume.",
+        "This session runs no goal. Hand the team a task with /huddle <task>, or take a goal up with /huddle resume.",
     });
     expect(await view({ revision: first.revision })).toEqual({ revision: first.revision });
     await session.start("Dice");

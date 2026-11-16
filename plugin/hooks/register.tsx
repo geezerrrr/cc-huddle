@@ -1,7 +1,7 @@
 /**
- * openplan's mod (docs/design.md §7.2): the pane, the band above the prompt,
+ * cc-huddle's mod (docs/design.md §7.2): the pane, the band above the prompt,
  * asks for what needs you, transcript rows for milestones, prompts to your
- * session for what needs a conversation, and the `/openplan` command, which
+ * session for what needs a conversation, and the `/huddle` command, which
  * hands the team a task. It draws what the MCP server serves on the pane's
  * socket, which the `pane` tool names, and answers through the `answer`
  * tool, with no model in between; the model is kept from both tools.
@@ -16,24 +16,24 @@ import { words } from "./text";
 import { watch } from "./watch";
 
 /** The server's tools, as the model names them. */
-const TOOLS = /^mcp__plugin_openplan_openplan__/;
+const TOOLS = /^mcp__plugin_cc-huddle_huddle__/;
 /** The tools only the mod calls, as the model would name them. */
-const PANE_ONLY = /^mcp__plugin_openplan_openplan__(pane|answer|hand_off|resume_goal)$/;
-const PANE_ONLY_REASON = "This tool is the user's, in /openplan.";
+const PANE_ONLY = /^mcp__plugin_cc-huddle_huddle__(pane|answer|hand_off|resume_goal)$/;
+const PANE_ONLY_REASON = "This tool is the user's, in /huddle.";
 
 export const register: Register = (on) => {
   on("session.start", async ($, e, next) => {
     await $.command.register({
-      name: "openplan",
+      name: "huddle",
       description:
-        "Hand openplan's team a task; with none, show the team in a pane; `/openplan status` prints where it stands, `pause` pauses this session's goal and `resume` resumes it or takes up another",
+        "Hand cc-huddle's team a task; with none, show the team in a pane; `/huddle status` prints where it stands, `pause` pauses this session's goal and `resume` resumes it or takes up another",
       argumentHint: "[task | status | pause | resume [number]]",
     });
     watch($);
     return next(e);
   });
 
-  on("command.run", { command: "openplan" }, async ($, e) => {
+  on("command.run", { command: "huddle" }, async ($, e) => {
     watch($);
     const task = e.args.trim();
     // Certain, so said without a model turn.
@@ -48,7 +48,7 @@ export const register: Register = (on) => {
       try {
         return { text: await run() };
       } catch (error) {
-        return { text: `openplan: ${words(error)}` };
+        return { text: `cc-huddle: ${words(error)}` };
       }
     }
     if (!task) {
@@ -59,12 +59,12 @@ export const register: Register = (on) => {
     try {
       text = await call($, "hand_off", { task });
     } catch (error) {
-      return { text: `openplan: ${words(error)}` };
+      return { text: `cc-huddle: ${words(error)}` };
     }
     // Once the command is done: a prompt submitted while it runs would wait on it.
     $.clock.after(0, () => {
       $.prompt.submit({ text }).catch((error: unknown) => {
-        $.ui.toast(`openplan: your session couldn't be given the task: ${words(error)}`);
+        $.ui.toast(`cc-huddle: your session couldn't be given the task: ${words(error)}`);
       });
     });
     return {};
@@ -94,7 +94,7 @@ export const register: Register = (on) => {
     const { Box, Text } = $.ui.resolve(e);
     return (
       <Box flexDirection="column">
-        <Text dimColor>openplan · {now.band}</Text>
+        <Text dimColor>cc-huddle · {now.band}</Text>
         {now.tasks.map((line, i) => (
           <Text key={`task-${String(i)}`} dimColor>
             {"  "}

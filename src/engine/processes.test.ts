@@ -24,7 +24,7 @@ const ended = (child: ChildProcess) =>
 const written = async (): Promise<unknown> => JSON.parse(await readFile(file, "utf8"));
 
 beforeEach(async () => {
-  dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-processes-")));
+  dir = await realpath(await mkdtemp(path.join(tmpdir(), "huddle-processes-")));
   file = path.join(dir, "members.json");
   await recordMembersIn(file, failed);
 });

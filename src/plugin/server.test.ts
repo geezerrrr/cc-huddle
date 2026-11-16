@@ -16,7 +16,7 @@ let dir: string;
 let repo: string;
 
 beforeEach(async () => {
-  dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-server-")));
+  dir = await realpath(await mkdtemp(path.join(tmpdir(), "huddle-server-")));
   repo = path.join(dir, "repo");
   const me = {
     GIT_AUTHOR_NAME: "you",
@@ -53,7 +53,7 @@ async function connect() {
     args: ["--experimental-transform-types", "--no-warnings", SERVER],
     env: {
       PATH: process.env.PATH ?? "",
-      CLAUDE_PLUGIN_DATA: path.join(dir, "openplan-inline"),
+      CLAUDE_PLUGIN_DATA: path.join(dir, "cc-huddle-inline"),
       CLAUDE_PROJECT_DIR: repo,
       // Your own team stays out of it.
       CLAUDE_CONFIG_DIR: path.join(dir, "claude"),
@@ -73,7 +73,7 @@ async function connect() {
 const filesOf = async (slug: string) =>
   goalFiles(
     path.join(
-      goalsFolder(repoFolder(path.join(dir, "openplan-inline"), await openRepository(repo))),
+      goalsFolder(repoFolder(path.join(dir, "cc-huddle-inline"), await openRepository(repo))),
       slug,
     ),
   );
@@ -84,9 +84,9 @@ describe("the MCP server", () => {
     expect(await call("status")).toContain("This session runs no goal");
     expect(await call("start_goal", { name: "Dice" })).toContain("The team has no members");
     await writeTeam();
-    expect(await call("start_goal", { name: "Dice" })).toContain("openplan/dice/main");
+    expect(await call("start_goal", { name: "Dice" })).toContain("huddle/dice/main");
     expect(await call("status")).toContain(
-      'Goal "Dice": active, on branch openplan/dice/main\nTeam: glm',
+      'Goal "Dice": active, on branch huddle/dice/main\nTeam: glm',
     );
     expect(await call("start_goal", { name: "Chess" })).toContain("a session runs one goal");
     await client.close();
@@ -119,7 +119,7 @@ describe("the MCP server", () => {
   it("closes its goal as the session ends: paused, its state written, the lock let go", async () => {
     await writeTeam();
     const { client, call } = await connect();
-    expect(await call("start_goal", { name: "Dice" })).toContain("openplan/dice/main");
+    expect(await call("start_goal", { name: "Dice" })).toContain("huddle/dice/main");
     await client.close();
     const files = await filesOf("dice");
     await expect(stat(files.lock)).rejects.toThrow();

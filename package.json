@@ -1,5 +1,5 @@
 {
-  "name": "openplan",
+  "name": "cc-huddle",
   "private": true,
   "description": "A team of Claude Code sessions on your repository: any model per member, a meeting before the plan, state machines in charge of the process.",
   "license": "MIT",

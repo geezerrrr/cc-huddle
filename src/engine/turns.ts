@@ -17,16 +17,16 @@ import { errorText } from "../shared/errors.ts";
 import type { MemberOptions } from "./policy.ts";
 import { watchMember } from "./processes.ts";
 
-/** The in-process MCP server that gives a member's turn openplan's tools. */
-const TURN_SERVER = "openplan";
+/** The in-process MCP server that gives a member's turn cc-huddle's tools. */
+const TURN_SERVER = "huddle";
 
-/** One of openplan's tools as a turn's rules name it: `mcp__openplan__<name>`. */
+/** One of cc-huddle's tools as a turn's rules name it: `mcp__huddle__<name>`. */
 export const turnToolName = (name: string) => `mcp__${TURN_SERVER}__${name}`;
 
-/** One of openplan's tools for a member's turn. */
+/** One of cc-huddle's tools for a member's turn. */
 export type TurnTool = NonNullable<Parameters<typeof createSdkMcpServer>[0]["tools"]>[number];
 
-/** A turn's `mcpServers`: the server that gives it these of openplan's tools. */
+/** A turn's `mcpServers`: the server that gives it these of cc-huddle's tools. */
 export const turnServer = (tools: TurnTool[]) => ({
   [TURN_SERVER]: createSdkMcpServer({ name: TURN_SERVER, tools }),
 });

@@ -5,28 +5,30 @@ import { describe, expect, it } from "vitest";
 import { pluginIds } from "./plugin-id.ts";
 
 describe("pluginIds", () => {
-  it("reads the id back from the data folder when no settings name openplan", async () => {
-    const dir = await mkdtemp(path.join(tmpdir(), "openplan-id-"));
-    expect(await pluginIds("/x/data/openplan-my-tools", dir, dir)).toEqual(["openplan@my-tools"]);
+  it("reads the id back from the data folder when no settings name cc-huddle", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "huddle-id-"));
+    expect(await pluginIds("/x/data/cc-huddle-my-tools", dir, dir)).toEqual(["cc-huddle@my-tools"]);
   });
 
-  it("adds every openplan id the user's and the project's settings name, a dotted marketplace's too", async () => {
-    const config = await mkdtemp(path.join(tmpdir(), "openplan-id-"));
-    const project = await mkdtemp(path.join(tmpdir(), "openplan-id-"));
+  it("adds every cc-huddle id the user's and the project's settings name, a dotted marketplace's too", async () => {
+    const config = await mkdtemp(path.join(tmpdir(), "huddle-id-"));
+    const project = await mkdtemp(path.join(tmpdir(), "huddle-id-"));
     await mkdir(path.join(project, ".claude"));
     await writeFile(
       path.join(config, "settings.json"),
-      JSON.stringify({ enabledPlugins: { "openplan@acme.tools": true, "other@acme.tools": true } }),
+      JSON.stringify({
+        enabledPlugins: { "cc-huddle@acme.tools": true, "other@acme.tools": true },
+      }),
     );
     await writeFile(
       path.join(project, ".claude", "settings.local.json"),
-      JSON.stringify({ enabledPlugins: { "openplan@inline": false } }),
+      JSON.stringify({ enabledPlugins: { "cc-huddle@inline": false } }),
     );
     await writeFile(path.join(project, ".claude", "settings.json"), "{ not json");
-    expect(await pluginIds("/x/data/openplan-acme-tools", config, project)).toEqual([
-      "openplan@acme-tools",
-      "openplan@acme.tools",
-      "openplan@inline",
+    expect(await pluginIds("/x/data/cc-huddle-acme-tools", config, project)).toEqual([
+      "cc-huddle@acme-tools",
+      "cc-huddle@acme.tools",
+      "cc-huddle@inline",
     ]);
   });
 });

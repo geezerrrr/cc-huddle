@@ -15,9 +15,9 @@ let repo: string;
 let data: string;
 
 beforeEach(async () => {
-  dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-context-")));
+  dir = await realpath(await mkdtemp(path.join(tmpdir(), "huddle-context-")));
   repo = path.join(dir, "repo");
-  data = path.join(dir, "openplan-inline");
+  data = path.join(dir, "cc-huddle-inline");
   const me = {
     GIT_AUTHOR_NAME: "you",
     GIT_AUTHOR_EMAIL: "y@x",
@@ -82,7 +82,7 @@ describe("the session's context", () => {
     await writeGoal("go", "active");
     await hold("go", { pid: process.pid, session: 42, address: "there" });
     expect(await sessionContext(repo, data, SESSION))
-      .toBe(`openplan: The repository's other goals, taken up here with /openplan resume:
+      .toBe(`cc-huddle: The repository's other goals, taken up here with /huddle resume:
   - go · no plan yet · in another session
   - dice · no plan yet · paused
   - chess · no plan yet · archived`);
@@ -93,9 +93,9 @@ describe("the session's context", () => {
     await writeGoal("dice", "active");
     await hold("dice", { pid: process.pid, session: SESSION, address: "here" });
     expect(await sessionContext(repo, data, SESSION))
-      .toBe(`This session runs openplan's goal "dice", as it stands:
+      .toBe(`This session runs cc-huddle's goal "dice", as it stands:
 
-Goal "dice": active, on branch openplan/dice/main
+Goal "dice": active, on branch huddle/dice/main
 Team: glm`);
   });
 

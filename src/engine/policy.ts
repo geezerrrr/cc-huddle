@@ -60,8 +60,8 @@ export function expandEnv(env: Record<string, string>, from: Env): Record<string
 /**
  * The flag settings a member's sessions run under: the team's settings, the
  * member's environment, and the guards every member has. No permission mode
- * or sandbox of openplan's own: what isn't the team's is your settings' and
- * your session's mode (sessionOptions). openplan is off in them, so a member
+ * or sandbox of cc-huddle's own: what isn't the team's is your settings' and
+ * your session's mode (sessionOptions). cc-huddle is off in them, so a member
  * never starts a team of its own, and they take no message from your
  * sessions and send none.
  */
@@ -170,7 +170,7 @@ export function sessionOptions(seat: Seat, kind: SessionKind, from: Env): Member
     env: { ...env, ...authorEnv(member.name) },
     systemPrompt: { type: "preset", preset: "claude_code", append: seat.system },
     includePartialMessages: true,
-    extraArgs: { name: `openplan-${member.name}` },
+    extraArgs: { name: `huddle-${member.name}` },
     pathToClaudeCodeExecutable: seat.claude,
     ...(readOnly && { tools: READ_ONLY_TOOLS, strictMcpConfig: true }),
   };

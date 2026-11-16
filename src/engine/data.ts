@@ -1,6 +1,6 @@
 /**
  * A repository's goals in the data folder (docs/design.md §3.4): each goal's
- * state, read and written as this openplan's version has it, a new goal's
+ * state, read and written as this cc-huddle's version has it, a new goal's
  * folder, and the goals listed with who holds each.
  */
 import { mkdir, readdir, readFile } from "node:fs/promises";
@@ -12,13 +12,13 @@ import { slugFor } from "./git.ts";
 import type { GoalState } from "./types.ts";
 import { holderOf, type Holder } from "./lock.ts";
 
-/** The version of `state.json` this openplan writes. */
+/** The version of `state.json` this cc-huddle writes. */
 const STATE_VERSION = 5;
 
 /** How long after a change the state is written: a burst of changes is written once. */
 const SAVE_DELAY_MS = 200;
 
-/** A goal's state from its file. Throws when the file can't be read as this openplan's. */
+/** A goal's state from its file. Throws when the file can't be read as this cc-huddle's. */
 export async function readState(file: string): Promise<GoalState> {
   const text = await readFile(file, "utf8");
   let saved: { version: number; state: GoalState };
@@ -30,10 +30,10 @@ export async function readState(file: string): Promise<GoalState> {
     });
   }
   if (saved.version > STATE_VERSION)
-    throw new Error(`${file} was written by a newer openplan: update openplan to go on`);
+    throw new Error(`${file} was written by a newer cc-huddle: update cc-huddle to go on`);
   if (saved.version < STATE_VERSION)
     throw new Error(
-      `${file} was written by an openplan before its first release: move it away to start over`,
+      `${file} was written by a cc-huddle before its first release: move it away to start over`,
     );
   return saved.state;
 }
@@ -110,7 +110,7 @@ export async function newGoalFolder(
   }
 }
 
-/** One of a repository's goals: its state, or why this openplan can't read it. */
+/** One of a repository's goals: its state, or why this cc-huddle can't read it. */
 export type GoalEntry = { slug: string; holder?: Holder } & (
   { state: GoalState } | { unreadable: string }
 );

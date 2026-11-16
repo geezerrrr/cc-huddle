@@ -29,7 +29,7 @@ export type GoalStatus = "active" | "paused" | "archived";
 /** One goal, on a branch of its own cut from your HEAD when it started (§5). */
 export interface Goal {
   name: string;
-  /** Its name in git: its branches are under `openplan/<slug>/` (git.ts). */
+  /** Its name in git: its branches are under `huddle/<slug>/` (git.ts). */
   slug: string;
   status: GoalStatus;
   /** When it started: the repository's goals are listed in that order. */

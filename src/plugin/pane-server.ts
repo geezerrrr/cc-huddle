@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { text } from "node:stream/consumers";
 import { z } from "zod";
-import type { OpenplanAsk, OpenplanTeam, OpenplanView } from "../../plugin/types/index.d.ts";
+import type { HuddleAsk, HuddleTeam, HuddleView } from "../../plugin/types/index.d.ts";
 import { errorCode, errorText } from "../shared/errors.ts";
 import { GitError, type GoalEntry, type HandedOver } from "../engine/index.ts";
 import { followedOf, paneTeam, shownMeeting, viewEntries, viewLive } from "./pane.ts";
@@ -31,7 +31,7 @@ const askSchema = z.object({
     })
     .optional(),
   speaking: z.object({ speech: z.string(), next }).optional(),
-}) satisfies z.ZodType<OpenplanAsk>;
+}) satisfies z.ZodType<HuddleAsk>;
 
 const releaseSchema = z.object({ goal: z.string() });
 
@@ -47,7 +47,7 @@ function viewer(session: () => Session) {
   let revision = 0;
   let shown = "";
   let goals: { at: number; entries: Promise<GoalEntry[]> } | undefined;
-  return async (asked: OpenplanAsk): Promise<OpenplanView> => {
+  return async (asked: HuddleAsk): Promise<HuddleView> => {
     if (!goals || asked.revision === undefined || Date.now() - goals.at >= GOALS_MS)
       goals = { at: Date.now(), entries: session().goals() };
     const all = await goals.entries.catch((error: unknown) => {
@@ -57,7 +57,7 @@ function viewer(session: () => Session) {
     const entries = session().othersOf(all);
     const engine = session().current;
     const mine = engine && { work: engine.work, members: engine.team.members };
-    const team: OpenplanTeam = paneTeam(mine, entries, session());
+    const team: HuddleTeam = paneTeam(mine, entries, session());
     const text = JSON.stringify(team);
     if (text !== shown) {
       shown = text;
@@ -113,8 +113,8 @@ export interface PaneServer {
  */
 function socketAddress(): { address: string; folder?: string } {
   if (process.platform === "win32")
-    return { address: `\\\\.\\pipe\\openplan-${randomBytes(12).toString("hex")}` };
-  const folder = mkdtempSync(path.join(tmpdir(), "openplan-"));
+    return { address: `\\\\.\\pipe\\huddle-${randomBytes(12).toString("hex")}` };
+  const folder = mkdtempSync(path.join(tmpdir(), "cc-huddle-"));
   return { address: path.join(folder, "pane.sock"), folder };
 }
 
@@ -145,7 +145,7 @@ export async function servePane(session: () => Session): Promise<PaneServer> {
       },
       (error: unknown) => {
         // An ask that doesn't fit (400); not in a repository, so there are no goals
-        // to read (409: the pane stops asking until you turn to openplan); anything
+        // to read (409: the pane stops asking until you turn to cc-huddle); anything
         // else, the asker shows why (500).
         const status =
           error instanceof z.ZodError || error instanceof SyntaxError

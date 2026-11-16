@@ -167,5 +167,5 @@ export class Session {
 /** Why a session runs no goal, and what to do, as its model is told: `moved`, the goal that moved to another session. */
 const noGoalForModel = (moved: string | undefined) =>
   moved
-    ? `The goal "${moved}" moved to another Claude Code session. The user brings it back with /openplan resume.`
-    : "This session runs no goal: start one (start_goal), or the user takes one up with /openplan resume.";
+    ? `The goal "${moved}" moved to another Claude Code session. The user brings it back with /huddle resume.`
+    : "This session runs no goal: start one (start_goal), or the user takes one up with /huddle resume.";

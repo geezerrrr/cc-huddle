@@ -1,11 +1,11 @@
 {
-  "name": "openplan",
+  "name": "cc-huddle",
   "version": "0.1.0",
   "description": "A team of Claude Code sessions on your repository: any model per member, a meeting before the plan, state machines in charge of the process.",
   "author": {
     "name": "geezerrrr"
   },
-  "repository": "https://github.com/geezerrrr/openplan",
+  "repository": "https://github.com/geezerrrr/cc-huddle",
   "license": "MIT",
   "keywords": ["team", "multi-agent", "planning", "worktrees"],
   "types": "./types/index.d.ts"

@@ -1,8 +1,8 @@
 /**
- * The team as you write it (docs/design.md §6), in your own `openplan/`
+ * The team as you write it (docs/design.md §6), in your own `huddle/`
  * folder beside Claude Code's user settings and in the repository's
- * `.claude/openplan/`: roles and members as Markdown files with front matter,
- * the Claude Code settings every member works under, and openplan's own.
+ * `.claude/huddle/`: roles and members as Markdown files with front matter,
+ * the Claude Code settings every member works under, and cc-huddle's own.
  */
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -17,7 +17,7 @@ import { serialBy } from "../shared/serial.ts";
 import { MEETING_SIZES, type MeetingSize, type Member, type Role } from "./types.ts";
 
 /** The team's folder in a repository. */
-export const teamFolder = (top: string) => path.join(top, ".claude", "openplan");
+export const teamFolder = (top: string) => path.join(top, ".claude", "huddle");
 
 /** Claude Code's user folder, as it finds it. */
 export const claudeFolder = (env: Record<string, string | undefined>) =>
@@ -25,7 +25,7 @@ export const claudeFolder = (env: Record<string, string | undefined>) =>
 
 /** Your own team's folder, for every repository: in Claude Code's user folder. */
 export const userTeamFolder = (env: Record<string, string | undefined>) =>
-  path.join(claudeFolder(env), "openplan");
+  path.join(claudeFolder(env), "huddle");
 
 const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const satisfies EffortLevel[];
 

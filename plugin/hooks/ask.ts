@@ -3,7 +3,7 @@
  * as the `answer` tool takes it. One dismissed waits in the pane.
  */
 import type { EngineInterface } from "claude-code";
-import type { OpenplanAnswer, OpenplanNeed } from "../types";
+import type { HuddleAnswer, HuddleNeed } from "../types";
 import { readTeam } from "./state";
 import { clip } from "./text";
 
@@ -24,8 +24,8 @@ const questionOf = (question: string, options: { label: string; description?: st
  */
 async function askedAnswer(
   $: EngineInterface,
-  need: OpenplanNeed,
-): Promise<OpenplanAnswer | undefined> {
+  need: HuddleNeed,
+): Promise<HuddleAnswer | undefined> {
   if (need.kind === "choices") {
     const picks: string[] = [];
     for (const choice of need.choices)
@@ -51,8 +51,8 @@ async function askedAnswer(
 /** Asks a need that is still open, and answers it (`answer`) as you said; dismissed, it waits in the pane. */
 export async function askNeed(
   $: EngineInterface,
-  need: OpenplanNeed,
-  answer: (given: OpenplanAnswer) => Promise<void>,
+  need: HuddleNeed,
+  answer: (given: HuddleAnswer) => Promise<void>,
 ) {
   // Answered meanwhile, in the pane: nothing left to ask.
   if (!(await readTeam($))?.needs.some((n) => n.id === need.id)) return;
@@ -64,5 +64,5 @@ export async function askNeed(
     return;
   }
   if (given) await answer(given);
-  else $.ui.toast("openplan: what you typed answers none of it; it waits in Needs you");
+  else $.ui.toast("cc-huddle: what you typed answers none of it; it waits in Needs you");
 }

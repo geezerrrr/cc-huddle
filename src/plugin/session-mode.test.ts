@@ -9,7 +9,7 @@ import { keepMode, modeOf } from "./session-mode.ts";
 let dir: string;
 
 beforeEach(async () => {
-  dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-mode-")));
+  dir = await realpath(await mkdtemp(path.join(tmpdir(), "huddle-mode-")));
 });
 
 afterEach(async () => {

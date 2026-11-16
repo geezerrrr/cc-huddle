@@ -36,7 +36,7 @@ const pump = vi.fn();
 const assign = vi.fn(() => []);
 
 beforeEach(async () => {
-  dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-meetings-")));
+  dir = await realpath(await mkdtemp(path.join(tmpdir(), "huddle-meetings-")));
   const repo = path.join(dir, "repo");
   await git({ cwd: dir }, ["init", "-q", "--initial-branch=main", repo]);
   await writeFile(path.join(repo, "README.md"), "hello\n");
@@ -82,7 +82,7 @@ type Ask = Parameters<typeof askOnce>[0];
 
 /** Calls the turn's meeting tool, as the model would. */
 async function call(ask: Ask, args: Record<string, unknown>) {
-  const server = ask.options.mcpServers?.openplan as unknown as {
+  const server = ask.options.mcpServers?.huddle as unknown as {
     tools: { handler: (a: Record<string, unknown>) => Promise<unknown> }[];
   };
   await server.tools[0]?.handler(args);
@@ -231,7 +231,7 @@ describe("Meetings", () => {
     const hand = asks.find((a) => a.prompt.includes("Would you speak next?"));
     expect(hand?.options).toMatchObject({
       resume: "sonnet/readOnly#3",
-      allowedTools: ["mcp__openplan__raise_hand"],
+      allowedTools: ["mcp__huddle__raise_hand"],
     });
     const answer = asks.find((a) => a.prompt.includes("You have the floor"));
     expect(answer?.prompt).toContain("for what you raised your hand about: Canvas is enough");

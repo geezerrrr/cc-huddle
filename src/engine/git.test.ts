@@ -46,7 +46,7 @@ async function makeRepository() {
 }
 
 beforeEach(async () => {
-  dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-git-")));
+  dir = await realpath(await mkdtemp(path.join(tmpdir(), "huddle-git-")));
   repo = path.join(dir, "repo");
   await mkdir(repo);
 });
@@ -120,7 +120,7 @@ describe("goals", () => {
     const tip = await git({ cwd: repo }, ["rev-parse", goalBranch("dice")]);
     expect(tip.stdout).toBe(head.stdout);
     const checkedOut = await git({ cwd: folder }, ["branch", "--show-current"]);
-    expect(checkedOut.stdout.trim()).toBe("openplan/dice/main");
+    expect(checkedOut.stdout.trim()).toBe("huddle/dice/main");
     expect(await takenSlugs(places.repo)).toEqual(new Set(["dice"]));
   });
 
@@ -132,7 +132,7 @@ describe("goals", () => {
     // Two at once (a review and a meeting, say) check it out once, not twice.
     await Promise.all([openGoal(places), openGoal(places)]);
     const checkedOut = await git({ cwd: folder }, ["branch", "--show-current"]);
-    expect(checkedOut.stdout.trim()).toBe("openplan/dice/main");
+    expect(checkedOut.stdout.trim()).toBe("huddle/dice/main");
   });
 
   it("leaves your checkout where it was", async () => {
@@ -196,7 +196,7 @@ describe("commitDesk", () => {
     await writeFile(path.join(desk, "dice.ts"), "roll\n");
     await commitDesk(places, "s1", "glm", "Roll the dice");
     expect(await log(repo, subtaskBranch("dice", "s1"))).toBe(
-      "glm <glm@openplan.local> Roll the dice",
+      "glm <glm@huddle.local> Roll the dice",
     );
   });
 
@@ -339,7 +339,7 @@ describe("removing", () => {
     root: path.join(dir, "data"),
   });
   const branches = () =>
-    git({ cwd: repo }, ["branch", "--list", "--format=%(refname:short)", "openplan/*"]).then((r) =>
+    git({ cwd: repo }, ["branch", "--list", "--format=%(refname:short)", "huddle/*"]).then((r) =>
       r.stdout.split("\n").filter(Boolean),
     );
 
@@ -349,7 +349,7 @@ describe("removing", () => {
     const desk = await openDesk(places, "s1");
     await writeFile(path.join(desk, "half.ts"), "half\n");
     await dropDesk(places, "s1");
-    expect(await branches()).toEqual(["openplan/dice/main"]);
+    expect(await branches()).toEqual(["huddle/dice/main"]);
     await openDesk(places, "s1");
     await expect(readFile(path.join(desk, "half.ts"))).rejects.toThrow();
   });
@@ -360,7 +360,7 @@ describe("removing", () => {
     await openDesk(places, "s1");
     await openDesk(places, "s2");
     await removeGoal(places);
-    expect(await branches()).toEqual(["openplan/dice/main"]);
+    expect(await branches()).toEqual(["huddle/dice/main"]);
     const worktrees = await git({ cwd: repo }, ["worktree", "list", "--porcelain"]);
     expect(worktrees.stdout.match(/^worktree /gm)).toHaveLength(1);
   });

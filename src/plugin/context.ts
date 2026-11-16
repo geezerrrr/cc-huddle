@@ -17,7 +17,7 @@ export async function sessionContext(
   try {
     repository = await RepositoryGoals.of(dataFolder, cwd);
   } catch (error) {
-    // No repository: openplan has nothing to say here.
+    // No repository: cc-huddle has nothing to say here.
     if (error instanceof GitError) return undefined;
     throw error;
   }
@@ -29,10 +29,10 @@ export async function sessionContext(
     // Read from the goal's files: what is under way is the server's, not known here.
     const status = statusText(await repository.stored(mine.slug, mine.state));
     parts.push(
-      `This session runs openplan's goal "${mine.state.goal.name}", as it stands:\n\n${status}`,
+      `This session runs cc-huddle's goal "${mine.state.goal.name}", as it stands:\n\n${status}`,
     );
   }
   const others = othersText(goals.filter((g) => g !== mine));
-  if (others) parts.push(`openplan: ${others}`);
+  if (others) parts.push(`cc-huddle: ${others}`);
   return parts.length ? parts.join("\n\n") : undefined;
 }

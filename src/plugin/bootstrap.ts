@@ -19,7 +19,7 @@ import { dataFolder } from "./data-folder.ts";
 import { depsFolder } from "../shared/layout.ts";
 
 if (!("registerHooks" in nodeModule))
-  throw new Error(`openplan needs Node.js 22.15 or later; this is ${process.version}`);
+  throw new Error(`cc-huddle needs Node.js 22.15 or later; this is ${process.version}`);
 const { registerHooks } = nodeModule;
 
 /** How long the first start may take to install the dependencies. */
@@ -60,7 +60,7 @@ if (!(await installed())) {
     await rm(draft, { recursive: true, force: true });
     // Another session's install got there first.
     if (!(await installed()))
-      throw new Error(`openplan couldn't install its dependencies with npm in ${draft}`, {
+      throw new Error(`cc-huddle couldn't install its dependencies with npm in ${draft}`, {
         cause: error,
       });
   }

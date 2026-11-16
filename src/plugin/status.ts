@@ -1,7 +1,7 @@
 /**
  * A goal as it stands, in words (docs/design.md §7.2): what your session
  * reads from the `status` tool and the SessionStart hook, and what
- * `/openplan status` prints. Ids are given in brackets, for the tools.
+ * `/huddle status` prints. Ids are given in brackets, for the tools.
  */
 import {
   derive,
@@ -47,7 +47,7 @@ function questionLine(question: QuestionToYou, work: Work): string {
   const then =
     question.kind === "decision"
       ? ` Options: ${question.decision.options.join(", ")}.`
-      : " Answered in /openplan.";
+      : " Answered in /huddle.";
   return `  - [${question.id}] ${headline}${asks}${detail ? ` (${detail})` : ""}${then}`;
 }
 
@@ -83,7 +83,7 @@ export function statusText(work: Work): string {
 export function othersText(others: readonly GoalEntry[]): string | undefined {
   if (!others.length) return undefined;
   return [
-    "The repository's other goals, taken up here with /openplan resume:",
+    "The repository's other goals, taken up here with /huddle resume:",
     ...resumableOf(others).map((o) => `  - ${o.label}`),
   ].join("\n");
 }

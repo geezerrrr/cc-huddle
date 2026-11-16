@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "openplan": {
+    "huddle": {
       "command": "node",
       "args": ["${CLAUDE_PLUGIN_ROOT}/dist/server.mjs"]
     }

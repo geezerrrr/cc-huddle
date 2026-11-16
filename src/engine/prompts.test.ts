@@ -61,7 +61,7 @@ describe("taskBrief", () => {
       },
       subtask: subtask("Scoreboard", { acceptance: "Shows both scores" }),
       cwd: "/desks/s2",
-      branch: "openplan/dice-game/s2",
+      branch: "huddle/dice-game/s2",
       plan: "# Dice game\n\nTwo players.",
       upstream: [
         {
@@ -86,7 +86,7 @@ Your subtask: Scoreboard
 
 Acceptance criteria: Shows both scores
 
-Your worktree is /desks/s2, on branch openplan/dice-game/s2.
+Your worktree is /desks/s2, on branch huddle/dice-game/s2.
 
 The plan your team agreed on, which this subtask is part of:
 

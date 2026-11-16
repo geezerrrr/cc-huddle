@@ -1,4 +1,4 @@
-# openplan
+# cc-huddle
 
 A team of Claude Code sessions on your repository. Each member has a role and any model with an Anthropic-compatible API. The team meets before it plans, works in parallel in its own worktrees, reviews and merges its own work, and asks you only when something needs you.
 
@@ -6,19 +6,19 @@ A team of Claude Code sessions on your repository. Each member has a role and an
 
 ## How it differs from Agent Teams
 
-Agent Teams asks a lead model to run the process: how many teammates, how to split the work, when it's done. openplan keeps the process in code and leaves the models the work.
+Agent Teams asks a lead model to run the process: how many teammates, how to split the work, when it's done. cc-huddle keeps the process in code and leaves the models the work.
 
-|                      | Agent Teams                                                 | openplan                                                                            |
-| -------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Who runs the process | The lead model, from its prompt                             | State machines in code                                                              |
-| Models               | Claude models, one provider                                 | Any model per member, any Anthropic-compatible provider                             |
-| Planning             | A teammate drafts a plan; approved automatically by default | A meeting of the members; you approve the plan                                      |
-| Isolation            | Shared working tree                                         | A git worktree per subtask, merged one at a time                                    |
-| Done means           | A teammate marks the task complete                          | Delivered, reviewed, merged; sent back with notes when review fails                 |
-| Errors               | The teammate stops; spawn a replacement                     | Go on in the same session and worktree                                              |
-| Closing the terminal | The team is gone                                            | Its goal pauses; take it up again with `/openplan resume` to go on where it stopped |
+|                      | Agent Teams                                                 | cc-huddle                                                                         |
+| -------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Who runs the process | The lead model, from its prompt                             | State machines in code                                                            |
+| Models               | Claude models, one provider                                 | Any model per member, any Anthropic-compatible provider                           |
+| Planning             | A teammate drafts a plan; approved automatically by default | A meeting of the members; you approve the plan                                    |
+| Isolation            | Shared working tree                                         | A git worktree per subtask, merged one at a time                                  |
+| Done means           | A teammate marks the task complete                          | Delivered, reviewed, merged; sent back with notes when review fails               |
+| Errors               | The teammate stops; spawn a replacement                     | Go on in the same session and worktree                                            |
+| Closing the terminal | The team is gone                                            | Its goal pauses; take it up again with `/huddle resume` to go on where it stopped |
 
-For one focused job, a subagent is cheaper and quicker. openplan is for work with several people, steps and dependencies.
+For one focused job, a subagent is cheaper and quicker. cc-huddle is for work with several people, steps and dependencies.
 
 ## Requirements
 
@@ -31,15 +31,15 @@ For one focused job, a subagent is cheaper and quicker. openplan is for work wit
 In Claude Code:
 
 ```
-/plugin install openplan --marketplace geezerrrr/openplan
+/plugin install cc-huddle --marketplace geezerrrr/cc-huddle
 ```
 
 ## Set up a team
 
-The team is files you write, in `~/.claude/openplan/` for every repository of yours, or in `.claude/openplan/` for one:
+The team is files you write, in `~/.claude/huddle/` for every repository of yours, or in `.claude/huddle/` for one:
 
 ```
-~/.claude/openplan/
+~/.claude/huddle/
   roles/developer.md
   roles/reviewer.md
   members/sonnet.md
@@ -73,9 +73,9 @@ env:
 
 `${VAR}` and `${VAR:-default}` are filled in from the environment Claude Code runs in, so keys stay out of the files. A member without `env` runs on your own Claude Code sign-in.
 
-A repository's `.claude/openplan/` adds to yours: a role or member there replaces yours of the same name, and its `settings.json` and `team.json` go on top of yours.
+A repository's `.claude/huddle/` adds to yours: a role or member there replaces yours of the same name, and its `settings.json` and `team.json` go on top of yours.
 
-`settings.json` is a Claude Code settings file every member works under: permission rules, the sandbox, anything Claude Code settings hold. `team.json` holds openplan's own:
+`settings.json` is a Claude Code settings file every member works under: permission rules, the sandbox, anything Claude Code settings hold. `team.json` holds cc-huddle's own:
 
 ```json
 { "review": true, "meetingSize": "discussion" }
@@ -88,29 +88,29 @@ A repository's `.claude/openplan/` adds to yours: a role or member there replace
 Start Claude Code in the repository and hand the team a task, in your own words:
 
 ```
-/openplan build a two-player dice game, glm on the art, sonnet on the code
-/openplan make the buttons on the settings page rounder
+/huddle build a two-player dice game, glm on the art, sonnet on the code
+/huddle make the buttons on the settings page rounder
 ```
 
-Your session proposes who takes it: a meeting, with who attends and what each brings, or one member for a job that needs no planning. It keeps to anyone you named, and asks you to start with that or say what to change. Once you start it, the team works in the background and your session is free. You can also just ask your session ("have glm do the scoreboard"); `/openplan` makes sure the task goes to the team.
+Your session proposes who takes it: a meeting, with who attends and what each brings, or one member for a job that needs no planning. It keeps to anyone you named, and asks you to start with that or say what to change. Once you start it, the team works in the background and your session is free. You can also just ask your session ("have glm do the scoreboard"); `/huddle` makes sure the task goes to the team.
 
 The members meet, and the host writes a plan of tasks with owners, dependencies and acceptance criteria. Your session shows you the plan and asks you to approve it, change it or drop it, and which tasks you want to accept yourself; none, unless you say. Then the members work in parallel, each subtask in its own worktree, reviewed and merged into the goal's branch. A task is done once its last subtask merges; one you chose to accept waits for you first.
 
 - `@sonnet put the scoreboard top right` passes a member a message, in their session.
-- `/openplan` with no task opens the pane: the meeting as it goes, each member at what they do (select one to follow their record), and what needs you, answered there with a button. What needs you is also asked as it comes, in Claude Code's own question dialog; either way, only you answer it.
-- `/openplan status` prints where the session's goal stands; `/openplan pause` pauses it, and `/openplan resume` resumes it or takes up another of the repository's goals. A session runs one goal: for more goals at once, run more sessions.
-- The band above the prompt says what goes on: `openplan · meeting · 3 working · 1 needs you`, with a line for each task not yet done.
+- `/huddle` with no task opens the pane: the meeting as it goes, each member at what they do (select one to follow their record), and what needs you, answered there with a button. What needs you is also asked as it comes, in Claude Code's own question dialog; either way, only you answer it.
+- `/huddle status` prints where the session's goal stands; `/huddle pause` pauses it, and `/huddle resume` resumes it or takes up another of the repository's goals. A session runs one goal: for more goals at once, run more sessions.
+- The band above the prompt says what goes on: `cc-huddle · meeting · 3 working · 1 needs you`, with a line for each task not yet done.
 
-The team runs while your session does. Closing the session pauses its goal; take it up again with `/openplan resume` to go on where it stopped.
+The team runs while your session does. Closing the session pauses its goal; take it up again with `/huddle resume` to go on where it stopped.
 
-openplan works only on `openplan/*` branches: each goal has `openplan/<goal>/main`, yours to review and merge. It never pushes and never checks anything out in your working tree. Each goal's state, its copy of the team, its records and its worktrees are in the plugin's data folder, outside the repository.
+cc-huddle works only on `huddle/*` branches: each goal has `huddle/<goal>/main`, yours to review and merge. It never pushes and never checks anything out in your working tree. Each goal's state, its copy of the team, its records and its worktrees are in the plugin's data folder, outside the repository.
 
 ## What runs, and what it may do
 
 - **Processes and tokens.** Each member's turn is a Claude Code process of its own, started by the plugin's MCP server: one per running subtask, review and meeting turn, several at once. Each uses tokens on its member's provider; the pane shows how many each member has used.
-- **Settings.** A member loads your user and project Claude Code settings, as any session of yours does, with the team's `settings.json` and its own `env` on top. Meetings, answers to teammates and reviews run read-only, with none of your MCP servers. Working, a member is in your session's permission mode, switched with it, unless `settings.json` sets `permissions.defaultMode`; openplan adds no default of its own. A call Claude Code asks about is put to you at once in Claude Code's own question dialog, and waits in the pane if you dismiss it. Members leave committing to delivery.
-- **Who answers.** Permissions and members' questions are answered in the pane, by you: the plugin keeps your session's model from the pane's tools. That guard is one of the plugin's hooks, so where `allowManagedHooksOnly` keeps a user's plugins from loading hooks, install openplan as a managed plugin. `claude -p` draws no pane: what needs you waits for an interactive session.
-- **Uninstalling** removes the plugin's data folder, worktrees included, and with them any work a member hasn't delivered. Delivered work stays on the `openplan/*` branches. `claude plugin uninstall openplan --keep-data` keeps the folder.
+- **Settings.** A member loads your user and project Claude Code settings, as any session of yours does, with the team's `settings.json` and its own `env` on top. Meetings, answers to teammates and reviews run read-only, with none of your MCP servers. Working, a member is in your session's permission mode, switched with it, unless `settings.json` sets `permissions.defaultMode`; cc-huddle adds no default of its own. A call Claude Code asks about is put to you at once in Claude Code's own question dialog, and waits in the pane if you dismiss it. Members leave committing to delivery.
+- **Who answers.** Permissions and members' questions are answered in the pane, by you: the plugin keeps your session's model from the pane's tools. That guard is one of the plugin's hooks, so where `allowManagedHooksOnly` keeps a user's plugins from loading hooks, install cc-huddle as a managed plugin. `claude -p` draws no pane: what needs you waits for an interactive session.
+- **Uninstalling** removes the plugin's data folder, worktrees included, and with them any work a member hasn't delivered. Delivered work stays on the `huddle/*` branches. `claude plugin uninstall cc-huddle --keep-data` keeps the folder.
 
 ## Development
 
@@ -130,7 +130,7 @@ To release, move what [CHANGELOG.md](CHANGELOG.md) lists under Unreleased to a n
 
 ## Origin
 
-openplan's engine comes from [Crewloft](https://playcrewloft.com), a game in which it runs a studio of AI staff.
+cc-huddle's engine comes from [Crewloft](https://playcrewloft.com), a game in which it runs a studio of AI staff.
 
 ## License
 

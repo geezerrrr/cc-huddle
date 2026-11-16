@@ -1,12 +1,12 @@
 {
-  "name": "openplan",
-  "description": "openplan, a team of Claude Code sessions on your repository.",
+  "name": "cc-huddle",
+  "description": "cc-huddle, a team of Claude Code sessions on your repository.",
   "owner": {
     "name": "geezerrrr"
   },
   "plugins": [
     {
-      "name": "openplan",
+      "name": "cc-huddle",
       "source": "./plugin",
       "description": "A team of Claude Code sessions on your repository: any model per member, a meeting before the plan, state machines in charge of the process."
     }

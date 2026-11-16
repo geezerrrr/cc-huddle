@@ -40,7 +40,7 @@ describe("memberSettings", () => {
       },
       glm,
       { GLM_KEY: "secret" },
-      ["openplan@openplan", "openplan@acme.tools"],
+      ["cc-huddle@cc-huddle", "cc-huddle@acme.tools"],
     );
     expect(settings).toEqual({
       permissions: {
@@ -50,8 +50,8 @@ describe("memberSettings", () => {
       env: { CI: "1", ANTHROPIC_BASE_URL: "https://glm.example", ANTHROPIC_AUTH_TOKEN: "secret" },
       enabledPlugins: {
         "other@market": true,
-        "openplan@openplan": false,
-        "openplan@acme.tools": false,
+        "cc-huddle@cc-huddle": false,
+        "cc-huddle@acme.tools": false,
       },
       crossSessionInbound: "refuse",
     });
@@ -62,7 +62,7 @@ describe("memberSettings", () => {
       { permissions: { defaultMode: "default" }, sandbox: { enabled: false } },
       glm,
       { GLM_KEY: "secret" },
-      ["openplan@openplan"],
+      ["cc-huddle@cc-huddle"],
     );
     expect(settings).toMatchObject({
       permissions: { defaultMode: "default" },
@@ -76,7 +76,7 @@ describe("writeSettings", () => {
   it.skipIf(process.platform === "win32")(
     "writes the settings where only you can read them, also over an older file",
     async () => {
-      const dir = await mkdtemp(path.join(tmpdir(), "openplan-policy-"));
+      const dir = await mkdtemp(path.join(tmpdir(), "huddle-policy-"));
       try {
         const file = path.join(dir, "members", "glm.json");
         await writeSettings(file, {});
@@ -115,15 +115,15 @@ describe("session options", () => {
       effort: "max",
       settings: "/data/glm.json",
       systemPrompt: { type: "preset", preset: "claude_code", append: "Your duties" },
-      extraArgs: { name: "openplan-glm" },
+      extraArgs: { name: "huddle-glm" },
       pathToClaudeCodeExecutable: "/bin/claude",
     });
     expect(options.env).toEqual({
       PATH: "/bin",
       GIT_AUTHOR_NAME: "glm",
-      GIT_AUTHOR_EMAIL: "glm@openplan.local",
+      GIT_AUTHOR_EMAIL: "glm@huddle.local",
       GIT_COMMITTER_NAME: "glm",
-      GIT_COMMITTER_EMAIL: "glm@openplan.local",
+      GIT_COMMITTER_EMAIL: "glm@huddle.local",
     });
   });
 

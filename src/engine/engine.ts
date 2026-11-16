@@ -33,7 +33,7 @@ export interface HandedOver {
 export interface EngineOptions {
   /** A folder in the repository. */
   cwd: string;
-  /** openplan's data folder (`CLAUDE_PLUGIN_DATA`). */
+  /** cc-huddle's data folder (`CLAUDE_PLUGIN_DATA`). */
   dataFolder: string;
   /** The Claude Code members run. */
   claude: string;
@@ -45,7 +45,7 @@ export interface EngineOptions {
   takeOver: (holder: Holder, slug: string) => Promise<HandedOver | undefined>;
   /** Your session's permission mode as it is now, which members work in (§8); undefined before it is known. */
   sessionMode: () => PermissionMode | undefined;
-  /** openplan's ids as `enabledPlugins` names them, turned off in members' sessions. */
+  /** cc-huddle's ids as `enabledPlugins` names them, turned off in members' sessions. */
   plugins: readonly string[];
   /** Your own team's folder, under the repository's (team.ts userTeamFolder). */
   userTeam: string;
@@ -147,7 +147,7 @@ export class Engine {
     const goals = await RepositoryGoals.of(options.dataFolder, options.cwd);
     const { folder, files } = goals.goal(slug);
     if (!existsSync(files.state)) throw new Error(`There is no goal "${slug}" in this repository`);
-    // What this openplan can't read, or a member's environment lacks, is said before the goal is taken from where it runs.
+    // What this cc-huddle can't read, or a member's environment lacks, is said before the goal is taken from where it runs.
     await readState(files.state);
     const { settings, team } = await readCopy(files.team);
     teamSettings(settings, team.members, options.env, options.plugins);

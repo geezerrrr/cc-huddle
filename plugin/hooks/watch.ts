@@ -4,7 +4,7 @@
  * transcript row, and what needs a conversation is a prompt to your session.
  */
 import type { EngineInterface, Timer } from "claude-code";
-import type { OpenplanAnswer, OpenplanNeed, OpenplanRun, OpenplanTeam } from "../types";
+import type { HuddleAnswer, HuddleNeed, HuddleRun, HuddleTeam } from "../types";
 import { askNeed } from "./ask";
 import { NoRepository, call, view } from "./server";
 import {
@@ -28,7 +28,7 @@ const RUN_KEEP = 200;
 let revision: number | undefined;
 /** Milestones and prompts told already; those there at the first look are not news. */
 let told: Set<string> | undefined;
-/** How many goals the session had opened at the last look (OpenplanTeam.opened). */
+/** How many goals the session had opened at the last look (HuddleTeam.opened). */
 let opened: number | undefined;
 let polling = false;
 /** Needs put to you in a question dialog already; one dismissed waits in the pane. */
@@ -37,7 +37,7 @@ const asked = new Set<string>();
 let asking = Promise.resolve();
 /**
  * The poll, while it runs. It stops when the session isn't in a repository,
- * and starts again when you or your session turn to openplan.
+ * and starts again when you or your session turn to cc-huddle.
  */
 let ticking: Timer | undefined;
 
@@ -50,11 +50,11 @@ export function watch($: EngineInterface) {
  * Answers a need as it was pressed or said, and looks again at once, so the
  * pane doesn't show it open; what the team refuses is shown.
  */
-export async function answer($: EngineInterface, need: OpenplanNeed, given: OpenplanAnswer) {
+export async function answer($: EngineInterface, need: HuddleNeed, given: HuddleAnswer) {
   try {
     await call($, "answer", { question: need.id, answer: given });
   } catch (error) {
-    $.ui.toast(`openplan: ${words(error)}`);
+    $.ui.toast(`cc-huddle: ${words(error)}`);
     return;
   }
   const left = <T>(all: Record<string, T>) =>
@@ -70,7 +70,7 @@ export async function answer($: EngineInterface, need: OpenplanNeed, given: Open
  * milestone and a prompt to your session for what needs a conversation. In
  * a goal just opened here, the milestones so far are not news.
  */
-function tell($: EngineInterface, now: OpenplanTeam) {
+function tell($: EngineInterface, now: HuddleTeam) {
   for (const need of now.needs) {
     if (asked.has(need.id) || !need.ask) continue;
     asked.add(need.id);
@@ -81,11 +81,11 @@ function tell($: EngineInterface, now: OpenplanTeam) {
   if (told) {
     if (!fresh)
       for (const milestone of now.milestones)
-        if (!told.has(milestone.key)) $.ui.log(`openplan: ${milestone.text}`);
+        if (!told.has(milestone.key)) $.ui.log(`cc-huddle: ${milestone.text}`);
     for (const prompt of now.prompts)
       if (!told.has(prompt.key))
         $.prompt.submit({ text: prompt.text }).catch((error: unknown) => {
-          $.ui.toast(`openplan: your session couldn't be told: ${words(error)}`);
+          $.ui.toast(`cc-huddle: your session couldn't be told: ${words(error)}`);
         });
   }
   told = new Set([
@@ -100,7 +100,7 @@ function tell($: EngineInterface, now: OpenplanTeam) {
  * what it had when the read is of the same run (`same`), else in its place;
  * none when the read brought none.
  */
-function caughtUp<T extends OpenplanRun>(
+function caughtUp<T extends HuddleRun>(
   had: T | undefined,
   got: T | undefined,
   same: (a: T, b: T) => boolean,

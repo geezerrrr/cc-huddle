@@ -1,5 +1,5 @@
 /**
- * `/openplan pause` and `/openplan resume` (§7.3): what they do; why they
+ * `/huddle pause` and `/huddle resume` (§7.3): what they do; why they
  * do nothing is the view's, the resume dialog and its list the mod's own.
  */
 import type { EngineInterface } from "claude-code";
@@ -38,10 +38,9 @@ export async function resumeGoal($: EngineInterface, number?: number): Promise<s
     label: `${String(i + 1)}. ${goal.label}`,
   }));
   if (number === undefined && listed.length > ASK_OPTIONS)
-    return [
-      "Goals; resume one with /openplan resume <number>:",
-      ...listed.map((g) => g.label),
-    ].join("\n");
+    return ["Goals; resume one with /huddle resume <number>:", ...listed.map((g) => g.label)].join(
+      "\n",
+    );
   const goal =
     number !== undefined
       ? listed[number - 1]

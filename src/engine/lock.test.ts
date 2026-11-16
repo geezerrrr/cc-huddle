@@ -9,7 +9,7 @@ import { holderOf, releaseLock, takeLock, type Holder } from "./lock.ts";
 let dir: string;
 
 beforeEach(async () => {
-  dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-lock-")));
+  dir = await realpath(await mkdtemp(path.join(tmpdir(), "huddle-lock-")));
 });
 
 afterEach(async () => {

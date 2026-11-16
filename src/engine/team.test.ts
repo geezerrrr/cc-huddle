@@ -7,7 +7,7 @@ import { allowInTeam, loadTeam, teamFolder } from "./team.ts";
 let top: string;
 
 beforeEach(async () => {
-  top = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-team-")));
+  top = await realpath(await mkdtemp(path.join(tmpdir(), "huddle-team-")));
 });
 
 afterEach(async () => {
@@ -26,7 +26,7 @@ async function write(files: Record<string, string>) {
 const UI = "---\ntitle: UI designer\n---\n\nDesign the screens.\n";
 
 describe("loadTeam", () => {
-  it("reads roles and members, by file name, with openplan's defaults", async () => {
+  it("reads roles and members, by file name, with cc-huddle's defaults", async () => {
     await write({
       "roles/ui-designer.md": UI,
       "roles/programmer.md": "---\ntitle: Programmer\n---\nWrite the code.",
@@ -65,7 +65,7 @@ describe("loadTeam", () => {
     expect([settings, meetingSize]).toEqual([{}, "discussion"]);
   });
 
-  it("takes the team's settings and openplan's own", async () => {
+  it("takes the team's settings and cc-huddle's own", async () => {
     await write({
       "roles/ui-designer.md": UI,
       "members/glm.md": "---\nrole: ui-designer\n---\n",

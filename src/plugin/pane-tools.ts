@@ -1,15 +1,15 @@
 /**
- * The tools of openplan's mod (docs/design.md §7.2, §7.3): where the pane
+ * The tools of cc-huddle's mod (docs/design.md §7.2, §7.3): where the pane
  * reads the team (`pane`, its socket), how it answers what waits on you
- * (`answer`), what `/openplan resume` does (`resume_goal`), and the prompt
- * `/openplan <task>` gives your session (`hand_off`). They are the mod's, not
+ * (`answer`), what `/huddle resume` does (`resume_goal`), and the prompt
+ * `/huddle <task>` gives your session (`hand_off`). They are the mod's, not
  * your session's: the mod keeps the model from calling them, so a permission
  * is granted only by you, pressing its button, and a goal is taken up only on
  * your word.
  */
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { OpenplanAnswer, OpenplanCalls } from "../../plugin/types/index.d.ts";
+import type { HuddleAnswer, HuddleCalls } from "../../plugin/types/index.d.ts";
 import {
   DECISION_OPTIONS,
   PERMISSION_OPTIONS,
@@ -28,7 +28,7 @@ import { rosterOf } from "./words.ts";
 const isPermission = (option: string): option is PermissionOption =>
   (PERMISSION_OPTIONS as readonly string[]).includes(option);
 
-const PANE_ONLY = "For openplan's pane only: your session never calls it.";
+const PANE_ONLY = "For cc-huddle's pane only: your session never calls it.";
 
 const answerSchema = z.discriminatedUnion("kind", [
   z.object({
@@ -41,20 +41,20 @@ const answerSchema = z.discriminatedUnion("kind", [
     kind: z.literal("choices"),
     picks: z.array(z.string()).describe("One pick per question with choices"),
   }),
-]) satisfies z.ZodType<OpenplanAnswer>;
+]) satisfies z.ZodType<HuddleAnswer>;
 
 const answerInput = z.object({
   question: z.string(),
   answer: answerSchema,
-}) satisfies z.ZodType<OpenplanCalls["answer"]>;
+}) satisfies z.ZodType<HuddleCalls["answer"]>;
 
 const handOffInput = z.object({ task: z.string().trim().min(1) }) satisfies z.ZodType<
-  OpenplanCalls["hand_off"]
+  HuddleCalls["hand_off"]
 >;
 
 const resumeInput = z.object({
   goal: z.string().regex(SLUG).describe("The goal's slug"),
-}) satisfies z.ZodType<OpenplanCalls["resume_goal"]>;
+}) satisfies z.ZodType<HuddleCalls["resume_goal"]>;
 
 /** Adds the pane's tools to `server`, for the goal the session runs (`session`). */
 export function addPaneTools(server: McpServer, session: Session, pane: PaneServer) {
@@ -89,7 +89,7 @@ export function addPaneTools(server: McpServer, session: Session, pane: PaneServ
   server.registerTool(
     "hand_off",
     {
-      description: `${PANE_ONLY} The prompt /openplan <task> gives the session: the task, for the team.`,
+      description: `${PANE_ONLY} The prompt /huddle <task> gives the session: the task, for the team.`,
       inputSchema: handOffInput.shape,
       annotations: { readOnlyHint: true },
     },
@@ -104,7 +104,7 @@ export function addPaneTools(server: McpServer, session: Session, pane: PaneServ
   server.registerTool(
     "resume_goal",
     {
-      description: `${PANE_ONLY} Takes up the goal you picked in this session and resumes it, as /openplan resume.`,
+      description: `${PANE_ONLY} Takes up the goal you picked in this session and resumes it, as /huddle resume.`,
       inputSchema: resumeInput.shape,
     },
     async ({ goal: slug }) => {
@@ -115,7 +115,7 @@ export function addPaneTools(server: McpServer, session: Session, pane: PaneServ
 }
 
 /**
- * What `/openplan <task>` gives your session: the task, for the team and not
+ * What `/huddle <task>` gives your session: the task, for the team and not
  * for it, as the team skill says to take it on; with the team and the goal
  * this session runs (`mine`), if it runs one.
  */
@@ -127,7 +127,7 @@ function handOffText(
     ? `This session runs the goal "${mine.goal.name}", ${mine.goal.status === "active" ? "under way" : mine.goal.status}. The team: ${rosterOf(mine.members)}.`
     : "This session runs no goal yet.";
   return [
-    "The user hands this to openplan's team: take it on as openplan's team skill says.",
+    "The user hands this to cc-huddle's team: take it on as cc-huddle's team skill says.",
     "",
     task,
     "",

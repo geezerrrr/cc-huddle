@@ -66,7 +66,7 @@ describe("statusText", () => {
       ],
       tokens: {},
     });
-    expect(text).toBe(`Goal "Dice": active, on branch openplan/dice/main
+    expect(text).toBe(`Goal "Dice": active, on branch huddle/dice/main
 Team: glm (busy), sonnet
   Meeting [m1], hosted by sonnet: its plan waits for review
   Task "Game" [t1], accepted by the user
@@ -75,7 +75,7 @@ Team: glm (busy), sonnet
     - Score [Score], glm: failed, error: API Error: 529
 
 Waiting for answers:
-  - [q1] glm asks to use Bash: npm test for "Rules". Allow it? Answered in /openplan.
+  - [q1] glm asks to use Bash: npm test for "Rules". Allow it? Answered in /huddle.
   - [q2] The task "Game" is done. Accept it? Options: accept, revise.`);
   });
 });

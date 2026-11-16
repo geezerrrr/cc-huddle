@@ -1,6 +1,6 @@
 /**
  * The permission mode hook: Claude Code runs it as you send a message and as
- * your session calls one of openplan's tools, with the session's permission
+ * your session calls one of cc-huddle's tools, with the session's permission
  * mode, which it keeps for the session's members (session-mode.ts).
  */
 import { text } from "node:stream/consumers";

@@ -1,5 +1,5 @@
 /**
- * The words openplan puts things in, once each: what your session reads
+ * The words cc-huddle puts things in, once each: what your session reads
  * (status.ts), the pane, the band and the question dialog (pane.ts) all say a
  * thing the same way, from here.
  */
@@ -207,18 +207,18 @@ function progressOf({ subtasks, meetings }: Pick<GoalState, "subtasks" | "meetin
       : "no plan yet";
 }
 
-/** A goal named with how far it got and `where` it is, as `/openplan resume` lists it. */
+/** A goal named with how far it got and `where` it is, as `/huddle resume` lists it. */
 export const goalLabel = (
   state: Pick<GoalState, "goal" | "subtasks" | "meetings">,
   where: string,
 ) => `${state.goal.name} · ${progressOf(state)} · ${where}`;
 
-/** One of the repository's goals as `/openplan resume` lists it: one that can't be read by its folder, and why. */
+/** One of the repository's goals as `/huddle resume` lists it: one that can't be read by its folder, and why. */
 const entryLabel = (entry: GoalEntry) =>
   "state" in entry
     ? goalLabel(entry.state, WHERE_WORDS[whereOf(entry)])
     : `${entry.slug} · ${WHERE_WORDS.unreadable}: ${entry.unreadable}`;
 
-/** The repository's goals a session doesn't run, each named with how far it got and where it is, for `/openplan resume`. */
+/** The repository's goals a session doesn't run, each named with how far it got and where it is, for `/huddle resume`. */
 export const resumableOf = (others: readonly GoalEntry[]): { slug: string; label: string }[] =>
   others.map((entry) => ({ slug: entry.slug, label: entryLabel(entry) }));

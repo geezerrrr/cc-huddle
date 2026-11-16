@@ -14,7 +14,7 @@ let records: Records;
 const failed = vi.fn();
 
 beforeEach(async () => {
-  dir = await realpath(await mkdtemp(path.join(tmpdir(), "openplan-records-")));
+  dir = await realpath(await mkdtemp(path.join(tmpdir(), "huddle-records-")));
   places = { repo: { top: dir, common: dir }, slug: "dice", root: dir };
   records = new Records(places, failed);
 });
