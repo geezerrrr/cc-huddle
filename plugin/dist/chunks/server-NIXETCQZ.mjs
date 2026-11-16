@@ -20,7 +20,7 @@ import {
   textIfThere,
   windowsProcessField,
   writeWhole
-} from "./chunk-MDEZBUZ3.mjs";
+} from "./chunk-ZDX64WN4.mjs";
 
 // node_modules/.pnpm/yaml@2.9.1/node_modules/yaml/dist/nodes/identity.js
 var require_identity = __commonJS({
@@ -7358,13 +7358,13 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 
 // plugin/.claude-plugin/plugin.json
 var plugin_default = {
-  name: "openplan",
+  name: "cc-huddle",
   version: "0.1.0",
   description: "A team of Claude Code sessions on your repository: any model per member, a meeting before the plan, state machines in charge of the process.",
   author: {
     name: "geezerrrr"
   },
-  repository: "https://github.com/geezerrrr/openplan",
+  repository: "https://github.com/geezerrrr/cc-huddle",
   license: "MIT",
   keywords: ["team", "multi-agent", "planning", "worktrees"],
   types: "./types/index.d.ts"
@@ -7781,7 +7781,7 @@ function git(at, args, options = {}) {
   });
 }
 function authorEnv(member) {
-  const email = `${member}@openplan.local`;
+  const email = `${member}@huddle.local`;
   return {
     GIT_AUTHOR_NAME: member,
     GIT_AUTHOR_EMAIL: email,
@@ -7801,7 +7801,7 @@ async function openRepository(folder) {
     throw new GitError("rev-parse", `${top} has no commit to start from yet`);
   return { top: await realpath(top), common: await realpath(path.resolve(folder, common)) };
 }
-var BRANCHES = "openplan/";
+var BRANCHES = "huddle/";
 var goalBranches = (slug) => `${BRANCHES}${slug}/`;
 var goalBranch = (slug) => `${goalBranches(slug)}main`;
 async function takenSlugs(repo) {
@@ -8087,10 +8087,10 @@ async function readState(file) {
     });
   }
   if (saved.version > STATE_VERSION)
-    throw new Error(`${file} was written by a newer openplan: update openplan to go on`);
+    throw new Error(`${file} was written by a newer cc-huddle: update cc-huddle to go on`);
   if (saved.version < STATE_VERSION)
     throw new Error(
-      `${file} was written by an openplan before its first release: move it away to start over`
+      `${file} was written by a cc-huddle before its first release: move it away to start over`
     );
   return saved.state;
 }
@@ -8694,7 +8694,7 @@ async function stopRecording() {
 }
 
 // src/engine/turns.ts
-var TURN_SERVER = "openplan";
+var TURN_SERVER = "huddle";
 var turnToolName = (name) => `mcp__${TURN_SERVER}__${name}`;
 var turnServer = (tools) => ({
   [TURN_SERVER]: createSdkMcpServer({ name: TURN_SERVER, tools })
@@ -9467,7 +9467,7 @@ function sessionOptions(seat, kind, from) {
     env: { ...env, ...authorEnv(member.name) },
     systemPrompt: { type: "preset", preset: "claude_code", append: seat.system },
     includePartialMessages: true,
-    extraArgs: { name: `openplan-${member.name}` },
+    extraArgs: { name: `huddle-${member.name}` },
     pathToClaudeCodeExecutable: seat.claude,
     ...readOnly && { tools: READ_ONLY_TOOLS, strictMcpConfig: true }
   };
@@ -10513,9 +10513,9 @@ import { readFile as readFile3 } from "node:fs/promises";
 import { homedir } from "node:os";
 import path4 from "node:path";
 import { z as z6 } from "zod";
-var teamFolder = (top) => path4.join(top, ".claude", "openplan");
+var teamFolder = (top) => path4.join(top, ".claude", "huddle");
 var claudeFolder = (env) => env.CLAUDE_CONFIG_DIR ?? path4.join(homedir(), ".claude");
-var userTeamFolder = (env) => path4.join(claudeFolder(env), "openplan");
+var userTeamFolder = (env) => path4.join(claudeFolder(env), "huddle");
 var EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 var roleSchema = z6.object({ title: z6.string().trim().min(1) });
 var memberSchema = z6.object({
@@ -10945,7 +10945,7 @@ async function executableOf(pid) {
 
 // src/plugin/plugin-id.ts
 import path5 from "node:path";
-var PLUGIN = "openplan";
+var PLUGIN = "cc-huddle";
 var pluginId = (dataFolder2) => `${PLUGIN}@${path5.basename(dataFolder2).slice(PLUGIN.length + 1)}`;
 async function idsIn(file) {
   let settings;
@@ -11254,7 +11254,7 @@ function milestones(work) {
       said.push({ key: `task:${task.id}`, text: `The task "${task.title}" is done` });
   return said;
 }
-var AS_THE_SKILL_SAYS = "Take it to the user as openplan's team skill says.";
+var AS_THE_SKILL_SAYS = "Take it to the user as cc-huddle's team skill says.";
 function prompts(work) {
   const asked2 = [];
   for (const meeting2 of work.meetings)
@@ -11446,8 +11446,8 @@ var NOTE_PROMPTS = {
   sendBack: "Or send it back, saying what to change",
   revise: "What to change"
 };
-var noGoalText = (moved) => moved ? `"${moved}" moved to another Claude Code session. Bring it back here with /openplan resume.` : "This session runs no goal. Hand the team a task with /openplan <task>, or take a goal up with /openplan resume.";
-var resumeRefusal = (name) => `"${name}" is under way in this session, which runs one goal: /openplan pause it first, or take the other up in another session.`;
+var noGoalText = (moved) => moved ? `"${moved}" moved to another Claude Code session. Bring it back here with /huddle resume.` : "This session runs no goal. Hand the team a task with /huddle <task>, or take a goal up with /huddle resume.";
+var resumeRefusal = (name) => `"${name}" is under way in this session, which runs one goal: /huddle pause it first, or take the other up in another session.`;
 
 // src/plugin/pane-server.ts
 var next = z7.number().int().min(0);
@@ -11512,8 +11512,8 @@ function viewer(session2) {
 }
 function socketAddress() {
   if (process.platform === "win32")
-    return { address: `\\\\.\\pipe\\openplan-${randomBytes(12).toString("hex")}` };
-  const folder = mkdtempSync(path6.join(tmpdir(), "openplan-"));
+    return { address: `\\\\.\\pipe\\huddle-${randomBytes(12).toString("hex")}` };
+  const folder = mkdtempSync(path6.join(tmpdir(), "cc-huddle-"));
   return { address: path6.join(folder, "pane.sock"), folder };
 }
 var asked = async (schema, request2) => schema.parse(JSON.parse(await text(request2) || "{}"));
@@ -11577,7 +11577,7 @@ function modeOf(dataFolder2, session2) {
 // src/plugin/pane-tools.ts
 import { z as z8 } from "zod";
 var isPermission = (option) => PERMISSION_OPTIONS.includes(option);
-var PANE_ONLY = "For openplan's pane only: your session never calls it.";
+var PANE_ONLY = "For cc-huddle's pane only: your session never calls it.";
 var answerSchema = z8.discriminatedUnion("kind", [
   z8.object({
     kind: z8.literal("option"),
@@ -11624,7 +11624,7 @@ function addPaneTools(server2, session2, pane2) {
   server2.registerTool(
     "hand_off",
     {
-      description: `${PANE_ONLY} The prompt /openplan <task> gives the session: the task, for the team.`,
+      description: `${PANE_ONLY} The prompt /huddle <task> gives the session: the task, for the team.`,
       inputSchema: handOffInput.shape,
       annotations: { readOnlyHint: true }
     },
@@ -11638,7 +11638,7 @@ function addPaneTools(server2, session2, pane2) {
   server2.registerTool(
     "resume_goal",
     {
-      description: `${PANE_ONLY} Takes up the goal you picked in this session and resumes it, as /openplan resume.`,
+      description: `${PANE_ONLY} Takes up the goal you picked in this session and resumes it, as /huddle resume.`,
       inputSchema: resumeInput.shape
     },
     async ({ goal: slug }) => {
@@ -11650,7 +11650,7 @@ function addPaneTools(server2, session2, pane2) {
 function handOffText(task, mine) {
   const goal = mine ? `This session runs the goal "${mine.goal.name}", ${mine.goal.status === "active" ? "under way" : mine.goal.status}. The team: ${rosterOf(mine.members)}.` : "This session runs no goal yet.";
   return [
-    "The user hands this to openplan's team: take it on as openplan's team skill says.",
+    "The user hands this to cc-huddle's team: take it on as cc-huddle's team skill says.",
     "",
     task,
     "",
@@ -11792,7 +11792,7 @@ var Session = class {
     return engine;
   }
 };
-var noGoalForModel = (moved) => moved ? `The goal "${moved}" moved to another Claude Code session. The user brings it back with /openplan resume.` : "This session runs no goal: start one (start_goal), or the user takes one up with /openplan resume.";
+var noGoalForModel = (moved) => moved ? `The goal "${moved}" moved to another Claude Code session. The user brings it back with /huddle resume.` : "This session runs no goal: start one (start_goal), or the user takes one up with /huddle resume.";
 
 // src/plugin/tools.ts
 import { z as z9 } from "zod";
@@ -11811,7 +11811,7 @@ function subtaskLine(subtask2, { waits, redone }, work) {
 function questionLine(question, work) {
   const { headline, detail } = needWords(question, work);
   const asks = question.kind === "choices" ? ` ${question.choices.map((c) => c.question).join(" ")}` : "";
-  const then = question.kind === "decision" ? ` Options: ${question.decision.options.join(", ")}.` : " Answered in /openplan.";
+  const then = question.kind === "decision" ? ` Options: ${question.decision.options.join(", ")}.` : " Answered in /huddle.";
   return `  - [${question.id}] ${headline}${asks}${detail ? ` (${detail})` : ""}${then}`;
 }
 function statusText(work) {
@@ -11843,7 +11843,7 @@ function statusText(work) {
 function othersText(others) {
   if (!others.length) return void 0;
   return [
-    "The repository's other goals, taken up here with /openplan resume:",
+    "The repository's other goals, taken up here with /huddle resume:",
     ...resumableOf(others).map((o) => `  - ${o.label}`)
   ].join("\n");
 }
@@ -12055,7 +12055,7 @@ function addTools(server2, session2) {
 
 // src/plugin/server.ts
 var say = (text2) => {
-  console.error(`openplan: ${text2}`);
+  console.error(`cc-huddle: ${text2}`);
 };
 var cwd = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
 var userTeam = userTeamFolder(process.env);
@@ -12115,9 +12115,9 @@ process.once("exit", () => {
   pane.close();
 });
 var server = new McpServer(
-  { name: "openplan", version: plugin_default.version },
+  { name: "huddle", version: plugin_default.version },
   {
-    instructions: "Talk to the user in the language they write to you in, whatever language openplan's messages and tool results are in."
+    instructions: "Talk to the user in the language they write to you in, whatever language cc-huddle's messages and tool results are in."
   }
 );
 var listMembers = addTools(server, session);

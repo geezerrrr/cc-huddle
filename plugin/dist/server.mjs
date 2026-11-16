@@ -5,7 +5,7 @@ import {
   exists,
   renameOver,
   running
-} from "./chunks/chunk-MDEZBUZ3.mjs";
+} from "./chunks/chunk-ZDX64WN4.mjs";
 
 // src/plugin/bootstrap.ts
 import { execFile } from "node:child_process";
@@ -16,7 +16,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 if (!("registerHooks" in nodeModule))
-  throw new Error(`openplan needs Node.js 22.15 or later; this is ${process.version}`);
+  throw new Error(`cc-huddle needs Node.js 22.15 or later; this is ${process.version}`);
 var { registerHooks } = nodeModule;
 var INSTALL_TIMEOUT_MS = 5 * 6e4;
 var here = path.dirname(fileURLToPath(import.meta.url));
@@ -45,7 +45,7 @@ if (!await installed()) {
   } catch (error) {
     await rm(draft, { recursive: true, force: true });
     if (!await installed())
-      throw new Error(`openplan couldn't install its dependencies with npm in ${draft}`, {
+      throw new Error(`cc-huddle couldn't install its dependencies with npm in ${draft}`, {
         cause: error
       });
   }
@@ -63,4 +63,4 @@ registerHooks({
     return bare && context.parentURL?.startsWith(ours) ? next(specifier, { ...context, parentURL: from }) : next(specifier, context);
   }
 });
-await import("./chunks/server-SBZYBDHZ.mjs");
+await import("./chunks/server-NIXETCQZ.mjs");

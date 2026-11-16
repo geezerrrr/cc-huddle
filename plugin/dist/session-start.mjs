@@ -7688,7 +7688,7 @@ async function openRepository(folder2) {
     throw new GitError("rev-parse", `${top} has no commit to start from yet`);
   return { top: await realpath(top), common: await realpath(path2.resolve(folder2, common)) };
 }
-var BRANCHES = "openplan/";
+var BRANCHES = "huddle/";
 var goalBranches = (slug) => `${BRANCHES}${slug}/`;
 var goalBranch = (slug) => `${goalBranches(slug)}main`;
 var verifies = async (at2, ref) => (await git(at2, ["rev-parse", "--verify", "-q", ref], { allow: [1] })).code === 0;
@@ -7734,10 +7734,10 @@ async function readState(file2) {
     });
   }
   if (saved.version > STATE_VERSION)
-    throw new Error(`${file2} was written by a newer openplan: update openplan to go on`);
+    throw new Error(`${file2} was written by a newer cc-huddle: update cc-huddle to go on`);
   if (saved.version < STATE_VERSION)
     throw new Error(
-      `${file2} was written by an openplan before its first release: move it away to start over`
+      `${file2} was written by a cc-huddle before its first release: move it away to start over`
     );
   return saved.state;
 }
@@ -53351,7 +53351,7 @@ function date4(params) {
 }
 
 // src/engine/turns.ts
-var TURN_SERVER = "openplan";
+var TURN_SERVER = "huddle";
 var turnToolName = (name) => `mcp__${TURN_SERVER}__${name}`;
 
 // src/engine/run.ts
@@ -53364,7 +53364,7 @@ var verdictSchema = external_exports.object({ pass: external_exports.boolean(), 
 import { readFile as readFile4 } from "node:fs/promises";
 var import_yaml = __toESM(require_dist(), 1);
 import path3 from "node:path";
-var teamFolder = (top) => path3.join(top, ".claude", "openplan");
+var teamFolder = (top) => path3.join(top, ".claude", "huddle");
 var EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 var roleSchema = external_exports.object({ title: external_exports.string().trim().min(1) });
 var memberSchema = external_exports.object({
@@ -53643,7 +53643,7 @@ function subtaskLine(subtask, { waits, redone }, work) {
 function questionLine(question, work) {
   const { headline, detail } = needWords(question, work);
   const asks = question.kind === "choices" ? ` ${question.choices.map((c) => c.question).join(" ")}` : "";
-  const then = question.kind === "decision" ? ` Options: ${question.decision.options.join(", ")}.` : " Answered in /openplan.";
+  const then = question.kind === "decision" ? ` Options: ${question.decision.options.join(", ")}.` : " Answered in /huddle.";
   return `  - [${question.id}] ${headline}${asks}${detail ? ` (${detail})` : ""}${then}`;
 }
 function statusText(work) {
@@ -53675,7 +53675,7 @@ function statusText(work) {
 function othersText(others) {
   if (!others.length) return void 0;
   return [
-    "The repository's other goals, taken up here with /openplan resume:",
+    "The repository's other goals, taken up here with /huddle resume:",
     ...resumableOf(others).map((o) => `  - ${o.label}`)
   ].join("\n");
 }
@@ -53696,20 +53696,20 @@ async function sessionContext(cwd, dataFolder2, session) {
   if (mine && "state" in mine) {
     const status = statusText(await repository.stored(mine.slug, mine.state));
     parts.push(
-      `This session runs openplan's goal "${mine.state.goal.name}", as it stands:
+      `This session runs cc-huddle's goal "${mine.state.goal.name}", as it stands:
 
 ${status}`
     );
   }
   const others = othersText(goals.filter((g) => g !== mine));
-  if (others) parts.push(`openplan: ${others}`);
+  if (others) parts.push(`cc-huddle: ${others}`);
   return parts.length ? parts.join("\n\n") : void 0;
 }
 
 // src/plugin/data-folder.ts
 import { chmodSync, mkdirSync as mkdirSync2 } from "node:fs";
 var folder = process.env.CLAUDE_PLUGIN_DATA;
-if (!folder) throw new Error("openplan runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA");
+if (!folder) throw new Error("cc-huddle runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA");
 mkdirSync2(folder, { recursive: true });
 chmodSync(folder, 448);
 var dataFolder = folder;

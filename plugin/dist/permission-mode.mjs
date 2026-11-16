@@ -6,7 +6,7 @@ import { text } from "node:stream/consumers";
 // src/plugin/data-folder.ts
 import { chmodSync, mkdirSync } from "node:fs";
 var folder = process.env.CLAUDE_PLUGIN_DATA;
-if (!folder) throw new Error("openplan runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA");
+if (!folder) throw new Error("cc-huddle runs in Claude Code, which gives it CLAUDE_PLUGIN_DATA");
 mkdirSync(folder, { recursive: true });
 chmodSync(folder, 448);
 var dataFolder = folder;
