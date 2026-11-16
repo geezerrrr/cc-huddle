@@ -7,7 +7,7 @@
 import type { Options, PermissionMode, Settings } from "@anthropic-ai/claude-agent-sdk";
 import { errorText } from "../shared/errors.ts";
 import { writeWhole } from "../shared/files.ts";
-import { authorEnv, memberSigner } from "./git.ts";
+import { authorEnv } from "./git.ts";
 import type { SessionKind } from "./prompts.ts";
 import type { Member } from "./types.ts";
 
@@ -132,25 +132,28 @@ export interface Seat {
 /** A member turn's options: always with its settings file, which tells its process from others (processes.ts). */
 export type MemberOptions = Options & { settings: string };
 
-/** The options of a member's turn of `kind`: working (workOptions) or reading only (readOnlyOptions). */
-export const sessionOptions = (seat: Seat, kind: SessionKind, from: Env): MemberOptions =>
-  kind === "work" ? workOptions(seat, from) : readOnlyOptions(seat, from);
-
 /**
- * Agent SDK options for a member's working turn: their model and effort,
- * their settings file, your session's permission mode unless the team sets
- * its own, Claude Code's system
- * prompt with ours appended, the reply streamed as it is written, their name
- * on the commits they make and in `claude agents`.
+ * Agent SDK options for a member's turn of `kind`: their model and effort,
+ * their settings file, Claude Code's system prompt with ours appended, the
+ * reply streamed as it is written, their name on the commits they make and in
+ * `claude agents`.
+ *
+ * A working turn runs in your session's permission mode, unless the team sets
+ * its own. A read-only turn is kept to the read-only tools, and as nobody is
+ * there to approve anything, what the rules don't allow is refused
+ * (dontAsk). Not plan mode: it brings Claude Code's planning workflow, which
+ * ends a turn with ExitPlanMode, at odds with a turn that has to end in
+ * structured output (a meeting's plan). It has no MCP server but the turn's
+ * own (strictMcpConfig): yours would offer tools that do more than read, and
+ * as a resumed session connects them partway through each turn, its tools
+ * change and the conversation's prompt cache is written again whole, turn
+ * after turn.
  */
-function workOptions(seat: Seat, from: Env): MemberOptions {
-  const teamMode = seat.team.permissions?.defaultMode !== undefined;
-  return memberOptions(seat, from, teamMode ? undefined : seat.sessionMode);
-}
-
-/** What every member turn runs with, in permission mode `mode` (Claude Code's default for none). */
-function memberOptions(seat: Seat, from: Env, mode: PermissionMode | undefined): MemberOptions {
+export function sessionOptions(seat: Seat, kind: SessionKind, from: Env): MemberOptions {
   const { member } = seat;
+  const readOnly = kind === "readOnly";
+  const teamMode = seat.team.permissions?.defaultMode !== undefined;
+  const mode = readOnly ? "dontAsk" : teamMode ? undefined : seat.sessionMode;
   const env = Object.fromEntries(
     Object.entries(from).filter(([name]) => !SESSION_VARS.includes(name)),
   );
@@ -164,30 +167,11 @@ function memberOptions(seat: Seat, from: Env, mode: PermissionMode | undefined):
       // The SDK takes bypassPermissions only so: your session runs in it, as you chose.
       ...(mode === "bypassPermissions" && { allowDangerouslySkipPermissions: true }),
     }),
-    env: { ...env, ...authorEnv(memberSigner(member.name)) },
+    env: { ...env, ...authorEnv(member.name) },
     systemPrompt: { type: "preset", preset: "claude_code", append: seat.system },
     includePartialMessages: true,
     extraArgs: { name: `openplan-${member.name}` },
     pathToClaudeCodeExecutable: seat.claude,
-  };
-}
-
-/**
- * Options for a read-only turn: the member's own session and settings, kept
- * to the read-only tools. Nobody is there to approve anything, so what the
- * rules don't allow is refused (dontAsk). Not plan mode: it brings Claude
- * Code's planning workflow, which ends a turn with ExitPlanMode, at odds with
- * a turn that has to end in structured output (a meeting's plan).
- *
- * No MCP server but the turn's own (strictMcpConfig): yours would offer tools
- * that do more than read, and as a resumed session connects them partway
- * through each turn, its tools change and the conversation's prompt cache is
- * written again whole, turn after turn.
- */
-function readOnlyOptions(seat: Seat, from: Env): MemberOptions {
-  return {
-    ...memberOptions(seat, from, "dontAsk"),
-    tools: READ_ONLY_TOOLS,
-    strictMcpConfig: true,
+    ...(readOnly && { tools: READ_ONLY_TOOLS, strictMcpConfig: true }),
   };
 }

@@ -36,7 +36,6 @@ import {
   type TurnListener,
 } from "./turns.ts";
 import type {
-  Goal,
   Meeting,
   MeetingHand,
   MeetingNow,
@@ -164,8 +163,8 @@ export class MeetingRun {
     private readonly signal: AbortSignal,
     /** The goal's worktree, where the meeting looks. */
     cwd: string,
-    goal: Goal,
   ) {
+    const { goal } = core.state;
     const named = (names: readonly string[]) =>
       names.flatMap((name) => core.team.members.filter((m) => m.name === name));
     const [host, ...others] = named(meeting.participants);

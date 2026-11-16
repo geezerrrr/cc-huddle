@@ -15,13 +15,13 @@ import { Goals } from "./goals.ts";
 import { Meetings } from "./meetings.ts";
 import { sessionOptions, teamSettings, writeSettings } from "./policy.ts";
 import { recordMembersIn, stopRecording } from "./processes.ts";
-import { systemPrompt } from "./prompts.ts";
+import { systemPrompt, type SessionKind } from "./prompts.ts";
 import { Questions, type Answer } from "./questions.ts";
 import { Records } from "./records.ts";
 import { Scheduler } from "./scheduler.ts";
 import { serialBy } from "../shared/serial.ts";
 import { allowInCopy, allowInTeam, copyTeam, loadTeam, readCopy, type TeamFiles } from "./team.ts";
-import type { GoalState, MeetingSize } from "./types.ts";
+import type { GoalState, MeetingSize, Member } from "./types.ts";
 import { releaseLock, takeLock, type Holder, type Runner } from "./lock.ts";
 import { RepositoryGoals } from "./repository.ts";
 
@@ -316,7 +316,7 @@ export class Engine {
       await writeSettings(this.files.settings(name), filled);
   }
 
-  private turnOptions(...[member, kind, cwd]: Parameters<Core["options"]>) {
+  private turnOptions(member: Member, kind: SessionKind, cwd: string) {
     const sessionMode = this.options.sessionMode();
     const seat = {
       member,

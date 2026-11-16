@@ -71,25 +71,16 @@ export function git(at: At, args: string[], options: GitOptions = {}): Promise<R
   });
 }
 
-/** Who a commit is by. */
-interface Signer {
-  name: string;
-  email: string;
+/** Git's variables for a member as who a commit is by: those the engine makes for them, and their own. */
+export function authorEnv(member: string): Record<string, string> {
+  const email = `${member}@openplan.local`;
+  return {
+    GIT_AUTHOR_NAME: member,
+    GIT_AUTHOR_EMAIL: email,
+    GIT_COMMITTER_NAME: member,
+    GIT_COMMITTER_EMAIL: email,
+  };
 }
-
-/** A member as the author of their commits. */
-export const memberSigner = (member: string): Signer => ({
-  name: member,
-  email: `${member}@openplan.local`,
-});
-
-/** Git's variables for who a commit is by: the engine's commits, and those members make themselves. */
-export const authorEnv = (by: Signer): Record<string, string> => ({
-  GIT_AUTHOR_NAME: by.name,
-  GIT_AUTHOR_EMAIL: by.email,
-  GIT_COMMITTER_NAME: by.name,
-  GIT_COMMITTER_EMAIL: by.email,
-});
 
 /** A repository the team works on: its top folder, and the git folder its worktrees share. */
 export interface Repository {
@@ -269,7 +260,7 @@ const merging = (at: At) => verifies(at, "MERGE_HEAD");
 export function commitDesk(
   places: Places,
   subtaskId: string,
-  by: Signer,
+  by: string,
   message: string,
 ): Promise<void> {
   return perGoal(places, async () => {
@@ -341,7 +332,7 @@ async function removeDesk(places: Places, subtaskId: string) {
  * worktree, the merge half done. Safe to run again: a subtask merged already
  * is gone with its branch.
  */
-export function mergeDesk(places: Places, subtaskId: string, by: Signer): Promise<MergeOutcome> {
+export function mergeDesk(places: Places, subtaskId: string, by: string): Promise<MergeOutcome> {
   return perGoal(places, async () => {
     const { repo, slug } = places;
     const folder = goalFiles(places.root).desk(subtaskId);

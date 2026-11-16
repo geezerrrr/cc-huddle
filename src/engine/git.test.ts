@@ -9,7 +9,6 @@ import {
   git,
   GitError,
   goalBranch,
-  memberSigner,
   mergeDesk,
   openDesk,
   openGoal,
@@ -195,7 +194,7 @@ describe("commitDesk", () => {
     const places = await placesOf();
     const desk = await openDesk(places, "s1");
     await writeFile(path.join(desk, "dice.ts"), "roll\n");
-    await commitDesk(places, "s1", memberSigner("glm"), "Roll the dice");
+    await commitDesk(places, "s1", "glm", "Roll the dice");
     expect(await log(repo, subtaskBranch("dice", "s1"))).toBe(
       "glm <glm@openplan.local> Roll the dice",
     );
@@ -205,7 +204,7 @@ describe("commitDesk", () => {
     await makeRepository();
     const places = await placesOf();
     await openDesk(places, "s1");
-    await commitDesk(places, "s1", memberSigner("glm"), "Nothing");
+    await commitDesk(places, "s1", "glm", "Nothing");
     expect(await log(repo, subtaskBranch("dice", "s1"))).toBe("you <you@example.com> start");
   });
 
@@ -218,7 +217,7 @@ describe("commitDesk", () => {
     await git({ cwd: other }, ["init", "-q"]);
     await writeFile(path.join(desk, ".git"), `gitdir: ${path.join(other, ".git")}\n`);
     await writeFile(path.join(desk, "dice.ts"), "roll\n");
-    await commitDesk(places, "s1", memberSigner("glm"), "Roll the dice");
+    await commitDesk(places, "s1", "glm", "Roll the dice");
     expect(await log(repo, subtaskBranch("dice", "s1"))).toContain("Roll the dice");
   });
 });
@@ -229,7 +228,7 @@ describe("mergeDesk", () => {
     slug: "dice",
     root: path.join(dir, "data"),
   });
-  const glm = memberSigner("glm");
+  const glm = "glm";
   const show = (ref: string, file: string) =>
     git({ cwd: repo }, ["show", `${ref}:${file}`]).then((r) => r.stdout);
   const deliver = async (places: Places, id: string, file: string, text: string) => {

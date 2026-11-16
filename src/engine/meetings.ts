@@ -208,7 +208,7 @@ export class Meetings {
     const { core } = this;
     try {
       const cwd = await openGoal(core.places);
-      const talk = new MeetingRun(core, meeting, now, signal, cwd, core.state.goal);
+      const talk = new MeetingRun(core, meeting, now, signal, cwd);
       meeting.plan = await talk.toPlan();
       meeting.status = step(MEETING_MACHINE, meeting.status, "plan");
     } catch (error) {

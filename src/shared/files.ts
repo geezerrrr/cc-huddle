@@ -20,15 +20,11 @@ export async function ifThere<T, M>(reading: Promise<T>, missing: M): Promise<T 
 }
 
 /** Whether `file` is there; anything but its absence is thrown. */
-export async function exists(file: string): Promise<boolean> {
-  try {
-    await stat(file);
-    return true;
-  } catch (error) {
-    if (errorCode(error) === "ENOENT") return false;
-    throw error;
-  }
-}
+export const exists = (file: string) =>
+  ifThere(
+    stat(file).then(() => true),
+    false,
+  );
 
 /** A file's text; undefined when it isn't there, anything else thrown. */
 export function textIfThere(file: string): string | undefined {
@@ -45,13 +41,8 @@ export function textIfThere(file: string): string | undefined {
  * is a SyntaxError naming the file.
  */
 export async function jsonIfThere(file: string): Promise<unknown> {
-  let text: string;
-  try {
-    text = await readFile(file, "utf8");
-  } catch (error) {
-    if (errorCode(error) === "ENOENT") return undefined;
-    throw error;
-  }
+  const text = await ifThere(readFile(file, "utf8"), undefined);
+  if (text === undefined) return undefined;
   try {
     return JSON.parse(text);
   } catch (error) {
@@ -60,14 +51,7 @@ export async function jsonIfThere(file: string): Promise<unknown> {
 }
 
 /** The names in a folder; none when it isn't there. */
-export async function namesIfThere(folder: string): Promise<string[]> {
-  try {
-    return await readdir(folder);
-  } catch (error) {
-    if (errorCode(error) === "ENOENT") return [];
-    throw error;
-  }
-}
+export const namesIfThere = (folder: string) => ifThere(readdir(folder), []);
 
 /** What Windows answers a rename while another program (an antivirus, an indexer) holds the file or folder a moment. */
 const HELD = new Set(["EPERM", "EACCES", "EBUSY"]);

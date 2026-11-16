@@ -24,7 +24,6 @@ import {
   commitDesk,
   dropDesk,
   GitError,
-  memberSigner,
   mergeDesk,
   openDesk,
   pickSide,
@@ -537,7 +536,7 @@ export class Scheduler {
         await commitDesk(
           core.places,
           subtask.id,
-          memberSigner(member.name),
+          member.name,
           `${subtask.title}\n\n${outcome.handover.summary}`,
         );
     } catch (error) {
@@ -622,7 +621,7 @@ export class Scheduler {
     const { end } = this.begin(subtask, "merge");
     try {
       // Git failing is put to you; anything else is a bug, and goes on up.
-      const merged = await mergeDesk(core.places, subtask.id, memberSigner(subtask.assignee)).catch(
+      const merged = await mergeDesk(core.places, subtask.id, subtask.assignee).catch(
         (error: unknown) => {
           if (error instanceof GitError) return error;
           throw error;
