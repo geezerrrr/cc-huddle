@@ -1,7 +1,7 @@
 /**
  * Where openplan keeps things in its data folder (docs/design.md §3.4),
- * named here only: each repository's goals, each goal's files, the session
- * modes and the server's dependencies. A leaf, for the bootstrap too.
+ * named here: each repository's goals, each goal's files, and the folders of
+ * the session modes and the server's dependencies. A leaf, for the bootstrap too.
  */
 import { createHash } from "node:crypto";
 import path from "node:path";
@@ -24,41 +24,10 @@ export const goalFolder = (repoFolder: string, slug: string) =>
   path.join(goalsFolder(repoFolder), slug);
 
 /** Where each session's permission mode is kept, by its pid (session-mode.ts). */
-export function sessionModes(dataFolder: string) {
-  const folder = path.join(dataFolder, "sessions");
-  return {
-    folder,
-    file: (pid: number) => path.join(folder, `${String(pid)}.mode`),
-    /** The session a file in the folder is kept for; undefined for a file that isn't a mode. */
-    pidOf: (name: string) => {
-      const { name: pid, ext } = path.parse(name);
-      return ext === ".mode" ? Number(pid) : undefined;
-    },
-  };
-}
+export const sessionsFolder = (dataFolder: string) => path.join(dataFolder, "sessions");
 
 /** Where the MCP server's npm dependencies are installed, by version (bootstrap.ts). */
-export function depsFolders(dataFolder: string) {
-  const folder = path.join(dataFolder, "deps");
-  return {
-    folder,
-    /** A version's dependencies, by the hash of what it locks. */
-    version: (hash: string) => path.join(folder, hash.slice(0, 12)),
-    /** Where process `pid` installs a version, beside it, before it moves in whole. */
-    draft: (version: string, pid: number) => `${version}.${String(pid)}`,
-    /** The process installing in a folder there; undefined for a version's own folder. */
-    pidOf: (name: string) => {
-      const [, pid] = name.split(".");
-      return pid === undefined ? undefined : Number(pid);
-    },
-  };
-}
-
-/** The files a lock is taken through, beside it (lock.ts): a taker's own, by its pid, and the claim on an ended holder's. */
-export const lockFiles = (lock: string) => ({
-  mine: (pid: number) => `${lock}.${String(pid)}`,
-  claim: (holder: string) => `${lock}.ended-${holder}`,
-});
+export const depsFolder = (dataFolder: string) => path.join(dataFolder, "deps");
 
 /** The files and folders in a goal's folder. */
 export const goalFiles = (folder: string) => ({

@@ -37,8 +37,6 @@ export type OpenplanTeam = {
   resumeRefused?: string;
   /** Why `/openplan pause` pauses nothing now: your session runs no goal, or its goal isn't under way. */
   pauseRefused?: string;
-  /** What is said when what you typed in a need's dialog answers none of it. */
-  typedAnswersNone: string;
 };
 
 export type OpenplanMeeting = {

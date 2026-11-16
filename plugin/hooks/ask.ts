@@ -54,9 +54,8 @@ export async function askNeed(
   need: OpenplanNeed,
   answer: (given: OpenplanAnswer) => Promise<void>,
 ) {
-  const team = await readTeam($);
   // Answered meanwhile, in the pane: nothing left to ask.
-  if (!team?.needs.some((n) => n.id === need.id)) return;
+  if (!(await readTeam($))?.needs.some((n) => n.id === need.id)) return;
   let given;
   try {
     given = await askedAnswer($, need);
@@ -65,5 +64,5 @@ export async function askNeed(
     return;
   }
   if (given) await answer(given);
-  else $.ui.toast(team.typedAnswersNone);
+  else $.ui.toast("openplan: what you typed answers none of it; it waits in Needs you");
 }

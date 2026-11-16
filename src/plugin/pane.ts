@@ -20,12 +20,9 @@ import {
   type Derived,
   type GoalEntry,
   inProgress,
-  type InProgress,
   type LiveRun,
   type Meeting,
   type Member,
-  type NoteOption,
-  PERMISSION_NOTE,
   type PermissionOption,
   type QuestionToYou,
   type RecordEntry,
@@ -89,8 +86,7 @@ export function followedOf(member: string, work: Work): Subtask | undefined {
 
 function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>): OpenplanMember {
   const own = work.subtasks.filter((s) => s.assignee === member.name);
-  const at = (...statuses: InProgress["status"][]) =>
-    own.find((s): s is InProgress => inProgress(s) && statuses.includes(s.status));
+  const at = (...statuses: Subtask["status"][]) => own.find((s) => statuses.includes(s.status));
   const reviewing = work.subtasks.find(
     (s) => s.assignee !== member.name && derived.subtasks[s.id]?.reviewedBy === member.name,
   );
@@ -158,7 +154,7 @@ function needOf(question: QuestionToYou, work: Work): OpenplanNeed {
   };
   switch (question.kind) {
     case "permission": {
-      const { options, note } = answersOf(question.permission.options, { option: PERMISSION_NOTE });
+      const { options, note } = answersOf(question.permission.options, { option: "deny" });
       return {
         ...head,
         kind: "options",
@@ -328,9 +324,6 @@ function othersBand(others: readonly GoalEntry[]): string | undefined {
   return parts.length ? parts.join(" · ") : undefined;
 }
 
-/** What you typed in a need's dialog answers none of it: it stays. */
-const TYPED_ANSWERS_NONE = "openplan: what you typed answers none of it; it waits in Needs you";
-
 /** Why `/openplan resume` takes nothing up when the repository has no goal this session doesn't run. */
 const NOTHING_TO_RESUME = "No goal to resume.";
 
@@ -360,7 +353,6 @@ export function paneTeam(
       resumable: resumableOf(others),
       ...(!others.length && { resumeRefused: NOTHING_TO_RESUME }),
       pauseRefused: noGoal,
-      typedAnswersNone: TYPED_ANSWERS_NONE,
     };
   }
   const { work, members } = mine;
@@ -385,7 +377,6 @@ export function paneTeam(
     ...(goal.status === "active"
       ? { resumeRefused: resumeRefusal(goal.name) }
       : { pauseRefused: `"${goal.name}" isn't under way: it is ${goal.status}.` }),
-    typedAnswersNone: TYPED_ANSWERS_NONE,
   };
 }
 
@@ -452,7 +443,7 @@ function noticeText(notice: Notice): string {
 }
 
 /** A subtask in progress, in words: worked on and how far, or where it was handed over to. */
-function inProgressText(subtask: InProgress): string {
+function inProgressText(subtask: Subtask): string {
   switch (subtask.status) {
     case "running": {
       const step = stepText(subtask.progress);
@@ -480,6 +471,9 @@ const OPTION_LABELS: Record<PermissionOption | DecisionOption, string> = {
 };
 
 /** What a note typed instead of a pick says, for the option it goes with. */
+/** The answers a note typed instead of a pick goes with: denying a permission, sending work back. */
+type NoteOption = "deny" | "sendBack" | "revise";
+
 const NOTE_PROMPTS: Record<NoteOption, string> = {
   deny: "Or deny it, saying why",
   sendBack: "Or send it back, saying what to change",

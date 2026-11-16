@@ -10,7 +10,7 @@ import path from "node:path";
 import type { PermissionMode } from "@anthropic-ai/claude-agent-sdk";
 import { textIfThere, writeWhole } from "../shared/files.ts";
 import { running } from "../shared/running.ts";
-import { sessionModes } from "../shared/layout.ts";
+import { sessionsFolder } from "../shared/layout.ts";
 
 /** The modes a member works in, as the hooks name them. */
 const MODES: readonly PermissionMode[] = [
@@ -21,6 +21,9 @@ const MODES: readonly PermissionMode[] = [
   "bypassPermissions",
 ];
 
+const fileOf = (dataFolder: string, session: number) =>
+  path.join(sessionsFolder(dataFolder), `${String(session)}.mode`);
+
 /**
  * Keeps `mode` for session `session` (its pid), as a hook got it; plan mode
  * and any other that isn't a permission level leave the kept one. Files of
@@ -28,16 +31,15 @@ const MODES: readonly PermissionMode[] = [
  */
 export async function keepMode(dataFolder: string, session: number, mode: string) {
   if (!MODES.includes(mode as PermissionMode)) return;
-  const modes = sessionModes(dataFolder);
-  await writeWhole(modes.file(session), mode);
-  for (const name of await readdir(modes.folder)) {
-    const pid = modes.pidOf(name);
-    if (pid !== undefined && !running(pid))
-      await rm(path.join(modes.folder, name), { force: true });
+  await writeWhole(fileOf(dataFolder, session), mode);
+  for (const name of await readdir(sessionsFolder(dataFolder))) {
+    const { name: pid, ext } = path.parse(name);
+    if (ext === ".mode" && !running(Number(pid)))
+      await rm(path.join(sessionsFolder(dataFolder), name), { force: true });
   }
 }
 
 /** Session `session`'s mode as last kept; undefined before any. */
 export function modeOf(dataFolder: string, session: number): PermissionMode | undefined {
-  return textIfThere(sessionModes(dataFolder).file(session)) as PermissionMode | undefined;
+  return textIfThere(fileOf(dataFolder, session)) as PermissionMode | undefined;
 }

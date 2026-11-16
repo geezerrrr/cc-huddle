@@ -240,14 +240,10 @@ export type DecisionOption = (typeof DECISION_OPTIONS)[number];
  * without one. A review stuck or failed, a merge with files it can't merge
  * line by line (`conflict`, its `files`) or one git failed, a task done.
  */
-export type Decision =
-  DecisionOf<"review" | "merge" | "delivery"> | (DecisionOf<"conflict"> & { files: string[] });
-
-interface DecisionOf<K extends string> {
-  kind: K;
+export type Decision = {
   options: DecisionOption[];
-  note?: { option: Extract<NoteOption, DecisionOption>; needed?: true };
-}
+  note?: { option: "sendBack" | "revise"; needed?: true };
+} & ({ kind: "review" | "merge" | "delivery" } | { kind: "conflict"; files: string[] });
 
 /** The decisions there are, each as it is put to you. */
 export const DECISIONS = {
@@ -286,10 +282,6 @@ export const noteNeeded = (decision: Decision, option: DecisionOption) =>
 /** The answers a permission request offers; a note typed instead denies it, saying why. */
 export const PERMISSION_OPTIONS = ["once", "always", "deny"] as const;
 export type PermissionOption = (typeof PERMISSION_OPTIONS)[number];
-export const PERMISSION_NOTE = "deny" satisfies PermissionOption;
-
-/** The answers a note typed instead of a pick goes with: denying a permission, sending work back. */
-export type NoteOption = typeof PERMISSION_NOTE | "sendBack" | "revise";
 
 /**
  * A tool call waiting to be allowed: the tool, and its input as the member

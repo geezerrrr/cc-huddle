@@ -26,7 +26,7 @@ How openplan behaves is `docs/design.md`: change it first, then the code. This f
 
 - One job per module, said in its header. A module that grows a second job is split along that seam.
 - A function says its job in its name and does that one job; a method that needs nested closures to read is a class or a module of its own.
-- Paths in the data folder are named in `src/shared/layout.ts` only.
+- The data folder's folders and a goal's files are named in `src/shared/layout.ts`; a file name only one module writes and reads stays in that module.
 - Agent SDK options are composed in `src/engine/policy.ts` only; a turn adds, in `turns.ts`, only what is its own: `resume`, `canUseTool`, its turn server and the tools it allows, an output schema, and the abort and the Claude Code process it runs under.
 - What a format is written as and read back from (a plan, the state) is in one module, both ways.
 
@@ -34,7 +34,7 @@ How openplan behaves is `docs/design.md`: change it first, then the code. This f
 
 - What a member's model reads: `src/engine/prompts.ts` only.
 - What your session's model reads and what you read: `src/plugin/words.ts` holds the words made from a kind (a status, a wait, a need, where a goal is), wherever they are said; any other sentence stays with what assembles it (`status.ts`, `pane.ts`, `tools.ts`), even when a like one is said elsewhere. Code never compares words: it compares kinds, and words are made from kinds.
-- The mod's own words are only its controls and labels, its tabs' empty states, the `/openplan resume` dialog, and what it says before the server answers or when a call fails. Everything about the team is the server's, served as sentences: the mod draws, it doesn't compose.
+- The mod's own words are only its controls and labels, its tabs' empty states, the `/openplan resume` dialog, what it says before the server answers or when a call fails, and how it reacts to its own dialogs. Everything about the team is the server's, served as sentences: the mod draws, it doesn't compose.
 - What your session's skill says is not repeated in a prompt to it: a prompt gives the facts and ids, and points to the skill.
 
 ## Contracts

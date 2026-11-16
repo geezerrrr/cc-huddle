@@ -39,19 +39,16 @@ const openQuestions = (state: Pick<Work, "questions">, subtaskId: string) =>
 
 const isActive = (state: Pick<GoalState, "goal">) => state.goal.status === "active";
 
-const IN_PROGRESS = [
+/** In progress: worked on, in review or being merged, or waiting on you there. */
+const IN_PROGRESS: readonly Subtask["status"][] = [
   "running",
   "reviewing",
   "waitingInReview",
   "merging",
   "waitingInMerge",
-] as const satisfies readonly Subtask["status"][];
+];
 
-/** A subtask in progress: worked on, in review or being merged, or waiting on you there. */
-export type InProgress = Subtask & { status: (typeof IN_PROGRESS)[number] };
-
-export const inProgress = (subtask: Subtask): subtask is InProgress =>
-  (IN_PROGRESS as readonly Subtask["status"][]).includes(subtask.status);
+export const inProgress = (subtask: Subtask) => IN_PROGRESS.includes(subtask.status);
 
 /** Handed over: in review or being merged, waiting on you there or stopped there, its delivery standing. */
 const HANDED_OVER: readonly Subtask["status"][] = [

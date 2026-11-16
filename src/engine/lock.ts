@@ -8,7 +8,6 @@ import { unlinkSync } from "node:fs";
 import { setTimeout as delay } from "node:timers/promises";
 import { errorCode } from "../shared/errors.ts";
 import { renameOver, textIfThere, writeWhole } from "../shared/files.ts";
-import { lockFiles } from "../shared/layout.ts";
 import { running } from "../shared/running.ts";
 
 /** A process that runs a goal, or would: its session's pid, and where it is asked to let the goal go. */
@@ -44,7 +43,7 @@ export function holderOf(lock: string): Holder | undefined {
 
 /** This process as the holder, in a file of its own beside the lock, to be put in place whole. */
 async function holding(lock: string, me: Runner): Promise<string> {
-  const file = lockFiles(lock).mine(process.pid);
+  const file = `${lock}.${String(process.pid)}`;
   const holder: Holder = { pid: process.pid, ...me };
   await writeWhole(file, JSON.stringify(holder));
   return file;
@@ -94,7 +93,7 @@ export async function takeLock<T>(
         }
         // Nothing answers where it is asked: its server ended, and its pid is another process's since.
       }
-      const claim = lockFiles(lock).claim(String(holder?.pid ?? "unread"));
+      const claim = `${lock}.ended-${String(holder?.pid ?? "unread")}`;
       try {
         await link(mine, claim);
       } catch (error) {

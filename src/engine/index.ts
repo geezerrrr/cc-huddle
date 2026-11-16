@@ -5,14 +5,7 @@
  */
 export type { Team } from "./core.ts";
 export type { GoalEntry } from "./data.ts";
-export {
-  acceptanceOf,
-  derive,
-  inProgress,
-  type InProgress,
-  taskDone,
-  type Work,
-} from "./derive.ts";
+export { acceptanceOf, derive, inProgress, taskDone, type Work } from "./derive.ts";
 export { Engine, type EngineOptions, type HandedOver } from "./engine.ts";
 export { GitError, goalBranch, SLUG } from "./git.ts";
 export { planSchema, writtenPlan } from "./plan.ts";

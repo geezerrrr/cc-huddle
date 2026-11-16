@@ -192,7 +192,6 @@ describe("the pane's socket and tools", () => {
       resumeRefused: "No goal to resume.",
       pauseRefused:
         "This session runs no goal. Hand the team a task with /openplan <task>, or take a goal up with /openplan resume.",
-      typedAnswersNone: "openplan: what you typed answers none of it; it waits in Needs you",
     });
     expect(await view({ revision: first.revision })).toEqual({ revision: first.revision });
     await session.start("Dice");

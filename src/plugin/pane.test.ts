@@ -342,7 +342,6 @@ Take it to the user as openplan's team skill says.`,
       resumable: [],
       resumeRefused: "No goal to resume.",
       pauseRefused: none,
-      typedAnswersNone: "openplan: what you typed answers none of it; it waits in Needs you",
     });
     expect(noGoal([], "Dice").noGoal).toBe(
       '"Dice" moved to another Claude Code session. Bring it back here with /openplan resume.',
