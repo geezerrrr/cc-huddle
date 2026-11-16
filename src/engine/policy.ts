@@ -61,7 +61,7 @@ export function expandEnv(env: Record<string, string>, from: Env): Record<string
  * The flag settings a member's sessions run under: the team's settings, the
  * member's environment, and the guards every member has. No permission mode
  * or sandbox of openplan's own: what isn't the team's is your settings' and
- * your session's mode (workOptions). openplan is off in them, so a member
+ * your session's mode (sessionOptions). openplan is off in them, so a member
  * never starts a team of its own, and they take no message from your
  * sessions and send none.
  */
