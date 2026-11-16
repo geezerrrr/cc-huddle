@@ -33,7 +33,7 @@ How openplan behaves is `docs/design.md`: change it first, then the code. This f
 ## Words
 
 - What a member's model reads: `src/engine/prompts.ts` only.
-- What your session's model reads and what you read: `src/plugin/words.ts` holds each thing said in more than one place; a sentence said once stays with what assembles it (`status.ts`, `pane.ts`, `tools.ts`). Code never compares words: it compares kinds, and words are made from kinds.
+- What your session's model reads and what you read: `src/plugin/words.ts` holds the words made from a kind (a status, a wait, a need, where a goal is), wherever they are said; any other sentence stays with what assembles it (`status.ts`, `pane.ts`, `tools.ts`), even when a like one is said elsewhere. Code never compares words: it compares kinds, and words are made from kinds.
 - The mod's own words are only its controls and labels, its tabs' empty states, the `/openplan resume` dialog, and what it says before the server answers or when a call fails. Everything about the team is the server's, served as sentences: the mod draws, it doesn't compose.
 - What your session's skill says is not repeated in a prompt to it: a prompt gives the facts and ids, and points to the skill.
 

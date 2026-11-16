@@ -50,7 +50,6 @@ import {
   whereOf,
   STATUS_WORDS,
   stepText,
-  goalsWhere,
 } from "./words.ts";
 
 /** The meeting the pane shows: one under way, else one whose plan waits on you, else the latest. */
@@ -320,10 +319,12 @@ function bandText(work: Work, needs: number): string {
 
 /** The band of a session without a goal: the goals it can take up, but those archived; nothing with none. */
 function othersBand(others: readonly GoalEntry[]): string | undefined {
-  const parts = (["paused", "elsewhere"] as const).flatMap((where) => {
-    const count = others.filter((e) => whereOf(e) === where).length;
-    return count ? [goalsWhere(count, where)] : [];
-  });
+  const paused = others.filter((e) => whereOf(e) === "paused").length;
+  const elsewhere = others.filter((e) => whereOf(e) === "elsewhere").length;
+  const parts = [
+    ...(paused ? [plural(paused, "goal paused", "goals paused")] : []),
+    ...(elsewhere ? [`${plural(elsewhere, "goal", "goals")} in another session`] : []),
+  ];
   return parts.length ? parts.join(" · ") : undefined;
 }
 

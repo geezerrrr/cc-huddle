@@ -22,7 +22,7 @@ import {
 import type { OpenplanCalls } from "../../plugin/types/index.d.ts";
 import type { Session } from "./session.ts";
 import { othersText, statusText } from "./status.ts";
-import { attendanceText, plural, rosterOf, STATUS_WORDS, SENT_BACK_FIELD } from "./words.ts";
+import { attendanceText, plural, rosterOf, STATUS_WORDS } from "./words.ts";
 import { toolText } from "../shared/text.ts";
 
 const meeting = z.string().describe("The meeting's id");
@@ -257,7 +257,7 @@ export function addTools(server: McpServer, session: Session) {
         question: z.string().describe("The id of what waits on the user"),
         decision: z.enum(DECISION_OPTIONS),
         note: z.string().trim().optional().describe("What to change, in the user's words"),
-        sent_back: z.string().optional().describe(SENT_BACK_FIELD),
+        sent_back: z.string().optional().describe("The subtask a revised task goes back to"),
       },
     },
     async ({ question, decision, note, sent_back }) => {

@@ -163,13 +163,14 @@ export function needWords(
           };
         }
         case "conflict":
+          return {
+            headline: `Merging "${title ?? ""}" is stuck. What now?`,
+            detail: question.decision.files.join(", "),
+          };
         case "merge":
           return {
             headline: `Merging "${title ?? ""}" is stuck. What now?`,
-            detail:
-              question.decision.kind === "conflict"
-                ? question.decision.files.join(", ")
-                : question.text,
+            detail: question.text,
           };
         case "delivery":
           return { headline: `The task "${question.text}" is done. Accept it?` };
@@ -195,13 +196,6 @@ const WHERE_WORDS: Record<GoalWhere, string> = {
   archived: "archived",
   paused: "paused",
 };
-
-/** How many of the repository's goals are `where`: "2 goals paused". */
-export const goalsWhere = (count: number, where: GoalWhere) =>
-  `${plural(count, "goal", "goals")} ${WHERE_WORDS[where]}`;
-
-/** What the subtask a revised task goes back to is, as both tools that send one back describe it. */
-export const SENT_BACK_FIELD = "The subtask a revised task goes back to";
 
 /** How far a goal got, in words. */
 function progressOf({ subtasks, meetings }: Pick<GoalState, "subtasks" | "meetings">): string {

@@ -23,7 +23,7 @@ import type { PaneServer } from "./pane-server.ts";
 import type { Session } from "./session.ts";
 
 import { toolText } from "../shared/text.ts";
-import { rosterOf, SENT_BACK_FIELD } from "./words.ts";
+import { rosterOf } from "./words.ts";
 
 const isPermission = (option: string): option is PermissionOption =>
   (PERMISSION_OPTIONS as readonly string[]).includes(option);
@@ -35,7 +35,7 @@ const answerSchema = z.discriminatedUnion("kind", [
     kind: z.literal("option"),
     option: z.enum([...PERMISSION_OPTIONS, ...DECISION_OPTIONS]),
     note: z.string().trim().optional().describe("Why it is denied, or what to change"),
-    sentBack: z.string().optional().describe(SENT_BACK_FIELD),
+    sentBack: z.string().optional().describe("The subtask a revised task goes back to"),
   }),
   z.object({
     kind: z.literal("choices"),
