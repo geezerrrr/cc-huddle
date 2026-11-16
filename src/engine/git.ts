@@ -109,8 +109,8 @@ export async function openRepository(folder: string): Promise<Repository> {
   const [top, common] = found.stdout.split("\n");
   if (found.code !== 0 || !top || !common)
     throw new GitError("rev-parse", `${folder} is not in a git repository`);
-  const head = await git(at, ["rev-parse", "--verify", "-q", "HEAD"], { allow: [1] });
-  if (head.code !== 0) throw new GitError("rev-parse", `${top} has no commit to start from yet`);
+  if (!(await verifies(at, "HEAD")))
+    throw new GitError("rev-parse", `${top} has no commit to start from yet`);
   return { top: await realpath(top), common: await realpath(path.resolve(folder, common)) };
 }
 
@@ -165,13 +165,12 @@ export function slugFor(name: string, taken: ReadonlySet<string>): string {
 const unlist = (repo: Repository, folder: string) =>
   git({ cwd: repo.top }, ["worktree", "remove", "--force", folder], { allow: [128] });
 
+/** Whether `ref` names a commit where `at` runs. */
+const verifies = async (at: At, ref: string) =>
+  (await git(at, ["rev-parse", "--verify", "-q", ref], { allow: [1] })).code === 0;
+
 /** Whether the repository has a branch. */
-async function hasBranch(repo: Repository, branch: string): Promise<boolean> {
-  const found = await git({ cwd: repo.top }, ["rev-parse", "--verify", "-q", branch], {
-    allow: [1],
-  });
-  return found.code === 0;
-}
+const hasBranch = (repo: Repository, branch: string) => verifies({ cwd: repo.top }, branch);
 
 /** Checks a branch out in a worktree at `folder`, listed afresh: a new branch from `from`, if given. */
 async function checkOut(repo: Repository, folder: string, branch: string, from?: string) {
@@ -260,8 +259,7 @@ async function worktreeAt(repo: Repository, tree: string): Promise<At> {
 }
 
 /** Whether a worktree is in the middle of a merge. */
-const merging = async (at: At) =>
-  (await git(at, ["rev-parse", "-q", "--verify", "MERGE_HEAD"], { allow: [1] })).code === 0;
+const merging = (at: At) => verifies(at, "MERGE_HEAD");
 
 /**
  * Commits what a subtask's worktree holds and its member left uncommitted, in
@@ -422,7 +420,7 @@ export function abortMerge(places: Places, subtaskId: string): Promise<void> {
   });
 }
 
-/** Throws a subtask's worktree away with its branch: it starts over, or its goal is deleted. */
+/** Throws a subtask's worktree away with its branch: it starts over. */
 export function dropDesk(places: Places, subtaskId: string): Promise<void> {
   return perGoal(places, () => removeDesk(places, subtaskId));
 }

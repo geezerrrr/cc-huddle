@@ -111,7 +111,7 @@ export type Notice =
   | { kind: "fallback"; from: string; to: string }
   | { kind: "refusal"; model: string }
   | { kind: "task"; state: "started" | "done" | "stopped" | "failed"; title: string }
-  | { kind: "rate-limit"; status: "warning" | "rejected"; resetsAt?: number }
+  | { kind: "rate-limit"; status: "warning" | "rejected" }
   | { kind: "subagent-retry"; attempt: number; max: number; delayMs: number };
 
 /** One item of a turn's todo list. */
@@ -257,9 +257,6 @@ export function turnDecoder(listener: TurnListener) {
           notify({
             kind: "rate-limit",
             status: message.rate_limit_info.status === "rejected" ? "rejected" : "warning",
-            ...(message.rate_limit_info.resetsAt !== undefined && {
-              resetsAt: message.rate_limit_info.resetsAt,
-            }),
           });
         return;
       case "tool_progress":

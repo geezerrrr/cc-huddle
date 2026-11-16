@@ -23,6 +23,7 @@ import {
   abortMerge,
   commitDesk,
   dropDesk,
+  GitError,
   memberSigner,
   mergeDesk,
   openDesk,
@@ -620,8 +621,15 @@ export class Scheduler {
     const { core } = this;
     const { end } = this.begin(subtask, "merge");
     try {
-      const merged = await mergeDesk(core.places, subtask.id, memberSigner(subtask.assignee));
-      if (merged.kind === "merged") {
+      // Git failing is put to you; anything else is a bug, and goes on up.
+      const merged = await mergeDesk(core.places, subtask.id, memberSigner(subtask.assignee)).catch(
+        (error: unknown) => {
+          if (error instanceof GitError) return error;
+          throw error;
+        },
+      );
+      if (merged instanceof GitError) this.ask(subtask, DECISIONS.failedMerge(), errorText(merged));
+      else if (merged.kind === "merged") {
         this.move(subtask, "merged");
         subtask.conflict = undefined;
         this.finished(subtask);
@@ -632,8 +640,6 @@ export class Scheduler {
         subtask.conflict = { files: merged.text };
         if (subtask.session) goOnWith(subtask, { why: "conflict" });
       }
-    } catch (error) {
-      this.ask(subtask, DECISIONS.failedMerge(), errorText(error));
     } finally {
       end();
       core.changed();

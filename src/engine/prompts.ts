@@ -41,7 +41,7 @@ You are ${member.name}, the ${member.role.title} on a team of Claude Code sessio
 ${others.length ? `Your teammates: ${others.join(", ")}.` : "You are the only member."}
 
 # Your duties
-${member.role.duties.trim()}`;
+${member.role.duties}`;
   return kind === "work" ? `${who}\n\n${TASK_WAYS}` : who;
 }
 
