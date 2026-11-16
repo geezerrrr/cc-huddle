@@ -76,7 +76,7 @@ function closePane($: $) {
   });
 }
 
-/** The pane's last line: the keys that work on the page, Back on a member's record. */
+/** The pane's last line: the keys that work on the page, Back to the team on the meeting and a member's record. */
 function keysLine($: $, ui: Ui, back?: () => void) {
   const { Box, Button, Text } = ui;
   return (
@@ -333,7 +333,15 @@ export async function paneView($: $, ui: Ui) {
           : shown === "team"
             ? teamTab($, ui, now)
             : await needsTab($, ui, now.needs)}
-      {keysLine($, ui, member !== undefined ? () => follow($, null) : undefined)}
+      {keysLine(
+        $,
+        ui,
+        member !== undefined
+          ? () => follow($, null)
+          : shown === "meeting"
+            ? () => showTab($, "team")
+            : undefined,
+      )}
     </Box>
   );
 }

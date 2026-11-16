@@ -320,6 +320,10 @@ test("the meeting shows the turn being spoken as a record, and your scrolling re
   expect(calls.at(-1)?.args).toEqual({ revision: 1, speaking: { speech: "sp1", next: 1 } });
   expect((await pane.find({ key: "speaking-e1-md" }))?.text).toBe("Hex it is");
   expect(await pane.find({ type: "Text", text: "⏺ Grep(board)" })).toBeDefined();
+  // Back leaves the meeting for the team.
+  await pane.press({ key: "back" });
+  expect(await pane.find({ key: "said-0" })).toBeUndefined();
+  expect(await pane.find({ key: "back" })).toBeUndefined();
   await pane.unmount();
 });
 
