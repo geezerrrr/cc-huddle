@@ -7566,6 +7566,14 @@ var errorCode = (error62) => error62.code;
 // src/shared/files.ts
 import { readFileSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+async function ifThere(reading, missing) {
+  try {
+    return await reading;
+  } catch (error62) {
+    if (errorCode(error62) === "ENOENT" || errorCode(error62) === "ENOTDIR") return missing;
+    throw error62;
+  }
+}
 function textIfThere(file2) {
   try {
     return readFileSync(file2, "utf8");
@@ -7575,27 +7583,15 @@ function textIfThere(file2) {
   }
 }
 async function jsonIfThere(file2) {
-  let text2;
-  try {
-    text2 = await readFile(file2, "utf8");
-  } catch (error62) {
-    if (errorCode(error62) === "ENOENT") return void 0;
-    throw error62;
-  }
+  const text2 = await ifThere(readFile(file2, "utf8"), void 0);
+  if (text2 === void 0) return void 0;
   try {
     return JSON.parse(text2);
   } catch (error62) {
     throw new SyntaxError(`${file2}: ${error62.message}`, { cause: error62 });
   }
 }
-async function namesIfThere(folder2) {
-  try {
-    return await readdir(folder2);
-  } catch (error62) {
-    if (errorCode(error62) === "ENOENT") return [];
-    throw error62;
-  }
-}
+var namesIfThere = (folder2) => ifThere(readdir(folder2), []);
 
 // src/shared/layout.ts
 import { createHash } from "node:crypto";

@@ -52,15 +52,10 @@ async function ifThere(reading, missing) {
     throw error;
   }
 }
-async function exists(file) {
-  try {
-    await stat(file);
-    return true;
-  } catch (error) {
-    if (errorCode(error) === "ENOENT") return false;
-    throw error;
-  }
-}
+var exists = (file) => ifThere(
+  stat(file).then(() => true),
+  false
+);
 function textIfThere(file) {
   try {
     return readFileSync(file, "utf8");
@@ -70,27 +65,15 @@ function textIfThere(file) {
   }
 }
 async function jsonIfThere(file) {
-  let text;
-  try {
-    text = await readFile(file, "utf8");
-  } catch (error) {
-    if (errorCode(error) === "ENOENT") return void 0;
-    throw error;
-  }
+  const text = await ifThere(readFile(file, "utf8"), void 0);
+  if (text === void 0) return void 0;
   try {
     return JSON.parse(text);
   } catch (error) {
     throw new SyntaxError(`${file}: ${error.message}`, { cause: error });
   }
 }
-async function namesIfThere(folder2) {
-  try {
-    return await readdir(folder2);
-  } catch (error) {
-    if (errorCode(error) === "ENOENT") return [];
-    throw error;
-  }
-}
+var namesIfThere = (folder2) => ifThere(readdir(folder2), []);
 var HELD = /* @__PURE__ */ new Set(["EPERM", "EACCES", "EBUSY"]);
 var HELD_WAIT_MS = 5e3;
 async function renameOver(from, to) {
@@ -153,37 +136,8 @@ function repoFolder(dataFolder2, repo) {
 }
 var goalsFolder = (repoFolder2) => path2.join(repoFolder2, "goals");
 var goalFolder = (repoFolder2, slug) => path2.join(goalsFolder(repoFolder2), slug);
-function sessionModes(dataFolder2) {
-  const folder2 = path2.join(dataFolder2, "sessions");
-  return {
-    folder: folder2,
-    file: (pid) => path2.join(folder2, `${String(pid)}.mode`),
-    /** The session a file in the folder is kept for; undefined for a file that isn't a mode. */
-    pidOf: (name) => {
-      const { name: pid, ext } = path2.parse(name);
-      return ext === ".mode" ? Number(pid) : void 0;
-    }
-  };
-}
-function depsFolders(dataFolder2) {
-  const folder2 = path2.join(dataFolder2, "deps");
-  return {
-    folder: folder2,
-    /** A version's dependencies, by the hash of what it locks. */
-    version: (hash) => path2.join(folder2, hash.slice(0, 12)),
-    /** Where process `pid` installs a version, beside it, before it moves in whole. */
-    draft: (version, pid) => `${version}.${String(pid)}`,
-    /** The process installing in a folder there; undefined for a version's own folder. */
-    pidOf: (name) => {
-      const [, pid] = name.split(".");
-      return pid === void 0 ? void 0 : Number(pid);
-    }
-  };
-}
-var lockFiles = (lock) => ({
-  mine: (pid) => `${lock}.${String(pid)}`,
-  claim: (holder) => `${lock}.ended-${holder}`
-});
+var sessionsFolder = (dataFolder2) => path2.join(dataFolder2, "sessions");
+var depsFolder = (dataFolder2) => path2.join(dataFolder2, "deps");
 var goalFiles = (folder2) => ({
   state: path2.join(folder2, "state.json"),
   lock: path2.join(folder2, "lock"),
@@ -221,8 +175,7 @@ export {
   repoFolder,
   goalsFolder,
   goalFolder,
-  sessionModes,
-  depsFolders,
-  lockFiles,
+  sessionsFolder,
+  depsFolder,
   goalFiles
 };

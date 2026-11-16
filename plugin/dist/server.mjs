@@ -1,11 +1,11 @@
 import { createRequire } from "node:module"; const require = createRequire(import.meta.url);
 import {
   dataFolder,
-  depsFolders,
+  depsFolder,
   exists,
   renameOver,
   running
-} from "./chunks/chunk-L4DDGNIV.mjs";
+} from "./chunks/chunk-MDEZBUZ3.mjs";
 
 // src/plugin/bootstrap.ts
 import { execFile } from "node:child_process";
@@ -25,13 +25,14 @@ var manifests = await Promise.all(
     async (file) => [file, await readFile(path.join(here, file), "utf8")]
   )
 );
-var deps = depsFolders(dataFolder);
-var home = deps.version(
-  manifests.reduce((hash, [, text]) => hash.update(text), createHash("sha256")).digest("hex")
+var deps = depsFolder(dataFolder);
+var home = path.join(
+  deps,
+  manifests.reduce((hash, [, text]) => hash.update(text), createHash("sha256")).digest("hex").slice(0, 12)
 );
 var installed = () => exists(path.join(home, "node_modules"));
 if (!await installed()) {
-  const draft = deps.draft(home, process.pid);
+  const draft = `${home}.${String(process.pid)}`;
   await mkdir(draft, { recursive: true });
   for (const [file, text] of manifests) await writeFile(path.join(draft, file), text);
   try {
@@ -48,10 +49,10 @@ if (!await installed()) {
         cause: error
       });
   }
-  for (const name of await readdir(deps.folder)) {
-    const pid = deps.pidOf(name);
-    if (path.join(deps.folder, name) !== home && !(pid !== void 0 && running(pid)))
-      await rm(path.join(deps.folder, name), { recursive: true, force: true });
+  for (const name of await readdir(deps)) {
+    const [, pid] = name.split(".");
+    if (path.join(deps, name) !== home && !(pid && running(Number(pid))))
+      await rm(path.join(deps, name), { recursive: true, force: true });
   }
 }
 var ours = pathToFileURL(here).href;
@@ -62,4 +63,4 @@ registerHooks({
     return bare && context.parentURL?.startsWith(ours) ? next(specifier, { ...context, parentURL: from }) : next(specifier, context);
   }
 });
-await import("./chunks/server-4PF4WLKM.mjs");
+await import("./chunks/server-SBZYBDHZ.mjs");

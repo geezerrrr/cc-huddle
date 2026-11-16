@@ -62,18 +62,7 @@ function running(pid) {
 
 // src/shared/layout.ts
 import path2 from "node:path";
-function sessionModes(dataFolder2) {
-  const folder2 = path2.join(dataFolder2, "sessions");
-  return {
-    folder: folder2,
-    file: (pid) => path2.join(folder2, `${String(pid)}.mode`),
-    /** The session a file in the folder is kept for; undefined for a file that isn't a mode. */
-    pidOf: (name) => {
-      const { name: pid, ext } = path2.parse(name);
-      return ext === ".mode" ? Number(pid) : void 0;
-    }
-  };
-}
+var sessionsFolder = (dataFolder2) => path2.join(dataFolder2, "sessions");
 
 // src/plugin/session-mode.ts
 var MODES = [
@@ -83,14 +72,14 @@ var MODES = [
   "dontAsk",
   "bypassPermissions"
 ];
+var fileOf = (dataFolder2, session) => path3.join(sessionsFolder(dataFolder2), `${String(session)}.mode`);
 async function keepMode(dataFolder2, session, mode) {
   if (!MODES.includes(mode)) return;
-  const modes = sessionModes(dataFolder2);
-  await writeWhole(modes.file(session), mode);
-  for (const name of await readdir2(modes.folder)) {
-    const pid = modes.pidOf(name);
-    if (pid !== void 0 && !running(pid))
-      await rm(path3.join(modes.folder, name), { force: true });
+  await writeWhole(fileOf(dataFolder2, session), mode);
+  for (const name of await readdir2(sessionsFolder(dataFolder2))) {
+    const { name: pid, ext } = path3.parse(name);
+    if (ext === ".mode" && !running(Number(pid)))
+      await rm(path3.join(sessionsFolder(dataFolder2), name), { force: true });
   }
 }
 
