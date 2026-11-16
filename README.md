@@ -28,11 +28,13 @@ For one focused job, a subagent is cheaper and quicker. cc-huddle is for work wi
 
 ## Install
 
-In Claude Code:
+In a terminal:
 
 ```
-/plugin install cc-huddle --marketplace geezerrrr/cc-huddle
+claude plugin install cc-huddle --marketplace geezerrrr/cc-huddle
 ```
+
+The plugin is then `cc-huddle@geezerrrr`.
 
 ## Set up a team
 

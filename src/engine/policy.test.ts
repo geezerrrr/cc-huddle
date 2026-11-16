@@ -40,7 +40,7 @@ describe("memberSettings", () => {
       },
       glm,
       { GLM_KEY: "secret" },
-      ["cc-huddle@cc-huddle", "cc-huddle@acme.tools"],
+      ["cc-huddle@geezerrrr", "cc-huddle@acme.tools"],
     );
     expect(settings).toEqual({
       permissions: {
@@ -50,7 +50,7 @@ describe("memberSettings", () => {
       env: { CI: "1", ANTHROPIC_BASE_URL: "https://glm.example", ANTHROPIC_AUTH_TOKEN: "secret" },
       enabledPlugins: {
         "other@market": true,
-        "cc-huddle@cc-huddle": false,
+        "cc-huddle@geezerrrr": false,
         "cc-huddle@acme.tools": false,
       },
       crossSessionInbound: "refuse",
@@ -62,7 +62,7 @@ describe("memberSettings", () => {
       { permissions: { defaultMode: "default" }, sandbox: { enabled: false } },
       glm,
       { GLM_KEY: "secret" },
-      ["cc-huddle@cc-huddle"],
+      ["cc-huddle@geezerrrr"],
     );
     expect(settings).toMatchObject({
       permissions: { defaultMode: "default" },
