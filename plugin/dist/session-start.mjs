@@ -7390,7 +7390,6 @@ function can(machine, state, event) {
 
 // src/engine/types.ts
 var isHalted = (status) => status === "failed" || status === "stopped" || status === "stoppedInReview" || status === "stoppedInMerge";
-var MEETING_SIZES = ["small", "discussion", "large"];
 var hostOf = (meeting) => meeting.participants[0];
 var toYou = (question) => question.kind !== "teammate";
 var isAcceptance = (question) => question.kind === "decision" && question.decision.kind === "delivery";
@@ -7722,7 +7721,7 @@ function holderOf(lock) {
 }
 
 // src/engine/data.ts
-var STATE_VERSION = 5;
+var STATE_VERSION = 6;
 async function readState(file2) {
   const text2 = await readFile3(file2, "utf8");
   let saved;
@@ -53354,31 +53353,23 @@ function date4(params) {
 var TURN_SERVER = "huddle";
 var turnToolName = (name) => `mcp__${TURN_SERVER}__${name}`;
 
-// src/engine/run.ts
-var OWN_TOOLS = /* @__PURE__ */ new Set([turnToolName("ask_teammate"), turnToolName("deliver")]);
-
-// src/engine/review.ts
-var verdictSchema = external_exports.object({ pass: external_exports.boolean(), notes: external_exports.string().trim() });
-
 // src/engine/team.ts
 import { readFile as readFile4 } from "node:fs/promises";
 var import_yaml = __toESM(require_dist(), 1);
 import path3 from "node:path";
 var teamFolder = (top) => path3.join(top, ".claude", "huddle");
 var EFFORTS = ["low", "medium", "high", "xhigh", "max"];
-var roleSchema = external_exports.object({ title: external_exports.string().trim().min(1) });
+var settingsSchema = external_exports.record(external_exports.string(), external_exports.unknown());
+var roleSchema = external_exports.object({ title: external_exports.string().trim().min(1).optional() });
 var memberSchema = external_exports.object({
   role: external_exports.string().trim().min(1),
   model: external_exports.string().trim().min(1).optional(),
   effort: external_exports.enum(EFFORTS).optional(),
   // As in `.mcp.json`, though YAML reads `API_TIMEOUT_MS: 3000000` as a number.
-  env: external_exports.record(external_exports.string(), external_exports.union([external_exports.string(), external_exports.number(), external_exports.boolean()]).transform(String)).default({})
+  env: external_exports.record(external_exports.string(), external_exports.union([external_exports.string(), external_exports.number(), external_exports.boolean()]).transform(String)).default({}),
+  settings: settingsSchema.optional()
 });
-var teamSchema = external_exports.object({
-  review: external_exports.boolean().optional(),
-  meetingSize: external_exports.enum(MEETING_SIZES).optional()
-});
-var settingsSchema = external_exports.record(external_exports.string(), external_exports.unknown());
+var teamSchema = external_exports.object({ members: external_exports.record(external_exports.string(), memberSchema).default({}) });
 var TeamError = class extends Error {
 };
 function parsed(schema, data, file2) {
@@ -53387,25 +53378,23 @@ function parsed(schema, data, file2) {
 ${external_exports.prettifyError(result.error)}`);
   return result.data;
 }
-async function markdownFiles(folder2) {
+function yamlIn(text2, file2) {
+  try {
+    return (0, import_yaml.parse)(text2) ?? {};
+  } catch (error62) {
+    throw new TeamError(`${file2}: ${errorText(error62)}`, { cause: error62 });
+  }
+}
+async function roleFiles(folder2) {
   const names = (await namesIfThere(folder2)).filter((name) => name.endsWith(".md")).sort();
   return Promise.all(
     names.map(async (name) => {
       const file2 = path3.join(folder2, name);
       const text2 = await readFile4(file2, "utf8");
       const front = /^---\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(text2);
-      let data;
-      try {
-        data = (0, import_yaml.parse)(front?.[1] ?? "") ?? {};
-      } catch (error62) {
-        throw new TeamError(`${file2}: ${errorText(error62)}`, { cause: error62 });
-      }
-      return {
-        name: name.slice(0, -".md".length),
-        file: file2,
-        data,
-        body: text2.slice(front?.[0].length ?? 0)
-      };
+      const id2 = name.slice(0, -".md".length);
+      const { title } = parsed(roleSchema, yamlIn(front?.[1] ?? "", file2), file2);
+      return [id2, { title: title ?? id2, duties: text2.slice(front?.[0].length ?? 0).trim() }];
     })
   );
 }
@@ -53421,16 +53410,14 @@ var isObject2 = (value) => typeof value === "object" && value !== null && !Array
 async function loadTeam(userTeam, top) {
   const roles = /* @__PURE__ */ new Map();
   const written = /* @__PURE__ */ new Map();
-  let own2 = {};
   let settings = {};
   const folders = [userTeam, teamFolder(top)];
   for (const folder2 of folders) {
-    for (const { name, file: file2, data, body } of await markdownFiles(path3.join(folder2, "roles")))
-      roles.set(name, { title: parsed(roleSchema, data, file2).title, duties: body.trim() });
-    for (const { name, file: file2, data } of await markdownFiles(path3.join(folder2, "members")))
-      written.set(name, { file: file2, data });
-    const teamFile = path3.join(folder2, "team.json");
-    own2 = { ...own2, ...parsed(teamSchema, await jsonIfThere(teamFile) ?? {}, teamFile) };
+    for (const [id2, role] of await roleFiles(path3.join(folder2, "roles"))) roles.set(id2, role);
+    const teamFile = path3.join(folder2, "team.yaml");
+    const text2 = await ifThere(readFile4(teamFile, "utf8"), "");
+    const { members: members3 } = parsed(teamSchema, yamlIn(text2, teamFile), teamFile);
+    for (const [name, member] of Object.entries(members3)) written.set(name, member);
     const settingsFile = path3.join(folder2, "settings.json");
     settings = mergeSettings(
       settings,
@@ -53438,32 +53425,30 @@ async function loadTeam(userTeam, top) {
     );
   }
   const byName = [...written].sort(([a], [b]) => a < b ? -1 : 1);
-  const members2 = byName.map(([name, { file: file2, data }]) => {
-    const { role, model, effort, env } = parsed(memberSchema, data, file2);
-    const found = roles.get(role);
-    if (!found) throw new TeamError(`${file2}: there is no role "${role}" in the team's roles/`);
-    return {
-      name,
-      role: found,
-      ...model !== void 0 && { model },
-      ...effort !== void 0 && { effort },
-      env
-    };
-  });
+  const members2 = byName.map(([name, { role, model, effort, env, settings: own2 }]) => ({
+    name,
+    role: roles.get(role) ?? { title: role, duties: "" },
+    ...model !== void 0 && { model },
+    ...effort !== void 0 && { effort },
+    env,
+    ...own2 !== void 0 && { settings: own2 }
+  }));
   if (!members2.length)
     throw new TeamError(
-      `The team has no members: add them in ${folders.map((f) => path3.join(f, "members")).join(" or ")}`
+      `The team has no members: list them in ${folders.map((f) => path3.join(f, "team.yaml")).join(" or ")}`
     );
-  return {
-    team: { members: members2, review: own2.review ?? true },
-    settings,
-    meetingSize: own2.meetingSize ?? "discussion"
-  };
+  return { team: { members: members2 }, settings };
 }
 var writing = serialBy();
 async function readCopy(file2) {
   return JSON.parse(await readFile4(file2, "utf8"));
 }
+
+// src/engine/run.ts
+var OWN_TOOLS = /* @__PURE__ */ new Set([turnToolName("ask_teammate"), turnToolName("deliver")]);
+
+// src/engine/review.ts
+var verdictSchema = external_exports.object({ pass: external_exports.boolean(), notes: external_exports.string().trim() });
 
 // src/engine/repository.ts
 var RepositoryGoals = class _RepositoryGoals {
@@ -53651,7 +53636,7 @@ function statusText(work) {
   const busy = new Set(derived2.busy);
   const { goal } = work;
   const lines = [
-    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)}`,
+    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)}; review ${goal.settings.review ? "on" : "off"}, ${goal.settings.meetingSize} meetings`,
     `Team: ${work.members.map((m) => busy.has(m) ? `${m} (busy)` : m).join(", ")}`
   ];
   for (const meeting of work.meetings.filter((m) => m.status !== "approved"))

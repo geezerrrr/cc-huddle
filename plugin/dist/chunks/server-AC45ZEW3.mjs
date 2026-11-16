@@ -99,17 +99,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path8) {
-      const ctrl = callVisitor(key, node, visitor, path8);
+    function visit_(key, node, visitor, path9) {
+      const ctrl = callVisitor(key, node, visitor, path9);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path8, ctrl);
-        return visit_(key, ctrl, visitor, path8);
+        replaceNode(key, path9, ctrl);
+        return visit_(key, ctrl, visitor, path9);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path8 = Object.freeze(path8.concat(node));
+          path9 = Object.freeze(path9.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path8);
+            const ci = visit_(i, node.items[i], visitor, path9);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -120,13 +120,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path8 = Object.freeze(path8.concat(node));
-          const ck = visit_("key", node.key, visitor, path8);
+          path9 = Object.freeze(path9.concat(node));
+          const ck = visit_("key", node.key, visitor, path9);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path8);
+          const cv = visit_("value", node.value, visitor, path9);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -147,17 +147,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path8) {
-      const ctrl = await callVisitor(key, node, visitor, path8);
+    async function visitAsync_(key, node, visitor, path9) {
+      const ctrl = await callVisitor(key, node, visitor, path9);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path8, ctrl);
-        return visitAsync_(key, ctrl, visitor, path8);
+        replaceNode(key, path9, ctrl);
+        return visitAsync_(key, ctrl, visitor, path9);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path8 = Object.freeze(path8.concat(node));
+          path9 = Object.freeze(path9.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path8);
+            const ci = await visitAsync_(i, node.items[i], visitor, path9);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -168,13 +168,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path8 = Object.freeze(path8.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path8);
+          path9 = Object.freeze(path9.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path9);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path8);
+          const cv = await visitAsync_("value", node.value, visitor, path9);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -201,23 +201,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path8) {
+    function callVisitor(key, node, visitor, path9) {
       if (typeof visitor === "function")
-        return visitor(key, node, path8);
+        return visitor(key, node, path9);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path8);
+        return visitor.Map?.(key, node, path9);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path8);
+        return visitor.Seq?.(key, node, path9);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path8);
+        return visitor.Pair?.(key, node, path9);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path8);
+        return visitor.Scalar?.(key, node, path9);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path8);
+        return visitor.Alias?.(key, node, path9);
       return void 0;
     }
-    function replaceNode(key, path8, node) {
-      const parent = path8[path8.length - 1];
+    function replaceNode(key, path9, node) {
+      const parent = path9[path9.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -829,10 +829,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path8, value) {
+    function collectionFromPath(schema, path9, value) {
       let v = value;
-      for (let i = path8.length - 1; i >= 0; --i) {
-        const k = path8[i];
+      for (let i = path9.length - 1; i >= 0; --i) {
+        const k = path9[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -851,7 +851,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path8) => path8 == null || typeof path8 === "object" && !!path8[Symbol.iterator]().next().done;
+    var isEmptyPath = (path9) => path9 == null || typeof path9 === "object" && !!path9[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -881,11 +881,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path8, value) {
-        if (isEmptyPath(path8))
+      addIn(path9, value) {
+        if (isEmptyPath(path9))
           this.add(value);
         else {
-          const [key, ...rest] = path8;
+          const [key, ...rest] = path9;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -899,8 +899,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path8) {
-        const [key, ...rest] = path8;
+      deleteIn(path9) {
+        const [key, ...rest] = path9;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -914,8 +914,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path8, keepScalar) {
-        const [key, ...rest] = path8;
+      getIn(path9, keepScalar) {
+        const [key, ...rest] = path9;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -933,8 +933,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path8) {
-        const [key, ...rest] = path8;
+      hasIn(path9) {
+        const [key, ...rest] = path9;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -944,8 +944,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path8, value) {
-        const [key, ...rest] = path8;
+      setIn(path9, value) {
+        const [key, ...rest] = path9;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -3460,9 +3460,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path8, value) {
+      addIn(path9, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path8, value);
+          this.contents.addIn(path9, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3537,14 +3537,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path8) {
-        if (Collection.isEmptyPath(path8)) {
+      deleteIn(path9) {
+        if (Collection.isEmptyPath(path9)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path8) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path9) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3559,10 +3559,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path8, keepScalar) {
-        if (Collection.isEmptyPath(path8))
+      getIn(path9, keepScalar) {
+        if (Collection.isEmptyPath(path9))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path8, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path9, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3573,10 +3573,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path8) {
-        if (Collection.isEmptyPath(path8))
+      hasIn(path9) {
+        if (Collection.isEmptyPath(path9))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path8) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path9) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3593,13 +3593,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path8, value) {
-        if (Collection.isEmptyPath(path8)) {
+      setIn(path9, value) {
+        if (Collection.isEmptyPath(path9)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path8), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path9), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path8, value);
+          this.contents.setIn(path9, value);
         }
       }
       /**
@@ -5560,9 +5560,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path8) => {
+    visit.itemAtPath = (cst, path9) => {
       let item = cst;
-      for (const [field, index] of path8) {
+      for (const [field, index] of path9) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5571,23 +5571,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path8) => {
-      const parent = visit.itemAtPath(cst, path8.slice(0, -1));
-      const field = path8[path8.length - 1][0];
+    visit.parentCollection = (cst, path9) => {
+      const parent = visit.itemAtPath(cst, path9.slice(0, -1));
+      const field = path9[path9.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path8, item, visitor) {
-      let ctrl = visitor(item, path8);
+    function _visit(path9, item, visitor) {
+      let ctrl = visitor(item, path9);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path8.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path9.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -5598,10 +5598,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path8);
+            ctrl = ctrl(item, path9);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path8) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path9) : ctrl;
     }
     exports.visit = visit;
   }
@@ -7366,7 +7366,15 @@ var plugin_default = {
   },
   repository: "https://github.com/geezerrrr/cc-huddle",
   license: "MIT",
-  keywords: ["team", "multi-agent", "planning", "worktrees"],
+  keywords: [
+    "multi-agent",
+    "agent-orchestration",
+    "parallel-agents",
+    "team",
+    "planning",
+    "code-review",
+    "git-worktree"
+  ],
   types: "./types/index.d.ts"
 };
 
@@ -8074,7 +8082,7 @@ function releaseLock(lock) {
 }
 
 // src/engine/data.ts
-var STATE_VERSION = 5;
+var STATE_VERSION = 6;
 var SAVE_DELAY_MS = 200;
 async function readState(file) {
   const text2 = await readFile2(file, "utf8");
@@ -8220,6 +8228,12 @@ var Goals = class {
       await this.meetings.settled();
       await removeGoal(core.places);
     });
+  }
+  /** Switches how the goal works, from its next delivery and meeting on. */
+  switchSettings(change) {
+    const { goal } = this;
+    goal.settings = { ...goal.settings, ...change };
+    this.core.changed();
   }
   /** Makes the goal active again; false when it was already. */
   wake() {
@@ -9387,6 +9401,128 @@ var Meetings = class {
   }
 };
 
+// src/engine/team.ts
+var import_yaml = __toESM(require_dist(), 1);
+import { readFile as readFile3 } from "node:fs/promises";
+import { homedir } from "node:os";
+import path2 from "node:path";
+import { z as z4 } from "zod";
+var teamFolder = (top) => path2.join(top, ".claude", "huddle");
+var claudeFolder = (env) => env.CLAUDE_CONFIG_DIR ?? path2.join(homedir(), ".claude");
+var userTeamFolder = (env) => path2.join(claudeFolder(env), "huddle");
+var EFFORTS = ["low", "medium", "high", "xhigh", "max"];
+var settingsSchema = z4.record(z4.string(), z4.unknown());
+var roleSchema = z4.object({ title: z4.string().trim().min(1).optional() });
+var memberSchema = z4.object({
+  role: z4.string().trim().min(1),
+  model: z4.string().trim().min(1).optional(),
+  effort: z4.enum(EFFORTS).optional(),
+  // As in `.mcp.json`, though YAML reads `API_TIMEOUT_MS: 3000000` as a number.
+  env: z4.record(z4.string(), z4.union([z4.string(), z4.number(), z4.boolean()]).transform(String)).default({}),
+  settings: settingsSchema.optional()
+});
+var teamSchema = z4.object({ members: z4.record(z4.string(), memberSchema).default({}) });
+var TeamError = class extends Error {
+};
+function parsed(schema, data, file) {
+  const result = schema.safeParse(data);
+  if (!result.success) throw new TeamError(`${file}:
+${z4.prettifyError(result.error)}`);
+  return result.data;
+}
+function yamlIn(text2, file) {
+  try {
+    return (0, import_yaml.parse)(text2) ?? {};
+  } catch (error) {
+    throw new TeamError(`${file}: ${errorText(error)}`, { cause: error });
+  }
+}
+async function roleFiles(folder) {
+  const names = (await namesIfThere(folder)).filter((name) => name.endsWith(".md")).sort();
+  return Promise.all(
+    names.map(async (name) => {
+      const file = path2.join(folder, name);
+      const text2 = await readFile3(file, "utf8");
+      const front = /^---\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(text2);
+      const id = name.slice(0, -".md".length);
+      const { title } = parsed(roleSchema, yamlIn(front?.[1] ?? "", file), file);
+      return [id, { title: title ?? id, duties: text2.slice(front?.[0].length ?? 0).trim() }];
+    })
+  );
+}
+function mergeSettings(under, over) {
+  const merged = { ...under };
+  for (const [key, value] of Object.entries(over)) {
+    const was = merged[key];
+    merged[key] = Array.isArray(was) && Array.isArray(value) ? [.../* @__PURE__ */ new Set([...was, ...value])] : isObject(was) && isObject(value) ? mergeSettings(was, value) : value;
+  }
+  return merged;
+}
+var isObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+async function loadTeam(userTeam2, top) {
+  const roles = /* @__PURE__ */ new Map();
+  const written2 = /* @__PURE__ */ new Map();
+  let settings = {};
+  const folders = [userTeam2, teamFolder(top)];
+  for (const folder of folders) {
+    for (const [id, role] of await roleFiles(path2.join(folder, "roles"))) roles.set(id, role);
+    const teamFile = path2.join(folder, "team.yaml");
+    const text2 = await ifThere(readFile3(teamFile, "utf8"), "");
+    const { members: members3 } = parsed(teamSchema, yamlIn(text2, teamFile), teamFile);
+    for (const [name, member] of Object.entries(members3)) written2.set(name, member);
+    const settingsFile = path2.join(folder, "settings.json");
+    settings = mergeSettings(
+      settings,
+      parsed(settingsSchema, await jsonIfThere(settingsFile) ?? {}, settingsFile)
+    );
+  }
+  const byName = [...written2].sort(([a], [b]) => a < b ? -1 : 1);
+  const members2 = byName.map(([name, { role, model, effort, env, settings: own }]) => ({
+    name,
+    role: roles.get(role) ?? { title: role, duties: "" },
+    ...model !== void 0 && { model },
+    ...effort !== void 0 && { effort },
+    env,
+    ...own !== void 0 && { settings: own }
+  }));
+  if (!members2.length)
+    throw new TeamError(
+      `The team has no members: list them in ${folders.map((f) => path2.join(f, "team.yaml")).join(" or ")}`
+    );
+  return { team: { members: members2 }, settings };
+}
+var writing = serialBy();
+function allowing(settings, rules, file) {
+  const permissions = parsed(
+    z4.looseObject({ allow: z4.array(z4.string()).default([]) }),
+    settings.permissions ?? {},
+    file
+  );
+  const allow = [.../* @__PURE__ */ new Set([...permissions.allow, ...rules])];
+  return { ...settings, permissions: { ...permissions, allow } };
+}
+function allowInTeam(top, rules) {
+  const file = path2.join(teamFolder(top), "settings.json");
+  return writing(file, async () => {
+    const settings = parsed(settingsSchema, await jsonIfThere(file) ?? {}, file);
+    await writeWhole(file, `${JSON.stringify(allowing(settings, rules, file), null, 2)}
+`);
+  });
+}
+var copyTeam = (file, team) => writeWhole(file, JSON.stringify(team));
+async function readCopy(file) {
+  return JSON.parse(await readFile3(file, "utf8"));
+}
+function allowInCopy(file, rules) {
+  return writing(file, async () => {
+    const copy = await readCopy(file);
+    const settings = allowing(copy.settings, rules, file);
+    const now = { ...copy, settings };
+    await copyTeam(file, now);
+    return now;
+  });
+}
+
 // src/engine/policy.ts
 var SESSION_VARS = [
   "AI_AGENT",
@@ -9420,17 +9556,18 @@ function expandEnv(env, from) {
   return filled;
 }
 function memberSettings(team, member, from, plugins2) {
+  const own = member.settings ? mergeSettings(team, member.settings) : team;
   return {
-    ...team,
-    env: { ...team.env, ...expandEnv(member.env, from) },
+    ...own,
+    env: { ...own.env, ...expandEnv(member.env, from) },
     enabledPlugins: {
-      ...team.enabledPlugins,
+      ...own.enabledPlugins,
       ...Object.fromEntries(plugins2.map((id) => [id, false]))
     },
     crossSessionInbound: "refuse",
     permissions: {
-      ...team.permissions,
-      deny: [...team.permissions?.deny ?? [], "SendMessage", "ListAgents"]
+      ...own.permissions,
+      deny: [...own.permissions?.deny ?? [], "SendMessage", "ListAgents"]
     }
   };
 }
@@ -9673,7 +9810,7 @@ var Questions = class {
 // src/engine/records.ts
 import { randomUUID as randomUUID3 } from "node:crypto";
 import { appendFile, mkdir as mkdir2, open } from "node:fs/promises";
-import path2 from "node:path";
+import path3 from "node:path";
 var OUTPUT_MAX = 4e3;
 var liveOf = (now) => ({
   ...now.streaming && { streaming: now.streaming },
@@ -9739,7 +9876,7 @@ var Records = class {
     const file = goalFiles(this.places.root).record(subtaskId);
     const write = (entry) => {
       this.writing.run(async () => {
-        await mkdir2(path2.dirname(file), { recursive: true });
+        await mkdir2(path3.dirname(file), { recursive: true });
         await appendFile(file, `${JSON.stringify(entry)}
 `);
       });
@@ -9815,7 +9952,7 @@ import { randomUUID as randomUUID4 } from "node:crypto";
 
 // src/engine/run.ts
 import { tool as tool2 } from "@anthropic-ai/claude-agent-sdk";
-import { z as z4 } from "zod";
+import { z as z5 } from "zod";
 var OWN_TOOLS = /* @__PURE__ */ new Set([turnToolName("ask_teammate"), turnToolName("deliver")]);
 function teamServer(collaboration, delivered) {
   return turnServer([
@@ -9823,8 +9960,8 @@ function teamServer(collaboration, delivered) {
       "ask_teammate",
       RUN_TOOLS.askTeammate.what,
       {
-        teammate: z4.string().trim().describe(RUN_TOOLS.askTeammate.teammate),
-        question: z4.string().describe(RUN_TOOLS.askTeammate.question)
+        teammate: z5.string().trim().describe(RUN_TOOLS.askTeammate.teammate),
+        question: z5.string().describe(RUN_TOOLS.askTeammate.question)
       },
       async ({ teammate, question }) => toolText(await collaboration.askTeammate(teammate, question))
     ),
@@ -9832,8 +9969,8 @@ function teamServer(collaboration, delivered) {
       "deliver",
       RUN_TOOLS.deliver.what,
       {
-        summary: z4.string().trim().min(1).describe(RUN_TOOLS.deliver.summary),
-        files: z4.array(z4.string()).describe(RUN_TOOLS.deliver.files)
+        summary: z5.string().trim().min(1).describe(RUN_TOOLS.deliver.summary),
+        files: z5.array(z5.string()).describe(RUN_TOOLS.deliver.files)
       },
       async ({ summary, files }) => {
         const checked = await collaboration.checkDelivery(files);
@@ -9890,7 +10027,7 @@ async function runSubtask(params) {
 
 // src/engine/collaboration.ts
 import { stat } from "node:fs/promises";
-import path3 from "node:path";
+import path4 from "node:path";
 function collaborationOf(core, questions, run2) {
   return {
     askTeammate: (name, question) => askTeammate(core, questions, run2, name, question),
@@ -9934,10 +10071,10 @@ async function checkDelivery(core, subtask2, desk, files) {
   const kept = [];
   const missing = [];
   for (const file of files) {
-    const relative = path3.relative(desk, path3.resolve(desk, file));
-    const inside = relative !== "" && !relative.startsWith("..") && !path3.isAbsolute(relative);
-    const there = inside && (await ifThere(stat(path3.join(desk, relative)), void 0))?.isFile() === true;
-    if (there) kept.push(relative.split(path3.sep).join("/"));
+    const relative = path4.relative(desk, path4.resolve(desk, file));
+    const inside = relative !== "" && !relative.startsWith("..") && !path4.isAbsolute(relative);
+    const there = inside && (await ifThere(stat(path4.join(desk, relative)), void 0))?.isFile() === true;
+    if (there) kept.push(relative.split(path4.sep).join("/"));
     else missing.push(file);
   }
   if (missing.length) return { refused: DELIVERY_REFUSED.missing(desk, missing) };
@@ -9947,8 +10084,8 @@ async function checkDelivery(core, subtask2, desk, files) {
 }
 
 // src/engine/review.ts
-import { z as z5 } from "zod";
-var verdictSchema = z5.object({ pass: z5.boolean(), notes: z5.string().trim() });
+import { z as z6 } from "zod";
+var verdictSchema = z6.object({ pass: z6.boolean(), notes: z6.string().trim() });
 async function reviewDelivery(core, review) {
   const { reviewer, task, subtask: subtask2, delivery, desk, signal } = review;
   const reply = await askOnce({
@@ -10412,7 +10549,7 @@ ${outcome.handover.summary}`
     } else if (outcome.status === "delivered") {
       subtask2.delivery = { ...outcome.handover, at: Date.now() };
       subtask2.conflict = void 0;
-      this.move(subtask2, core.team.review ? "review" : "merge");
+      this.move(subtask2, core.state.goal.settings.review ? "review" : "merge");
     } else {
       this.move(subtask2, outcome.status === "failed" ? "fail" : "stop");
       if (outcome.status === "failed") subtask2.error = outcome.error;
@@ -10507,142 +10644,6 @@ ${outcome.handover.summary}`
   }
 };
 
-// src/engine/team.ts
-var import_yaml = __toESM(require_dist(), 1);
-import { readFile as readFile3 } from "node:fs/promises";
-import { homedir } from "node:os";
-import path4 from "node:path";
-import { z as z6 } from "zod";
-var teamFolder = (top) => path4.join(top, ".claude", "huddle");
-var claudeFolder = (env) => env.CLAUDE_CONFIG_DIR ?? path4.join(homedir(), ".claude");
-var userTeamFolder = (env) => path4.join(claudeFolder(env), "huddle");
-var EFFORTS = ["low", "medium", "high", "xhigh", "max"];
-var roleSchema = z6.object({ title: z6.string().trim().min(1) });
-var memberSchema = z6.object({
-  role: z6.string().trim().min(1),
-  model: z6.string().trim().min(1).optional(),
-  effort: z6.enum(EFFORTS).optional(),
-  // As in `.mcp.json`, though YAML reads `API_TIMEOUT_MS: 3000000` as a number.
-  env: z6.record(z6.string(), z6.union([z6.string(), z6.number(), z6.boolean()]).transform(String)).default({})
-});
-var teamSchema = z6.object({
-  review: z6.boolean().optional(),
-  meetingSize: z6.enum(MEETING_SIZES).optional()
-});
-var settingsSchema = z6.record(z6.string(), z6.unknown());
-var TeamError = class extends Error {
-};
-function parsed(schema, data, file) {
-  const result = schema.safeParse(data);
-  if (!result.success) throw new TeamError(`${file}:
-${z6.prettifyError(result.error)}`);
-  return result.data;
-}
-async function markdownFiles(folder) {
-  const names = (await namesIfThere(folder)).filter((name) => name.endsWith(".md")).sort();
-  return Promise.all(
-    names.map(async (name) => {
-      const file = path4.join(folder, name);
-      const text2 = await readFile3(file, "utf8");
-      const front = /^---\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(text2);
-      let data;
-      try {
-        data = (0, import_yaml.parse)(front?.[1] ?? "") ?? {};
-      } catch (error) {
-        throw new TeamError(`${file}: ${errorText(error)}`, { cause: error });
-      }
-      return {
-        name: name.slice(0, -".md".length),
-        file,
-        data,
-        body: text2.slice(front?.[0].length ?? 0)
-      };
-    })
-  );
-}
-function mergeSettings(under, over) {
-  const merged = { ...under };
-  for (const [key, value] of Object.entries(over)) {
-    const was = merged[key];
-    merged[key] = Array.isArray(was) && Array.isArray(value) ? [.../* @__PURE__ */ new Set([...was, ...value])] : isObject(was) && isObject(value) ? mergeSettings(was, value) : value;
-  }
-  return merged;
-}
-var isObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
-async function loadTeam(userTeam2, top) {
-  const roles = /* @__PURE__ */ new Map();
-  const written2 = /* @__PURE__ */ new Map();
-  let own = {};
-  let settings = {};
-  const folders = [userTeam2, teamFolder(top)];
-  for (const folder of folders) {
-    for (const { name, file, data, body } of await markdownFiles(path4.join(folder, "roles")))
-      roles.set(name, { title: parsed(roleSchema, data, file).title, duties: body.trim() });
-    for (const { name, file, data } of await markdownFiles(path4.join(folder, "members")))
-      written2.set(name, { file, data });
-    const teamFile = path4.join(folder, "team.json");
-    own = { ...own, ...parsed(teamSchema, await jsonIfThere(teamFile) ?? {}, teamFile) };
-    const settingsFile = path4.join(folder, "settings.json");
-    settings = mergeSettings(
-      settings,
-      parsed(settingsSchema, await jsonIfThere(settingsFile) ?? {}, settingsFile)
-    );
-  }
-  const byName = [...written2].sort(([a], [b]) => a < b ? -1 : 1);
-  const members2 = byName.map(([name, { file, data }]) => {
-    const { role, model, effort, env } = parsed(memberSchema, data, file);
-    const found = roles.get(role);
-    if (!found) throw new TeamError(`${file}: there is no role "${role}" in the team's roles/`);
-    return {
-      name,
-      role: found,
-      ...model !== void 0 && { model },
-      ...effort !== void 0 && { effort },
-      env
-    };
-  });
-  if (!members2.length)
-    throw new TeamError(
-      `The team has no members: add them in ${folders.map((f) => path4.join(f, "members")).join(" or ")}`
-    );
-  return {
-    team: { members: members2, review: own.review ?? true },
-    settings,
-    meetingSize: own.meetingSize ?? "discussion"
-  };
-}
-var writing = serialBy();
-function allowing(settings, rules, file) {
-  const permissions = parsed(
-    z6.looseObject({ allow: z6.array(z6.string()).default([]) }),
-    settings.permissions ?? {},
-    file
-  );
-  const allow = [.../* @__PURE__ */ new Set([...permissions.allow, ...rules])];
-  return { ...settings, permissions: { ...permissions, allow } };
-}
-function allowInTeam(top, rules) {
-  const file = path4.join(teamFolder(top), "settings.json");
-  return writing(file, async () => {
-    const settings = parsed(settingsSchema, await jsonIfThere(file) ?? {}, file);
-    await writeWhole(file, `${JSON.stringify(allowing(settings, rules, file), null, 2)}
-`);
-  });
-}
-var copyTeam = (file, team) => writeWhole(file, JSON.stringify(team));
-async function readCopy(file) {
-  return JSON.parse(await readFile3(file, "utf8"));
-}
-function allowInCopy(file, rules) {
-  return writing(file, async () => {
-    const copy = await readCopy(file);
-    const settings = allowing(copy.settings, rules, file);
-    const now = { ...copy, settings };
-    await copyTeam(file, now);
-    return now;
-  });
-}
-
 // src/engine/repository.ts
 var RepositoryGoals = class _RepositoryGoals {
   constructor(repo, folder) {
@@ -10715,11 +10716,11 @@ var Engine = class _Engine {
   records;
   parts;
   /**
-   * Starts a goal for this session: a folder of its own, the team copied
-   * into it as its files have it now (§6), and its branch cut from your
-   * HEAD, checked out in its own worktree.
+   * Starts a goal for this session, working as `settings` say (§6.1): a
+   * folder of its own, the team copied into it as its files have it now (§6),
+   * and its branch cut from your HEAD, checked out in its own worktree.
    */
-  static async start(options, name) {
+  static async start(options, name, settings) {
     const goals = await RepositoryGoals.of(options.dataFolder, options.cwd);
     const { repo } = goals;
     const copy = await loadTeam(options.userTeam, repo.top);
@@ -10734,7 +10735,7 @@ var Engine = class _Engine {
       const places = { repo, slug, root: folder };
       await openGoal(places);
       const state = {
-        goal: { name, slug, status: "active", createdAt: Date.now() },
+        goal: { name, slug, status: "active", createdAt: Date.now(), settings },
         tasks: [],
         subtasks: [],
         meetings: [],
@@ -10824,9 +10825,9 @@ var Engine = class _Engine {
   get team() {
     return this.core.team;
   }
-  /** The size a meeting has unless you say. */
-  get meetingSize() {
-    return this.copy.meetingSize;
+  /** Switches how the goal works (§6.1). */
+  switchSettings(change) {
+    this.parts.goals.switchSettings(change);
   }
   /**
    * Answers a question put to you, and carries out a decision (a stuck
@@ -11598,6 +11599,10 @@ var handOffInput = z8.object({ task: z8.string().trim().min(1) });
 var resumeInput = z8.object({
   goal: z8.string().regex(SLUG).describe("The goal's slug")
 });
+var settingsInput = z8.object({
+  review: z8.boolean().optional(),
+  meetingSize: z8.enum(MEETING_SIZES).optional()
+});
 function addPaneTools(server2, session2, pane2) {
   server2.registerTool(
     "pane",
@@ -11628,11 +11633,21 @@ function addPaneTools(server2, session2, pane2) {
       inputSchema: handOffInput.shape,
       annotations: { readOnlyHint: true }
     },
-    ({ task }) => {
+    async ({ task }) => {
       const engine = session2.current;
-      return toolText(
-        handOffText(task, engine && { goal: engine.work.goal, members: engine.team.members })
-      );
+      const members2 = engine ? engine.team.members : (await session2.team()).members;
+      return toolText(handOffText(task, engine?.work.goal, members2));
+    }
+  );
+  server2.registerTool(
+    "switch_settings",
+    {
+      description: `${PANE_ONLY} Switches review or the meeting size for this session's goal and goals started after, as /huddle review and /huddle meeting.`,
+      inputSchema: settingsInput.shape
+    },
+    async (change) => {
+      const now = await session2.switchSettings(change);
+      return toolText(switchedText(change, now, session2.current !== void 0));
     }
   );
   server2.registerTool(
@@ -11647,15 +11662,37 @@ function addPaneTools(server2, session2, pane2) {
     }
   );
 }
-function handOffText(task, mine) {
-  const goal = mine ? `This session runs the goal "${mine.goal.name}", ${mine.goal.status === "active" ? "under way" : mine.goal.status}. The team: ${rosterOf(mine.members)}.` : "This session runs no goal yet.";
+function handOffText(task, goal, members2) {
+  const runs = goal ? `This session runs the goal "${goal.name}", ${goal.status === "active" ? "under way" : goal.status}.` : "This session runs no goal yet.";
   return [
     "The user hands this to cc-huddle's team: take it on as cc-huddle's team skill says.",
     "",
     task,
     "",
-    goal
+    `${runs} The team: ${rosterOf(members2)}.`
   ].join("\n");
+}
+function switchedText(change, now, runsGoal) {
+  const switched = [
+    ...change.review === void 0 ? [] : [`Review is ${now.review ? "on" : "off"}`],
+    ...change.meetingSize === void 0 ? [] : [`Meetings are ${now.meetingSize}`]
+  ];
+  return `${switched.join(", ")}: for ${runsGoal ? "this session's goal and " : ""}goals started after.`;
+}
+
+// src/plugin/defaults.ts
+import path8 from "node:path";
+import { z as z9 } from "zod";
+var FILE = "defaults.json";
+var defaultsSchema = z9.object({
+  review: z9.boolean().default(true),
+  meetingSize: z9.enum(MEETING_SIZES).default("discussion")
+});
+async function readDefaults(dataFolder2) {
+  return defaultsSchema.parse(await jsonIfThere(path8.join(dataFolder2, FILE)) ?? {});
+}
+function writeDefaults(dataFolder2, settings) {
+  return writeWhole(path8.join(dataFolder2, FILE), JSON.stringify(settings));
 }
 
 // src/plugin/session.ts
@@ -11702,12 +11739,20 @@ var Session = class {
   get none() {
     return noGoalForModel(this.movedAway);
   }
-  /** Starts a goal here: refused while this session's goal is active; a paused or archived one is let go. */
+  /** Starts a goal here, with the settings goals start with: refused while this session's goal is active; a paused or archived one is let go. */
   start(name) {
     return this.turn(TURN, async () => {
       await this.leave();
-      return this.run(await Engine.start(await this.engineOptions(), name));
+      const settings = await readDefaults(this.options.dataFolder);
+      return this.run(await Engine.start(await this.engineOptions(), name, settings));
     });
+  }
+  /** Switches how this session's goal works, if it runs one, and how goals started after do (§6.1): the settings as they are now. */
+  async switchSettings(change) {
+    const now = { ...await readDefaults(this.options.dataFolder), ...change };
+    await writeDefaults(this.options.dataFolder, now);
+    this.engine?.switchSettings(change);
+    return now;
   }
   /**
    * Takes up the repository's goal `slug` and resumes it: this session's own
@@ -11751,13 +11796,11 @@ var Session = class {
   }
   /** The repository's goals, oldest first. */
   async goals() {
-    this.repo ??= RepositoryGoals.of(this.options.dataFolder, this.options.cwd).catch(
-      (error) => {
-        this.repo = void 0;
-        throw error;
-      }
-    );
-    return (await this.repo).list();
+    return (await this.repository()).list();
+  }
+  /** The team a goal started now would have; throws what is wrong with its files. */
+  async team() {
+    return (await this.repository()).team(this.options.userTeam);
   }
   /** Of the repository's goals (`goals`), those this session doesn't run. */
   othersOf(goals) {
@@ -11781,6 +11824,15 @@ var Session = class {
     this.changed(void 0);
     await was.close();
   }
+  repository() {
+    this.repo ??= RepositoryGoals.of(this.options.dataFolder, this.options.cwd).catch(
+      (error) => {
+        this.repo = void 0;
+        throw error;
+      }
+    );
+    return this.repo;
+  }
   async engineOptions() {
     return { ...this.options, claude: await this.claude() };
   }
@@ -11795,7 +11847,7 @@ var Session = class {
 var noGoalForModel = (moved) => moved ? `The goal "${moved}" moved to another Claude Code session. The user brings it back with /huddle resume.` : "This session runs no goal: start one (start_goal), or the user takes one up with /huddle resume.";
 
 // src/plugin/tools.ts
-import { z as z9 } from "zod";
+import { z as z10 } from "zod";
 
 // src/plugin/status.ts
 function subtaskLine(subtask2, { waits, redone }, work) {
@@ -11819,7 +11871,7 @@ function statusText(work) {
   const busy = new Set(derived.busy);
   const { goal } = work;
   const lines = [
-    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)}`,
+    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)}; review ${goal.settings.review ? "on" : "off"}, ${goal.settings.meetingSize} meetings`,
     `Team: ${work.members.map((m) => busy.has(m) ? `${m} (busy)` : m).join(", ")}`
   ];
   for (const meeting2 of work.meetings.filter((m) => m.status !== "approved"))
@@ -11850,28 +11902,30 @@ function othersText(others) {
 var redoneText = (titles) => `built on ${titles.map((t) => `"${t}"`).join(", ")}, redone since: redo it to take that in`;
 
 // src/plugin/tools.ts
-var meeting = z9.string().describe("The meeting's id");
-var subtask = z9.string().describe("The subtask's id");
-var goalActionInput = z9.object({ action: z9.enum(GOAL_ACTIONS) });
+var meeting = z10.string().describe("The meeting's id");
+var subtask = z10.string().describe("The subtask's id");
+var goalActionInput = z10.object({ action: z10.enum(GOAL_ACTIONS) });
 function memberName(members2) {
-  if (!members2) return z9.string().trim().describe("A member's name");
+  if (!members2) return z10.string().trim().describe("A member's name");
   const names = members2.map((m) => m.name);
-  return z9.enum(names).describe(`One of the team: ${rosterOf(members2)}`);
+  return z10.enum(names).describe(`One of the team: ${rosterOf(members2)}`);
 }
 var meetingInput = (member) => ({
-  agenda: z9.string().trim().min(1).describe("What to plan, with everything the user said about it"),
-  size: z9.enum(MEETING_SIZES).optional().describe("How long the discussion runs; the team's default when left out"),
-  attendees: z9.array(member).default([]).describe("The host first; everyone when empty"),
-  host_only: z9.boolean().default(false).describe(
+  agenda: z10.string().trim().min(1).describe("What to plan, with everything the user said about it"),
+  size: z10.enum(MEETING_SIZES).optional().describe(
+    "How long the discussion runs, only when the user asked for this meeting's own; the goal's when left out"
+  ),
+  attendees: z10.array(member).default([]).describe("The host first; everyone when empty"),
+  host_only: z10.boolean().default(false).describe(
     "True when the host only runs the meeting: no view of their own and no work in the plan. Leave it out for a host who also takes part from their role, the usual"
   )
 });
 var changePlanInput = (member) => ({ meeting, plan: planSchema(member) });
 var assignInput = (member) => ({
   assignee: member,
-  title: z9.string().trim().min(1),
-  description: z9.string().trim().describe("Everything the user said about it"),
-  acceptance: z9.string().trim().default("").describe("When it counts as done")
+  title: z10.string().trim().min(1),
+  description: z10.string().trim().describe("Everything the user said about it"),
+  acceptance: z10.string().trim().default("").describe("When it counts as done")
 });
 function addTools(server2, session2) {
   server2.registerTool(
@@ -11892,7 +11946,7 @@ function addTools(server2, session2) {
     "start_goal",
     {
       description: "Start a goal in this session: something the user wants done. It gets its own branch, cut from the repository's HEAD, and its own copy of the team. A session runs one goal: refused while its goal is under way. Then hold a meeting to plan it, or assign work directly.",
-      inputSchema: { name: z9.string().trim().min(1).describe("A few words for what is wanted") }
+      inputSchema: { name: z10.string().trim().min(1).describe("A few words for what is wanted") }
     },
     async ({ name }) => {
       const { goal } = (await session2.start(name)).work;
@@ -11909,7 +11963,7 @@ function addTools(server2, session2) {
       const engine = session2.goal;
       const held = engine.meetings.start({
         agenda,
-        size: size ?? engine.meetingSize,
+        size: size ?? engine.work.goal.settings.meetingSize,
         attendees,
         hostOnly: host_only
       });
@@ -12003,7 +12057,7 @@ function addTools(server2, session2) {
     "subtask_action",
     {
       description: "Stop a subtask; continue a stopped or failed one in its session and worktree; retry one from the start; or redo a done one whose upstream was redone.",
-      inputSchema: { subtask, action: z9.enum(SUBTASK_ACTIONS) }
+      inputSchema: { subtask, action: z10.enum(SUBTASK_ACTIONS) }
     },
     async ({ subtask: id, action }) => {
       const engine = session2.goal;
@@ -12015,7 +12069,7 @@ function addTools(server2, session2) {
     "message",
     {
       description: "Pass the user's words to the member working on a subtask: a running one takes them at once, in its session; one not started reads them first.",
-      inputSchema: { subtask, text: z9.string().trim().min(1) }
+      inputSchema: { subtask, text: z10.string().trim().min(1) }
     },
     ({ subtask: id, text: text2 }) => {
       const went = session2.goal.scheduler.carry(id, text2);
@@ -12029,10 +12083,10 @@ function addTools(server2, session2) {
     {
       description: "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask), a stuck review (rereview, skip, sendBack; one that failed goes back only with a note), or a merge (ours, theirs, retry; one git failed on: retry, stop).",
       inputSchema: {
-        question: z9.string().describe("The id of what waits on the user"),
-        decision: z9.enum(DECISION_OPTIONS),
-        note: z9.string().trim().optional().describe("What to change, in the user's words"),
-        sent_back: z9.string().optional().describe("The subtask a revised task goes back to")
+        question: z10.string().describe("The id of what waits on the user"),
+        decision: z10.enum(DECISION_OPTIONS),
+        note: z10.string().trim().optional().describe("What to change, in the user's words"),
+        sent_back: z10.string().optional().describe("The subtask a revised task goes back to")
       }
     },
     async ({ question, decision, note, sent_back }) => {
