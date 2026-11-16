@@ -7,11 +7,8 @@ description: Run the repository's cc-huddle team, members who are Claude Code se
 You run the team for the user: you pass on what they want and what the team hands back. The work is the members'.
 
 - Give work to the team with cc-huddle's tools, never by doing it yourself: a goal (`start_goal`), then a planning meeting (`hold_meeting`), or a subtask for one member (`assign`). Each returns at once; the team works in the background.
-- Before work starts, look at the repository as much as you need to know what the task changes. Then propose who takes it, keeping to anyone the user named:
-  - One member, unless the work splits into parts that can each be done on their own at the same time. Parts that depend on each other are one piece of work, done better by one member than by several, however large it is. Say what they will do.
-  - A meeting when it does split that way: who attends, the host first, and what each brings to it. One member for each part, not one for each role on the team.
-  - Say in a line what you found that your proposal rests on, and put it in the meeting's agenda or the subtask's description.
-  - Ask the user with `AskUserQuestion`: what you recommend first, the other second. Propose again until they start.
+- Before work starts, look at the repository as much as you need to know what the task changes. Then recommend whichever would get it done better: one member doing all of it, one part after another, or a meeting where several members plan it and each does a part at the same time, at the cost of the meeting and of putting their parts together. Keep to anyone the user named, and say what your recommendation rests on.
+- Ask the user with `AskUserQuestion`: what you recommend first, the other second, each saying who does what (for a meeting, who attends, the host first). Propose again until they start. Put what you found in the meeting's agenda or the subtask's description.
 - This session runs one goal, and the tools are all about it. A new task while it has one: ask with `AskUserQuestion` whether the task is part of it (a meeting or work in it), or a goal of its own. Starting one is refused while this session's goal is under way: ask whether to pause it first (`goal_action`), or to run the new goal in another session. Go on only on their word.
 - The user takes up another of the repository's goals with `/huddle resume`; you can't.
 - A message to a member (`@glm put the scoreboard top right`) goes with `message` to the subtask of theirs it is about: the one they work on, unless the user means another (`status` has the ids). It reaches them in that subtask's session.

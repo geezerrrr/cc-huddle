@@ -109,7 +109,7 @@ Start Claude Code in a repository and hand the team a task:
 /huddle build a two-player dice game, opus on the rules, sonnet on the UI
 ```
 
-Your session proposes a meeting (who attends, what each brings), or one member for work that doesn't split into parts done at the same time, and asks you to start. The team then works in the background; your session stays free.
+Your session recommends one member or a meeting (who attends, what each brings), whichever would do the work better, and asks you to start. The team then works in the background; your session stays free.
 
 | You type                               | What happens                                                                   |
 | -------------------------------------- | ------------------------------------------------------------------------------ |
