@@ -75,28 +75,31 @@ Restart Claude Code after installing. To update, `claude plugin update cc-huddle
 
 ## Set up a team
 
-A team is Markdown files: roles, and members who each take a role. Put them in `~/.claude/huddle/` for all your repositories, or in a repository's `.claude/huddle/`. One role and two members is enough to start:
+A team is a `team.yaml` listing the members, each with a role and the model it runs on. Put it in `~/.claude/huddle/` for all your repositories, or in a repository's `.claude/huddle/`:
 
-```sh
-mkdir -p ~/.claude/huddle/roles ~/.claude/huddle/members
-printf -- '---\ntitle: Developer\n---\n\nWrite the code for your subtask and its tests.\n' > ~/.claude/huddle/roles/developer.md
-printf -- '---\nrole: developer\nmodel: sonnet\n---\n' > ~/.claude/huddle/members/sonnet.md
-printf -- '---\nrole: developer\nmodel: opus\n---\n' > ~/.claude/huddle/members/opus.md
+```yaml
+# ~/.claude/huddle/team.yaml
+members:
+  sonnet:
+    role: developer
+    model: sonnet
+  opus:
+    role: developer
+    model: opus
 ```
 
-A member without `env` runs on your own Claude Code sign-in. A member on another provider names its endpoint and key:
+A member without `env` runs on your own Claude Code sign-in. A member on another provider gets its variables, any that Claude Code reads:
 
-```markdown
----
-role: designer
-model: glm-5.3-flashx
-env:
-  ANTHROPIC_BASE_URL: https://open.bigmodel.cn/api/anthropic
-  ANTHROPIC_AUTH_TOKEN: ${GLM_API_KEY}
----
+```yaml
+glm:
+  role: designer
+  model: glm-5.3-flashx
+  env:
+    ANTHROPIC_BASE_URL: https://open.bigmodel.cn/api/anthropic
+    ANTHROPIC_AUTH_TOKEN: ${GLM_API_KEY}
 ```
 
-`${VAR}` is filled in from your environment, so keys stay out of the files. Effort, Claude Code settings for the whole team, review and meeting size: [docs/configuration.md](docs/configuration.md).
+`${VAR}` is filled in from your environment, so keys stay out of the files. A role's duties go in `roles/<role>.md`, Markdown every member in that role reads. Effort, permissions per member and for the whole team, and a provider's full setup: [docs/configuration.md](docs/configuration.md).
 
 ## Use it
 
@@ -114,9 +117,11 @@ Your session proposes a meeting (who attends, what each brings), or one member f
 | `/huddle`                              | Opens the pane: the meeting, the team, what needs you                          |
 | `/huddle status`                       | Prints where the session's goal stands                                         |
 | `/huddle pause`, `/huddle resume`      | Pauses the session's goal; resumes it, or takes up another of the repository's |
+| `/huddle review on\|off`               | Turns review of deliveries on or off                                           |
+| `/huddle meeting <size>`               | Sets how long meetings run: `small`, `discussion` or `large`                   |
 | `@sonnet put the scoreboard top right` | Passes a member a message, in their session                                    |
 
-You can also ask your session in words ("have opus do the scoreboard"). A session runs one goal; for more goals at once, run more sessions. The band above the prompt keeps count: `cc-huddle · meeting · 3 working · 1 needs you`. Closing the session pauses its goal; `/huddle resume` goes on where it stopped.
+You can also ask your session in words ("have opus do the scoreboard"). A session runs one goal; for more goals at once, run more sessions. Like `/model`, `review` and `meeting` apply to the session's goal and goals started after. The band above the prompt keeps count: `cc-huddle · meeting · 3 working · 1 needs you`. Closing the session pauses its goal; `/huddle resume` goes on where it stopped.
 
 <table>
   <tr>
