@@ -7,12 +7,7 @@
  * meeting, in the goal's worktree. What goes on meanwhile is told in `now`;
  * the meeting's status is its owner's (meetings.ts).
  */
-import {
-  tool,
-  type AnyZodRawShape,
-  type McpServerConfig,
-  type SdkMcpToolDefinition,
-} from "@anthropic-ai/claude-agent-sdk";
+import { tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { toolText } from "../shared/text.ts";
 import { spend, type Core } from "./core.ts";
@@ -31,8 +26,8 @@ import {
   askOnce,
   turnServer,
   turnToolName,
-  withTurn,
   type Reply,
+  type TurnTool,
   type TurnListener,
 } from "./turns.ts";
 import type {
@@ -52,32 +47,19 @@ const MEETING_TURNS_EACH: Record<MeetingSize, number> = {
   large: 4,
 };
 
-/** A turn's one meeting tool: its server, and its name as the turn's rules allow it. */
-interface TurnTool {
-  server: McpServerConfig;
-  name: string;
-}
-
-const turnTool = <S extends AnyZodRawShape>(meetingTool: SdkMcpToolDefinition<S>): TurnTool => ({
-  server: turnServer([meetingTool]),
-  name: turnToolName(meetingTool.name),
-});
-
 /** The turn's raise_hand: calling it puts the hand up, not calling it leaves it down. */
 const handTool = (raise: (hand: Omit<MeetingHand, "member">) => void) =>
-  turnTool(
-    tool(
-      "raise_hand",
-      MEETING_TOOLS.raiseHand.what,
-      {
-        point: z.string().trim().min(1).describe(MEETING_TOOLS.raiseHand.point),
-        to: z.string().trim().optional().describe(MEETING_TOOLS.raiseHand.to),
-      },
-      ({ point, to }) => {
-        raise({ point, ...(to && { to }) });
-        return Promise.resolve(toolText(MEETING_TOOLS.raiseHand.done));
-      },
-    ),
+  tool(
+    "raise_hand",
+    MEETING_TOOLS.raiseHand.what,
+    {
+      point: z.string().trim().min(1).describe(MEETING_TOOLS.raiseHand.point),
+      to: z.string().trim().optional().describe(MEETING_TOOLS.raiseHand.to),
+    },
+    ({ point, to }) => {
+      raise({ point, ...(to && { to }) });
+      return Promise.resolve(toolText(MEETING_TOOLS.raiseHand.done));
+    },
   );
 
 /** The host's give_floor: whom they call next, of the others (there are some: the talk needs them). */
@@ -85,21 +67,19 @@ const floorTool = (
   others: readonly Member[],
   give: (floor: { member: string; quiet?: boolean }) => void,
 ) =>
-  turnTool(
-    tool(
-      "give_floor",
-      MEETING_TOOLS.giveFloor.what,
-      {
-        member: z
-          .enum(others.map((m) => m.name) as [string, ...string[]])
-          .describe(MEETING_TOOLS.giveFloor.member),
-        quiet: z.boolean().optional().describe(MEETING_TOOLS.giveFloor.quiet),
-      },
-      (floor) => {
-        give(floor);
-        return Promise.resolve(toolText(MEETING_TOOLS.giveFloor.done));
-      },
-    ),
+  tool(
+    "give_floor",
+    MEETING_TOOLS.giveFloor.what,
+    {
+      member: z
+        .enum(others.map((m) => m.name) as [string, ...string[]])
+        .describe(MEETING_TOOLS.giveFloor.member),
+      quiet: z.boolean().optional().describe(MEETING_TOOLS.giveFloor.quiet),
+    },
+    (floor) => {
+      give(floor);
+      return Promise.resolve(toolText(MEETING_TOOLS.giveFloor.done));
+    },
   );
 
 /** Who takes part as a member (§4.2): everyone at it, but a host who only runs it. */
@@ -142,6 +122,7 @@ export function nextMove(
 interface Exchange {
   /** How many of the meeting's turns the session has taken in once done; all of them unless said. */
   heard?: number;
+  /** The one meeting tool it may call. */
   tool?: TurnTool;
   /** The shape the turn hands its result back in. */
   schema?: z.ZodType;
@@ -228,10 +209,14 @@ export class MeetingRun {
     const seat = meeting.seats?.[member.name];
     const reply = await askOnce({
       prompt,
-      options: withTurn(options, {
-        ...(seat && { resume: seat.session }),
-        ...(turn.tool && { server: turn.tool.server, allowed: [turn.tool.name] }),
-      }),
+      options: {
+        ...options,
+        resume: seat?.session,
+        ...(turn.tool && {
+          mcpServers: turnServer([turn.tool]),
+          allowedTools: [turnToolName(turn.tool.name)],
+        }),
+      },
       ...(turn.schema && { schema: turn.schema }),
       signal: turn.signal ?? this.signal,
       spent: (tokens) => {

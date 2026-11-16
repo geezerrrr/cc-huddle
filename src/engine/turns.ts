@@ -6,8 +6,6 @@ import { spawn } from "node:child_process";
 import {
   createSdkMcpServer,
   query,
-  type CanUseTool,
-  type McpServerConfig,
   type SDKMessage,
   type SDKResultMessage,
   type SpawnedProcess,
@@ -25,29 +23,12 @@ const TURN_SERVER = "openplan";
 /** One of openplan's tools as a turn's rules name it: `mcp__openplan__<name>`. */
 export const turnToolName = (name: string) => `mcp__${TURN_SERVER}__${name}`;
 
-/** The server that gives a turn these of openplan's tools. */
-export const turnServer = (tools: NonNullable<Parameters<typeof createSdkMcpServer>[0]["tools"]>) =>
-  createSdkMcpServer({ name: TURN_SERVER, tools });
+/** One of openplan's tools for a member's turn. */
+export type TurnTool = NonNullable<Parameters<typeof createSdkMcpServer>[0]["tools"]>[number];
 
-/** What a turn adds to its member's options (policy.ts), and nothing else. */
-export interface TurnAdds {
-  /** The session it goes on in. */
-  resume?: string;
-  /** openplan's tools for it (turnServer). */
-  server?: McpServerConfig;
-  /** Tools it may call outright: a read-only turn refuses what its rules don't allow. */
-  allowed?: string[];
-  /** Who answers the calls its rules don't cover. */
-  canUseTool?: CanUseTool;
-}
-
-/** A member's options with what one turn adds. */
-export const withTurn = (options: MemberOptions, turn: TurnAdds): MemberOptions => ({
-  ...options,
-  ...(turn.resume !== undefined && { resume: turn.resume }),
-  ...(turn.server && { mcpServers: { ...options.mcpServers, [TURN_SERVER]: turn.server } }),
-  ...(turn.allowed && { allowedTools: turn.allowed }),
-  ...(turn.canUseTool && { canUseTool: turn.canUseTool }),
+/** A turn's `mcpServers`: the server that gives it these of openplan's tools. */
+export const turnServer = (tools: TurnTool[]) => ({
+  [TURN_SERVER]: createSdkMcpServer({ name: TURN_SERVER, tools }),
 });
 
 /** How a turn ended: its final text, or why it failed, and the tokens it used. */
