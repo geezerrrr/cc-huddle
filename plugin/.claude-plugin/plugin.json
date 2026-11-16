@@ -7,6 +7,14 @@
   },
   "repository": "https://github.com/geezerrrr/cc-huddle",
   "license": "MIT",
-  "keywords": ["team", "multi-agent", "planning", "worktrees"],
+  "keywords": [
+    "multi-agent",
+    "agent-orchestration",
+    "parallel-agents",
+    "team",
+    "planning",
+    "code-review",
+    "git-worktree"
+  ],
   "types": "./types/index.d.ts"
 }
