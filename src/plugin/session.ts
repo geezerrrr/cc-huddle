@@ -8,10 +8,13 @@ import {
   Engine,
   type EngineOptions,
   type GoalEntry,
+  type GoalSettings,
   type HandedOver,
   RepositoryGoals,
+  type Team,
 } from "../engine/index.ts";
 import { serialBy } from "../shared/serial.ts";
+import { readDefaults, writeDefaults } from "./defaults.ts";
 
 /** The key the session's changes of goal take turns on. */
 const TURN = "goal";
@@ -62,12 +65,21 @@ export class Session {
     return noGoalForModel(this.movedAway);
   }
 
-  /** Starts a goal here: refused while this session's goal is active; a paused or archived one is let go. */
+  /** Starts a goal here, with the settings goals start with: refused while this session's goal is active; a paused or archived one is let go. */
   start(name: string): Promise<Engine> {
     return this.turn(TURN, async () => {
       await this.leave();
-      return this.run(await Engine.start(await this.engineOptions(), name));
+      const settings = await readDefaults(this.options.dataFolder);
+      return this.run(await Engine.start(await this.engineOptions(), name, settings));
     });
+  }
+
+  /** Switches how this session's goal works, if it runs one, and how goals started after do (§6.1): the settings as they are now. */
+  async switchSettings(change: Partial<GoalSettings>): Promise<GoalSettings> {
+    const now = { ...(await readDefaults(this.options.dataFolder)), ...change };
+    await writeDefaults(this.options.dataFolder, now);
+    this.engine?.switchSettings(change);
+    return now;
   }
 
   /**
@@ -116,14 +128,12 @@ export class Session {
 
   /** The repository's goals, oldest first. */
   async goals(): Promise<GoalEntry[]> {
-    this.repo ??= RepositoryGoals.of(this.options.dataFolder, this.options.cwd).catch(
-      (error: unknown) => {
-        // Looked for again next time: the folder may be a repository by then.
-        this.repo = undefined;
-        throw error;
-      },
-    );
-    return (await this.repo).list();
+    return (await this.repository()).list();
+  }
+
+  /** The team a goal started now would have; throws what is wrong with its files. */
+  async team(): Promise<Team> {
+    return (await this.repository()).team(this.options.userTeam);
   }
 
   /** Of the repository's goals (`goals`), those this session doesn't run. */
@@ -149,6 +159,17 @@ export class Session {
     this.engine = undefined;
     this.changed(undefined);
     await was.close();
+  }
+
+  private repository(): Promise<RepositoryGoals> {
+    this.repo ??= RepositoryGoals.of(this.options.dataFolder, this.options.cwd).catch(
+      (error: unknown) => {
+        // Looked for again next time: the folder may be a repository by then.
+        this.repo = undefined;
+        throw error;
+      },
+    );
+    return this.repo;
   }
 
   private async engineOptions(): Promise<EngineOptions> {

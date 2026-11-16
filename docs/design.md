@@ -79,7 +79,7 @@ Each goal is held by a lock in its folder with the pids of the MCP server and it
 
 ### 3.3 Plugin
 
-- **MCP server `huddle`**: the engine of your session's goal and the tools your session uses (§7.3). The pane reads the team twice a second from the server's own socket: `POST /view` gives the team as the pane draws it, the record of the member it follows from where it left off (from the start of their new work once they are on it), and the turn being spoken at the meeting the same way. It doesn't go through `$.mcp.call`, which Claude Code runs as a tool call, with your PreToolUse and PostToolUse hooks around it each time. The socket is one per session, in a folder only you can read (a named pipe on Windows), and does only one thing besides reading: `POST /release` lets the goal go to another of your sessions that takes it up (§3.2). More tools serve the mod: `pane` names the socket, once, `answer` carries what you pressed, `resume_goal` carries `/huddle resume`, and `hand_off` makes the prompt `/huddle <task>` gives your session. The mod keeps them from your session's model, so an answer comes only from you. `/huddle pause` is your session's `goal_action`.
+- **MCP server `huddle`**: the engine of your session's goal and the tools your session uses (§7.3). The pane reads the team twice a second from the server's own socket: `POST /view` gives the team as the pane draws it, the record of the member it follows from where it left off (from the start of their new work once they are on it), and the turn being spoken at the meeting the same way. It doesn't go through `$.mcp.call`, which Claude Code runs as a tool call, with your PreToolUse and PostToolUse hooks around it each time. The socket is one per session, in a folder only you can read (a named pipe on Windows), and does only one thing besides reading: `POST /release` lets the goal go to another of your sessions that takes it up (§3.2). More tools serve the mod: `pane` names the socket, once, `answer` carries what you pressed, `resume_goal` carries `/huddle resume`, `hand_off` makes the prompt `/huddle <task>` gives your session, and `switch_settings` carries `/huddle review` and `/huddle meeting` (§6.1). The mod keeps them from your session's model, so an answer comes only from you. `/huddle pause` is your session's `goal_action`.
 - **Mod**: the asks, the pane, the band, transcript rows and the `/huddle` command (§7.2), and the prompts that wake your session (§7.3). `/huddle <task>` hands your session the task for the team; the pane and `status` run without a model turn. The mod only draws and passes on what you press: what it shows about the team, what each need offers and takes, and when it refuses, are the server's, served as sentences; its own words are its controls and labels, its tabs' empty states, the `/huddle resume` dialog, and what it says when a call fails.
 - **Skill**: tells your session what it is for: relay and act, never do the work itself.
 - **SessionStart hook**: tells your session, as context, which of the repository's goals are paused and which run in other sessions, and how to take one up. The mod shows the same in the band.
@@ -91,11 +91,12 @@ The repository's `plugin/` folder is the plugin, listed by the marketplace at th
 
 | What                                                                                                            | Where                                                                                   | In git                            |
 | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | --------------------------------- |
-| Team: roles, members, settings                                                                                  | `~/.claude/huddle/`, and `.claude/huddle/` in the repository                            | The repository's, yours to commit |
+| Team: members, roles, settings                                                                                  | `~/.claude/huddle/`, and `.claude/huddle/` in the repository                            | The repository's, yours to commit |
 | A goal: its copy of the team, its state, lock, plans, records, member settings and the member processes running | `${CLAUDE_PLUGIN_DATA}/repos/<repo-id>/goals/<goal>/`                                   | No                                |
 | Worktrees                                                                                                       | `goals/<goal>/checkout/` for the goal, `goals/<goal>/desks/<subtask>/` for each subtask | Branches only                     |
 | The MCP server's npm dependencies                                                                               | `${CLAUDE_PLUGIN_DATA}/deps/<version-hash>/`                                            | No                                |
 | Each session's permission mode, by its pid (§8)                                                                 | `${CLAUDE_PLUGIN_DATA}/sessions/`                                                       | No                                |
+| The settings new goals start with (§6.1)                                                                        | `${CLAUDE_PLUGIN_DATA}/defaults.json`                                                   | No                                |
 
 `${CLAUDE_PLUGIN_DATA}` is the data folder Claude Code gives each plugin (`~/.claude/plugins/data/<plugin-id>/`). cc-huddle makes it a folder only you can read: goals' state, records and team copies hold what members said, did and were given. It is passed to the MCP server and the hooks. It survives plugin updates and is removed on uninstall, worktrees included; their branches stay in your repository, and git prunes the stale worktree entries on its own. `claude plugin uninstall --keep-data` keeps it.
 
@@ -214,35 +215,47 @@ What each decision offers:
 ```
 ~/.claude/huddle/          yours, for every repository
 .claude/huddle/            the repository's
+  team.yaml
   roles/gameplay-programmer.md
-  members/sonnet.md
-  members/glm.md
   settings.json
-  team.json
 ```
 
-The team has the two scopes Claude Code's own setup has, and you write its files yourself. Yours sits beside Claude Code's user settings (in `CLAUDE_CONFIG_DIR` when that is set); the repository's beside the rest of its Claude Code setup. The two are read together: a role or member the repository has by the same name replaces yours, its `team.json` fields replace yours, and the two `settings.json` merge as Claude Code merges its scopes, arrays joined. Most people keep their members in theirs, written once, and give a repository only what is its own. The team is not in `agents/`: Claude Code would load members there as its own subagents, on its own provider.
+The team has the two scopes Claude Code's own setup has, and you write its files yourself. Yours sits beside Claude Code's user settings (in `CLAUDE_CONFIG_DIR` when that is set); the repository's beside the rest of its Claude Code setup. The two are read together: a member or role the repository has by the same name replaces yours, and the two `settings.json` merge as Claude Code merges its scopes, arrays joined. Most people keep their members in theirs, written once, and give a repository only what is its own. The team is not in `agents/`: Claude Code would load members there as its own subagents, on its own provider.
 
-A role file is its duties in Markdown with a `title` in front matter. A member file names its role, model and effort, and the environment its Claude Code runs with:
+`team.yaml` lists the members, each by name, with its role, and optionally its model, effort, the environment its Claude Code runs with, and Claude Code settings of its own:
 
-```markdown
----
-role: ui-designer
-model: glm-5.3-flashx
-effort: max
-env:
-  ANTHROPIC_BASE_URL: https://open.bigmodel.cn/api/anthropic
-  ANTHROPIC_AUTH_TOKEN: ${GLM_API_KEY}
----
+```yaml
+members:
+  sonnet:
+    role: gameplay-programmer
+    model: sonnet
+    settings:
+      permissions:
+        allow: ["Bash(pnpm test *)"]
+  glm:
+    role: ui-designer
+    model: glm-5.3-flashx
+    effort: max
+    env:
+      ANTHROPIC_BASE_URL: https://open.bigmodel.cn/api/anthropic
+      ANTHROPIC_AUTH_TOKEN: ${GLM_API_KEY}
 ```
 
-The member's name is the file name. `env` is written as in `.mcp.json`: `${VAR}` and `${VAR:-default}` are filled in from the environment cc-huddle runs in, so keys stay out of the files. A member without `env` runs on your own Claude Code sign-in.
+`env` is written as in `.mcp.json`, and takes any variable Claude Code reads: `${VAR}` and `${VAR:-default}` are filled in from the environment cc-huddle runs in, so keys stay out of the files. A member without `env` runs on your own Claude Code sign-in. A member's `settings` go over the team's, as a scope above it.
 
-`settings.json` is a Claude Code settings file applied to every member: the permission rules they work under, the sandbox, anything else Claude Code settings hold. `team.json` holds cc-huddle's own: acceptance review on or off (on by default) and the default meeting size.
+A role is a Markdown file in `roles/`, named by its file: its duties, which every member in it reads, and optionally a `title` in front matter, the file's name when there is none. A role a member names that has no file is a title alone, with no duties.
 
-A member session loads your user and project settings like any session of yours. On top, as flag settings, which outrank both: the team's `settings.json`, the member's `env`, and the guards of §8. Your own settings' `env` would otherwise override the member's. The engine writes these to a file only you can read in the goal's folder as the goal opens, and again as you allow a rule always, and passes its path, since settings given inline end up on a command line where other processes can read them.
+`settings.json` is a Claude Code settings file applied to every member: the permission rules they work under, the sandbox, anything else Claude Code settings hold. It stays apart from `team.yaml` because cc-huddle writes to it too: a rule you allow always (§8).
 
-A goal copies the team into its folder as it starts, as read then: roles, members, settings, `team.json`, each member's `env` still as written, its `${VAR}`s filled in only as the goal opens, so no key is written down. The goal works with that copy to its end: its plan and who does what were made with that team, so a member removed or changed later is still there for it, and goals started after get the team as it is then. A rule you allow always goes in the repository's `settings.json`, for goals started after, and in the goal's copy, for its members' next turns.
+A member session loads your user and project settings like any session of yours. On top, as flag settings, which outrank both: the team's `settings.json`, the member's own `settings` and `env`, and the guards of §8. Your own settings' `env` would otherwise override the member's. The engine writes these to a file only you can read in the goal's folder as the goal opens, and again as you allow a rule always, and passes its path, since settings given inline end up on a command line where other processes can read them.
+
+A goal copies the team into its folder as it starts, as read then: members, roles, settings, each member's `env` still as written, its `${VAR}`s filled in only as the goal opens, so no key is written down. The goal works with that copy to its end: its plan and who does what were made with that team, so a member removed or changed later is still there for it, and goals started after get the team as it is then. A rule you allow always goes in the repository's `settings.json`, for goals started after, and in the goal's copy, for its members' next turns.
+
+The team's files are read as `/huddle <task>` hands a task over: what is wrong with them is said then, naming the file, before your session proposes anything.
+
+### 6.1 Review and meeting size
+
+Whether deliveries are reviewed (on unless you turn it off) and how long a meeting's discussion runs (`small`, `discussion` or `large`, §4.2) are a goal's own, kept in its state. You switch them as Claude Code switches `/model`: `/huddle review on|off` and `/huddle meeting small|discussion|large`, or with no value, picked in Claude Code's question dialog. A switch changes your session's goal, if it has one, and the default goals started after take; goals already started elsewhere keep theirs. The defaults are in the plugin's data folder, for all your repositories. A meeting you ask for at a size of its own in words is held at that size.
 
 ## 7. Interaction
 
@@ -269,7 +282,7 @@ A goal copies the team into its folder as it starts, as read then: roles, member
 
 ### 7.3 Your session
 
-Your session talks; the pane shows and answers. `/huddle pause` pauses your session's goal, and `/huddle resume` resumes it, or takes up one of the repository's goals not running here (§3.2): the only one, or, with several, the one you pick in Claude Code's question dialog, each listed by name, how far it got, and whether it is paused, archived or running in another session (one this cc-huddle can't read by its folder and why, the rest listed all the same); more than the dialog's four are listed numbered, for `/huddle resume <number>`. While your session's goal is active, `/huddle resume` says to pause it first; with nothing under way, `/huddle pause` says so. Neither spends a model turn: they are certain. The tools your session has are all about its own goal, each described in its schema (`src/plugin/tools.ts`): where it stands and the repository's other goals (`status`); starting a goal, refused while the session's goal is active (a paused one it lets go); meetings and the plans they write; assigning work directly; the goal's and its subtasks' lifecycles, as §4 has them; messages to a member about one of their subtasks, which go on in that subtask's session; and carrying out your decisions.
+Your session talks; the pane shows and answers. `/huddle pause` pauses your session's goal, and `/huddle resume` resumes it, or takes up one of the repository's goals not running here (§3.2): the only one, or, with several, the one you pick in Claude Code's question dialog, each listed by name, how far it got, and whether it is paused, archived or running in another session (one this cc-huddle can't read by its folder and why, the rest listed all the same); more than the dialog's four are listed numbered, for `/huddle resume <number>`. While your session's goal is active, `/huddle resume` says to pause it first; with nothing under way, `/huddle pause` says so. `/huddle review` and `/huddle meeting` switch the goal's settings (§6.1). None of these spends a model turn: they are certain. The tools your session has are all about its own goal, each described in its schema (`src/plugin/tools.ts`): where it stands and the repository's other goals (`status`); starting a goal, refused while the session's goal is active (a paused one it lets go); meetings and the plans they write; assigning work directly; the goal's and its subtasks' lifecycles, as §4 has them; messages to a member about one of their subtasks, which go on in that subtask's session; and carrying out your decisions.
 
 A tool that names a member (a meeting's attendees, an assignee, a plan's owners) takes only the goal's members, each listed with their role in its schema, so your session matches what you said against the team as it would against any tool's options. Before a goal, they list the team as its files have it. When the session starts or takes up a goal, the server tells Claude Code its tools changed (`notifications/tools/list_changed`).
 
@@ -279,7 +292,7 @@ cc-huddle's prompts and tool results are in English, written for the model. What
 
 ## 8. Permissions
 
-Members work under Claude Code's own permission modes and rules, set per team. Every member session also gets, as flag settings: cc-huddle disabled (`enabledPlugins`), so a member never starts a team of its own: the id read back from the data folder, which renames every character but letters, digits, `_` and `-` to `-`, and every `cc-huddle@…` your user and project settings name, since a marketplace's name may have a `.` that doesn't read back; `crossSessionInbound: refuse` and `SendMessage` and `ListAgents` denied, so members take no messages from your sessions and send none; and `--name cc-huddle-<member>`, so a running member shows under its name in `claude agents`. Bare mode is not used: it would also drop the repository's `CLAUDE.md`. A member's turn runs in your session's permission mode, as you started it or switched it since (Shift+Tab): the mode of your last message, or of your session's last call to cc-huddle, one of which comes before any work starts (§3.3). So a session in `bypassPermissions` has members that ask nothing, and a session that asks has members that ask. A team whose `settings.json` sets `permissions.defaultMode` has its members in that mode instead. cc-huddle adds no permission default or sandbox of its own: a member loads your user and project settings as any session of yours does, so what Claude Code would let it do, or ask about, is what your settings say. A call Claude Code asks about becomes a permission request in "Needs you", and the member's turn waits for your answer: allow it once, deny it (with a note the member reads), or, where Claude Code suggests a rule for it, allow it always, which adds that rule to the repository's `settings.json` and the goal's copy (§6), so every member of the goal works under it from then on. Meetings, teammates' answers and reviews run read-only: the read-only tools, and no MCP server but the turn's own (`strictMcpConfig`). Yours would offer tools that do more than read; and a resumed session connects them partway through its turn, which changes its tools and writes the conversation's prompt cache again whole. In the first real meeting that cost the host 60k, 124k and 187k tokens of cache written on successive turns. Working sessions keep your MCP servers.
+Members work under Claude Code's own permission modes and rules, set per team. Every member session also gets, as flag settings: cc-huddle disabled (`enabledPlugins`), so a member never starts a team of its own: the id read back from the data folder, which renames every character but letters, digits, `_` and `-` to `-`, and every `cc-huddle@…` your user and project settings name, since a marketplace's name may have a `.` that doesn't read back; `crossSessionInbound: refuse` and `SendMessage` and `ListAgents` denied, so members take no messages from your sessions and send none; and `--name huddle-<member>`, so a running member shows under its name in `claude agents`. Bare mode is not used: it would also drop the repository's `CLAUDE.md`. A member's turn runs in your session's permission mode, as you started it or switched it since (Shift+Tab): the mode of your last message, or of your session's last call to cc-huddle, one of which comes before any work starts (§3.3). So a session in `bypassPermissions` has members that ask nothing, and a session that asks has members that ask. A team whose `settings.json` sets `permissions.defaultMode` has its members in that mode instead. cc-huddle adds no permission default or sandbox of its own: a member loads your user and project settings as any session of yours does, so what Claude Code would let it do, or ask about, is what your settings say. A call Claude Code asks about becomes a permission request in "Needs you", and the member's turn waits for your answer: allow it once, deny it (with a note the member reads), or, where Claude Code suggests a rule for it, allow it always, which adds that rule to the repository's `settings.json` and the goal's copy (§6), so every member of the goal works under it from then on. Meetings, teammates' answers and reviews run read-only: the read-only tools, and no MCP server but the turn's own (`strictMcpConfig`). Yours would offer tools that do more than read; and a resumed session connects them partway through its turn, which changes its tools and writes the conversation's prompt cache again whole. In the first real meeting that cost the host 60k, 124k and 187k tokens of cache written on successive turns. Working sessions keep your MCP servers.
 
 ## 9. What it fixes
 

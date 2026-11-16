@@ -18,7 +18,13 @@ afterEach(async () => {
 });
 
 const fresh = (slug = "dice", createdAt = 0): GoalState => ({
-  goal: { name: "Dice", slug, status: "active", createdAt },
+  goal: {
+    name: "Dice",
+    slug,
+    status: "active",
+    createdAt,
+    settings: { review: true, meetingSize: "discussion" },
+  },
   tasks: [],
   subtasks: [],
   meetings: [],
@@ -55,7 +61,7 @@ describe("the state file", () => {
     writer.changed();
     await writer.flush();
     expect((await readState(file)).goal.status).toBe("paused");
-    expect(JSON.parse(await readFile(file, "utf8"))).toMatchObject({ version: 5 });
+    expect(JSON.parse(await readFile(file, "utf8"))).toMatchObject({ version: 6 });
   });
 
   it("tells a write that failed", async () => {
@@ -71,7 +77,7 @@ describe("the state file", () => {
     const file = path.join(dir, "state.json");
     await writeFile(file, "{");
     await expect(readState(file)).rejects.toThrow("can't be read");
-    await writeFile(file, JSON.stringify({ version: 6, state: fresh() }));
+    await writeFile(file, JSON.stringify({ version: 7, state: fresh() }));
     await expect(readState(file)).rejects.toThrow("written by a newer cc-huddle");
   });
 });

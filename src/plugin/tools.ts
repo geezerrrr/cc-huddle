@@ -45,7 +45,9 @@ const meetingInput = (member: z.ZodType<string>) => ({
   size: z
     .enum(MEETING_SIZES)
     .optional()
-    .describe("How long the discussion runs; the team's default when left out"),
+    .describe(
+      "How long the discussion runs, only when the user asked for this meeting's own; the goal's when left out",
+    ),
   attendees: z.array(member).default([]).describe("The host first; everyone when empty"),
   host_only: z
     .boolean()
@@ -111,7 +113,7 @@ export function addTools(server: McpServer, session: Session) {
       const engine = session.goal;
       const held = engine.meetings.start({
         agenda,
-        size: size ?? engine.meetingSize,
+        size: size ?? engine.work.goal.settings.meetingSize,
         attendees,
         hostOnly: host_only,
       });

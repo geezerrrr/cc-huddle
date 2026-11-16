@@ -43,7 +43,13 @@ const work = (fields: Partial<Work> = {}): Work => ({
   members: ["host", "ann", "bob"],
   underWay: [],
   meetingsNow: {},
-  goal: { name: "dice", slug: "dice", status: "active", createdAt: 0 },
+  goal: {
+    name: "dice",
+    slug: "dice",
+    status: "active",
+    createdAt: 0,
+    settings: { review: true, meetingSize: "discussion" },
+  },
   tasks: [
     {
       id: "t1",
@@ -152,7 +158,13 @@ describe("waitsIn", () => {
 
   it("holds what is pending or yet to merge while its goal is paused", () => {
     const state = work({
-      goal: { name: "dice", slug: "dice", status: "paused", createdAt: 0 },
+      goal: {
+        name: "dice",
+        slug: "dice",
+        status: "paused",
+        createdAt: 0,
+        settings: { review: true, meetingSize: "discussion" },
+      },
     });
     const held = [{ kind: "goal", status: "paused" }];
     expect(waitsIn(state, subtask("s1"), new Set())).toEqual(held);

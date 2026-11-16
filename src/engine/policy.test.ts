@@ -71,6 +71,24 @@ describe("memberSettings", () => {
   });
 });
 
+describe("memberSettings, with the member's own", () => {
+  it("lays them over the team's, as a scope above it", () => {
+    const settings = memberSettings(
+      { permissions: { allow: ["Read"], deny: ["Bash(rm:*)"] }, model: "x" },
+      { ...glm, settings: { permissions: { allow: ["Write"] }, model: "y" } },
+      { GLM_KEY: "secret" },
+      [],
+    );
+    expect(settings).toMatchObject({
+      permissions: {
+        allow: ["Read", "Write"],
+        deny: ["Bash(rm:*)", "SendMessage", "ListAgents"],
+      },
+      model: "y",
+    });
+  });
+});
+
 describe("writeSettings", () => {
   // Windows keeps who may read a file in its ACL, not in mode bits.
   it.skipIf(process.platform === "win32")(

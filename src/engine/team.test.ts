@@ -26,24 +26,28 @@ async function write(files: Record<string, string>) {
 const UI = "---\ntitle: UI designer\n---\n\nDesign the screens.\n";
 
 describe("loadTeam", () => {
-  it("reads roles and members, by file name, with cc-huddle's defaults", async () => {
+  it("reads the members from team.yaml and their roles by file name", async () => {
     await write({
       "roles/ui-designer.md": UI,
       "roles/programmer.md": "---\ntitle: Programmer\n---\nWrite the code.",
-      "members/sonnet.md": "---\nrole: programmer\nmodel: claude-sonnet-5-5\n---\n",
-      "members/glm.md": [
-        "---",
-        "role: ui-designer",
-        "model: glm-5.3-flashx",
-        "effort: max",
-        "env:",
-        "  ANTHROPIC_AUTH_TOKEN: ${GLM_API_KEY}",
-        "  API_TIMEOUT_MS: 3000000",
-        "---",
-        "Notes for me.",
+      "team.yaml": [
+        "members:",
+        "  sonnet:",
+        "    role: programmer",
+        "    model: claude-sonnet-5-5",
+        "  glm:",
+        "    role: ui-designer",
+        "    model: glm-5.3-flashx",
+        "    effort: max",
+        "    env:",
+        "      ANTHROPIC_AUTH_TOKEN: ${GLM_API_KEY}",
+        "      API_TIMEOUT_MS: 3000000",
+        "    settings:",
+        "      permissions:",
+        "        allow: [Write]",
       ].join("\n"),
     });
-    const { team, settings, meetingSize } = await loadTeam(path.join(top, "user"), top);
+    const { team, settings } = await loadTeam(path.join(top, "user"), top);
     expect(team).toEqual({
       members: [
         {
@@ -52,6 +56,7 @@ describe("loadTeam", () => {
           model: "glm-5.3-flashx",
           effort: "max",
           env: { ANTHROPIC_AUTH_TOKEN: "${GLM_API_KEY}", API_TIMEOUT_MS: "3000000" },
+          settings: { permissions: { allow: ["Write"] } },
         },
         {
           name: "sonnet",
@@ -60,23 +65,19 @@ describe("loadTeam", () => {
           env: {},
         },
       ],
-      review: true,
     });
-    expect([settings, meetingSize]).toEqual([{}, "discussion"]);
+    expect(settings).toEqual({});
   });
 
-  it("takes the team's settings and cc-huddle's own", async () => {
+  it("names a role by its file without a title, and by itself without a file", async () => {
     await write({
-      "roles/ui-designer.md": UI,
-      "members/glm.md": "---\nrole: ui-designer\n---\n",
-      "settings.json": '{ "permissions": { "allow": ["Bash(pnpm test)"] } }',
-      "team.json": '{ "review": false, "meetingSize": "large" }',
+      "roles/tester.md": "Run the tests.",
+      "team.yaml": "members:\n  ann:\n    role: tester\n  bob:\n    role: writer\n",
     });
-    const { team, settings, meetingSize } = await loadTeam(path.join(top, "user"), top);
-    expect([team.review, settings, meetingSize]).toEqual([
-      false,
-      { permissions: { allow: ["Bash(pnpm test)"] } },
-      "large",
+    const { team } = await loadTeam(path.join(top, "user"), top);
+    expect(team.members.map((m) => m.role)).toEqual([
+      { title: "tester", duties: "Run the tests." },
+      { title: "writer", duties: "" },
     ]);
   });
 
@@ -85,58 +86,44 @@ describe("loadTeam", () => {
     for (const [name, text] of Object.entries({
       "roles/ui-designer.md": UI,
       "roles/programmer.md": "---\ntitle: Programmer\n---\nWrite the code.",
-      "members/glm.md": "---\nrole: ui-designer\nmodel: glm-5\n---\n",
-      "members/sonnet.md": "---\nrole: programmer\n---\n",
+      "team.yaml":
+        "members:\n  glm:\n    role: ui-designer\n    model: glm-5\n  sonnet:\n    role: programmer\n",
       "settings.json": JSON.stringify({
         permissions: { allow: ["Read"], deny: ["Bash(rm:*)"] },
         model: "x",
       }),
-      "team.json": '{ "review": false, "meetingSize": "large" }',
     })) {
       await mkdir(path.dirname(path.join(user, name)), { recursive: true });
       await writeFile(path.join(user, name), text);
     }
     await write({
       "roles/programmer.md": "---\ntitle: Game programmer\n---\nWrite the game.",
-      "members/glm.md": "---\nrole: programmer\n---\n",
-      "members/ann.md": "---\nrole: ui-designer\n---\n",
+      "team.yaml": "members:\n  glm:\n    role: programmer\n  ann:\n    role: ui-designer\n",
       "settings.json": JSON.stringify({ permissions: { allow: ["Read", "Bash(pnpm test)"] } }),
-      "team.json": '{ "meetingSize": "small" }',
     });
-    const { team, settings, meetingSize } = await loadTeam(user, top);
+    const { team, settings } = await loadTeam(user, top);
     expect(team.members.map((m) => [m.name, m.role.title, m.model])).toEqual([
       ["ann", "UI designer", undefined],
       ["glm", "Game programmer", undefined],
       ["sonnet", "Game programmer", undefined],
     ]);
-    expect([team.review, meetingSize, settings]).toEqual([
-      false,
-      "small",
-      {
-        permissions: { allow: ["Read", "Bash(pnpm test)"], deny: ["Bash(rm:*)"] },
-        model: "x",
-      },
-    ]);
+    expect(settings).toEqual({
+      permissions: { allow: ["Read", "Bash(pnpm test)"], deny: ["Bash(rm:*)"] },
+      model: "x",
+    });
   });
 
   it("says which file is wrong, and how", async () => {
     await expect(loadTeam(path.join(top, "user"), top)).rejects.toThrow("The team has no members");
-    await write({ "members/glm.md": "---\nrole: ui-designer\n---\n" });
-    await expect(loadTeam(path.join(top, "user"), top)).rejects.toThrow(
-      /glm\.md: there is no role "ui-designer"/,
-    );
+    await write({ "team.yaml": "members:\n  glm:\n    role: dev\n    effort: huge\n" });
+    await expect(loadTeam(path.join(top, "user"), top)).rejects.toThrow(/team\.yaml:\n.*effort/s);
+    await write({ "team.yaml": "members:\n  glm: [dev\n" });
+    await expect(loadTeam(path.join(top, "user"), top)).rejects.toThrow(/team\.yaml: /);
     await write({
-      "roles/ui-designer.md": UI,
-      "members/glm.md": "---\nrole: ui-designer\neffort: huge\n---\n",
+      "team.yaml": "members:\n  glm:\n    role: dev\n",
+      "roles/dev.md": "---\ntitle: [\n---\n",
     });
-    await expect(loadTeam(path.join(top, "user"), top)).rejects.toThrow(/glm\.md:\n.*effort/s);
-    await write({ "members/glm.md": "---\nrole: [ui-designer\n---\n" });
-    await expect(loadTeam(path.join(top, "user"), top)).rejects.toThrow(/glm\.md: /);
-    await write({
-      "members/glm.md": "---\nrole: ui-designer\n---\n",
-      "team.json": "{ review: false }",
-    });
-    await expect(loadTeam(path.join(top, "user"), top)).rejects.toThrow(/team\.json: /);
+    await expect(loadTeam(path.join(top, "user"), top)).rejects.toThrow(/dev\.md: /);
   });
 });
 

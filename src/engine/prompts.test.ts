@@ -52,7 +52,13 @@ describe("systemPrompt", () => {
 describe("taskBrief", () => {
   it("gives the work, where to do it, its plan, what it builds on, and your words for it", () => {
     const brief = taskBrief({
-      goal: { name: "Dice game", slug: "dice-game", status: "active", createdAt: 0 },
+      goal: {
+        name: "Dice game",
+        slug: "dice-game",
+        status: "active",
+        createdAt: 0,
+        settings: { review: true, meetingSize: "discussion" },
+      },
       task: {
         id: "t1",
         title: "Board",
@@ -152,7 +158,13 @@ describe("meeting prompts", () => {
   });
   const brief = (fields: Partial<Meeting> = {}): MeetingBrief => ({
     meeting: meeting(fields),
-    goal: { name: "Dice", slug: "dice", status: "active", createdAt: 0 },
+    goal: {
+      name: "Dice",
+      slug: "dice",
+      status: "active",
+      createdAt: 0,
+      settings: { review: true, meetingSize: "discussion" },
+    },
     attendees: [sonnet, glm],
     members: fields.hostOnly ? [glm] : [sonnet, glm],
     cwd: "/goals/dice",

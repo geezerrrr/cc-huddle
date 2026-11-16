@@ -48,12 +48,14 @@ async function teamFile(name: string, text: string) {
   await writeFile(file, text);
 }
 
+const SETTINGS = { review: true, meetingSize: "discussion" } as const;
+
 const keep = (engine: Engine) => {
   opened.push(engine);
   return engine;
 };
 const start = async (name = "Dice", with_: Partial<EngineOptions> = {}) =>
-  keep(await Engine.start({ ...options, ...with_ }, name));
+  keep(await Engine.start({ ...options, ...with_ }, name, SETTINGS));
 const takeUp = async (slug: string, with_: Partial<EngineOptions> = {}) =>
   keep(await Engine.takeUp({ ...options, ...with_ }, slug));
 /** Closes an engine the test is done with. */
@@ -85,8 +87,8 @@ beforeEach(async () => {
   await git({ cwd: repo, env: ME }, ["commit", "-q", "-m", "start"]);
   await teamFile("roles/dev.md", "---\ntitle: Developer\n---\nBuild it.");
   await teamFile(
-    "members/glm.md",
-    "---\nrole: dev\nenv:\n  ANTHROPIC_AUTH_TOKEN: ${GLM_KEY}\n---\n",
+    "team.yaml",
+    "members:\n  glm:\n    role: dev\n    env:\n      ANTHROPIC_AUTH_TOKEN: ${GLM_KEY}\n",
   );
   const dataFolder = path.join(dir, "cc-huddle-inline");
   options = {
@@ -117,7 +119,7 @@ describe("Engine", () => {
     const { goal } = engine.work;
     expect(goal).toMatchObject({ name: "Dice game", slug: "dice-game", status: "active" });
     expect(engine.team.members.map((m) => m.name)).toEqual(["glm"]);
-    expect(engine.meetingSize).toBe("discussion");
+    expect(goal.settings).toEqual(SETTINGS);
     const files = filesOf("dice-game");
     // The copy keeps a member's environment as written; their settings file has it filled in.
     expect((await readCopy(files.team)).team.members[0]?.env).toEqual({
@@ -156,7 +158,10 @@ describe("Engine", () => {
 
   it("works its goal with the team as it started, whatever the team's files say after", async () => {
     const engine = await start();
-    await teamFile("members/ann.md", "---\nrole: dev\n---\n");
+    await teamFile(
+      "team.yaml",
+      "members:\n  glm:\n    role: dev\n    env:\n      ANTHROPIC_AUTH_TOKEN: ${GLM_KEY}\n  ann:\n    role: dev\n",
+    );
     expect(engine.team.members.map((m) => m.name)).toEqual(["glm"]);
     await close(engine);
     const again = await takeUp("dice");

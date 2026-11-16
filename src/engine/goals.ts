@@ -2,7 +2,8 @@
  * The goal's life (docs/design.md §4.1): the goals' state machine
  * (GOAL_MACHINE) and what a goal's life reaches into: its work and its
  * meetings, its branch and worktrees. One change to its life at a time, and
- * asking twice is the same as asking once.
+ * asking twice is the same as asking once. Also how the goal works, as you
+ * switch it (§6.1).
  */
 import { REFUSED, type Core } from "./core.ts";
 import { removeGoal } from "./git.ts";
@@ -10,7 +11,7 @@ import { can, GOAL_MACHINE, step } from "./machines.ts";
 import type { Meetings } from "./meetings.ts";
 import type { Scheduler } from "./scheduler.ts";
 import { serialBy } from "../shared/serial.ts";
-import type { Goal } from "./types.ts";
+import type { Goal, GoalSettings } from "./types.ts";
 
 /** The key the goal's changes take turns on. */
 const LIFE = "life";
@@ -79,6 +80,13 @@ export class Goals {
       await this.meetings.settled();
       await removeGoal(core.places);
     });
+  }
+
+  /** Switches how the goal works, from its next delivery and meeting on. */
+  switchSettings(change: Partial<GoalSettings>) {
+    const { goal } = this;
+    goal.settings = { ...goal.settings, ...change };
+    this.core.changed();
   }
 
   /** Makes the goal active again; false when it was already. */

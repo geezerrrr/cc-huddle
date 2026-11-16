@@ -1,8 +1,8 @@
 /**
  * The team as you write it (docs/design.md §6), in your own `huddle/`
  * folder beside Claude Code's user settings and in the repository's
- * `.claude/huddle/`: roles and members as Markdown files with front matter,
- * the Claude Code settings every member works under, and cc-huddle's own.
+ * `.claude/huddle/`: the members in `team.yaml`, the roles as Markdown files,
+ * and the Claude Code settings every member works under.
  */
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -12,9 +12,9 @@ import { parse } from "yaml";
 import { z } from "zod";
 import { type Team } from "./core.ts";
 import { errorText } from "../shared/errors.ts";
-import { writeWhole, jsonIfThere, namesIfThere } from "../shared/files.ts";
+import { ifThere, jsonIfThere, namesIfThere, writeWhole } from "../shared/files.ts";
 import { serialBy } from "../shared/serial.ts";
-import { MEETING_SIZES, type MeetingSize, type Member, type Role } from "./types.ts";
+import { type Member, type Role } from "./types.ts";
 
 /** The team's folder in a repository. */
 export const teamFolder = (top: string) => path.join(top, ".claude", "huddle");
@@ -29,7 +29,9 @@ export const userTeamFolder = (env: Record<string, string | undefined>) =>
 
 const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const satisfies EffortLevel[];
 
-const roleSchema = z.object({ title: z.string().trim().min(1) });
+const settingsSchema = z.record(z.string(), z.unknown());
+
+const roleSchema = z.object({ title: z.string().trim().min(1).optional() });
 
 const memberSchema = z.object({
   role: z.string().trim().min(1),
@@ -39,23 +41,18 @@ const memberSchema = z.object({
   env: z
     .record(z.string(), z.union([z.string(), z.number(), z.boolean()]).transform(String))
     .default({}),
+  settings: settingsSchema.optional(),
 });
 
-const teamSchema = z.object({
-  review: z.boolean().optional(),
-  meetingSize: z.enum(MEETING_SIZES).optional(),
-});
+const teamSchema = z.object({ members: z.record(z.string(), memberSchema).default({}) });
 
-const settingsSchema = z.record(z.string(), z.unknown());
-
-/** The team, the settings its members work under, and the size a meeting has unless you say. */
+/** The team and the settings its members work under. */
 export interface TeamFiles {
   team: Team;
   settings: Settings;
-  meetingSize: MeetingSize;
 }
 
-/** What is wrong with the team's files, naming the file; a file that isn't JSON throws a SyntaxError instead. */
+/** What is wrong with the team's files, naming the file; a `settings.json` that isn't JSON throws a SyntaxError instead. */
 export class TeamError extends Error {}
 
 /** Throws why a file's contents don't fit, naming the file. */
@@ -65,26 +62,26 @@ function parsed<T>(schema: z.ZodType<T>, data: unknown, file: string): T {
   return result.data;
 }
 
-/** The Markdown files in a folder, by name: their front matter and the text after it. */
-async function markdownFiles(folder: string) {
+/** YAML as data, or what is wrong with it, naming the file. */
+function yamlIn(text: string, file: string): unknown {
+  try {
+    return parse(text) ?? {};
+  } catch (error) {
+    throw new TeamError(`${file}: ${errorText(error)}`, { cause: error });
+  }
+}
+
+/** The roles in a `roles/` folder, by file name: front matter and the duties after it. */
+async function roleFiles(folder: string) {
   const names = (await namesIfThere(folder)).filter((name) => name.endsWith(".md")).sort();
   return Promise.all(
-    names.map(async (name) => {
+    names.map(async (name): Promise<[string, Role]> => {
       const file = path.join(folder, name);
       const text = await readFile(file, "utf8");
       const front = /^---\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(text);
-      let data: unknown;
-      try {
-        data = parse(front?.[1] ?? "") ?? {};
-      } catch (error) {
-        throw new TeamError(`${file}: ${errorText(error)}`, { cause: error });
-      }
-      return {
-        name: name.slice(0, -".md".length),
-        file,
-        data,
-        body: text.slice(front?.[0].length ?? 0),
-      };
+      const id = name.slice(0, -".md".length);
+      const { title } = parsed(roleSchema, yamlIn(front?.[1] ?? "", file), file);
+      return [id, { title: title ?? id, duties: text.slice(front?.[0].length ?? 0).trim() }];
     }),
   );
 }
@@ -93,11 +90,8 @@ async function markdownFiles(folder: string) {
  * Settings over settings, as Claude Code merges its own scopes: objects key
  * by key, arrays joined without repeats, anything else replaced.
  */
-function mergeSettings(
-  under: Record<string, unknown>,
-  over: Record<string, unknown>,
-): Record<string, unknown> {
-  const merged = { ...under };
+export function mergeSettings(under: object, over: object): Record<string, unknown> {
+  const merged: Record<string, unknown> = { ...under };
   for (const [key, value] of Object.entries(over)) {
     const was = merged[key];
     merged[key] =
@@ -115,24 +109,21 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 
 /**
  * Reads the team from your folder (`userTeam`), then the repository's (at
- * `top`): a
- * role or member the repository has by the same name replaces yours, its
- * `team.json` fields replace yours, and settings merge as Claude Code's do.
- * Throws what is wrong with a file, naming it.
+ * `top`): a member or role the repository has by the same name replaces
+ * yours, and settings merge as Claude Code's do. A role with no file is its
+ * name alone. Throws what is wrong with a file, naming it.
  */
 export async function loadTeam(userTeam: string, top: string): Promise<TeamFiles> {
   const roles = new Map<string, Role>();
-  const written = new Map<string, { file: string; data: unknown }>();
-  let own: z.infer<typeof teamSchema> = {};
+  const written = new Map<string, z.output<typeof memberSchema>>();
   let settings: Record<string, unknown> = {};
   const folders = [userTeam, teamFolder(top)];
   for (const folder of folders) {
-    for (const { name, file, data, body } of await markdownFiles(path.join(folder, "roles")))
-      roles.set(name, { title: parsed(roleSchema, data, file).title, duties: body.trim() });
-    for (const { name, file, data } of await markdownFiles(path.join(folder, "members")))
-      written.set(name, { file, data });
-    const teamFile = path.join(folder, "team.json");
-    own = { ...own, ...parsed(teamSchema, (await jsonIfThere(teamFile)) ?? {}, teamFile) };
+    for (const [id, role] of await roleFiles(path.join(folder, "roles"))) roles.set(id, role);
+    const teamFile = path.join(folder, "team.yaml");
+    const text = await ifThere(readFile(teamFile, "utf8"), "");
+    const { members } = parsed(teamSchema, yamlIn(text, teamFile), teamFile);
+    for (const [name, member] of Object.entries(members)) written.set(name, member);
     const settingsFile = path.join(folder, "settings.json");
     settings = mergeSettings(
       settings,
@@ -140,27 +131,19 @@ export async function loadTeam(userTeam: string, top: string): Promise<TeamFiles
     );
   }
   const byName = [...written].sort(([a], [b]) => (a < b ? -1 : 1));
-  const members = byName.map(([name, { file, data }]): Member => {
-    const { role, model, effort, env } = parsed(memberSchema, data, file);
-    const found = roles.get(role);
-    if (!found) throw new TeamError(`${file}: there is no role "${role}" in the team's roles/`);
-    return {
-      name,
-      role: found,
-      ...(model !== undefined && { model }),
-      ...(effort !== undefined && { effort }),
-      env,
-    };
-  });
+  const members = byName.map(([name, { role, model, effort, env, settings: own }]): Member => ({
+    name,
+    role: roles.get(role) ?? { title: role, duties: "" },
+    ...(model !== undefined && { model }),
+    ...(effort !== undefined && { effort }),
+    env,
+    ...(own !== undefined && { settings: own }),
+  }));
   if (!members.length)
     throw new TeamError(
-      `The team has no members: add them in ${folders.map((f) => path.join(f, "members")).join(" or ")}`,
+      `The team has no members: list them in ${folders.map((f) => path.join(f, "team.yaml")).join(" or ")}`,
     );
-  return {
-    team: { members, review: own.review ?? true },
-    settings,
-    meetingSize: own.meetingSize ?? "discussion",
-  };
+  return { team: { members }, settings };
 }
 
 /** One write to the team's settings at a time, so no rule added is lost to another. */

@@ -38,7 +38,7 @@ afterEach(async () => {
 async function writeTeam() {
   for (const [name, text] of [
     ["roles/dev.md", "---\ntitle: Developer\n---\n"],
-    ["members/glm.md", "---\nrole: dev\n---\n"],
+    ["team.yaml", "members:\n  glm:\n    role: dev\n"],
   ] as const) {
     const file = path.join(teamFolder(repo), name);
     await mkdir(path.dirname(file), { recursive: true });
@@ -86,7 +86,7 @@ describe("the MCP server", () => {
     await writeTeam();
     expect(await call("start_goal", { name: "Dice" })).toContain("huddle/dice/main");
     expect(await call("status")).toContain(
-      'Goal "Dice": active, on branch huddle/dice/main\nTeam: glm',
+      'Goal "Dice": active, on branch huddle/dice/main; review on, discussion meetings\nTeam: glm',
     );
     expect(await call("start_goal", { name: "Chess" })).toContain("a session runs one goal");
     await client.close();

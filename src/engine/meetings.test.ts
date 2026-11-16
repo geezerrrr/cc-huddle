@@ -50,14 +50,20 @@ beforeEach(async () => {
   await git({ cwd: repo, env: me }, ["commit", "-q", "-m", "start"]);
   core = {
     state: {
-      goal: { name: "Dice", slug: "dice", status: "active", createdAt: 0 },
+      goal: {
+        name: "Dice",
+        slug: "dice",
+        status: "active",
+        createdAt: 0,
+        settings: { review: true, meetingSize: "discussion" },
+      },
       tasks: [],
       subtasks: [],
       meetings: [],
       questions: [],
       tokens: {},
     },
-    team: { members: [member("sonnet", "Programmer"), member("glm", "UI designer")], review: true },
+    team: { members: [member("sonnet", "Programmer"), member("glm", "UI designer")] },
     places: { repo: await openRepository(repo), slug: "dice", root: path.join(dir, "data") },
     changed: vi.fn(),
     allowAlways: vi.fn(),

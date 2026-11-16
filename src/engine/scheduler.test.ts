@@ -57,14 +57,20 @@ beforeEach(async () => {
   await git({ cwd: repo, env: ME }, ["commit", "-q", "-m", "start"]);
   core = {
     state: {
-      goal: { name: "Dice", slug: "dice", status: "active", createdAt: 0 },
+      goal: {
+        name: "Dice",
+        slug: "dice",
+        status: "active",
+        createdAt: 0,
+        settings: { review: false, meetingSize: "discussion" },
+      },
       tasks: [{ id: "t1", title: "Board", outcome: "", ownerAccepts: true }],
       subtasks: [],
       meetings: [],
       questions: [],
       tokens: {},
     },
-    team: { members: [member("glm"), member("sonnet")], review: false },
+    team: { members: [member("glm"), member("sonnet")] },
     places: { repo: await openRepository(repo), slug: "dice", root: path.join(dir, "data") },
     changed: vi.fn(),
     allowAlways: vi.fn(),
@@ -346,7 +352,7 @@ describe("Scheduler", () => {
 
   describe("with review on", () => {
     beforeEach(() => {
-      core.team = { ...core.team, review: true };
+      core.state.goal.settings.review = true;
     });
 
     it("has another member review the delivery in its worktree before it is merged", async () => {
@@ -505,7 +511,7 @@ describe("Scheduler", () => {
     });
 
     it("stop a review, which goes on later with the delivery standing", async () => {
-      core.team = { ...core.team, review: true };
+      core.state.goal.settings.review = true;
       const s1 = subtask("s1");
       core.state.subtasks.push(s1);
       vi.mocked(runSubtask).mockImplementation(delivering({ "score.txt": "1\n" }));
@@ -536,7 +542,7 @@ describe("Scheduler", () => {
     });
 
     it("decide a stuck review: skip it, and it is merged", async () => {
-      core.team = { ...core.team, review: true };
+      core.state.goal.settings.review = true;
       const s1 = subtask("s1");
       core.state.subtasks.push(s1);
       vi.mocked(runSubtask).mockImplementation(delivering({ "score.txt": "1\n" }));

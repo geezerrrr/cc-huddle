@@ -47,7 +47,7 @@ beforeEach(async () => {
   await git({ cwd: repo, env: me }, ["commit", "-q", "-m", "start"]);
   for (const [name, text] of [
     ["roles/dev.md", "---\ntitle: Developer\n---\n"],
-    ["members/glm.md", "---\nrole: dev\nmodel: glm-5\n---\n"],
+    ["team.yaml", "members:\n  glm:\n    role: dev\n    model: glm-5\n"],
   ] as const) {
     const file = path.join(teamFolder(repo), name);
     await mkdir(path.dirname(file), { recursive: true });
@@ -147,12 +147,37 @@ describe("the pane's socket and tools", () => {
 
   it("hand the session a task for the team, with the goal it runs and its team", async () => {
     expect((await call("hand_off", { task: "Add a scoreboard" })).text).toBe(
-      "The user hands this to cc-huddle's team: take it on as cc-huddle's team skill says.\n\nAdd a scoreboard\n\nThis session runs no goal yet.",
+      "The user hands this to cc-huddle's team: take it on as cc-huddle's team skill says.\n\nAdd a scoreboard\n\nThis session runs no goal yet. The team: glm (Developer).",
     );
     await session.start("Dice");
     expect((await call("hand_off", { task: "Add a scoreboard" })).text).toContain(
       'This session runs the goal "Dice", under way. The team: glm (Developer).',
     );
+  });
+
+  it("say what is wrong with the team's files as a task is handed over", async () => {
+    await writeFile(path.join(teamFolder(path.join(dir, "repo")), "team.yaml"), "members: [glm\n");
+    expect(await call("hand_off", { task: "Add a scoreboard" })).toMatchObject({
+      error: true,
+      text: expect.stringContaining("team.yaml: ") as string,
+    });
+  });
+
+  it("switch review and the meeting size for the session's goal and goals started after", async () => {
+    expect((await call("switch_settings", { review: false })).text).toBe(
+      "Review is off: for goals started after.",
+    );
+    const dice = await session.start("Dice");
+    expect(dice.work.goal.settings).toEqual({ review: false, meetingSize: "discussion" });
+    expect((await call("switch_settings", { meetingSize: "large" })).text).toBe(
+      "Meetings are large: for this session's goal and goals started after.",
+    );
+    expect(dice.work.goal.settings).toEqual({ review: false, meetingSize: "large" });
+    await dice.goals.pause();
+    expect((await session.start("Chess")).work.goal.settings).toEqual({
+      review: false,
+      meetingSize: "large",
+    });
   });
 
   it("take up only a goal named by its slug", async () => {

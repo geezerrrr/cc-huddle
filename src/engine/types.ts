@@ -1,27 +1,29 @@
 /**
  * The team's state as the engine keeps it (docs/design.md §2, §4). Members
- * are named by their file in the team folder; everything here refers to them
- * by that name. What anything waits on is never stored: derive.ts works it
+ * are named as `team.yaml` lists them; everything here refers to them by that
+ * name. What anything waits on is never stored: derive.ts works it
  * out from this.
  */
-import type { EffortLevel } from "@anthropic-ai/claude-agent-sdk";
+import type { EffortLevel, Settings } from "@anthropic-ai/claude-agent-sdk";
 
-/** A job and its duties, from its file in the team folder (§6). */
+/** A job and its duties, from its file in the team's `roles/` (§6). */
 export interface Role {
   title: string;
-  /** The file's Markdown. */
+  /** The file's Markdown; none for a role with no file. */
   duties: string;
 }
 
-/** Someone on the team, from their file in the team folder (§6). */
+/** Someone on the team, as `team.yaml` lists them (§6). */
 export interface Member {
-  /** The file's name. */
+  /** Their name in `team.yaml`. */
   name: string;
   role: Role;
   model?: string;
   effort?: EffortLevel;
   /** Their Claude Code's environment, `${VAR}` not filled in yet. */
   env: Record<string, string>;
+  /** Claude Code settings of their own, over the team's. */
+  settings?: Settings;
 }
 
 export type GoalStatus = "active" | "paused" | "archived";
@@ -34,6 +36,15 @@ export interface Goal {
   status: GoalStatus;
   /** When it started: the repository's goals are listed in that order. */
   createdAt: number;
+  settings: GoalSettings;
+}
+
+/** How a goal works, switched as `/model` is (§6.1). */
+export interface GoalSettings {
+  /** Deliveries are reviewed before they are merged. */
+  review: boolean;
+  /** How long its meetings' discussions run, unless one is asked for at a size of its own. */
+  meetingSize: MeetingSize;
 }
 
 /** One result for you: a group of subtasks, done once they all are. */

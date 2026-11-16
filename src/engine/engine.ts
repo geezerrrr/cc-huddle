@@ -21,7 +21,7 @@ import { Records } from "./records.ts";
 import { Scheduler } from "./scheduler.ts";
 import { serialBy } from "../shared/serial.ts";
 import { allowInCopy, allowInTeam, copyTeam, loadTeam, readCopy, type TeamFiles } from "./team.ts";
-import type { GoalState, MeetingSize, Member } from "./types.ts";
+import type { GoalSettings, GoalState, Member } from "./types.ts";
 import { releaseLock, takeLock, type Holder, type Runner } from "./lock.ts";
 import { RepositoryGoals } from "./repository.ts";
 
@@ -98,11 +98,15 @@ export class Engine {
   }
 
   /**
-   * Starts a goal for this session: a folder of its own, the team copied
-   * into it as its files have it now (§6), and its branch cut from your
-   * HEAD, checked out in its own worktree.
+   * Starts a goal for this session, working as `settings` say (§6.1): a
+   * folder of its own, the team copied into it as its files have it now (§6),
+   * and its branch cut from your HEAD, checked out in its own worktree.
    */
-  static async start(options: EngineOptions, name: string): Promise<Engine> {
+  static async start(
+    options: EngineOptions,
+    name: string,
+    settings: GoalSettings,
+  ): Promise<Engine> {
     const goals = await RepositoryGoals.of(options.dataFolder, options.cwd);
     const { repo } = goals;
     const copy = await loadTeam(options.userTeam, repo.top);
@@ -119,7 +123,7 @@ export class Engine {
       const places: Places = { repo, slug, root: folder };
       await openGoal(places);
       const state: GoalState = {
-        goal: { name, slug, status: "active", createdAt: Date.now() },
+        goal: { name, slug, status: "active", createdAt: Date.now(), settings },
         tasks: [],
         subtasks: [],
         meetings: [],
@@ -225,9 +229,9 @@ export class Engine {
     return this.core.team;
   }
 
-  /** The size a meeting has unless you say. */
-  get meetingSize(): MeetingSize {
-    return this.copy.meetingSize;
+  /** Switches how the goal works (§6.1). */
+  switchSettings(change: Partial<GoalSettings>) {
+    this.parts.goals.switchSettings(change);
   }
 
   /**

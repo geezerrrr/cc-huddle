@@ -9,6 +9,7 @@ import { errorText } from "../shared/errors.ts";
 import { writeWhole } from "../shared/files.ts";
 import { authorEnv } from "./git.ts";
 import type { SessionKind } from "./prompts.ts";
+import { mergeSettings } from "./team.ts";
 import type { Member } from "./types.ts";
 
 type Env = Record<string, string | undefined>;
@@ -58,8 +59,9 @@ export function expandEnv(env: Record<string, string>, from: Env): Record<string
 }
 
 /**
- * The flag settings a member's sessions run under: the team's settings, the
- * member's environment, and the guards every member has. No permission mode
+ * The flag settings a member's sessions run under: the team's settings with
+ * the member's own over them, the member's environment, and the guards every
+ * member has. No permission mode
  * or sandbox of cc-huddle's own: what isn't the team's is your settings' and
  * your session's mode (sessionOptions). cc-huddle is off in them, so a member
  * never starts a team of its own, and they take no message from your
@@ -71,17 +73,18 @@ export function memberSettings(
   from: Env,
   plugins: readonly string[],
 ): Settings {
+  const own = (member.settings ? mergeSettings(team, member.settings) : team) as Settings;
   return {
-    ...team,
-    env: { ...team.env, ...expandEnv(member.env, from) },
+    ...own,
+    env: { ...own.env, ...expandEnv(member.env, from) },
     enabledPlugins: {
-      ...team.enabledPlugins,
+      ...own.enabledPlugins,
       ...Object.fromEntries(plugins.map((id) => [id, false])),
     },
     crossSessionInbound: "refuse",
     permissions: {
-      ...team.permissions,
-      deny: [...(team.permissions?.deny ?? []), "SendMessage", "ListAgents"],
+      ...own.permissions,
+      deny: [...(own.permissions?.deny ?? []), "SendMessage", "ListAgents"],
     },
   };
 }

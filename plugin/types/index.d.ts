@@ -126,6 +126,7 @@ export type HuddleCalls = {
   answer: { question: string; answer: HuddleAnswer };
   hand_off: { task: string };
   resume_goal: { goal: string };
+  switch_settings: { review?: boolean; meetingSize?: "small" | "discussion" | "large" };
   goal_action: { action: "pause" | "resume" | "archive" | "delete" };
 };
 

@@ -31,7 +31,13 @@ describe("statusText", () => {
       members: ["glm", "sonnet"],
       underWay: [],
       meetingsNow: {},
-      goal: { name: "Dice", slug: "dice", status: "active", createdAt: 0 },
+      goal: {
+        name: "Dice",
+        slug: "dice",
+        status: "active",
+        createdAt: 0,
+        settings: { review: true, meetingSize: "discussion" },
+      },
       meetings: [
         {
           id: "m1",
@@ -66,7 +72,8 @@ describe("statusText", () => {
       ],
       tokens: {},
     });
-    expect(text).toBe(`Goal "Dice": active, on branch huddle/dice/main
+    expect(text)
+      .toBe(`Goal "Dice": active, on branch huddle/dice/main; review on, discussion meetings
 Team: glm (busy), sonnet
   Meeting [m1], hosted by sonnet: its plan waits for review
   Task "Game" [t1], accepted by the user

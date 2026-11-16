@@ -1,8 +1,9 @@
 /**
  * The tools of cc-huddle's mod (docs/design.md §7.2, §7.3): where the pane
  * reads the team (`pane`, its socket), how it answers what waits on you
- * (`answer`), what `/huddle resume` does (`resume_goal`), and the prompt
- * `/huddle <task>` gives your session (`hand_off`). They are the mod's, not
+ * (`answer`), what `/huddle resume` does (`resume_goal`), the prompt
+ * `/huddle <task>` gives your session (`hand_off`), and what `/huddle review`
+ * and `/huddle meeting` switch (`switch_settings`). They are the mod's, not
  * your session's: the mod keeps the model from calling them, so a permission
  * is granted only by you, pressing its button, and a goal is taken up only on
  * your word.
@@ -12,10 +13,12 @@ import { z } from "zod";
 import type { HuddleAnswer, HuddleCalls } from "../../plugin/types/index.d.ts";
 import {
   DECISION_OPTIONS,
+  type Goal,
+  type GoalSettings,
+  MEETING_SIZES,
   PERMISSION_OPTIONS,
   type PermissionOption,
   SLUG,
-  type GoalState,
   type Member,
 } from "../engine/index.ts";
 
@@ -56,6 +59,11 @@ const resumeInput = z.object({
   goal: z.string().regex(SLUG).describe("The goal's slug"),
 }) satisfies z.ZodType<HuddleCalls["resume_goal"]>;
 
+const settingsInput = z.object({
+  review: z.boolean().optional(),
+  meetingSize: z.enum(MEETING_SIZES).optional(),
+}) satisfies z.ZodType<HuddleCalls["switch_settings"]>;
+
 /** Adds the pane's tools to `server`, for the goal the session runs (`session`). */
 export function addPaneTools(server: McpServer, session: Session, pane: PaneServer) {
   server.registerTool(
@@ -93,11 +101,23 @@ export function addPaneTools(server: McpServer, session: Session, pane: PaneServ
       inputSchema: handOffInput.shape,
       annotations: { readOnlyHint: true },
     },
-    ({ task }) => {
+    async ({ task }) => {
       const engine = session.current;
-      return toolText(
-        handOffText(task, engine && { goal: engine.work.goal, members: engine.team.members }),
-      );
+      // With no goal yet, what is wrong with the team's files is said now, before your session proposes anything (§6).
+      const members = engine ? engine.team.members : (await session.team()).members;
+      return toolText(handOffText(task, engine?.work.goal, members));
+    },
+  );
+
+  server.registerTool(
+    "switch_settings",
+    {
+      description: `${PANE_ONLY} Switches review or the meeting size for this session's goal and goals started after, as /huddle review and /huddle meeting.`,
+      inputSchema: settingsInput.shape,
+    },
+    async (change) => {
+      const now = await session.switchSettings(change);
+      return toolText(switchedText(change, now, session.current !== undefined));
     },
   );
 
@@ -116,21 +136,27 @@ export function addPaneTools(server: McpServer, session: Session, pane: PaneServ
 
 /**
  * What `/huddle <task>` gives your session: the task, for the team and not
- * for it, as the team skill says to take it on; with the team and the goal
- * this session runs (`mine`), if it runs one.
+ * for it, as the team skill says to take it on; with the goal this session
+ * runs, if it runs one, and the team.
  */
-function handOffText(
-  task: string,
-  mine: { goal: GoalState["goal"]; members: readonly Member[] } | undefined,
-): string {
-  const goal = mine
-    ? `This session runs the goal "${mine.goal.name}", ${mine.goal.status === "active" ? "under way" : mine.goal.status}. The team: ${rosterOf(mine.members)}.`
+function handOffText(task: string, goal: Goal | undefined, members: readonly Member[]): string {
+  const runs = goal
+    ? `This session runs the goal "${goal.name}", ${goal.status === "active" ? "under way" : goal.status}.`
     : "This session runs no goal yet.";
   return [
     "The user hands this to cc-huddle's team: take it on as cc-huddle's team skill says.",
     "",
     task,
     "",
-    goal,
+    `${runs} The team: ${rosterOf(members)}.`,
   ].join("\n");
+}
+
+/** What a switch of settings says: what it switched, and for which goals. */
+function switchedText(change: Partial<GoalSettings>, now: GoalSettings, runsGoal: boolean) {
+  const switched = [
+    ...(change.review === undefined ? [] : [`Review is ${now.review ? "on" : "off"}`]),
+    ...(change.meetingSize === undefined ? [] : [`Meetings are ${now.meetingSize}`]),
+  ];
+  return `${switched.join(", ")}: for ${runsGoal ? "this session's goal and " : ""}goals started after.`;
 }

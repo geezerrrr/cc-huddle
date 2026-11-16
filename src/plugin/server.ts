@@ -120,7 +120,7 @@ async function listTeamFiles() {
     if (error instanceof GitError) return;
     throw error;
   }
-  // A team that doesn't read yet takes any name: starting a goal says what is wrong with it.
+  // A team that doesn't read yet takes any name: handing it a task says what is wrong with it.
   const team = await goals.team(userTeam).catch((error: unknown) => {
     if (error instanceof TeamError || error instanceof SyntaxError) return undefined;
     throw error;

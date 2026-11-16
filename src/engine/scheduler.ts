@@ -557,7 +557,7 @@ export class Scheduler {
     } else if (outcome.status === "delivered") {
       subtask.delivery = { ...outcome.handover, at: Date.now() };
       subtask.conflict = undefined;
-      this.move(subtask, core.team.review ? "review" : "merge");
+      this.move(subtask, core.state.goal.settings.review ? "review" : "merge");
     } else {
       this.move(subtask, outcome.status === "failed" ? "fail" : "stop");
       if (outcome.status === "failed") subtask.error = outcome.error;

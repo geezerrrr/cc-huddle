@@ -11,11 +11,9 @@ import type { Inbox } from "./questions.ts";
 import type { TurnListener } from "./turns.ts";
 import type { Goal, GoalState, Meeting, MeetingNow, Member, Question, Subtask } from "./types.ts";
 
-/** The team as configured (§6): its members in order, and cc-huddle's own settings. */
+/** The team as configured (§6): its members in order. */
 export interface Team {
   members: readonly Member[];
-  /** Deliveries are reviewed before they are merged. */
-  review: boolean;
 }
 
 export interface Core extends Inbox {

@@ -12,13 +12,15 @@ import { following, openPane, paneView, scrollPane } from "./pane";
 import type { Ui } from "./rows";
 import { call } from "./server";
 import { PANE, PLUGIN, readTeam } from "./state";
+import { switchMeeting, switchReview } from "./settings";
 import { words } from "./text";
 import { watch } from "./watch";
 
 /** The server's tools, as the model names them. */
 const TOOLS = /^mcp__plugin_cc-huddle_huddle__/;
 /** The tools only the mod calls, as the model would name them. */
-const PANE_ONLY = /^mcp__plugin_cc-huddle_huddle__(pane|answer|hand_off|resume_goal)$/;
+const PANE_ONLY =
+  /^mcp__plugin_cc-huddle_huddle__(pane|answer|hand_off|resume_goal|switch_settings)$/;
 const PANE_ONLY_REASON = "This tool is the user's, in /huddle.";
 
 export const register: Register = (on) => {
@@ -26,8 +28,8 @@ export const register: Register = (on) => {
     await $.command.register({
       name: "huddle",
       description:
-        "Hand cc-huddle's team a task; with none, show the team in a pane; `/huddle status` prints where it stands, `pause` pauses this session's goal and `resume` resumes it or takes up another",
-      argumentHint: "[task | status | pause | resume [number]]",
+        "Hand cc-huddle's team a task; with none, show the team in a pane; `/huddle status` prints where it stands, `pause` pauses this session's goal and `resume` resumes it or takes up another, `review` and `meeting` switch review and the meeting size",
+      argumentHint: "[task | status | pause | resume [number] | review [on|off] | meeting [size]]",
     });
     watch($);
     return next(e);
@@ -43,7 +45,14 @@ export const register: Register = (on) => {
       resume: () => resumeGoal($),
     };
     const numbered = /^resume\s+(\d+)$/.exec(task);
-    const run = numbered ? () => resumeGoal($, Number(numbered[1])) : certain[task];
+    const setting = /^(review|meeting)(?:\s+(\S+))?$/.exec(task);
+    const run = numbered
+      ? () => resumeGoal($, Number(numbered[1]))
+      : setting?.[1] === "review"
+        ? () => switchReview($, setting[2] ?? "")
+        : setting?.[1] === "meeting"
+          ? () => switchMeeting($, setting[2] ?? "")
+          : certain[task];
     if (run) {
       try {
         return { text: await run() };

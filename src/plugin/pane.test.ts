@@ -63,7 +63,13 @@ const work = (): Work => ({
   members: ["glm", "sonnet"],
   underWay: [],
   meetingsNow: {},
-  goal: { name: "Dice", slug: "dice", status: "active", createdAt: 0 },
+  goal: {
+    name: "Dice",
+    slug: "dice",
+    status: "active",
+    createdAt: 0,
+    settings: { review: true, meetingSize: "discussion" },
+  },
   tasks: [
     {
       id: "t1",

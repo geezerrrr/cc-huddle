@@ -49,8 +49,7 @@ beforeEach(async () => {
   await git({ cwd: repo, env: ME }, ["commit", "-q", "-m", "start"]);
   for (const [name, text] of [
     ["roles/dev.md", "---\ntitle: Developer\n---\nBuild it."],
-    ["members/glm.md", "---\nrole: dev\n---\n"],
-    ["members/sonnet.md", "---\nrole: dev\n---\n"],
+    ["team.yaml", "members:\n  glm:\n    role: dev\n  sonnet:\n    role: dev\n"],
   ] as const) {
     const file = path.join(teamFolder(repo), name);
     await mkdir(path.dirname(file), { recursive: true });

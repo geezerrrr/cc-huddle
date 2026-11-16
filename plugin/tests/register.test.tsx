@@ -104,7 +104,9 @@ function serve(on: On, views: HuddleView[]) {
           ? `Resumed ${String(e.args.goal)}.`
           : e.tool === "hand_off"
             ? `For the team: ${String(e.args.task)}`
-            : "Team: glm";
+            : e.tool === "switch_settings"
+              ? `Switched ${JSON.stringify(e.args)}.`
+              : "Team: glm";
     return { value: { content: [{ type: "text", text }], isError: false } };
   });
   on("http.fetch", (_, e) => {
@@ -594,6 +596,34 @@ test("/huddle resume asks which goal when there are several, each numbered", asy
   expect(calls.filter((c) => c.tool === "resume_goal")).toEqual([
     { tool: "resume_goal", args: { goal: "g2" } },
   ]);
+});
+
+test("/huddle review and meeting switch to the value given, or to what you pick", async ($, on) => {
+  const asked: string[][] = [];
+  const said = ["off", "large"];
+  on("tool.call", { tool: "AskUserQuestion" }, (_, e) => {
+    const [question] = e.questions as { question: string; options: { label: string }[] }[];
+    asked.push(question?.options.map((o) => o.label) ?? []);
+    const answer = said.shift();
+    return answer
+      ? { result: { answers: { [question?.question ?? ""]: answer } } }
+      : { deny: "dismissed" };
+  });
+  const calls = serve(on, [{ revision: 1, team: NO_GOAL }]);
+  await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
+  expect(await huddle($, "review on")).toBe('Switched {"review":true}.');
+  expect(await huddle($, "review")).toBe('Switched {"review":false}.');
+  expect(await huddle($, "meeting")).toBe('Switched {"meetingSize":"large"}.');
+  expect(await huddle($, "meeting")).toBe("Nothing switched.");
+  expect(await huddle($, "meeting huge")).toBe(
+    'Meetings are small, discussion, large, not "huge".',
+  );
+  expect(asked).toEqual([
+    ["on", "off"],
+    ["small", "discussion", "large"],
+    ["small", "discussion", "large"],
+  ]);
+  expect(calls.filter((c) => c.tool === "switch_settings")).toHaveLength(3);
 });
 
 test("/huddle resume lists more goals than the dialog holds, to pick by number", async ($, on) => {

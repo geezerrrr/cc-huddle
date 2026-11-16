@@ -45,20 +45,22 @@ const filesOf = async (slug: string) =>
 async function writeGoal(slug: string, status = "paused") {
   const files = await filesOf(slug);
   const team: TeamFiles = {
-    team: {
-      members: [{ name: "glm", role: { title: "Developer", duties: "" }, env: {} }],
-      review: true,
-    },
+    team: { members: [{ name: "glm", role: { title: "Developer", duties: "" }, env: {} }] },
     settings: {},
-    meetingSize: "discussion",
   };
   await copyTeam(files.team, team);
   await writeFile(
     files.state,
     JSON.stringify({
-      version: 5,
+      version: 6,
       state: {
-        goal: { name: slug, slug, status, createdAt: slug.length },
+        goal: {
+          name: slug,
+          slug,
+          status,
+          createdAt: slug.length,
+          settings: { review: true, meetingSize: "discussion" },
+        },
         tasks: [],
         subtasks: [],
         meetings: [],
@@ -95,7 +97,7 @@ describe("the session's context", () => {
     expect(await sessionContext(repo, data, SESSION))
       .toBe(`This session runs cc-huddle's goal "dice", as it stands:
 
-Goal "dice": active, on branch huddle/dice/main
+Goal "dice": active, on branch huddle/dice/main; review on, discussion meetings
 Team: glm`);
   });
 
