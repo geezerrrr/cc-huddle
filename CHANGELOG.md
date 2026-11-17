@@ -4,6 +4,8 @@ All notable changes to cc-huddle are listed here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-17
+
 ### Added
 
 - A team of Claude Code sessions on your repository, set up in `~/.claude/huddle/` for all your repositories and in a repository's `.claude/huddle/` on top: members in `team.yaml`, each with any model and environment Claude Code takes and settings of its own, roles as Markdown, and Claude Code settings for all of them.
@@ -14,3 +16,6 @@ All notable changes to cc-huddle are listed here. The format follows [Keep a Cha
 - Your session's tools for goals, meetings, plans, subtasks and decisions, and a skill that keeps it to relaying.
 - Example team files written to `~/.claude/huddle/` where missing, explained in comments; no built-in roles.
 - A member's subtask that builds on their own merged work forks that work's session, in a new worktree.
+
+[Unreleased]: https://github.com/geezerrrr/cc-huddle/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/geezerrrr/cc-huddle/releases/tag/v0.1.0
