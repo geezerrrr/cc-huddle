@@ -7420,11 +7420,11 @@ var SUBTASK_MACHINE = {
   /** The reviewer, or you, sent it back. */
   reject: { from: ["reviewing", "waitingInReview"], to: "pending" },
   merged: { from: ["merging"], to: "done" },
-  /** Merging it left text conflicts for its assignee to resolve. */
-  conflict: { from: ["merging"], to: "pending" },
-  /** Files it can't merge line by line, or git failing: it waits on your decision. */
+  /** The goal's branch has commits its branch lacks: back to its assignee to merge them in. */
+  behind: { from: ["merging"], to: "pending" },
+  /** Git refusing the fast-forward otherwise: it waits on your decision. */
   askMerge: { from: ["merging"], to: "waitingInMerge" },
-  /** You kept a side, or had it merged again. */
+  /** You had it merged again. */
   remerge: { from: ["waitingInMerge"], to: "merging" },
   /** From the start: no session, delivery or worktree. */
   retry: { from: ["failed", "stopped", "stoppedInReview", "stoppedInMerge"], to: "pending" },
@@ -7459,8 +7459,6 @@ var DECISION_OPTIONS = [
   "rereview",
   "skip",
   "sendBack",
-  "ours",
-  "theirs",
   "retry",
   "stop",
   "accept",
@@ -7485,13 +7483,7 @@ var DECISIONS = {
     options: ["rereview", "skip", "sendBack"],
     note: { option: "sendBack", needed: true }
   }),
-  /** Files a merge can't take line by line: keep one side, or merge again. */
-  mergeFiles: (files) => ({
-    kind: "conflict",
-    options: ["ours", "theirs", "retry"],
-    files
-  }),
-  /** A merge git failed on: try again, or stop the subtask, its delivery standing. */
+  /** A merge git refused: try again, or stop the subtask, its delivery standing. */
   failedMerge: () => ({ kind: "merge", options: ["retry", "stop"] }),
   /** A task done that you accept: accept it, or send it back saying what to change. */
   delivery: () => ({
@@ -7598,7 +7590,7 @@ function reviewerAway(state, subtask2) {
 function startWaits(state, subtask2, busy) {
   const { goal } = state;
   if (goal.status !== "active") return [{ kind: "goal", status: goal.status }];
-  const unmerged2 = (d) => ({
+  const unmerged = (d) => ({
     kind: "upstream",
     by: d.assignee,
     subtaskId: d.id,
@@ -7607,12 +7599,12 @@ function startWaits(state, subtask2, busy) {
   const upstream = subtask2.dependsOn.flatMap((id) => {
     const d = state.subtasks.find((s) => s.id === id);
     if (!d) return [];
-    if (d.status !== "done") return [unmerged2(d)];
+    if (d.status !== "done") return [unmerged(d)];
     if (d.taskId === subtask2.taskId) return [];
     if (!state.tasks.find((t) => t.id === d.taskId)?.ownerAccepts || accepted(state, d.taskId))
       return [];
     const rest = state.subtasks.find((s) => s.taskId === d.taskId && s.status !== "done");
-    if (rest) return [unmerged2(rest)];
+    if (rest) return [unmerged(rest)];
     const acceptance = acceptanceOf(state, d.taskId);
     return acceptance ? [{ kind: "acceptance", questionId: acceptance.id }] : [];
   });
@@ -7926,27 +7918,6 @@ function commitDesk(places, subtaskId, by, message) {
       await git(signed, ["commit", "-q", "--allow-empty", "-m", message]);
   });
 }
-var MARKERS = /^<{7} [\s\S]*?^={7}\r?$[\s\S]*?^>{7} /m;
-var unresolved = (places, subtaskId, files) => marked(goalFiles(places.root).desk(subtaskId), files);
-async function marked(tree, files) {
-  const found = await Promise.all(
-    // One deleted on a side has no markers.
-    files.map(
-      async (file) => MARKERS.test(await ifThere(readFile(path.join(tree, file), "utf8"), ""))
-    )
-  );
-  return files.filter((_, i) => found[i]);
-}
-async function unmerged(at) {
-  const list = await git(at, ["diff", "--name-only", "-z", "--diff-filter=U"]);
-  return list.stdout.split("\0").filter(Boolean);
-}
-async function conflicts(places, subtaskId, at) {
-  const files = await unmerged(at);
-  if (!files.length) return void 0;
-  const text2 = await unresolved(places, subtaskId, files);
-  return { kind: "conflict", text: text2, other: files.filter((file) => !text2.includes(file)) };
-}
 async function removeDesk(places, subtaskId) {
   const desk = goalFiles(places.root).desk(subtaskId);
   await unlist(places.repo, desk);
@@ -7959,80 +7930,30 @@ async function removeDesk(places, subtaskId) {
     }
   );
 }
-function mergeDesk(places, subtaskId, by) {
+async function contains(at, commit, ancestor) {
+  const found = await git(at, ["merge-base", "--is-ancestor", ancestor, commit], { allow: [1] });
+  return found.code === 0;
+}
+function mergeDesk(places, subtaskId) {
   return perGoal(places, async () => {
     const { repo, slug } = places;
-    const folder = goalFiles(places.root).desk(subtaskId);
-    if (!await exists(folder)) {
-      const branch = subtaskBranch(slug, subtaskId);
-      if (!await hasBranch(repo, branch)) return { kind: "merged" };
-      await checkOut(repo, folder, branch);
-    }
-    const at = await worktreeAt(repo, folder);
-    const desk = { ...at, env: { ...at.env, ...authorEnv(by) } };
-    if (await merging(desk)) {
-      const found = await conflicts(places, subtaskId, desk);
-      if (found) return found;
-      await git(desk, ["commit", "-q", "--no-edit"]);
-    } else {
-      const merge = await git(
-        desk,
-        ["-c", "merge.ff=true", "merge", "-q", "--no-edit", goalBranch(slug)],
-        { allow: [1] }
-      );
-      if (merge.code === 1) {
-        const found = await conflicts(places, subtaskId, desk);
-        if (found) return found;
-        throw new GitError("merge", (merge.stderr || merge.stdout).trim());
-      }
-    }
-    const head = (await git(desk, ["rev-parse", "HEAD"])).stdout.trim();
+    const branch = subtaskBranch(slug, subtaskId);
+    if (!await hasBranch(repo, branch)) return "merged";
     const goal = await worktreeAt(repo, await setUpGoal(places));
+    const head = (await git(goal, ["rev-parse", `refs/heads/${branch}`])).stdout.trim();
+    if (!await contains(goal, head, "HEAD")) return "behind";
     await git(goal, ["merge", "-q", "--ff-only", head]);
     await removeDesk(places, subtaskId);
-    return { kind: "merged" };
-  });
-}
-var literally = (file) => `:(literal)${file}`;
-function pickSide(places, subtaskId, files, side) {
-  return perGoal(places, async () => {
-    const desk = await worktreeAt(places.repo, goalFiles(places.root).desk(subtaskId));
-    const stages = await git(desk, ["ls-files", "-u", "-z", "--", ...files.map(literally)]);
-    const wanted = side === "ours" ? "2" : "3";
-    const kept = new Set(
-      stages.stdout.split("\0").filter(Boolean).map((line) => line.split("	")).filter(([meta]) => meta?.split(" ")[2] === wanted).map(([, file]) => file)
-    );
-    for (const file of files) {
-      if (kept.has(file)) {
-        await git(desk, ["checkout", `--${side}`, "--", literally(file)]);
-        await git(desk, ["add", "--", literally(file)]);
-      } else await git(desk, ["rm", "-q", "--", literally(file)]);
-    }
-  });
-}
-function abortMerge(places, subtaskId) {
-  return perGoal(places, async () => {
-    const desk = await worktreeAt(places.repo, goalFiles(places.root).desk(subtaskId));
-    if (await merging(desk)) await git(desk, ["merge", "--abort"]);
+    return "merged";
   });
 }
 function dropDesk(places, subtaskId) {
   return perGoal(places, () => removeDesk(places, subtaskId));
 }
-function mergeBase(places, base, by) {
+function behindBase(places, base) {
   return perGoal(places, async () => {
-    const at = await worktreeAt(places.repo, await setUpGoal(places));
-    const goal = { ...at, env: { ...at.env, ...authorEnv(by) } };
-    if (await merging(goal)) return { kind: "conflict", files: await unmerged(goal) };
-    const merge = await git(
-      goal,
-      ["-c", "merge.ff=true", "merge", "-q", "--no-edit", `refs/heads/${base}`],
-      { allow: [1] }
-    );
-    if (merge.code === 0) return { kind: "clean" };
-    const files = await unmerged(goal);
-    if (!files.length) throw new GitError("merge", (merge.stderr || merge.stdout).trim());
-    return { kind: "conflict", files };
+    const goal = await worktreeAt(places.repo, await setUpGoal(places));
+    return !await contains(goal, "HEAD", `refs/heads/${base}`);
   });
 }
 function fastForward(places, base) {
@@ -8047,10 +7968,7 @@ function fastForward(places, base) {
       return;
     }
     const was = (await git({ cwd: repo.top }, ["rev-parse", ref])).stdout.trim();
-    const ff = await git({ cwd: repo.top }, ["merge-base", "--is-ancestor", was, head], {
-      allow: [1]
-    });
-    if (ff.code === 1)
+    if (!await contains({ cwd: repo.top }, head, was))
       throw new GitError("merge", `${base} has commits the goal's branch lacks: merge again`);
     await git({ cwd: repo.top }, ["update-ref", ref, head, was]);
   });
@@ -8254,7 +8172,7 @@ var toolText = (text2) => ({ content: [{ type: "text", text: text2 }] });
 // src/engine/prompts.ts
 var called = (member) => `${member.name} (${member.role.title})`;
 var TASK_WAYS = `# How you work on a subtask
-- You work in a git worktree of your own, on a branch cut from the goal's branch, which is merged into the goal's branch once you deliver. Teammates working at the same time each have theirs, so you never get in each other's way. Stay in yours.
+- You work in a git worktree of your own, on a branch cut from the goal's branch; once you deliver, the goal's branch moves up to yours. Teammates working at the same time each have theirs, so you never get in each other's way. Stay in yours.
 - You needn't commit: delivering commits whatever you leave uncommitted, under your name.
 - When you need information or a decision from a teammate (an interface, a design detail), ask them with ask_teammate. It waits for their answer.
 - When you need the user to decide something or give you what only they have, ask with AskUserQuestion, offering options, and wait for the answer. Don't just write that you are waiting: the user may not be watching.
@@ -8302,7 +8220,7 @@ function taskBrief(input) {
 ${note ?? ""}`);
   return lines.join("\n");
 }
-function goOnMessage(reasons, subtask2) {
+function goOnMessage(reasons, goalBranch2) {
   const said = ({ why, note = "" }) => {
     switch (why) {
       case "held":
@@ -8312,8 +8230,8 @@ function goOnMessage(reasons, subtask2) {
       case "rejected":
         return `The review sent your delivery back. Fix what it says, then deliver again:
 ${note}`;
-      case "conflict":
-        return `Merging your delivery into the goal's branch left conflicts in ${subtask2.conflict?.files.join(", ") ?? ""}. The merge is under way in your worktree, the conflict markers in those files. Resolve them, keeping what both sides meant, then deliver again.`;
+      case "behind":
+        return `The goal's branch, ${goalBranch2}, moved on before your delivery merged. Merge it into your branch, then deliver again.`;
       case "revised":
         return `The user sent your task back, asking for:
 ${note}
@@ -8344,8 +8262,7 @@ var TEAMMATE_REPLIES = {
   failed: (name, error) => `${name} couldn't answer just now: ${error}`
 };
 var DELIVERY_REFUSED = {
-  missing: (desk, files) => `Not delivered: these aren't files in your worktree (${desk}): ${files.join(", ")}. Deliver the files that are there.`,
-  conflicted: (files) => `Not delivered: conflict markers are still in ${files.join(", ")}. Resolve them first, keeping what both sides meant, then deliver.`
+  missing: (desk, files) => `Not delivered: these aren't files in your worktree (${desk}): ${files.join(", ")}. Deliver the files that are there.`
 };
 var PERMISSION_REPLIES = {
   /** Its turn ended first. */
@@ -8369,10 +8286,8 @@ Files: ${files}
 Their worktree is ${input.cwd}. Read the files, and whatever else you need there, to check the work against the criteria, and stop once you can tell. Pass it when it meets them, even if you would have done it differently; send it back only for what really falls short, and say exactly what to fix.`;
 }
 function handBackPrompt(input) {
-  const { goal, cwd: cwd2, files } = input;
-  return `The team's work on the goal "${goal.name}" is done, and is being merged back into the branch "${goal.base}" it was cut from. In the goal's worktree, ${cwd2}, "${goal.base}" is being merged into the goal's branch, and the merge stopped on conflicts in: ${files.join(", ")}.
-
-Resolve them, and finish the merge with git commit.`;
+  const { goal, cwd: cwd2 } = input;
+  return `The team's work on the goal "${goal.name}" is done, to be handed back into the branch "${goal.base}" it was cut from, which has moved on meanwhile. In the goal's worktree, ${cwd2}, merge "${goal.base}" into the goal's branch.`;
 }
 function teammateQuestion(input) {
   const own = input.own.map(
@@ -9269,11 +9184,11 @@ var Goals = class {
     });
   }
   /**
-   * Hands the work back (§5): `base` merged into the goal's branch, its
-   * conflicts the lead's to resolve and the merge theirs to finish, in a
-   * session of their own, then `base` fast-forwarded to it. Merged, the goal
-   * closes; where git refuses, or the lead's turn fails, it comes back to
-   * you, saying why. Paused meanwhile, it stops, to be asked again.
+   * Hands the work back (§5): `base` fast-forwarded to the goal's branch,
+   * the lead first merging `base` in, in a session of their own, where it
+   * has commits the goal's branch lacks. Merged, the goal closes; where git
+   * refuses, or the lead's turn fails, it comes back to you, saying why.
+   * Paused meanwhile, it stops, to be asked again.
    */
   async handBack(handing) {
     const { core } = this;
@@ -9281,11 +9196,10 @@ var Goals = class {
     const { base } = this.goal;
     const by = this.lead;
     try {
-      const merged = await mergeBase(core.places, base, by);
-      if (merged.kind === "conflict") {
+      if (await behindBase(core.places, base)) {
         handing.by = by;
         core.changed();
-        await this.resolve(by, merged.files, signal);
+        await this.resolve(by, signal);
       }
       await fastForward(core.places, base);
       this.let(handing);
@@ -9297,14 +9211,14 @@ var Goals = class {
       core.changed();
     }
   }
-  /** The member `by` resolves the hand-back's `files` in conflict, in the goal's worktree, in a session of their own. */
-  async resolve(by, files, signal) {
+  /** The member `by` merges the goal's base into its branch, in the goal's worktree, in a session of their own. */
+  async resolve(by, signal) {
     const { core } = this;
     const member = core.team.members.find((m) => m.name === by);
     if (!member) throw new Error(`${by} isn't on the goal's team`);
     const cwd2 = goalFiles(core.places.root).checkout;
     const outcome = await runTurn(
-      handBackPrompt({ goal: this.goal, cwd: cwd2, files }),
+      handBackPrompt({ goal: this.goal, cwd: cwd2 }),
       {
         ...core.options(member, "merge", cwd2),
         canUseTool: this.questions.gate({ from: by, signal })
@@ -9316,7 +9230,7 @@ var Goals = class {
     if (!outcome.ok) throw new Error(outcome.error);
   }
   /**
-   * Who leads the goal's end: resolves its hand-back's conflicts, and puts
+   * Who leads the goal's end: merges its base in to hand the work back, and puts
    * its decisions to you. The host of its meeting, else the member its work
    * was given to.
    */
@@ -10446,8 +10360,6 @@ async function checkDelivery(core, subtask2, desk, files) {
     else missing.push(file);
   }
   if (missing.length) return { refused: DELIVERY_REFUSED.missing(desk, missing) };
-  const left = subtask2.conflict ? await unresolved(core.places, subtask2.id, subtask2.conflict.files) : [];
-  if (left.length) return { refused: DELIVERY_REFUSED.conflicted(left) };
   return { files: [...new Set(kept)] };
 }
 
@@ -10637,7 +10549,6 @@ var Scheduler = class {
       return;
     }
     if (!actionEvent(subtask2.status, "stop")) return;
-    if (subtask2.status === "waitingInMerge") await abortMerge(this.core.places, subtask2.id);
     const event = actionEvent(subtask2.status, "stop");
     if (!event) return;
     live?.abort.abort();
@@ -10657,8 +10568,7 @@ var Scheduler = class {
       session: void 0,
       goOn: void 0,
       delivery: void 0,
-      review: void 0,
-      conflict: void 0
+      review: void 0
     });
     this.core.changed();
     this.pump();
@@ -10677,9 +10587,8 @@ var Scheduler = class {
   }
   /**
    * Answers a decision put to you (Questions.answer) and carries it out: on a
-   * stuck review (review again, skip it, send it back), on a merge (keep one
-   * side of the files that can't be merged line by line, or try again), on a
-   * task done (accept it, which is all it takes for work built on it to
+   * stuck review (review again, skip it, send it back), on a merge git
+   * refused (try again, or stop), on a task done (accept it, which is all it takes for work built on it to
    * start; or send one of its subtasks, `sentBack` or else the last one done,
    * back with what to change). Throws as answering does, and when the
    * subtask sent back isn't one done in the task.
@@ -10711,12 +10620,7 @@ var Scheduler = class {
       }
     } else if (subtask2.status === "waitingInMerge") {
       if (pick === "stop") await this.stop(subtask2);
-      else {
-        if (pick === "retry") await abortMerge(this.core.places, subtask2.id);
-        else if (question.decision.kind === "conflict" && (pick === "ours" || pick === "theirs"))
-          await pickSide(this.core.places, subtask2.id, question.decision.files, pick);
-        if (can(SUBTASK_MACHINE, subtask2.status, "remerge")) this.move(subtask2, "remerge");
-      }
+      else this.move(subtask2, "remerge");
     }
     this.core.changed();
     this.pump();
@@ -10824,7 +10728,7 @@ var Scheduler = class {
       const recorder = core.recorder(subtask2.id);
       outcome = await runSubtask({
         options: core.options(member, "work", desk),
-        opening: goOn ? goOnMessage(goOn, subtask2) : taskBrief({
+        opening: goOn ? goOnMessage(goOn, goalBranch(goal.slug)) : taskBrief({
           goal,
           task,
           subtask: subtask2,
@@ -10884,7 +10788,6 @@ ${outcome.handover.summary}`
       for (const reason of held) goOnWith(subtask2, reason);
     } else if (outcome.status === "delivered") {
       subtask2.delivery = { ...outcome.handover, at: Date.now() };
-      subtask2.conflict = void 0;
       this.move(subtask2, core.state.goal.settings.review ? "review" : "merge");
     } else {
       this.move(subtask2, outcome.status === "failed" ? "fail" : "stop");
@@ -10935,32 +10838,26 @@ ${outcome.handover.summary}`
     }
   }
   /**
-   * Merges a delivery into its goal's branch. Clean, the subtask is done.
-   * Text conflicts go back to its member, in their session and worktree;
-   * files that can't be merged line by line, or git failing, wait on your
-   * decision.
+   * Merges a delivery into its goal's branch (§5), the goal's branch
+   * fast-forwarding to it: the subtask is done. Behind the goal's branch, it
+   * goes back to its member, in their session, to merge that in; git
+   * refusing otherwise, it waits on your decision.
    */
   async startMerge(subtask2) {
     const { core } = this;
     const { end: end2 } = this.begin(subtask2, "merge");
     try {
-      const merged = await mergeDesk(core.places, subtask2.id, subtask2.assignee).catch(
-        (error) => {
-          if (error instanceof GitError) return error;
-          throw error;
-        }
-      );
+      const merged = await mergeDesk(core.places, subtask2.id).catch((error) => {
+        if (error instanceof GitError) return error;
+        throw error;
+      });
       if (merged instanceof GitError) this.ask(subtask2, DECISIONS.failedMerge(), errorText(merged));
-      else if (merged.kind === "merged") {
+      else if (merged === "merged") {
         this.move(subtask2, "merged");
-        subtask2.conflict = void 0;
         this.finished(subtask2);
-      } else if (merged.other.length) {
-        this.ask(subtask2, DECISIONS.mergeFiles(merged.other), "");
       } else {
-        this.move(subtask2, "conflict");
-        subtask2.conflict = { files: merged.text };
-        if (subtask2.session) goOnWith(subtask2, { why: "conflict" });
+        this.move(subtask2, "behind");
+        if (subtask2.session) goOnWith(subtask2, { why: "behind" });
       }
     } finally {
       end2();
@@ -11459,11 +11356,6 @@ function needWords(question, work) {
             ...detail && { detail }
           };
         }
-        case "conflict":
-          return {
-            headline: `Merging "${title ?? ""}" is stuck. What now?`,
-            detail: question.decision.files.join(", ")
-          };
         case "merge":
           return {
             headline: `Merging "${title ?? ""}" is stuck. What now?`,
@@ -11857,8 +11749,6 @@ var OPTION_LABELS = {
   rereview: "Review again",
   skip: "Skip the review",
   sendBack: "Send back",
-  ours: "Keep ours",
-  theirs: "Take theirs",
   retry: "Retry",
   stop: "Stop",
   accept: "Accept",
@@ -12373,7 +12263,7 @@ function statusText(work) {
   ];
   if (work.handingBack)
     lines.push(
-      `  Merging back into ${goal.base}${work.handingBack.by ? `: ${work.handingBack.by} resolves its conflicts` : ""}`
+      `  Merging back into ${goal.base}${work.handingBack.by ? `: ${work.handingBack.by} merges it in first` : ""}`
     );
   for (const meeting2 of work.meetings.filter((m) => m.status !== "approved"))
     lines.push(

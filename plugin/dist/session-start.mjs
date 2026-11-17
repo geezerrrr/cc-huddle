@@ -53659,11 +53659,6 @@ function needWords(question, work) {
             ...detail && { detail }
           };
         }
-        case "conflict":
-          return {
-            headline: `Merging "${title ?? ""}" is stuck. What now?`,
-            detail: question.decision.files.join(", ")
-          };
         case "merge":
           return {
             headline: `Merging "${title ?? ""}" is stuck. What now?`,
@@ -53744,7 +53739,7 @@ function statusText(work) {
   ];
   if (work.handingBack)
     lines.push(
-      `  Merging back into ${goal.base}${work.handingBack.by ? `: ${work.handingBack.by} resolves its conflicts` : ""}`
+      `  Merging back into ${goal.base}${work.handingBack.by ? `: ${work.handingBack.by} merges it in first` : ""}`
     );
   for (const meeting of work.meetings.filter((m) => m.status !== "approved"))
     lines.push(
