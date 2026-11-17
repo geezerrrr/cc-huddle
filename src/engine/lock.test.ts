@@ -3,6 +3,7 @@ import { once } from "node:events";
 import { mkdir, mkdtemp, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { holderOf, releaseLock, takeLock, type Holder } from "./lock.ts";
 
@@ -78,7 +79,7 @@ describe("the lock", () => {
   it("goes to one of several sessions starting at once, also over one that has ended", async () => {
     const lock = path.join(dir, "repo", "lock");
     const take = `
-      import { takeLock } from ${JSON.stringify(path.join(import.meta.dirname, "lock.ts"))};
+      import { takeLock } from ${JSON.stringify(pathToFileURL(path.join(import.meta.dirname, "lock.ts")).href)};
       takeLock(process.argv[1], { session: 1, address: "" }, () => Promise.reject(new Error("held"))).then(() => console.log("took"), () => console.log("refused"));
       setTimeout(() => {}, 2000);
     `;
