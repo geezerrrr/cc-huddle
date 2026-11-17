@@ -8019,43 +8019,41 @@ function abortMerge(places, subtaskId) {
 function dropDesk(places, subtaskId) {
   return perGoal(places, () => removeDesk(places, subtaskId));
 }
-function handBackGoal(places, base, by) {
+function mergeBase(places, base, by) {
   return perGoal(places, async () => {
-    const { repo } = places;
-    const tree = await setUpGoal(places);
-    const at = await worktreeAt(repo, tree);
+    const at = await worktreeAt(places.repo, await setUpGoal(places));
     const goal = { ...at, env: { ...at.env, ...authorEnv(by) } };
-    const ref = `refs/heads/${base}`;
-    if (!await merging(goal)) {
-      const merge = await git(goal, ["-c", "merge.ff=true", "merge", "-q", "--no-edit", ref], {
-        allow: [1]
-      });
-      if (merge.code === 1 && !(await unmerged(goal)).length)
-        throw new GitError("merge", (merge.stderr || merge.stdout).trim());
-    }
-    if (await merging(goal)) {
-      const files = await unmerged(goal);
-      const left = [...files, ...await marked(tree, await changed(goal))];
-      if (left.length) return { kind: "conflict", files: [...new Set(left)] };
-      await git(goal, ["commit", "-q", "--no-edit"]);
-    }
-    const head = (await git(goal, ["rev-parse", "HEAD"])).stdout.trim();
-    const was = (await git({ cwd: repo.top }, ["rev-parse", ref])).stdout.trim();
-    const checkout = await checkedOut(repo, ref);
-    if (checkout) await git({ cwd: checkout }, ["merge", "-q", "--ff-only", head]);
-    else {
-      const ff = await git({ cwd: repo.top }, ["merge-base", "--is-ancestor", was, head], {
-        allow: [1]
-      });
-      if (ff.code === 1) throw new GitError("merge", `${base} moved meanwhile: merge again`);
-      await git({ cwd: repo.top }, ["update-ref", ref, head, was]);
-    }
-    return { kind: "merged" };
+    if (await merging(goal)) return { kind: "conflict", files: await unmerged(goal) };
+    const merge = await git(
+      goal,
+      ["-c", "merge.ff=true", "merge", "-q", "--no-edit", `refs/heads/${base}`],
+      { allow: [1] }
+    );
+    if (merge.code === 0) return { kind: "clean" };
+    const files = await unmerged(goal);
+    if (!files.length) throw new GitError("merge", (merge.stderr || merge.stdout).trim());
+    return { kind: "conflict", files };
   });
 }
-async function changed(at) {
-  const list = await git(at, ["diff", "--name-only", "-z", "HEAD"]);
-  return list.stdout.split("\0").filter(Boolean);
+function fastForward(places, base) {
+  return perGoal(places, async () => {
+    const { repo } = places;
+    const ref = `refs/heads/${base}`;
+    const at = await worktreeAt(repo, await setUpGoal(places));
+    const head = (await git(at, ["rev-parse", "HEAD"])).stdout.trim();
+    const checkout = await checkedOut(repo, ref);
+    if (checkout) {
+      await git({ cwd: checkout }, ["merge", "-q", "--ff-only", head]);
+      return;
+    }
+    const was = (await git({ cwd: repo.top }, ["rev-parse", ref])).stdout.trim();
+    const ff = await git({ cwd: repo.top }, ["merge-base", "--is-ancestor", was, head], {
+      allow: [1]
+    });
+    if (ff.code === 1)
+      throw new GitError("merge", `${base} has commits the goal's branch lacks: merge again`);
+    await git({ cwd: repo.top }, ["update-ref", ref, head, was]);
+  });
 }
 async function checkedOut(repo, ref) {
   const list = await git({ cwd: repo.top }, ["worktree", "list", "--porcelain", "-z"]);
@@ -8374,7 +8372,7 @@ function handBackPrompt(input) {
   const { goal, cwd: cwd2, files } = input;
   return `The team's work on the goal "${goal.name}" is done, and is being merged back into the branch "${goal.base}" it was cut from. In the goal's worktree, ${cwd2}, "${goal.base}" is being merged into the goal's branch, and the merge stopped on conflicts in: ${files.join(", ")}.
 
-Resolve them. Read both sides' commits (git log, git diff) to see what each side changed and why, and keep what both meant. Check the result as the repository's own instructions say to. Then stage everything and finish the merge with git commit. Change nothing the merge doesn't need.`;
+Resolve them, and finish the merge with git commit.`;
 }
 function teammateQuestion(input) {
   const own = input.own.map(
@@ -9272,24 +9270,24 @@ var Goals = class {
   }
   /**
    * Hands the work back (§5): `base` merged into the goal's branch, its
-   * conflicts resolved by the lead in a session of their own, then `base`
-   * fast-forwarded to it. Merged, the goal closes; else it comes back to
+   * conflicts the lead's to resolve and the merge theirs to finish, in a
+   * session of their own, then `base` fast-forwarded to it. Merged, the goal
+   * closes; where git refuses, or the lead's turn fails, it comes back to
    * you, saying why. Paused meanwhile, it stops, to be asked again.
    */
   async handBack(handing) {
     const { core } = this;
     const { signal } = handing.abort;
+    const { base } = this.goal;
     const by = this.lead;
     try {
-      let merged = await handBackGoal(core.places, this.goal.base, by);
+      const merged = await mergeBase(core.places, base, by);
       if (merged.kind === "conflict") {
         handing.by = by;
         core.changed();
         await this.resolve(by, merged.files, signal);
-        merged = await handBackGoal(core.places, this.goal.base, by);
-        if (merged.kind === "conflict")
-          throw new Error(`Conflicts are left in ${merged.files.join(", ")}`);
       }
+      await fastForward(core.places, base);
       this.let(handing);
       if (can(GOAL_MACHINE, this.goal.status, "close")) this.close();
     } catch (error) {
@@ -12180,10 +12178,10 @@ var Session = class {
    * members run, found as a goal first opens. `changed`: the session's goal
    * is another now, or it has none.
    */
-  constructor(options, claude2, changed2) {
+  constructor(options, claude2, changed) {
     this.options = options;
     this.claude = claude2;
-    this.changed = changed2;
+    this.changed = changed;
   }
   options;
   claude;
