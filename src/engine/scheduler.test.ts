@@ -321,7 +321,7 @@ describe("Scheduler", () => {
         second = run;
         // The member merges as they see fit; here, by hand, committing the merge as they deliver.
         const cwd = run.options.cwd ?? "";
-        await git({ cwd }, ["merge", "-q", goalBranch(core.places.slug)], { allow: [1] });
+        await git({ cwd, env: ME }, ["merge", "-q", goalBranch(core.places.slug)], { allow: [1] });
         return delivering({ "README.md": "from both\n" })(run);
       });
     s2.session = "sonnet-1";

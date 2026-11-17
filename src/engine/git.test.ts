@@ -249,7 +249,7 @@ describe("mergeDesk", () => {
     expect(await mergeDesk(places, "s2")).toBe("behind");
     expect(await show(goalBranch("dice"), "README.md")).toBe("one\n");
     // The member merges as they see fit; here, by hand.
-    await git({ cwd: desk }, ["merge", "-q", goalBranch("dice")], { allow: [1] });
+    await git({ cwd: desk, env: ME }, ["merge", "-q", goalBranch("dice")], { allow: [1] });
     await writeFile(path.join(desk, "README.md"), "one and two\n");
     await committed(places, "s2", "Merge the goal");
     expect(await mergeDesk(places, "s2")).toBe("merged");
