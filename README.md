@@ -19,17 +19,34 @@
 
 ## Why cc-huddle
 
-Plenty of tools run Claude Code sessions in parallel. Most leave the process to someone: you start and merge each session yourself, or a lead model decides how many teammates to spawn, how to split the work and when it is done. cc-huddle puts the process in code. State machines decide what starts, what waits and what counts as done; the models only do the work.
+Compared with most tools that run several agents, cc-huddle:
 
-|            | cc-huddle                                         | Agent Teams                           | Claude Squad, Conductor            |
-| ---------- | ------------------------------------------------- | ------------------------------------- | ---------------------------------- |
-| Who plans  | The members, in a meeting; you approve the plan   | The lead model                        | You                                |
-| Isolation  | A git worktree per subtask                        | One shared working tree               | A worktree per session             |
-| Done means | Reviewed by another member, then merged           | A teammate marks its task complete    | You review and merge each branch   |
-| Models     | Any per member, any Anthropic-compatible provider | Per teammate, on the lead's provider  | Several agent CLIs                 |
-| Runs as    | A Claude Code plugin, in your session             | Built into Claude Code (experimental) | A separate terminal or desktop app |
+- **Runs inside Claude Code.** It is a plugin in your session, and every member is a full Claude Code session: the same agent loop, tools, settings and permissions you already use, each member on the model and provider you choose.
+- **Keeps the process in code.** State machines decide what starts, what waits and what counts as done; the models only do the work. The state is kept in files, so a goal outlives your session and `/huddle resume` goes on where it stopped.
+- **Plans in a meeting.** The members you pick discuss the task from their own roles before the plan is written, which suits open questions and loose requirements. Nothing starts until you approve the plan.
+- **Isolates and checks the work.** Each subtask has its own git worktree. Another member reviews each delivery against its acceptance criteria before it merges, and your branch changes only when you say.
+- **Leaves the decisions to you.** Plans, finished work, permissions and members' questions come to you in Claude Code's dialog; no model answers them for you.
 
 For one focused job, a single session or a subagent is cheaper and quicker. cc-huddle is for work with several parts and dependencies.
+
+### A trial
+
+One task done twice, all on Sonnet: building a playable mini-game into a 3D game, once by a single session and once by a team of five.
+
+|                     | One session | A team of five                       |
+| ------------------- | ----------- | ------------------------------------ |
+| Time                | 25m 33s     | 26m 44s, the meeting 3m 12s of it    |
+| Tokens              | 14.87M      | 12.79M: meeting 0.69M, reviews 0.79M |
+| Code                | 1,703 lines | 3,260 lines, 880 of them tests       |
+| Model calls at work | 70          | 143                                  |
+
+<p align="center">
+  <img src="docs/media/context-per-call.svg" alt="Context sent with each model call: the single session grows to 289k over 70 calls; each of the team's seven subtask sessions starts fresh and stays under 143k" width="760">
+</p>
+
+The team made twice the calls and used fewer tokens. Each call sends the whole session so far: the single session grew to 289k, while each subtask starts a session of its own that holds only its part, 78k a call on average against 208k. Both versions were playable, and much alike.
+
+Each way ran once, and a model's output varies from run to run: one sample, not a benchmark. Many comparisons cost more than we can spend for now.
 
 ## How it works
 

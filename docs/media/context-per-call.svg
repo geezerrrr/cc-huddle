@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="410" viewBox="0 0 760 410" role="img" aria-label="Context sent with each model call: the solo session grows to 289k; each of the team's seven subtask sessions starts fresh and stays under 143k">
+  <style>
+    .title { font: 600 16px -apple-system, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif; fill: #1f2328; }
+    .sub { font: 13px -apple-system, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif; fill: #59636e; }
+    .grid { stroke: #d0d7de; stroke-width: 1; }
+    .ref { stroke: #8c959f; stroke-width: 1; stroke-dasharray: 4 4; }
+    .solo { stroke: #c4643f; stroke-width: 2.5; fill: none; }
+    .soloText { font: 600 13px -apple-system, &quot;Segoe UI&quot;, Helvetica, Arial, sans-serif; fill: #c4643f; }
+    .team { stroke: #8c959f; stroke-width: 1.5; fill: none; }
+    @media (prefers-color-scheme: dark) {
+      .title { fill: #e6edf3; }
+      .sub { fill: #9198a1; }
+      .grid { stroke: #3d444d; }
+      .ref { stroke: #6e7681; }
+      .solo { stroke: #e08a66; }
+      .soloText { fill: #e08a66; }
+      .team { stroke: #6e7681; }
+    }
+  </style>
+  <text class="title" x="20" y="28">Context sent with each model call</text>
+  <text class="sub" x="20" y="50">Same task, all Sonnet. Orange: the solo session. Grey: the team's 7 subtask sessions (meeting and reviews not shown).</text>
+  <line class="grid" x1="64" x2="724" y1="364.0" y2="364.0"/>
+  <text class="sub" x="56" y="368.0" text-anchor="end">0k</text>
+  <line class="grid" x1="64" x2="724" y1="270.7" y2="270.7"/>
+  <text class="sub" x="56" y="274.7" text-anchor="end">100k</text>
+  <line class="grid" x1="64" x2="724" y1="177.3" y2="177.3"/>
+  <text class="sub" x="56" y="181.3" text-anchor="end">200k</text>
+  <line class="grid" x1="64" x2="724" y1="84.0" y2="84.0"/>
+  <text class="sub" x="56" y="88.0" text-anchor="end">300k</text>
+  <text class="sub" x="64.0" y="384" text-anchor="middle">1</text>
+  <text class="sub" x="150.1" y="384" text-anchor="middle">10</text>
+  <text class="sub" x="245.7" y="384" text-anchor="middle">20</text>
+  <text class="sub" x="341.4" y="384" text-anchor="middle">30</text>
+  <text class="sub" x="437.0" y="384" text-anchor="middle">40</text>
+  <text class="sub" x="532.7" y="384" text-anchor="middle">50</text>
+  <text class="sub" x="628.3" y="384" text-anchor="middle">60</text>
+  <text class="sub" x="724.0" y="384" text-anchor="middle">70</text>
+  <text class="sub" x="724" y="404" text-anchor="end">model call in the session</text>
+  <path class="team" d="M64.0 336.9 L73.6 329.5 L83.1 327.6 L92.7 325.7 L102.3 301.5 L111.8 300.5 L121.4 294.0 L131.0 291.2 L140.5 290.3 L150.1 288.4 L159.7 286.5 L169.2 284.7 L178.8 281.9 L188.3 280.9 L197.9 278.1 L207.5 270.7 L217.0 268.8 L226.6 265.1 L236.2 262.3 L245.7 261.3 L255.3 260.4"><title>physics</title></path>
+  <path class="team" d="M64.0 337.9 L73.6 329.5 L83.1 327.6 L92.7 325.7 L102.3 320.1 L111.8 319.2 L121.4 318.3 L131.0 314.5 L140.5 309.9 L150.1 309.9 L159.7 308.9 L169.2 308.9 L178.8 308.0"><title>rules</title></path>
+  <path class="team" d="M64.0 333.2 L73.6 329.5 L83.1 323.9 L92.7 316.4 L102.3 313.6 L111.8 305.2 L121.4 294.9 L131.0 288.4 L140.5 281.9 L150.1 280.9 L159.7 271.6 L169.2 265.1 L178.8 257.6 L188.3 256.7 L197.9 252.9 L207.5 250.1 L217.0 249.2 L226.6 247.3 L236.2 244.5 L245.7 241.7 L255.3 240.8 L264.9 238.9 L274.4 237.1 L284.0 234.3 L293.6 234.3 L303.1 233.3 L312.7 233.3 L322.3 232.4 L331.8 232.4 L341.4 231.5 L351.0 231.5 L360.5 230.5"><title>wiring</title></path>
+  <path class="team" d="M64.0 336.9 L73.6 328.5 L83.1 323.9 L92.7 319.2 L102.3 311.7 L111.8 308.0 L121.4 304.3 L131.0 301.5 L140.5 298.7 L150.1 297.7 L159.7 295.9 L169.2 293.1 L178.8 292.1 L188.3 291.2 L197.9 283.7 L207.5 276.3 L217.0 275.3 L226.6 274.4 L236.2 269.7 L245.7 268.8 L255.3 268.8 L264.9 268.8 L274.4 267.9 L284.0 267.9 L293.6 267.9 L303.1 266.9 L312.7 266.0 L322.3 265.1 L331.8 265.1 L341.4 264.1 L351.0 263.2 L360.5 262.3 L370.1 262.3 L379.7 260.4"><title>camera</title></path>
+  <path class="team" d="M64.0 336.9 L73.6 334.1 L83.1 325.7 L92.7 323.9 L102.3 322.9 L111.8 320.1 L121.4 315.5 L131.0 315.5 L140.5 313.6 L150.1 311.7 L159.7 310.8 L169.2 308.0 L178.8 305.2 L188.3 305.2 L197.9 305.2 L207.5 304.3"><title>ui</title></path>
+  <path class="team" d="M64.0 338.8 L73.6 337.9 L83.1 324.8 L92.7 321.1 L102.3 317.3 L111.8 313.6 L121.4 307.1 L131.0 301.5 L140.5 299.6 L150.1 298.7 L159.7 297.7 L169.2 296.8 L178.8 294.9 L188.3 294.9"><title>models</title></path>
+  <path class="team" d="M64.0 338.8 L73.6 337.9 L83.1 327.6 L92.7 322.0 L102.3 311.7 L111.8 309.9 L121.4 308.0 L131.0 294.9 L140.5 290.3 L150.1 289.3 L159.7 288.4 L169.2 288.4 L178.8 287.5"><title>contracts</title></path>
+  <path class="solo" d="M64.0 338.8 L73.6 336.0 L83.1 324.8 L92.7 317.3 L102.3 315.5 L111.8 308.9 L121.4 296.8 L131.0 294.0 L140.5 289.3 L150.1 273.5 L159.7 260.4 L169.2 234.3 L178.8 231.5 L188.3 225.9 L197.9 209.1 L207.5 208.1 L217.0 206.3 L226.6 206.3 L236.2 205.3 L245.7 195.1 L255.3 190.4 L264.9 190.4 L274.4 181.1 L284.0 174.5 L293.6 171.7 L303.1 170.8 L312.7 167.1 L322.3 165.2 L331.8 163.3 L341.4 160.5 L351.0 156.8 L360.5 154.9 L370.1 154.9 L379.7 154.0 L389.2 152.1 L398.8 149.3 L408.3 146.5 L417.9 145.6 L427.5 145.6 L437.0 144.7 L446.6 142.8 L456.2 138.1 L465.7 135.3 L475.3 132.5 L484.9 129.7 L494.4 127.9 L504.0 125.1 L513.6 124.1 L523.1 123.2 L532.7 118.5 L542.3 116.7 L551.8 115.7 L561.4 112.0 L571.0 109.2 L580.5 109.2 L590.1 108.3 L599.7 108.3 L609.2 107.3 L618.8 107.3 L628.3 106.4 L637.9 105.5 L647.5 105.5 L657.0 104.5 L666.6 104.5 L676.2 100.8 L685.7 98.0 L695.3 96.1 L704.9 96.1 L714.4 95.2 L724.0 94.3"/>
+  <line class="ref" x1="64" x2="724" y1="169.9" y2="169.9"/>
+  <text class="sub" x="724" y="185.9" text-anchor="end">solo mean 208k</text>
+  <line class="ref" x1="64" x2="724" y1="291.2" y2="291.2"/>
+  <text class="sub" x="724" y="285.2" text-anchor="end">team mean 78k</text>
+  <text class="soloText" x="83.1" y="126.0">solo: 70 calls in one session, up to 289k</text>
+</svg>
