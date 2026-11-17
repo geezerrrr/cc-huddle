@@ -34,7 +34,7 @@ For one focused job, a single session or a subagent is cheaper and quicker. cc-h
 ## How it works
 
 <p align="center">
-  <img src="docs/media/how-it-works.svg" alt="Task, meeting, plan you approve, parallel work, review (sent back with notes when it fails), merge into huddle/&lt;goal&gt;/main" width="900">
+  <img src="docs/media/how-it-works.svg" alt="Task, meeting, plan you approve, parallel work, review (sent back with notes when it fails), merge into huddle/&lt;goal&gt;/main, then into your branch on your word" width="900">
 </p>
 
 - **Meeting.** The members you pick discuss the task in turns, read-only. The host writes a plan of tasks with owners, dependencies and acceptance criteria; you approve it, change it or drop it.
