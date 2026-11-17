@@ -121,5 +121,5 @@ export async function askNeed(
     return;
   }
   if (given) await answer(given);
-  else $.ui.toast("cc-huddle: what you typed answers none of it; it waits in Needs you");
+  else $.ui.toast("What you typed answers none of it; it waits in Needs you");
 }

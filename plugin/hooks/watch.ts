@@ -54,7 +54,7 @@ export async function answer($: EngineInterface, need: HuddleNeed, given: Huddle
   try {
     await call($, "answer", { question: need.id, answer: given });
   } catch (error) {
-    $.ui.toast(`cc-huddle: ${words(error)}`);
+    $.ui.toast(words(error));
     return;
   }
   await answered($, need);
@@ -69,12 +69,12 @@ export async function decide($: EngineInterface, need: PlanNeed, decided: Huddle
   try {
     text = await call($, "review_plan", { meeting: need.meeting, ...decided });
   } catch (error) {
-    $.ui.toast(`cc-huddle: ${words(error)}`);
+    $.ui.toast(words(error));
     return;
   }
   if (decided.decision === "change")
     $.prompt.submit({ text }).catch((error: unknown) => {
-      $.ui.toast(`cc-huddle: your session couldn't be given the change: ${words(error)}`);
+      $.ui.toast(`Your session couldn't be given the change: ${words(error)}`);
     });
   await answered($, need);
 }
@@ -109,8 +109,7 @@ function tell($: EngineInterface, now: HuddleTeam) {
   const fresh = now.opened !== opened;
   opened = now.opened;
   if (told && !fresh)
-    for (const milestone of now.milestones)
-      if (!told.has(milestone.key)) $.ui.log(`cc-huddle: ${milestone.text}`);
+    for (const milestone of now.milestones) if (!told.has(milestone.key)) $.ui.log(milestone.text);
   told = new Set([...(told ?? []), ...now.milestones.map((m) => m.key)]);
 }
 

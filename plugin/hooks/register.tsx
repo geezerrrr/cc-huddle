@@ -76,7 +76,7 @@ export const register: Register = (on) => {
     // Once the command is done: a prompt submitted while it runs would wait on it.
     $.clock.after(0, () => {
       $.prompt.submit({ text }).catch((error: unknown) => {
-        $.ui.toast(`cc-huddle: your session couldn't be given the task: ${words(error)}`);
+        $.ui.toast(`Your session couldn't be given the task: ${words(error)}`);
       });
     });
     return {};

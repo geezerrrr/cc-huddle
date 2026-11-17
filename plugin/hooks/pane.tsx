@@ -39,7 +39,7 @@ const paneTitle = (shown: { member: string } | null) =>
 /** Moves the pane's window; one the engine won't move (`deny`) stays where it is, all a scroll can lose. */
 export function scrollPane($: $, to: "start" | "end") {
   $.ui.scroll({ in: PANE, to }).catch((error: unknown) => {
-    $.ui.toast(`cc-huddle: the pane couldn't scroll: ${words(error)}`);
+    $.ui.toast(`The pane couldn't scroll: ${words(error)}`);
   });
 }
 
@@ -72,7 +72,7 @@ async function follow($: $, member: string | null, subtask?: string) {
 /** Closes the pane, as its close mark does. */
 function closePane($: $) {
   $.ui.close({ id: PANE }).catch((error: unknown) => {
-    $.ui.toast(`cc-huddle: the pane couldn't close: ${words(error)}`);
+    $.ui.toast(`The pane couldn't close: ${words(error)}`);
   });
 }
 

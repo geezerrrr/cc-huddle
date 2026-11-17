@@ -355,7 +355,7 @@ test("a new milestone is a transcript row; what was there before is not news", a
   ]);
   await $.session.start({ cwd: "/", surface: "terminal", isInteractive: true });
   await clock.advance(1000);
-  expect(rows).toEqual(['cc-huddle: "Rules" by glm is merged']);
+  expect(rows).toEqual(['"Rules" by glm is merged']);
 });
 
 test("each need is asked as it comes, in turn, and answered as you said", async ($, on) => {
