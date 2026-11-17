@@ -12359,6 +12359,7 @@ var assignInput = (member) => ({
   description: z10.string().trim().describe("Everything the user said about it"),
   acceptance: z10.string().trim().default("").describe("When it counts as done")
 });
+var UPFRONT = { "anthropic/alwaysLoad": true };
 function addTools(server2, session2) {
   server2.registerTool(
     "status",
@@ -12381,7 +12382,8 @@ function addTools(server2, session2) {
       inputSchema: {
         task: z10.string().trim().min(1).describe("The user's task, in their own words")
       },
-      annotations: { readOnlyHint: true }
+      annotations: { readOnlyHint: true },
+      _meta: UPFRONT
     },
     async ({ task }, { signal }) => {
       const { way, members: members2, why } = await session2.recommend(task, signal);
@@ -12395,7 +12397,8 @@ function addTools(server2, session2) {
     "start_goal",
     {
       description: "Start a goal in this session: something the user wants done. It gets its own branch, cut from the branch the user's checkout is on, which it merges its work back into once done and the user agrees, and its own copy of the team. A session runs one goal: refused while its goal is under way. Then plan it once: a meeting of the members the user picked, or, with one picked, the task assigned to them. Nothing is added to a goal after.",
-      inputSchema: { name: z10.string().trim().min(1).describe("A few words for what is wanted") }
+      inputSchema: { name: z10.string().trim().min(1).describe("A few words for what is wanted") },
+      _meta: UPFRONT
     },
     async ({ name }) => {
       const { goal } = (await session2.start(name)).work;
@@ -12406,7 +12409,8 @@ function addTools(server2, session2) {
     "hold_meeting",
     {
       description: "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and cc-huddle asks the user about its plan when it is ready. A goal has one meeting, held as it starts; hold it only once the user has picked who attends.",
-      inputSchema: meetingInput(memberName())
+      inputSchema: meetingInput(memberName()),
+      _meta: UPFRONT
     },
     ({ agenda, size, attendees, host_only }) => {
       const engine = session2.goal;
@@ -12480,7 +12484,8 @@ function addTools(server2, session2) {
     "assign",
     {
       description: "Give the goal's task to the one member the user picked, without a meeting, as the goal starts: a goal is planned once. Assign only once the user has picked them.",
-      inputSchema: assignInput(memberName())
+      inputSchema: assignInput(memberName()),
+      _meta: UPFRONT
     },
     (work) => {
       const added = session2.goal.scheduler.assignOne(work);

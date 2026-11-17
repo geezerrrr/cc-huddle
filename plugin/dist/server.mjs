@@ -63,4 +63,4 @@ registerHooks({
     return bare && context.parentURL?.startsWith(ours) ? next(specifier, { ...context, parentURL: from }) : next(specifier, context);
   }
 });
-await import("./chunks/server-MNK4BFEK.mjs");
+await import("./chunks/server-NCARVI7C.mjs");
