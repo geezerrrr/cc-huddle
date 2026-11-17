@@ -7250,7 +7250,7 @@ var require_public_api = __commonJS({
         return docs;
       return Object.assign([], { empty: true }, composer$1.streamInfo());
     }
-    function parseDocument(source, options = {}) {
+    function parseDocument2(source, options = {}) {
       const { lineCounter: lineCounter2, prettyErrors } = parseOptions(options);
       const parser$1 = new parser.Parser(lineCounter2?.addNewLine);
       const composer$1 = new composer.Composer(options);
@@ -7276,7 +7276,7 @@ var require_public_api = __commonJS({
       } else if (options === void 0 && reviver && typeof reviver === "object") {
         options = reviver;
       }
-      const doc = parseDocument(src, options);
+      const doc = parseDocument2(src, options);
       if (!doc)
         return null;
       doc.warnings.forEach((warning) => log.warn(doc.options.logLevel, warning));
@@ -7312,7 +7312,7 @@ var require_public_api = __commonJS({
     }
     exports.parse = parse5;
     exports.parseAllDocuments = parseAllDocuments;
-    exports.parseDocument = parseDocument;
+    exports.parseDocument = parseDocument2;
     exports.stringify = stringify;
   }
 });
@@ -7390,6 +7390,7 @@ function can(machine, state, event) {
 
 // src/engine/types.ts
 var isHalted = (status) => status === "failed" || status === "stopped" || status === "stoppedInReview" || status === "stoppedInMerge";
+var MEETING_SIZES = ["small", "discussion", "large"];
 var hostOf = (meeting) => meeting.participants[0];
 var toYou = (question) => question.kind !== "teammate";
 var isAcceptance = (question) => question.kind === "decision" && question.decision.kind === "delivery";
@@ -7432,6 +7433,7 @@ function ahead(state, subtask, alike) {
   });
 }
 function reviewerAway(state, subtask) {
+  if (state.goal.settings.parallel) return void 0;
   const reviewer = reviewerOf(state, subtask);
   const working = state.subtasks.some((s) => s.status === "running" && s.assignee === reviewer);
   const meeting = state.meetings.some(
@@ -7466,7 +7468,7 @@ function startWaits(state, subtask, busy) {
     return acceptance ? [{ kind: "acceptance", questionId: acceptance.id }] : [];
   });
   if (upstream.length) return [...new Map(upstream.map((w) => [JSON.stringify(w), w])).values()];
-  return busy.has(subtask.assignee) ? [{ kind: "busy", by: subtask.assignee }] : [];
+  return busy.has(subtask.assignee) && !goal.settings.parallel ? [{ kind: "busy", by: subtask.assignee }] : [];
 }
 function waitsIn(state, subtask, busy) {
   const { goal } = state;
@@ -7477,7 +7479,7 @@ function waitsIn(state, subtask, busy) {
   switch (subtask.status) {
     case "pending": {
       const waits = startWaits(state, subtask, busy);
-      if (waits.length) return waits;
+      if (waits.length || goal.settings.parallel) return waits;
       const could = state.subtasks.filter(
         (s) => s.status === "pending" && s.assignee === subtask.assignee && !startWaits(state, s, busy).length
       );
@@ -7513,14 +7515,6 @@ function waitsIn(state, subtask, busy) {
       return [];
   }
 }
-function redoneUpstream(state, subtask) {
-  const startedAt2 = subtask.startedAt;
-  if (subtask.status !== "done" || startedAt2 === void 0) return [];
-  return subtask.dependsOn.flatMap((id2) => {
-    const d = state.subtasks.find((s) => s.id === id2);
-    return d?.status === "done" && (d.finishedAt ?? 0) > startedAt2 ? [d] : [];
-  });
-}
 function meetingResumes(state, meeting) {
   return can(MEETING_MACHINE, meeting.status, "resume") && isActive(state);
 }
@@ -7529,13 +7523,11 @@ function derive(state) {
   return {
     subtasks: Object.fromEntries(
       state.subtasks.map((s) => {
-        const redone = redoneUpstream(state, s).map((d) => d.id);
         const reviewed = s.status === "reviewing" && state.underWay.includes(s.id);
         return [
           s.id,
           {
             waits: waitsIn(state, s, busy),
-            redone,
             ...reviewed && { reviewedBy: reviewerOf(state, s) }
           }
         ];
@@ -53354,7 +53346,7 @@ var TURN_SERVER = "huddle";
 var turnToolName = (name) => `mcp__${TURN_SERVER}__${name}`;
 
 // src/engine/team.ts
-import { readFile as readFile4 } from "node:fs/promises";
+import { mkdir as mkdir3, readFile as readFile4, writeFile as writeFile2 } from "node:fs/promises";
 var import_yaml = __toESM(require_dist(), 1);
 import path3 from "node:path";
 var teamFolder = (top) => path3.join(top, ".claude", "huddle");
@@ -53369,7 +53361,26 @@ var memberSchema = external_exports.object({
   env: external_exports.record(external_exports.string(), external_exports.union([external_exports.string(), external_exports.number(), external_exports.boolean()]).transform(String)).default({}),
   settings: settingsSchema.optional()
 });
-var teamSchema = external_exports.object({ members: external_exports.record(external_exports.string(), memberSchema).default({}) });
+var teamSchema = external_exports.object({
+  review: external_exports.boolean().optional(),
+  meeting: external_exports.enum(MEETING_SIZES).optional(),
+  parallel: external_exports.boolean().optional(),
+  // `members:` with every member commented out, as shipped, is null.
+  members: external_exports.record(external_exports.string(), memberSchema).nullish().transform((members2) => members2 ?? {})
+});
+var SETTING_KEYS = {
+  review: "review",
+  meeting: "meetingSize",
+  parallel: "parallel"
+};
+var DEFAULT_SETTINGS = { review: true, meetingSize: "discussion", parallel: false };
+function settingsIn(file2) {
+  const set2 = {};
+  for (const [key, setting] of Object.entries(SETTING_KEYS))
+    if (file2[key] !== void 0)
+      set2[setting] = file2[key];
+  return set2;
+}
 var TeamError = class extends Error {
 };
 function parsed(schema, data, file2) {
@@ -53394,30 +53405,36 @@ async function roleFiles(folder2) {
       const front = /^---\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(text2);
       const id2 = name.slice(0, -".md".length);
       const { title } = parsed(roleSchema, yamlIn(front?.[1] ?? "", file2), file2);
-      return [id2, { title: title ?? id2, duties: text2.slice(front?.[0].length ?? 0).trim() }];
+      const duties = text2.slice(front?.[0].length ?? 0).replace(/<!--[\s\S]*?-->/g, "").trim();
+      return [id2, { title: title ?? id2, duties }];
     })
   );
 }
-function mergeSettings(under, over) {
+function mergeSettings(under, over2) {
   const merged = { ...under };
-  for (const [key, value] of Object.entries(over)) {
+  for (const [key, value] of Object.entries(over2)) {
     const was = merged[key];
     merged[key] = Array.isArray(was) && Array.isArray(value) ? [.../* @__PURE__ */ new Set([...was, ...value])] : isObject2(was) && isObject2(value) ? mergeSettings(was, value) : value;
   }
   return merged;
 }
 var isObject2 = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+async function teamFile(folder2) {
+  const file2 = path3.join(folder2, "team.yaml");
+  const text2 = await ifThere(readFile4(file2, "utf8"), "");
+  return parsed(teamSchema, yamlIn(text2, file2), file2);
+}
 async function loadTeam(userTeam, top) {
   const roles = /* @__PURE__ */ new Map();
   const written = /* @__PURE__ */ new Map();
   let settings = {};
+  let goalSettings = DEFAULT_SETTINGS;
   const folders = [userTeam, teamFolder(top)];
   for (const folder2 of folders) {
     for (const [id2, role] of await roleFiles(path3.join(folder2, "roles"))) roles.set(id2, role);
-    const teamFile = path3.join(folder2, "team.yaml");
-    const text2 = await ifThere(readFile4(teamFile, "utf8"), "");
-    const { members: members3 } = parsed(teamSchema, yamlIn(text2, teamFile), teamFile);
-    for (const [name, member] of Object.entries(members3)) written.set(name, member);
+    const file2 = await teamFile(folder2);
+    goalSettings = { ...goalSettings, ...settingsIn(file2) };
+    for (const [name, member] of Object.entries(file2.members)) written.set(name, member);
     const settingsFile = path3.join(folder2, "settings.json");
     settings = mergeSettings(
       settings,
@@ -53437,8 +53454,51 @@ async function loadTeam(userTeam, top) {
     throw new TeamError(
       `The team has no members: list them in ${folders.map((f) => path3.join(f, "team.yaml")).join(" or ")}`
     );
-  return { team: { members: members2 }, settings };
+  return { team: { members: members2 }, settings, goalSettings };
 }
+var SHIPPED = {
+  "team.yaml": `# Your cc-huddle team, for every repository. A repository's own
+# .claude/huddle/team.yaml adds members and overrides these settings.
+
+# Another member reviews each delivery before it merges.
+review: true
+# How long a meeting's discussion runs: small, discussion or large.
+meeting: discussion
+# Whether a member does several pieces of work at once.
+parallel: false
+
+# The members, each by name. Uncomment one and edit it.
+members:
+#   sonnet:
+#     role: developer       # the angle it sees the work from: a name, and roles/<role>.md if you write one
+#     model: sonnet         # the model it runs on; your session's when left out
+#     effort: high          # low, medium, high, xhigh or max
+#     settings:             # Claude Code settings of its own, over settings.json
+#       permissions:
+#         allow: ["Bash(pnpm test *)"]
+#   glm:
+#     role: designer
+#     model: glm-5.3-flashx
+#     env:                  # what its Claude Code runs with; \${VAR} comes from your environment
+#       ANTHROPIC_BASE_URL: https://open.bigmodel.cn/api/anthropic
+#       ANTHROPIC_AUTH_TOKEN: \${GLM_API_KEY}
+`,
+  [path3.join("roles", "developer.md")]: `<!--
+A role file: what your team keeps to in this role, its own conventions and
+what it never does. Every member whose role is "developer" reads it, at the
+meeting and in their work. A role with no file is its name alone.
+
+Write below this comment; comments aren't read. Front matter at the very top
+may give the role a title:
+
+---
+title: Developer
+---
+-->
+`,
+  "settings.json": `${JSON.stringify({ permissions: { allow: [], ask: [], deny: [] } }, null, 2)}
+`
+};
 var writing = serialBy();
 async function readCopy(file2) {
   return JSON.parse(await readFile4(file2, "utf8"));
@@ -53620,13 +53680,11 @@ var entryLabel = (entry) => "state" in entry ? goalLabel(entry.state, WHERE_WORD
 var resumableOf = (others) => others.map((entry) => ({ slug: entry.slug, label: entryLabel(entry) }));
 
 // src/plugin/status.ts
-function subtaskLine(subtask, { waits, redone }, work) {
+function subtaskLine(subtask, { waits }, work) {
   const parts = [STATUS_WORDS[subtask.status]];
   const step2 = subtask.status === "running" && stepText(subtask.progress);
   if (step2) parts.push(step2);
   parts.push(...waits.map((w) => waitText(w, work)));
-  if (redone.length)
-    parts.push(redoneText(redone.map((id2) => work.subtasks.find((s) => s.id === id2)?.title ?? "")));
   if (subtask.error) parts.push(`error: ${subtask.error}`);
   return `    - ${subtask.title} [${subtask.id}], ${subtask.assignee}: ${parts.join(", ")}`;
 }
@@ -53641,7 +53699,7 @@ function statusText(work) {
   const busy = new Set(derived2.busy);
   const { goal } = work;
   const lines = [
-    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)}; review ${goal.settings.review ? "on" : "off"}, ${goal.settings.meetingSize} meetings`,
+    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)}; review ${goal.settings.review ? "on" : "off"}, ${goal.settings.meetingSize} meetings, parallel ${goal.settings.parallel ? "on" : "off"}`,
     `Team: ${work.members.map((m) => busy.has(m) ? `${m} (busy)` : m).join(", ")}`
   ];
   for (const meeting of work.meetings.filter((m) => m.status !== "approved"))
@@ -53653,9 +53711,7 @@ function statusText(work) {
       `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", accepted by the user" : ""}`
     );
     for (const subtask of work.subtasks.filter((s) => s.taskId === task.id))
-      lines.push(
-        subtaskLine(subtask, derived2.subtasks[subtask.id] ?? { waits: [], redone: [] }, work)
-      );
+      lines.push(subtaskLine(subtask, derived2.subtasks[subtask.id] ?? { waits: [] }, work));
   }
   const open2 = work.questions.filter(toYou);
   if (open2.length)
@@ -53669,7 +53725,6 @@ function othersText(others) {
     ...resumableOf(others).map((o) => `  - ${o.label}`)
   ].join("\n");
 }
-var redoneText = (titles) => `built on ${titles.map((t) => `"${t}"`).join(", ")}, redone since: redo it to take that in`;
 
 // src/plugin/context.ts
 async function sessionContext(cwd, dataFolder2, session) {
