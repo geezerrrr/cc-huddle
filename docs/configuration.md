@@ -1,6 +1,6 @@
 # Configuring a team
 
-A team is three things: the members, in `team.yaml`; their roles, as Markdown files; and the Claude Code settings they all work under. How the engine reads them is in [design.md §6](design.md#6-team-configuration).
+A team is three things: the members and the team's settings, in `team.yaml`; their roles, as Markdown files; and the Claude Code settings they all work under. How the engine reads them is in [design.md §6](design.md#6-team-configuration).
 
 ## Where the files go
 
@@ -9,10 +9,10 @@ A team is three things: the members, in `team.yaml`; their roles, as Markdown fi
 .claude/huddle/            one repository's, on top of yours
   team.yaml
   roles/developer.md
-  settings.json            optional
+  settings.json
 ```
 
-Yours sits beside Claude Code's user settings (in `CLAUDE_CONFIG_DIR` when that is set). A repository's `.claude/huddle/` adds to yours: a member or role there replaces yours of the same name, and its `settings.json` goes on top of yours.
+Yours sits beside Claude Code's user settings (in `CLAUDE_CONFIG_DIR` when that is set). cc-huddle writes each of the three files there that is missing as a session starts, as examples explained in comments, and never touches one that is there. A repository's `.claude/huddle/` adds to yours: a member, role or team setting there replaces yours, and its `settings.json` goes on top of yours.
 
 ## `team.yaml`
 
@@ -61,28 +61,33 @@ members:
 
 ## Roles
 
-A role is its duties in Markdown, which every member in it reads; the file's name is the role's. A `title` in front matter names it on screen, the file's name when there is none:
+A role is a name: the angle its members see the work from. cc-huddle ships none. A role may have a Markdown file, named by it, for the principles your team keeps in that role, which every member in it reads; comments in it aren't read. A `title` in front matter names it on screen, the file's name when there is none:
 
 ```markdown
 ---
 title: Developer
 ---
 
-Write the code for your subtask and its tests. Keep to the repository's conventions.
+Keep to the repository's conventions. Never change a public API without saying so in your handover.
 ```
+
+A role with no file is its name alone. What the whole team works by belongs in the repository's `CLAUDE.md`.
 
 ## `settings.json`
 
 A Claude Code settings file every member works under: permission rules, the sandbox, anything Claude Code settings hold. When you allow a member's request always, cc-huddle adds the rule here, in the repository's.
 
-## Review and meeting size
+## Team settings
 
-Not in the files: switch them as you switch `/model`.
+Three settings in `team.yaml`, beside `members`; the repository's file overrides yours:
 
-- `/huddle review on|off`: whether another member reviews each delivery before it merges. On by default.
-- `/huddle meeting small|discussion|large`: how long meetings' discussions run. `discussion` by default.
+```yaml
+review: true # another member reviews each delivery before it merges
+meeting: discussion # how long meetings' discussions run: small, discussion or large
+parallel: false # whether a member does several pieces of work at once
+```
 
-With no value, each asks in a dialog. A switch applies to your session's goal and the goals you start after; goals already started elsewhere keep theirs.
+Switch them as you switch `/model`: `/huddle review on|off`, `/huddle meeting small|discussion|large`, `/huddle parallel on|off`, or with no value, picked in a dialog. A switch writes your `team.yaml`, keeping its comments, and applies to your session's goal and the goals you start after; goals already started elsewhere keep theirs. Where the repository's `team.yaml` sets one, the command says to change it there.
 
 ## What runs, and what it may do
 

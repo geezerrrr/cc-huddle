@@ -93,7 +93,7 @@ export function addTools(server: McpServer, session: Session) {
     "start_goal",
     {
       description:
-        "Start a goal in this session: something the user wants done. It gets its own branch, cut from the repository's HEAD, and its own copy of the team. A session runs one goal: refused while its goal is under way. Then hold a meeting to plan it, or assign work directly.",
+        "Start a goal in this session: something the user wants done. It gets its own branch, cut from the repository's HEAD (or from the session's last goal, closed, where HEAD lacks its work), and its own copy of the team. A session runs one goal: refused while its goal is under way. Then plan it once: a meeting of the members the user picked, or, with one picked, the task assigned to them. Nothing is added to a goal after.",
       inputSchema: { name: z.string().trim().min(1).describe("A few words for what is wanted") },
     },
     async ({ name }) => {
@@ -106,7 +106,7 @@ export function addTools(server: McpServer, session: Session) {
     "hold_meeting",
     {
       description:
-        "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and cc-huddle asks the user about its plan when it is ready. Hold one only once the user has agreed who attends.",
+        "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and cc-huddle asks the user about its plan when it is ready. A goal has one meeting, held as it starts; hold it only once the user has picked who attends.",
       inputSchema: meetingInput(memberName()),
     },
     ({ agenda, size, attendees, host_only }) => {
@@ -191,7 +191,7 @@ export function addTools(server: McpServer, session: Session) {
     "assign",
     {
       description:
-        "Give a member one subtask directly, without a meeting. It starts once they are free. Assign only once the user has agreed who takes it.",
+        "Give the goal's task to the one member the user picked, without a meeting, as the goal starts: a goal is planned once. Assign only once the user has picked them.",
       inputSchema: assignInput(memberName()),
     },
     (work) => {

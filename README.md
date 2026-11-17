@@ -38,7 +38,7 @@ For one focused job, a single session or a subagent is cheaper and quicker. cc-h
 </p>
 
 - **Meeting.** The members you pick discuss the task in turns, read-only. The host writes a plan of tasks with owners, dependencies and acceptance criteria; you approve it, change it or drop it.
-- **Work.** Each subtask runs in its own worktree as a fresh Claude Code session, on its member's model, as soon as what it waits on is merged. Members can ask each other questions.
+- **Work.** Each subtask runs in its own worktree as a Claude Code session on its member's model, as soon as what it waits on is merged: a fresh one, or, where it builds on the same member's own work, a fork of that work's session. Members can ask each other questions.
 - **Review and merge.** Another member checks each delivery against its acceptance criteria and passes it or sends it back with notes. Passed work merges into `huddle/<goal>/main` one subtask at a time; a conflict goes back to its author.
 - **You.** Plans to approve, finished tasks to accept, permission requests and members' questions come to you in Claude Code's dialog, or wait in the pane; your session's model can't answer them. A task you accept comes with what was done and how to check it. The goal branch is yours to merge: cc-huddle never pushes or touches your working tree.
 
@@ -75,7 +75,7 @@ Restart Claude Code after installing. To update, `claude plugin update cc-huddle
 
 ## Set up a team
 
-A team is a `team.yaml` listing the members, each with a role and the model it runs on. Put it in `~/.claude/huddle/` for all your repositories, or in a repository's `.claude/huddle/`:
+A team is a `team.yaml` listing the members, each with a role and the model it runs on. cc-huddle writes an example to `~/.claude/huddle/` the first time it starts, for all your repositories; a repository can add its own in `.claude/huddle/`:
 
 ```yaml
 # ~/.claude/huddle/team.yaml
@@ -99,7 +99,7 @@ glm:
     ANTHROPIC_AUTH_TOKEN: ${GLM_API_KEY}
 ```
 
-`${VAR}` is filled in from your environment, so keys stay out of the files. A role's duties go in `roles/<role>.md`, Markdown every member in that role reads. Effort, permissions per member and for the whole team, and a provider's full setup: [docs/configuration.md](docs/configuration.md).
+`${VAR}` is filled in from your environment, so keys stay out of the files. A role is a name, the angle a member sees the work from; your team's own principles for it can go in `roles/<role>.md`, Markdown every member in that role reads. Effort, permissions per member and for the whole team, and a provider's full setup: [docs/configuration.md](docs/configuration.md).
 
 ## Use it
 
@@ -109,18 +109,19 @@ Start Claude Code in a repository and hand the team a task:
 /huddle build a two-player dice game, opus on the rules, sonnet on the UI
 ```
 
-Your session recommends one member or a meeting (who attends, what each brings), whichever would do the work better, and asks you to start. The team then works in the background; your session stays free.
+Each task is a goal of its own. Your session proposes who takes part, by what the work needs, and asks you to start: one member picked takes the task; several meet and plan it. The team then works in the background; your session stays free.
 
 | You type                          | What happens                                                                   |
 | --------------------------------- | ------------------------------------------------------------------------------ |
-| `/huddle <task>`                  | Hands the team a task                                                          |
+| `/huddle <task>`                  | Hands the team a task, as a new goal                                           |
 | `/huddle`                         | Opens the pane: the meeting, the team, what needs you                          |
 | `/huddle status`                  | Prints where the session's goal stands                                         |
 | `/huddle pause`, `/huddle resume` | Pauses the session's goal; resumes it, or takes up another of the repository's |
 | `/huddle review on\|off`          | Turns review of deliveries on or off                                           |
 | `/huddle meeting <size>`          | Sets how long meetings run: `small`, `discussion` or `large`                   |
+| `/huddle parallel on\|off`        | Lets a member do several pieces of work at once                                |
 
-You can also ask your session in words ("have opus do the scoreboard"). A session runs one goal; for more goals at once, run more sessions. Like `/model`, `review` and `meeting` apply to the session's goal and goals started after. The band above the prompt keeps count: `cc-huddle · meeting · 3 working · 1 needs you`. Closing the session pauses its goal; `/huddle resume` goes on where it stopped.
+You can also ask your session in words ("have opus do the scoreboard"). A session runs one goal; for more goals at once, run more sessions. A goal closes once its tasks are done, and the next one in the session carries on from its branch. `review`, `meeting` and `parallel` are kept in your `team.yaml`; like `/model`, a switch applies to the session's goal and goals started after. The band above the prompt keeps count: `cc-huddle · meeting · 3 working · 1 needs you`. Closing the session pauses its goal; `/huddle resume` goes on where it stopped.
 
 <table>
   <tr>

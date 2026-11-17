@@ -28,8 +28,9 @@ export const register: Register = (on) => {
     await $.command.register({
       name: "huddle",
       description:
-        "Hand cc-huddle's team a task; with none, show the team in a pane; `/huddle status` prints where it stands, `pause` pauses this session's goal and `resume` resumes it or takes up another, `review` and `meeting` switch review and the meeting size",
-      argumentHint: "[task | status | pause | resume [number] | review [on|off] | meeting [size]]",
+        "Hand cc-huddle's team a task; with none, show the team in a pane; `/huddle status` prints where it stands, `pause` pauses this session's goal and `resume` resumes it or takes up another, `review`, `meeting` and `parallel` switch the team's settings",
+      argumentHint:
+        "[task | status | pause | resume [number] | review [on|off] | meeting [size] | parallel [on|off]]",
     });
     watch($);
     return next(e);
