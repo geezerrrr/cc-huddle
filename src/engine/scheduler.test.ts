@@ -415,7 +415,7 @@ describe("Scheduler", () => {
         expect(vi.mocked(runSubtask).mock.calls.length).toBeGreaterThan(3);
       });
       expect(vi.mocked(runSubtask).mock.calls[3]?.[0].opening).toBe(
-        "The review sent your delivery back. Fix what it says, then deliver again:\nScores overlap\n\nThe user adds to your subtask:\nKeep the board",
+        "The review sent your delivery back. Fix what it says, then deliver again:\nScores overlap\n\nThe user adds: Keep the board",
       );
     });
 
@@ -438,7 +438,7 @@ describe("Scheduler", () => {
         expect(vi.mocked(runSubtask).mock.calls.length).toBe(2);
       });
       expect(vi.mocked(runSubtask).mock.calls[1]?.[0].opening).toBe(
-        "The user adds to your subtask:\nBigger",
+        "The review sent your delivery back. Fix what it says, then deliver again:\nThe user adds: Bigger",
       );
     });
   });
@@ -609,36 +609,14 @@ describe("Scheduler", () => {
       await settled(s2, "done");
       expect(await onGoal("logo.bin")).toBe("sonnet\0\n");
     });
-
-    it("redo work whose upstream was redone, in its session", async () => {
-      const s1 = subtask("s1", { status: "done", finishedAt: 20 });
-      const s2 = subtask("s2", {
-        status: "done",
-        dependsOn: ["s1"],
-        startedAt: 10,
-        session: "glm-2",
-      });
-      core.state.subtasks.push(s1, s2);
-      vi.mocked(runSubtask).mockImplementation(delivering({ "board.txt": "2\n" }));
-      await scheduler.act("s2", "redo");
-      await settled(s2, "done");
-      expect(runs()[0]).toMatchObject({
-        resume: "glm-2",
-        opening: expect.stringContaining(
-          "Work you build on was redone after you delivered: Make s1.",
-        ) as string,
-      });
-    });
   });
 
   it("refuses what can't be done to a subtask where it stands", async () => {
     const s1 = subtask("s1", { status: "done", finishedAt: 5 });
-    const s2 = subtask("s2", { status: "done", dependsOn: ["s1"], startedAt: 10 });
-    core.state.subtasks.push(s1, s2);
-    await expect(scheduler.act("s2", "redo")).rejects.toThrow("can't redo while done");
+    core.state.subtasks.push(s1);
     await expect(scheduler.act("s1", "retry")).rejects.toThrow("can't retry while done");
     await expect(scheduler.act("gone", "stop")).rejects.toThrow("There is no such subtask");
-    expect(s2.status).toBe("done");
+    expect(s1.status).toBe("done");
   });
 
   describe("work on hold", () => {
@@ -672,50 +650,17 @@ describe("Scheduler", () => {
       });
     });
 
-    it("takes what you add to it: a run stops and goes on with it, one not started hears it first", async () => {
-      const s1 = subtask("s1", { session: "glm-1" });
-      const s2 = subtask("s2", { assignee: "sonnet" });
-      core.state.subtasks.push(s1, s2);
-      vi.mocked(runSubtask).mockImplementation(async (run) =>
-        run.opening.includes("Make s1") && !run.resume
-          ? working(run)
-          : delivering({ [`${run.resume ?? "s2"}.txt`]: "x\n" })(run),
-      );
-      expect(scheduler.carry("s2", "Use blue")).toBe("goes");
-      scheduler.pump();
-      await settled(s2, "done");
-      expect(runs().find((r) => r.opening.includes("Make s2"))?.opening).toContain(
-        "The user adds to your subtask:\nUse blue",
-      );
-      expect(scheduler.carry("s1", "Top right")).toBe("goes");
-      await settled(s1, "done");
-      expect(runs().at(-1)).toMatchObject({
-        resume: "glm-1",
-        opening: "The user adds to your subtask:\nTop right",
-      });
-    });
-
-    it("keeps how a run held as its session closes ended, what you added to it too", async () => {
+    it("keeps how a run held as its session closes ended", async () => {
       const s1 = subtask("s1", { session: "glm-1" });
       core.state.subtasks.push(s1);
       vi.mocked(runSubtask).mockImplementation(working);
       scheduler.pump();
       await started(1);
-      expect(scheduler.carry("s1", "Top right")).toBe("goes");
       core.state.goal.status = "paused";
       scheduler.hold();
       await scheduler.close();
       expect(s1.status).toBe("pending");
-      expect(s1.goOn).toEqual([{ why: "carried", note: "Top right" }, { why: "held" }]);
-    });
-
-    it("isn't added to while handed over, while its goal is paused, or when there is none", () => {
-      core.state.subtasks.push(subtask("s1", { status: "reviewing" }), subtask("s2"));
-      expect(scheduler.carry("s1", "x")).toBe("handedOver");
-      const { goal } = core.state;
-      goal.status = "paused";
-      expect(scheduler.carry("s2", "x")).toBe("onHold");
-      expect(() => scheduler.carry("s9", "x")).toThrow("There is no such subtask");
+      expect(s1.goOn).toEqual([{ why: "held" }]);
     });
 
     it("is let go of before it is deleted, once its run has ended", async () => {

@@ -100,11 +100,7 @@ describe("taskBrief", () => {
           direct: false,
         },
       ],
-      notes: [
-        { why: "revised", note: "Bigger numbers" },
-        { why: "held" },
-        { why: "carried", note: "Use blue" },
-      ],
+      notes: [{ why: "revised", note: "Bigger numbers" }, { why: "held" }],
     });
     expect(brief).toBe(`Goal: Dice game
 Task: Board. A board to roll on
@@ -130,10 +126,7 @@ Which built on:
 - Setup, by sonnet: Set up.
 
 The user sent this task back before, asking for:
-Bigger numbers
-
-The user adds to your subtask:
-Use blue`);
+Bigger numbers`);
   });
 });
 
@@ -144,14 +137,14 @@ describe("goOnMessage", () => {
         { why: "held" },
         { why: "rejected", note: "Scores overlap" },
         { why: "held" },
-        { why: "carried", note: "Use blue" },
+        { why: "revised", note: "Use blue" },
       ],
       subtask("s1"),
     );
     expect(message.split("\n\n")).toEqual([
       "Your work was paused and now goes on. Pick up where you left off.",
       "The review sent your delivery back. Fix what it says, then deliver again:\nScores overlap",
-      "The user adds to your subtask:\nUse blue",
+      "The user sent your task back, asking for:\nUse blue\nMake those changes, then deliver again.",
     ]);
   });
 });

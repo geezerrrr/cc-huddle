@@ -111,15 +111,14 @@ Start Claude Code in a repository and hand the team a task:
 
 Your session recommends one member or a meeting (who attends, what each brings), whichever would do the work better, and asks you to start. The team then works in the background; your session stays free.
 
-| You type                               | What happens                                                                   |
-| -------------------------------------- | ------------------------------------------------------------------------------ |
-| `/huddle <task>`                       | Hands the team a task                                                          |
-| `/huddle`                              | Opens the pane: the meeting, the team, what needs you                          |
-| `/huddle status`                       | Prints where the session's goal stands                                         |
-| `/huddle pause`, `/huddle resume`      | Pauses the session's goal; resumes it, or takes up another of the repository's |
-| `/huddle review on\|off`               | Turns review of deliveries on or off                                           |
-| `/huddle meeting <size>`               | Sets how long meetings run: `small`, `discussion` or `large`                   |
-| `@sonnet put the scoreboard top right` | Passes a member a message, in their session                                    |
+| You type                          | What happens                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------------ |
+| `/huddle <task>`                  | Hands the team a task                                                          |
+| `/huddle`                         | Opens the pane: the meeting, the team, what needs you                          |
+| `/huddle status`                  | Prints where the session's goal stands                                         |
+| `/huddle pause`, `/huddle resume` | Pauses the session's goal; resumes it, or takes up another of the repository's |
+| `/huddle review on\|off`          | Turns review of deliveries on or off                                           |
+| `/huddle meeting <size>`          | Sets how long meetings run: `small`, `discussion` or `large`                   |
 
 You can also ask your session in words ("have opus do the scoreboard"). A session runs one goal; for more goals at once, run more sessions. Like `/model`, `review` and `meeting` apply to the session's goal and goals started after. The band above the prompt keeps count: `cc-huddle · meeting · 3 working · 1 needs you`. Closing the session pauses its goal; `/huddle resume` goes on where it stopped.
 

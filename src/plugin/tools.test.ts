@@ -124,7 +124,7 @@ describe("tools", () => {
     ).toMatchObject({ error: true, text: expect.stringContaining('"glm"') as string });
   });
 
-  it("start a goal, assign work, pass a message, stop it, and tell where it stands", async () => {
+  it("start a goal, assign work, stop it, and tell where it stands", async () => {
     expect(await call("start_goal", { name: "Dice" })).toMatchObject({
       text: expect.stringContaining("on branch huddle/dice/main") as string,
     });
@@ -138,10 +138,6 @@ describe("tools", () => {
     expect(subtask?.status).toBe("running");
     const id = subtask?.id ?? "";
 
-    expect((await call("message", { subtask: id, text: "Use d6" })).text).toBe("Passed on.");
-    await vi.waitFor(() => {
-      expect(runSubtask).toHaveBeenCalledTimes(2);
-    });
     expect((await call("subtask_action", { subtask: id, action: "stop" })).text).toBe(
       '"Rules" is stopped now.',
     );

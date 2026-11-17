@@ -6,17 +6,7 @@
  * goal's branch, one merge at a time.
  */
 import { randomUUID } from "node:crypto";
-import {
-  actionsOf,
-  busyMembers,
-  canSendBack,
-  messageReach,
-  redoneUpstream,
-  reviewerOf,
-  taskDone,
-  waitsIn,
-  upstreamOf,
-} from "./derive.ts";
+import { busyMembers, canSendBack, reviewerOf, taskDone, waitsIn, upstreamOf } from "./derive.ts";
 import { REFUSED, spend, workOf, type Core } from "./core.ts";
 import { errorText } from "../shared/errors.ts";
 import {
@@ -191,41 +181,14 @@ export class Scheduler {
     }
   }
 
-  /**
-   * You add to a subtask (a message to its member): it goes on in its
-   * session, from where it stopped, with `note`; a running one stops first,
-   * one not started yet hears it in its brief. One being reviewed or merged
-   * is handed over already, and the work of a paused or archived goal waits for
-   * the goal to be resumed. Throws when there is no such subtask.
-   */
-  carry(subtaskId: string, note: string): "goes" | "handedOver" | "onHold" {
-    const subtask = this.subtask(subtaskId);
-    if (!subtask) throw new Error("There is no such subtask");
-    const reach = messageReach(this.core.state, subtask);
-    if (reach !== "goes") return reach;
-    const live = this.live.get(subtaskId);
-    if (live) {
-      this.keepOn(subtaskId, { why: "carried", note });
-      live.abort.abort();
-      return "goes";
-    }
-    if (subtask.status === "failed" || subtask.status === "stopped") this.move(subtask, "continue");
-    else if (subtask.status === "done") this.move(subtask, "redo");
-    goOnWith(subtask, { why: "carried", note });
-    subtask.error = undefined;
-    this.core.changed();
-    this.pump();
-    return "goes";
-  }
-
   /** The subtasks whose review or merge is under way now. */
   underWay(): string[] {
     return [...this.live].filter(([, live]) => live.kind !== "run").map(([id]) => id);
   }
 
   /**
-   * Does what you asked to a subtask (§4.3): stop it, have it go on, retry it,
-   * or redo it: the subtask, where that left it. Throws when there is no
+   * Does what you asked to a subtask (§4.3): stop it, have it go on, or retry
+   * it: the subtask, where that left it. Throws when there is no
    * such subtask, or when it can't be done where the subtask stands
    * (derive.ts actionsOf).
    */
@@ -233,8 +196,7 @@ export class Scheduler {
     const subtask = this.subtask(subtaskId);
     if (!subtask) throw new Error("There is no such subtask");
     const event = actionEvent(subtask.status, action);
-    if (!event || !actionsOf(workOf(this.core), subtask).includes(action))
-      throw new Error(`"${subtask.title}" can't ${action} while ${subtask.status}`);
+    if (!event) throw new Error(`"${subtask.title}" can't ${action} while ${subtask.status}`);
     if (action === "continue") this.continue(subtask, event);
     else await this[action](subtask);
     return subtask;
@@ -318,15 +280,6 @@ export class Scheduler {
     this.pump();
   }
 
-  /** You redo a done subtask whose upstream was redone since: in its session, from the goal's branch. */
-  private redo(subtask: Subtask) {
-    const redone = redoneUpstream(this.core.state, subtask).map((s) => s.title);
-    this.move(subtask, "redo");
-    if (subtask.session) goOnWith(subtask, { why: "redo", note: redone.join(", ") });
-    this.core.changed();
-    this.pump();
-  }
-
   /**
    * Answers a decision put to you (Questions.answer) and carries it out: on a
    * stuck review (review again, skip it, send it back), on a merge (keep one
@@ -358,9 +311,8 @@ export class Scheduler {
       else if (pick === "sendBack") {
         this.move(subtask, "reject");
         if (subtask.session) {
-          const { notes } = subtask.review;
-          if (notes) goOnWith(subtask, { why: "rejected", note: notes });
-          if (note) goOnWith(subtask, { why: "carried", note });
+          const said = [subtask.review.notes, note && `The user adds: ${note}`];
+          goOnWith(subtask, { why: "rejected", note: said.filter(Boolean).join("\n\n") });
         }
       }
     } else if (subtask.status === "waitingInMerge") {
@@ -550,8 +502,8 @@ export class Scheduler {
     spend(core.state, subtask.assignee, outcome.tokens);
     const held = this.held.get(subtask.id);
     this.held.delete(subtask.id);
-    // Recorded even while closing, so a goal let go keeps how its runs ended. Held with its goal, it goes on if it stopped; added to by you, even if it delivered just before.
-    if (held && (outcome.status === "stopped" || held.some((g) => g.why === "carried"))) {
+    // Recorded even while closing, so a goal let go keeps how its runs ended. Held with its goal, it goes on if it stopped.
+    if (held && outcome.status === "stopped") {
       this.move(subtask, "hold");
       for (const reason of held) goOnWith(subtask, reason);
     } else if (outcome.status === "delivered") {

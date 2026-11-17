@@ -1,12 +1,11 @@
 /**
  * What the rules make of the state (docs/design.md §4.5): what each subtask
- * waits on, who is busy, who reviews a delivery, whose upstream was redone,
- * which tasks are accepted, and what you can do to a subtask. Worked out here only and never stored:
- * the scheduler acts on it, and the plugin shows it.
+ * waits on, who is busy, who reviews a delivery, and which tasks are
+ * accepted. Worked out here only and never stored: the scheduler acts on it,
+ * and the plugin shows it.
  */
-import { actionEvent, can, MEETING_MACHINE } from "./machines.ts";
+import { can, MEETING_MACHINE } from "./machines.ts";
 import {
-  SUBTASK_ACTIONS,
   hostOf,
   isAcceptance,
   isHalted,
@@ -15,7 +14,6 @@ import {
   type MeetingNow,
   type Question,
   type Subtask,
-  type SubtaskAction,
   type GoalState,
   type Wait,
 } from "./types.ts";
@@ -49,28 +47,6 @@ const IN_PROGRESS: readonly Subtask["status"][] = [
 ];
 
 export const inProgress = (subtask: Subtask) => IN_PROGRESS.includes(subtask.status);
-
-/** Handed over: in review or being merged, waiting on you there or stopped there, its delivery standing. */
-const HANDED_OVER: readonly Subtask["status"][] = [
-  "reviewing",
-  "waitingInReview",
-  "merging",
-  "waitingInMerge",
-  "stoppedInReview",
-  "stoppedInMerge",
-];
-
-/**
- * What a message to a subtask does (§7.3): it goes on with it; one handed
- * over is past hearing it; in a goal paused or archived, it waits for the goal.
- */
-export function messageReach(
-  state: Pick<GoalState, "goal">,
-  subtask: Subtask,
-): "goes" | "handedOver" | "onHold" {
-  if (state.goal.status !== "active") return "onHold";
-  return HANDED_OVER.includes(subtask.status) ? "handedOver" : "goes";
-}
 
 /** Whether a task done may be sent back by way of `sentBack`: one of its subtasks that is done, or none named. */
 export function canSendBack(
@@ -292,24 +268,6 @@ export function upstreamOf(state: Pick<GoalState, "subtasks">, subtask: Subtask)
   return chain;
 }
 
-/** The upstream subtasks a done subtask built on that were done again after it started. */
-export function redoneUpstream(state: Pick<GoalState, "subtasks">, subtask: Subtask): Subtask[] {
-  const startedAt = subtask.startedAt;
-  if (subtask.status !== "done" || startedAt === undefined) return [];
-  return subtask.dependsOn.flatMap((id) => {
-    const d = state.subtasks.find((s) => s.id === id);
-    return d?.status === "done" && (d.finishedAt ?? 0) > startedAt ? [d] : [];
-  });
-}
-
-/** What you can do to a subtask where it stands: redo it only once its upstream was redone. */
-export function actionsOf(state: Work, subtask: Subtask): SubtaskAction[] {
-  return SUBTASK_ACTIONS.filter((action) => {
-    const event = actionEvent(subtask.status, action);
-    return event !== undefined && (event !== "redo" || redoneUpstream(state, subtask).length > 0);
-  });
-}
-
 /**
  * Whether a meeting can go on from where it stopped: it stopped before its
  * plan, and its goal is active. Who is busy changes by the minute; it is
@@ -325,13 +283,11 @@ export function derive(state: Work): Derived {
   return {
     subtasks: Object.fromEntries(
       state.subtasks.map((s) => {
-        const redone = redoneUpstream(state, s).map((d) => d.id);
         const reviewed = s.status === "reviewing" && state.underWay.includes(s.id);
         return [
           s.id,
           {
             waits: waitsIn(state, s, busy),
-            redone,
             ...(reviewed && { reviewedBy: reviewerOf(state, s) }),
           },
         ];

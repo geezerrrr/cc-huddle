@@ -90,7 +90,6 @@ export function taskBrief(input: {
   for (const { why, note } of input.notes)
     if (why === "revised")
       lines.push("", `The user sent this task back before, asking for:\n${note ?? ""}`);
-    else if (why === "carried") lines.push("", `The user adds to your subtask:\n${note ?? ""}`);
   return lines.join("\n");
 }
 
@@ -103,16 +102,12 @@ export function goOnMessage(reasons: readonly GoOn[], subtask: Subtask): string 
     switch (why) {
       case "held":
         return "Your work was paused and now goes on. Pick up where you left off.";
-      case "carried":
-        return `The user adds to your subtask:\n${note}`;
       case "continued":
         return "The user asks you to go on from where you stopped.";
       case "rejected":
         return `The review sent your delivery back. Fix what it says, then deliver again:\n${note}`;
       case "conflict":
         return `Merging your delivery into the goal's branch left conflicts in ${subtask.conflict?.files.join(", ") ?? ""}. The merge is under way in your worktree, the conflict markers in those files. Resolve them, keeping what both sides meant, then deliver again.`;
-      case "redo":
-        return `Work you build on was redone after you delivered: ${note}. Your worktree now starts from the goal's branch as it stands. Check your part against it, change what needs changing, and deliver again.`;
       case "revised":
         return `The user sent your task back, asking for:\n${note}\nMake those changes, then deliver again.`;
     }

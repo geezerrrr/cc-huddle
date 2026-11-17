@@ -93,11 +93,10 @@ export type Delivery = Handover & { at: number };
 
 /**
  * Why a subtask's next run goes on in its last session instead of starting
- * over: held (its goal paused), you added to it, you went
- * on, the review sent it back, a merge left conflicts, its upstream was
- * redone, or you sent its task back with what to change.
+ * over: held (its goal paused), you went on, the review (or you) sent it
+ * back, a merge left conflicts, or you sent its task back with what to change.
  */
-type GoOnReason = "held" | "carried" | "continued" | "rejected" | "conflict" | "redo" | "revised";
+type GoOnReason = "held" | "continued" | "rejected" | "conflict" | "revised";
 
 /** One reason a subtask goes on in its session, with what it carries (the notes, the files, your words). */
 export interface GoOn {
@@ -367,7 +366,7 @@ export type Wait =
   /** Upstream work in another task you accept, done, whose task waits for your acceptance. */
   | { kind: "acceptance"; questionId: string };
 
-export const SUBTASK_ACTIONS = ["stop", "continue", "retry", "redo"] as const;
+export const SUBTASK_ACTIONS = ["stop", "continue", "retry"] as const;
 export type SubtaskAction = (typeof SUBTASK_ACTIONS)[number];
 
 export const GOAL_ACTIONS = ["pause", "resume", "archive", "delete"] as const;
@@ -378,8 +377,6 @@ export interface Derived {
     string,
     {
       waits: Wait[];
-      /** The upstream subtasks done again since it started: it is built on work redone (§7.1). */
-      redone: string[];
       /** Who reviews it, while its review is under way. */
       reviewedBy?: string;
     }

@@ -68,8 +68,8 @@ interface Parts {
 }
 
 export class Engine {
-  /** Your actions on the goal's subtasks, a message to one, and work given directly. */
-  readonly scheduler: Pick<Scheduler, "act" | "carry" | "assignOne">;
+  /** Your actions on the goal's subtasks, and work given directly. */
+  readonly scheduler: Pick<Scheduler, "act" | "assignOne">;
   /** Calling meetings, and their plans in review. */
   readonly meetings: Pick<Meetings, "start" | "change" | "approve" | "cancel" | "resume">;
   /** Pausing, resuming and archiving the goal; deleting it is the engine's own (delete). */

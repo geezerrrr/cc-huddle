@@ -23,18 +23,12 @@ import {
   STATUS_WORDS,
 } from "./words.ts";
 
-/** A subtask on one line: its status, how far it is, what it waits on, what it is built on that was redone, what went wrong. */
-function subtaskLine(
-  subtask: Subtask,
-  { waits, redone }: Derived["subtasks"][string],
-  work: Work,
-): string {
+/** A subtask on one line: its status, how far it is, what it waits on, what went wrong. */
+function subtaskLine(subtask: Subtask, { waits }: Derived["subtasks"][string], work: Work): string {
   const parts: string[] = [STATUS_WORDS[subtask.status]];
   const step = subtask.status === "running" && stepText(subtask.progress);
   if (step) parts.push(step);
   parts.push(...waits.map((w) => waitText(w, work)));
-  if (redone.length)
-    parts.push(redoneText(redone.map((id) => work.subtasks.find((s) => s.id === id)?.title ?? "")));
   if (subtask.error) parts.push(`error: ${subtask.error}`);
   return `    - ${subtask.title} [${subtask.id}], ${subtask.assignee}: ${parts.join(", ")}`;
 }
@@ -69,9 +63,7 @@ export function statusText(work: Work): string {
       `  Task "${task.title}" [${task.id}]${task.ownerAccepts ? ", accepted by the user" : ""}`,
     );
     for (const subtask of work.subtasks.filter((s) => s.taskId === task.id))
-      lines.push(
-        subtaskLine(subtask, derived.subtasks[subtask.id] ?? { waits: [], redone: [] }, work),
-      );
+      lines.push(subtaskLine(subtask, derived.subtasks[subtask.id] ?? { waits: [] }, work));
   }
   const open = work.questions.filter(toYou);
   if (open.length)
@@ -87,7 +79,3 @@ export function othersText(others: readonly GoalEntry[]): string | undefined {
     ...resumableOf(others).map((o) => `  - ${o.label}`),
   ].join("\n");
 }
-
-/** That a done subtask is built on work redone since, `titles` that work. */
-const redoneText = (titles: readonly string[]) =>
-  `built on ${titles.map((t) => `"${t}"`).join(", ")}, redone since: redo it to take that in`;

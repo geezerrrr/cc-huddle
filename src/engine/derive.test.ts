@@ -1,13 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  actionsOf,
-  busyMembers,
-  derive,
-  meetingResumes,
-  reviewerOf,
-  waitsIn,
-  type Work,
-} from "./derive.ts";
+import { busyMembers, derive, meetingResumes, reviewerOf, waitsIn, type Work } from "./derive.ts";
 import { DECISIONS, type Ask, type Meeting, type Question, type Subtask } from "./types.ts";
 
 const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
@@ -104,8 +96,7 @@ describe("waitsIn", () => {
 
   it("has new work wait for its member's work going on in its session, while that can start", () => {
     const fresh = subtask("fresh");
-    // Your words for work not started yet don't put it first.
-    const told = subtask("told", { goOn: [{ why: "carried", note: "Bigger" }] });
+    const told = subtask("told");
     const held = subtask("held", { session: "glm-1", goOn: [{ why: "held" }] });
     const state = work({ subtasks: [fresh, told, held] });
     expect(waitsIn(state, fresh, busyMembers(state))).toEqual([
@@ -225,22 +216,6 @@ describe("waitsIn", () => {
 });
 
 describe("derive", () => {
-  it("offers redo only once an upstream was done again after it started", () => {
-    const up = subtask("up", { status: "done", finishedAt: 5 });
-    const down = subtask("down", { status: "done", dependsOn: ["up"], startedAt: 3 });
-    const state = work({ subtasks: [up, down] });
-    expect(derive(state).subtasks.down).toEqual({ waits: [], redone: ["up"] });
-    expect(actionsOf(state, down)).toEqual(["redo"]);
-    expect(actionsOf(state, up)).toEqual([]);
-  });
-
-  it("offers stopping a merge only while it waits on your call", () => {
-    const merging = subtask("s1", { status: "merging" });
-    expect(actionsOf(work({ subtasks: [merging] }), merging)).toEqual([]);
-    const waiting = subtask("s1", { status: "waitingInMerge" });
-    expect(actionsOf(work({ subtasks: [waiting] }), waiting)).toEqual(["stop"]);
-  });
-
   it("counts everyone in a running meeting as busy", () => {
     const state = work({ meetings: [meeting({ status: "running" })] });
     expect(derive(state).busy.sort()).toEqual(["ann", "host"]);

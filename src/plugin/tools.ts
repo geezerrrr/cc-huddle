@@ -221,32 +221,13 @@ export function addTools(server: McpServer, session: Session) {
     "subtask_action",
     {
       description:
-        "Stop a subtask; continue a stopped or failed one in its session and worktree; retry one from the start; or redo a done one whose upstream was redone.",
+        "Stop a subtask; continue a stopped or failed one in its session and worktree; or retry one from the start.",
       inputSchema: { subtask, action: z.enum(SUBTASK_ACTIONS) },
     },
     async ({ subtask: id, action }) => {
       const engine = session.goal;
       const acted = await engine.scheduler.act(id, action);
       return toolText(`"${acted.title}" is ${STATUS_WORDS[acted.status]} now.`);
-    },
-  );
-
-  server.registerTool(
-    "message",
-    {
-      description:
-        "Pass the user's words to the member working on a subtask: a running one takes them at once, in its session; one not started reads them first.",
-      inputSchema: { subtask, text: z.string().trim().min(1) },
-    },
-    ({ subtask: id, text }) => {
-      const went = session.goal.scheduler.carry(id, text);
-      return toolText(
-        went === "goes"
-          ? "Passed on."
-          : went === "handedOver"
-            ? "Not passed on: it is delivered and in review or being merged. Send its task back once it is done."
-            : "Not passed on: its goal is paused or archived.",
-      );
     },
   );
 

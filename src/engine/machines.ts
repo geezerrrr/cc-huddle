@@ -66,7 +66,7 @@ export const SUBTASK_MACHINE = {
   /** Stopped after delivery: its review, or its merge, again. */
   reviewAgain: { from: ["stoppedInReview"], to: "reviewing" },
   mergeAgain: { from: ["stoppedInMerge"], to: "merging" },
-  /** Done, then redone in its session: its upstream changed, you added to it, or you sent its task back. */
+  /** Done, then done again in its session: you sent its task back. */
   redo: { from: ["done"], to: "pending" },
 } as const satisfies Machine<SubtaskStatus>;
 
@@ -77,7 +77,6 @@ const ACTION_EVENTS: Record<SubtaskAction, readonly SubtaskEvent[]> = {
   stop: ["stop", "stopReview", "stopMerge"],
   continue: ["continue", "reviewAgain", "mergeAgain"],
   retry: ["retry"],
-  redo: ["redo"],
 };
 
 /** The event `action` is in `status`; undefined where it can't be done. */
