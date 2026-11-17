@@ -106,6 +106,17 @@ async function call(name: string, args: Record<string, unknown> = {}) {
 }
 
 describe("tools", () => {
+  it("load the four a goal starts with upfront, and leave the rest deferred", async () => {
+    const { tools } = await client.listTools();
+    const upfront = tools.filter((tool) => tool._meta?.["anthropic/alwaysLoad"] === true);
+    expect(upfront.map((tool) => tool.name).sort()).toEqual([
+      "assign",
+      "hold_meeting",
+      "recommend",
+      "start_goal",
+    ]);
+  });
+
   it("name members only from the goal's team, each with their role", async () => {
     const told = vi.fn();
     client.setNotificationHandler(ToolListChangedNotificationSchema, told);

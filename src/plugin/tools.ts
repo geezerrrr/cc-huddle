@@ -67,6 +67,13 @@ const assignInput = (member: z.ZodType<string>) => ({
 });
 
 /**
+ * On the tools a goal starts with: Claude Code loads their schemas upfront
+ * instead of deferring them, so your session doesn't guess their arguments
+ * (docs/design.md §7.3).
+ */
+const UPFRONT = { "anthropic/alwaysLoad": true };
+
+/**
  * Adds the tools to `server`, all about the goal the session runs
  * (`session`). Returns what to call as the team they name is read, so the
  * tools that name a member list its members, and your session is told they
@@ -98,6 +105,7 @@ export function addTools(server: McpServer, session: Session) {
         task: z.string().trim().min(1).describe("The user's task, in their own words"),
       },
       annotations: { readOnlyHint: true },
+      _meta: UPFRONT,
     },
     async ({ task }, { signal }) => {
       const { way, members, why } = await session.recommend(task, signal);
@@ -116,6 +124,7 @@ export function addTools(server: McpServer, session: Session) {
       description:
         "Start a goal in this session: something the user wants done. It gets its own branch, cut from the branch the user's checkout is on, which it merges its work back into once done and the user agrees, and its own copy of the team. A session runs one goal: refused while its goal is under way. Then plan it once: a meeting of the members the user picked, or, with one picked, the task assigned to them. Nothing is added to a goal after.",
       inputSchema: { name: z.string().trim().min(1).describe("A few words for what is wanted") },
+      _meta: UPFRONT,
     },
     async ({ name }) => {
       const { goal } = (await session.start(name)).work;
@@ -129,6 +138,7 @@ export function addTools(server: McpServer, session: Session) {
       description:
         "Have members meet to plan a goal. They discuss it read-only in the goal's worktree, and the host writes a plan of tasks and subtasks, each with an assignee, dependencies and acceptance criteria. Returns at once: the meeting runs in the background, and cc-huddle asks the user about its plan when it is ready. A goal has one meeting, held as it starts; hold it only once the user has picked who attends.",
       inputSchema: meetingInput(memberName()),
+      _meta: UPFRONT,
     },
     ({ agenda, size, attendees, host_only }) => {
       const engine = session.goal;
@@ -214,6 +224,7 @@ export function addTools(server: McpServer, session: Session) {
       description:
         "Give the goal's task to the one member the user picked, without a meeting, as the goal starts: a goal is planned once. Assign only once the user has picked them.",
       inputSchema: assignInput(memberName()),
+      _meta: UPFRONT,
     },
     (work) => {
       const added = session.goal.scheduler.assignOne(work);
