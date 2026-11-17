@@ -16,6 +16,7 @@ import {
   type Subtask,
   type SubtaskStatus,
   type Wait,
+  toMerge,
   type Work,
 } from "../engine/index.ts";
 import { listOf } from "../shared/text.ts";
@@ -252,6 +253,10 @@ export const whereOf = (entry: GoalEntry): GoalWhere =>
         ? "archived"
         : "paused";
 
+/** A goal's status in words: a paused one with nothing left but the merge waits to merge. */
+export const goalStatusText = (state: Parameters<typeof toMerge>[0]) =>
+  toMerge(state) ? "waits to merge" : state.goal.status;
+
 const WHERE_WORDS: Record<GoalWhere, string> = {
   elsewhere: "in another session",
   unreadable: "can't be read",
@@ -278,7 +283,10 @@ export const goalLabel = (
 /** One of the repository's goals as `/huddle resume` lists it: one that can't be read by its folder, and why. */
 const entryLabel = (entry: GoalEntry) =>
   "state" in entry
-    ? goalLabel(entry.state, WHERE_WORDS[whereOf(entry)])
+    ? goalLabel(
+        entry.state,
+        whereOf(entry) === "paused" ? goalStatusText(entry.state) : WHERE_WORDS[whereOf(entry)],
+      )
     : `${entry.slug} · ${WHERE_WORDS.unreadable}: ${entry.unreadable}`;
 
 /** The repository's goals a session doesn't run, each named with how far it got and where it is, for `/huddle resume`. */

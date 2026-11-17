@@ -98,6 +98,11 @@ export const accepted = (state: Pick<Work, "questions" | "subtasks">, taskId: st
 export const planned = (state: Pick<GoalState, "meetings" | "subtasks">) =>
   state.meetings.length > 0 || state.subtasks.length > 0;
 
+/** Whether a paused goal has nothing left but merging its work back (§4.1): it asks as it resumes. */
+export const toMerge = (
+  state: Pick<Work, "goal" | "meetings" | "tasks" | "subtasks" | "questions">,
+) => state.goal.status === "paused" && state.tasks.length > 0 && over(state);
+
 /** Whether the goal's work is all done (§4.1): it has tasks, and every one is done, whether or not you accept it yet. */
 export const workDone = (state: Pick<GoalState, "tasks" | "subtasks">) =>
   state.tasks.length > 0 && state.tasks.every((t) => taskDone(state, t.id));

@@ -46,6 +46,7 @@ import {
   plural,
   resumableOf,
   waitText,
+  goalStatusText,
   whereOf,
   STATUS_WORDS,
   stepText,
@@ -306,8 +307,7 @@ function bandText(work: Work, needs: number): string {
   if (working) parts.push(`${String(working)} working`);
   if (work.handingBack) parts.push(`merging into ${work.goal.base}`);
   if (needs) parts.push(`${plural(needs, "needs", "need")} you`);
-  const { status } = work.goal;
-  if (!parts.length) parts.push(status === "active" ? "idle" : status);
+  if (!parts.length) parts.push(work.goal.status === "active" ? "idle" : goalStatusText(work));
   return parts.join(" · ");
 }
 
@@ -363,7 +363,7 @@ export function paneTeam(
   // Only a goal on hold goes on: an active one is under way, a closed one has nothing left.
   const here =
     goal.status === "paused" || goal.status === "archived"
-      ? [{ slug: goal.slug, label: goalLabel(work, `${goal.status}, in this session`) }]
+      ? [{ slug: goal.slug, label: goalLabel(work, `${goalStatusText(work)}, in this session`) }]
       : [];
   return {
     opened,

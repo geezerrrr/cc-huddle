@@ -347,6 +347,7 @@ describe("paneTeam", () => {
 
   it("says where the goal is when nothing goes on, and lists what /huddle resume takes up", () => {
     const now = work();
+    now.tasks = [];
     now.subtasks = [];
     now.questions = [];
     now.goal.status = "paused";
@@ -355,10 +356,13 @@ describe("paneTeam", () => {
       state: { ...work(), questions: [], goal: { ...now.goal, name: slug, slug, status } },
       ...(held && { holder: { pid: 1, session: 7, address: "there" } }),
     });
+    const done = entry("snake", "paused");
+    done.state.subtasks = done.state.subtasks.map((s) => ({ ...s, status: "done" as const }));
     const others = [
       entry("chess", "paused"),
       entry("go", "active", true),
       entry("old", "archived"),
+      done,
     ];
     const team = paneTeam(now, members, others);
     expect(team.band).toBe("paused");
@@ -369,6 +373,7 @@ describe("paneTeam", () => {
       { slug: "chess", label: "chess · 1/3 subtasks done · paused" },
       { slug: "go", label: "go · 1/3 subtasks done · in another session" },
       { slug: "old", label: "old · 1/3 subtasks done · archived" },
+      { slug: "snake", label: "snake · 3/3 subtasks done · waits to merge" },
     ]);
     now.goal.status = "active";
     expect(paneTeam(now, members, others).resumeRefused).toBe(
@@ -379,6 +384,7 @@ describe("paneTeam", () => {
       "chess",
       "go",
       "old",
+      "snake",
     ]);
   });
 
