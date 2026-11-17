@@ -70,6 +70,7 @@ const resumeInput = z.object({
 const settingsInput = z.object({
   review: z.boolean().optional(),
   meetingSize: z.enum(MEETING_SIZES).optional(),
+  parallel: z.boolean().optional(),
 }) satisfies z.ZodType<HuddleCalls["switch_settings"]>;
 
 /** Adds the pane's tools to `server`, for the goal the session runs (`session`). */
@@ -153,12 +154,12 @@ export function addPaneTools(server: McpServer, session: Session, pane: PaneServ
   server.registerTool(
     "switch_settings",
     {
-      description: `${PANE_ONLY} Switches review or the meeting size for this session's goal and goals started after, as /huddle review and /huddle meeting.`,
+      description: `${PANE_ONLY} Switches the team's settings in your team.yaml, for this session's goal and goals started after, as /huddle review, /huddle meeting and /huddle parallel.`,
       inputSchema: settingsInput.shape,
     },
     async (change) => {
-      const now = await session.switchSettings(change);
-      return toolText(switchedText(change, now, session.current !== undefined));
+      const held = await session.switchSettings(change);
+      return toolText(switchedText(change, held, session.current !== undefined));
     },
   );
 
@@ -207,11 +208,36 @@ function changeText(meeting: string, goal: string, change: string) {
   ].join("\n");
 }
 
-/** What a switch of settings says: what it switched, and for which goals. */
-function switchedText(change: Partial<GoalSettings>, now: GoalSettings, runsGoal: boolean) {
-  const switched = [
-    ...(change.review === undefined ? [] : [`Review is ${now.review ? "on" : "off"}`]),
-    ...(change.meetingSize === undefined ? [] : [`Meetings are ${now.meetingSize}`]),
-  ];
-  return `${switched.join(", ")}: for ${runsGoal ? "this session's goal and " : ""}goals started after.`;
+/** A team setting as a switch names it: in `team.yaml`, and switched to `value`. */
+const SETTING_WORDS: {
+  [K in keyof GoalSettings]: { key: string; now: (value: GoalSettings[K]) => string };
+} = {
+  review: { key: "review", now: (on) => `Review is ${on ? "on" : "off"}` },
+  meetingSize: { key: "meeting", now: (size) => `Meetings are ${size}` },
+  parallel: { key: "parallel", now: (on) => `Parallel work is ${on ? "on" : "off"}` },
+};
+
+/** What a switch of settings says: what it switched, and for which goals; what the repository's team.yaml sets (`held`), to change there. */
+function switchedText(
+  change: Partial<GoalSettings>,
+  held: readonly (keyof GoalSettings)[],
+  runsGoal: boolean,
+) {
+  const said = (key: keyof GoalSettings) =>
+    (SETTING_WORDS[key].now as (value: unknown) => string)(change[key]);
+  const keys = (Object.keys(change) as (keyof GoalSettings)[]).filter(
+    (key) => change[key] !== undefined,
+  );
+  const switched = keys.filter((key) => !held.includes(key)).map(said);
+  return [
+    ...(switched.length
+      ? [
+          `${switched.join(", ")}: for ${runsGoal ? "this session's goal and " : ""}goals started after.`,
+        ]
+      : []),
+    ...held.map(
+      (key) =>
+        `The repository's .claude/huddle/team.yaml sets ${SETTING_WORDS[key].key}: change it there.`,
+    ),
+  ].join("\n");
 }

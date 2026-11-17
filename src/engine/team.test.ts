@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promi
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { allowInTeam, loadTeam, teamFolder } from "./team.ts";
+import { allowInTeam, loadTeam, shipTeam, teamFolder } from "./team.ts";
 
 let top: string;
 
@@ -111,6 +111,32 @@ describe("loadTeam", () => {
       permissions: { allow: ["Read", "Bash(pnpm test)"], deny: ["Bash(rm:*)"] },
       model: "x",
     });
+  });
+
+  it("takes the team's settings from yours, under the repository's, at their defaults where neither sets them", async () => {
+    const user = path.join(top, "user");
+    await mkdir(user, { recursive: true });
+    await writeFile(path.join(user, "team.yaml"), "review: false\nmeeting: large\n");
+    await write({ "team.yaml": "meeting: small\nmembers:\n  glm:\n    role: dev\n" });
+    expect((await loadTeam(user, top)).goalSettings).toEqual({
+      review: false,
+      meetingSize: "small",
+      parallel: false,
+    });
+  });
+
+  it("ships its example files where they are missing, never over yours, and reads none of their comments", async () => {
+    const user = path.join(top, "user");
+    await mkdir(path.join(user, "roles"), { recursive: true });
+    await writeFile(path.join(user, "settings.json"), "{}");
+    await shipTeam(user);
+    await shipTeam(user);
+    expect(await readFile(path.join(user, "settings.json"), "utf8")).toBe("{}");
+    await expect(loadTeam(user, top)).rejects.toThrow("The team has no members");
+    await write({ "team.yaml": "members:\n  glm:\n    role: developer\n" });
+    const { team, goalSettings } = await loadTeam(user, top);
+    expect(team.members[0]?.role).toEqual({ title: "developer", duties: "" });
+    expect(goalSettings).toEqual({ review: true, meetingSize: "discussion", parallel: false });
   });
 
   it("says which file is wrong, and how", async () => {

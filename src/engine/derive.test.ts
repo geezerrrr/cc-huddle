@@ -48,7 +48,7 @@ const work = (fields: Partial<Work> = {}): Work => ({
     slug: "dice",
     status: "active",
     createdAt: 0,
-    settings: { review: true, meetingSize: "discussion" },
+    settings: { review: true, meetingSize: "discussion", parallel: false },
   },
   tasks: [
     {
@@ -162,7 +162,7 @@ describe("waitsIn", () => {
         slug: "dice",
         status: "paused",
         createdAt: 0,
-        settings: { review: true, meetingSize: "discussion" },
+        settings: { review: true, meetingSize: "discussion", parallel: false },
       },
     });
     const held = [{ kind: "goal", status: "paused" }];

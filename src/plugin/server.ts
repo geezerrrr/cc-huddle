@@ -12,6 +12,7 @@ import {
   claudeFolder,
   GitError,
   RepositoryGoals,
+  shipTeam,
   stopMembers,
   TeamError,
   userTeamFolder,
@@ -31,6 +32,9 @@ const say = (text: string) => {
 
 const cwd = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
 const userTeam = userTeamFolder(process.env);
+await shipTeam(userTeam).catch((error: unknown) => {
+  say(`your team's example files couldn't be written: ${errorText(error)}`);
+});
 const plugins = await pluginIds(dataFolder, claudeFolder(process.env), cwd);
 
 const pane = await servePane(() => session);

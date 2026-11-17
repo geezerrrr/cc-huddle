@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -8,7 +8,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { git } from "../engine/git.ts";
-import { teamFolder } from "../engine/team.ts";
+import { shipTeam, teamFolder } from "../engine/team.ts";
 import { DECISIONS, type DecisionQuestion, type Subtask } from "../engine/types.ts";
 import type { HuddleAsk, HuddleView } from "../../plugin/types/index.d.ts";
 import { askToLetGo, servePane, type PaneServer } from "./pane-server.ts";
@@ -226,21 +226,50 @@ Get it with show_plan, rewrite it with their words and change_plan. cc-huddle th
     });
   });
 
-  it("switch review and the meeting size for the session's goal and goals started after", async () => {
+  it("switch the team's settings in your team.yaml, keeping its comments, for the session's goal and goals started after", async () => {
+    const userTeam = path.join(dir, "user-team");
+    await shipTeam(userTeam);
     expect((await call("switch_settings", { review: false })).text).toBe(
       "Review is off: for goals started after.",
     );
     const dice = await session.start("Dice");
-    expect(dice.work.goal.settings).toEqual({ review: false, meetingSize: "discussion" });
-    expect((await call("switch_settings", { meetingSize: "large" })).text).toBe(
-      "Meetings are large: for this session's goal and goals started after.",
+    expect(dice.work.goal.settings).toEqual({
+      review: false,
+      meetingSize: "discussion",
+      parallel: false,
+    });
+    expect((await call("switch_settings", { meetingSize: "large", parallel: true })).text).toBe(
+      "Meetings are large, Parallel work is on: for this session's goal and goals started after.",
     );
-    expect(dice.work.goal.settings).toEqual({ review: false, meetingSize: "large" });
+    expect(dice.work.goal.settings).toEqual({
+      review: false,
+      meetingSize: "large",
+      parallel: true,
+    });
+    const yours = await readFile(path.join(userTeam, "team.yaml"), "utf8");
+    expect(yours).toContain(
+      "# Another member reviews each delivery before it merges.\nreview: false",
+    );
+    expect(yours).toContain("meeting: large");
+    expect(yours).toContain("#   sonnet:");
     await dice.goals.pause();
     expect((await session.start("Chess")).work.goal.settings).toEqual({
       review: false,
       meetingSize: "large",
+      parallel: true,
     });
+  });
+
+  it("leave a team setting the repository's team.yaml sets as it is, and say to change it there", async () => {
+    await writeFile(
+      path.join(teamFolder(path.join(dir, "repo")), "team.yaml"),
+      "review: true\nmembers:\n  glm:\n    role: developer\n",
+    );
+    const dice = await session.start("Dice");
+    expect((await call("switch_settings", { review: false, parallel: true })).text).toBe(
+      "Parallel work is on: for this session's goal and goals started after.\nThe repository's .claude/huddle/team.yaml sets review: change it there.",
+    );
+    expect(dice.work.goal.settings).toMatchObject({ review: true, parallel: true });
   });
 
   it("take up only a goal named by its slug", async () => {

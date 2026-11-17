@@ -12,7 +12,7 @@ import { following, openPane, paneView, scrollPane } from "./pane";
 import type { Ui } from "./rows";
 import { call } from "./server";
 import { PANE, PLUGIN, readTeam } from "./state";
-import { switchMeeting, switchReview } from "./settings";
+import { switchMeeting, switchParallel, switchReview } from "./settings";
 import { words } from "./text";
 import { watch } from "./watch";
 
@@ -45,14 +45,16 @@ export const register: Register = (on) => {
       resume: () => resumeGoal($),
     };
     const numbered = /^resume\s+(\d+)$/.exec(task);
-    const setting = /^(review|meeting)(?:\s+(\S+))?$/.exec(task);
+    const setting = /^(review|meeting|parallel)(?:\s+(\S+))?$/.exec(task);
     const run = numbered
       ? () => resumeGoal($, Number(numbered[1]))
       : setting?.[1] === "review"
         ? () => switchReview($, setting[2] ?? "")
         : setting?.[1] === "meeting"
           ? () => switchMeeting($, setting[2] ?? "")
-          : certain[task];
+          : setting?.[1] === "parallel"
+            ? () => switchParallel($, setting[2] ?? "")
+            : certain[task];
     if (run) {
       try {
         return { text: await run() };

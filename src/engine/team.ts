@@ -1,20 +1,21 @@
 /**
  * The team as you write it (docs/design.md §6), in your own `huddle/`
  * folder beside Claude Code's user settings and in the repository's
- * `.claude/huddle/`: the members in `team.yaml`, the roles as Markdown files,
- * and the Claude Code settings every member works under.
+ * `.claude/huddle/`: the members and the team's settings in `team.yaml`, the
+ * roles as Markdown files, and the Claude Code settings every member works
+ * under.
  */
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { EffortLevel, Settings } from "@anthropic-ai/claude-agent-sdk";
-import { parse } from "yaml";
+import { parse, parseDocument } from "yaml";
 import { z } from "zod";
 import { type Team } from "./core.ts";
-import { errorText } from "../shared/errors.ts";
+import { errorCode, errorText } from "../shared/errors.ts";
 import { ifThere, jsonIfThere, namesIfThere, writeWhole } from "../shared/files.ts";
 import { serialBy } from "../shared/serial.ts";
-import { type Member, type Role } from "./types.ts";
+import { type GoalSettings, MEETING_SIZES, type Member, type Role } from "./types.ts";
 
 /** The team's folder in a repository. */
 export const teamFolder = (top: string) => path.join(top, ".claude", "huddle");
@@ -44,12 +45,44 @@ const memberSchema = z.object({
   settings: settingsSchema.optional(),
 });
 
-const teamSchema = z.object({ members: z.record(z.string(), memberSchema).default({}) });
+const teamSchema = z.object({
+  review: z.boolean().optional(),
+  meeting: z.enum(MEETING_SIZES).optional(),
+  parallel: z.boolean().optional(),
+  // `members:` with every member commented out, as shipped, is null.
+  members: z
+    .record(z.string(), memberSchema)
+    .nullish()
+    .transform((members) => members ?? {}),
+});
+
+/** The team's settings (§6.1) as `team.yaml` names them, and as a goal keeps them. */
+const SETTING_KEYS = {
+  review: "review",
+  meeting: "meetingSize",
+  parallel: "parallel",
+} as const satisfies Record<string, keyof GoalSettings>;
+
+const DEFAULT_SETTINGS: GoalSettings = { review: true, meetingSize: "discussion", parallel: false };
+
+/** The team's settings a `team.yaml` sets, as a goal keeps them. */
+function settingsIn(file: z.output<typeof teamSchema>): Partial<GoalSettings> {
+  const set: Partial<Record<keyof GoalSettings, unknown>> = {};
+  for (const [key, setting] of Object.entries(SETTING_KEYS))
+    if (file[key as keyof typeof SETTING_KEYS] !== undefined)
+      set[setting] = file[key as keyof typeof SETTING_KEYS];
+  return set as Partial<GoalSettings>;
+}
 
 /** The team and the settings its members work under. */
 export interface TeamFiles {
   team: Team;
   settings: Settings;
+}
+
+/** The team as its files have it now: with the team's settings a goal started now takes (§6.1). */
+export interface LoadedTeam extends TeamFiles {
+  goalSettings: GoalSettings;
 }
 
 /** What is wrong with the team's files, naming the file; a `settings.json` that isn't JSON throws a SyntaxError instead. */
@@ -81,7 +114,12 @@ async function roleFiles(folder: string) {
       const front = /^---\r?\n(?:([\s\S]*?)\r?\n)?---[ \t]*(?:\r?\n|$)/.exec(text);
       const id = name.slice(0, -".md".length);
       const { title } = parsed(roleSchema, yamlIn(front?.[1] ?? "", file), file);
-      return [id, { title: title ?? id, duties: text.slice(front?.[0].length ?? 0).trim() }];
+      // Comments explain the file, as shipped (§6): never duties.
+      const duties = text
+        .slice(front?.[0].length ?? 0)
+        .replace(/<!--[\s\S]*?-->/g, "")
+        .trim();
+      return [id, { title: title ?? id, duties }];
     }),
   );
 }
@@ -107,23 +145,30 @@ export function mergeSettings(under: object, over: object): Record<string, unkno
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
+/** A `team.yaml` read, or empty where there is none; throws what is wrong with it, naming it. */
+async function teamFile(folder: string) {
+  const file = path.join(folder, "team.yaml");
+  const text = await ifThere(readFile(file, "utf8"), "");
+  return parsed(teamSchema, yamlIn(text, file), file);
+}
+
 /**
  * Reads the team from your folder (`userTeam`), then the repository's (at
- * `top`): a member or role the repository has by the same name replaces
- * yours, and settings merge as Claude Code's do. A role with no file is its
- * name alone. Throws what is wrong with a file, naming it.
+ * `top`): a member, role or team setting the repository has replaces yours,
+ * and settings merge as Claude Code's do. A role with no file is its name
+ * alone. Throws what is wrong with a file, naming it.
  */
-export async function loadTeam(userTeam: string, top: string): Promise<TeamFiles> {
+export async function loadTeam(userTeam: string, top: string): Promise<LoadedTeam> {
   const roles = new Map<string, Role>();
   const written = new Map<string, z.output<typeof memberSchema>>();
   let settings: Record<string, unknown> = {};
+  let goalSettings = DEFAULT_SETTINGS;
   const folders = [userTeam, teamFolder(top)];
   for (const folder of folders) {
     for (const [id, role] of await roleFiles(path.join(folder, "roles"))) roles.set(id, role);
-    const teamFile = path.join(folder, "team.yaml");
-    const text = await ifThere(readFile(teamFile, "utf8"), "");
-    const { members } = parsed(teamSchema, yamlIn(text, teamFile), teamFile);
-    for (const [name, member] of Object.entries(members)) written.set(name, member);
+    const file = await teamFile(folder);
+    goalSettings = { ...goalSettings, ...settingsIn(file) };
+    for (const [name, member] of Object.entries(file.members)) written.set(name, member);
     const settingsFile = path.join(folder, "settings.json");
     settings = mergeSettings(
       settings,
@@ -143,7 +188,88 @@ export async function loadTeam(userTeam: string, top: string): Promise<TeamFiles
     throw new TeamError(
       `The team has no members: list them in ${folders.map((f) => path.join(f, "team.yaml")).join(" or ")}`,
     );
-  return { team: { members }, settings };
+  return { team: { members }, settings, goalSettings };
+}
+
+/**
+ * Switches team settings in your `team.yaml` (§6.1), keeping its comments,
+ * for goals started after: those the repository's `team.yaml` doesn't set.
+ * Gives those it does, which yours doesn't decide.
+ */
+export function switchInTeam(
+  userTeam: string,
+  top: string,
+  change: Partial<GoalSettings>,
+): Promise<(keyof GoalSettings)[]> {
+  const file = path.join(userTeam, "team.yaml");
+  return writing(file, async () => {
+    const theirs = settingsIn(await teamFile(teamFolder(top)));
+    const held = (Object.keys(change) as (keyof GoalSettings)[]).filter((k) => k in theirs);
+    const yours = Object.entries(SETTING_KEYS).filter(
+      ([, setting]) => change[setting] !== undefined && !held.includes(setting),
+    );
+    if (!yours.length) return held;
+    await teamFile(userTeam);
+    const doc = parseDocument(await ifThere(readFile(file, "utf8"), ""));
+    for (const [key, setting] of yours) doc.set(key, change[setting]);
+    await writeWhole(file, doc.toString());
+    return held;
+  });
+}
+
+/** The files cc-huddle ships in your team's folder (§6): examples to edit, explained in comments. */
+const SHIPPED: Record<string, string> = {
+  "team.yaml": `# Your cc-huddle team, for every repository. A repository's own
+# .claude/huddle/team.yaml adds members and overrides these settings.
+
+# Another member reviews each delivery before it merges.
+review: true
+# How long a meeting's discussion runs: small, discussion or large.
+meeting: discussion
+# Whether a member does several pieces of work at once.
+parallel: false
+
+# The members, each by name. Uncomment one and edit it.
+members:
+#   sonnet:
+#     role: developer       # the angle it sees the work from: a name, and roles/<role>.md if you write one
+#     model: sonnet         # the model it runs on; your session's when left out
+#     effort: high          # low, medium, high, xhigh or max
+#     settings:             # Claude Code settings of its own, over settings.json
+#       permissions:
+#         allow: ["Bash(pnpm test *)"]
+#   glm:
+#     role: designer
+#     model: glm-5.3-flashx
+#     env:                  # what its Claude Code runs with; \${VAR} comes from your environment
+#       ANTHROPIC_BASE_URL: https://open.bigmodel.cn/api/anthropic
+#       ANTHROPIC_AUTH_TOKEN: \${GLM_API_KEY}
+`,
+  [path.join("roles", "developer.md")]: `<!--
+A role file: what your team keeps to in this role, its own conventions and
+what it never does. Every member whose role is "developer" reads it, at the
+meeting and in their work. A role with no file is its name alone.
+
+Write below this comment; comments aren't read. Front matter at the very top
+may give the role a title:
+
+---
+title: Developer
+---
+-->
+`,
+  "settings.json": `${JSON.stringify({ permissions: { allow: [], ask: [], deny: [] } }, null, 2)}\n`,
+};
+
+/** Writes each file cc-huddle ships that is missing from your team's folder (`userTeam`); one that is there is never touched. */
+export async function shipTeam(userTeam: string): Promise<void> {
+  for (const [name, text] of Object.entries(SHIPPED)) {
+    const file = path.join(userTeam, name);
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, text, { flag: "wx" }).catch((error: unknown) => {
+      if (errorCode(error) !== "EEXIST") throw error;
+    });
+  }
 }
 
 /** One write to the team's settings at a time, so no rule added is lost to another. */
@@ -173,7 +299,8 @@ export function allowInTeam(top: string, rules: readonly string[]): Promise<void
  * Writes a goal's copy of the team (§6) to `file`: as read when it started,
  * each member's `env` as written, its `${VAR}`s not filled in.
  */
-export const copyTeam = (file: string, team: TeamFiles) => writeWhole(file, JSON.stringify(team));
+export const copyTeam = (file: string, { team, settings }: TeamFiles) =>
+  writeWhole(file, JSON.stringify({ team, settings }));
 
 /** A goal's copy of the team, from its file (copyTeam). */
 export async function readCopy(file: string): Promise<TeamFiles> {

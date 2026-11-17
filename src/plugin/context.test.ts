@@ -59,7 +59,7 @@ async function writeGoal(slug: string, status = "paused") {
           slug,
           status,
           createdAt: slug.length,
-          settings: { review: true, meetingSize: "discussion" },
+          settings: { review: true, meetingSize: "discussion", parallel: false },
         },
         tasks: [],
         subtasks: [],
@@ -97,7 +97,7 @@ describe("the session's context", () => {
     expect(await sessionContext(repo, data, SESSION))
       .toBe(`This session runs cc-huddle's goal "dice", as it stands:
 
-Goal "dice": active, on branch huddle/dice/main; review on, discussion meetings
+Goal "dice": active, on branch huddle/dice/main; review on, discussion meetings, parallel off
 Team: glm`);
   });
 

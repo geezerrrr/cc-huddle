@@ -39,12 +39,14 @@ export interface Goal {
   settings: GoalSettings;
 }
 
-/** How a goal works, switched as `/model` is (§6.1). */
+/** How a goal works: the team's settings in `team.yaml` as it started, switched as `/model` is (§6.1). */
 export interface GoalSettings {
   /** Deliveries are reviewed before they are merged. */
   review: boolean;
   /** How long its meetings' discussions run, unless one is asked for at a size of its own. */
   meetingSize: MeetingSize;
+  /** A member does several pieces of work at once (§2, §4.5). */
+  parallel: boolean;
 }
 
 /** One result for you: a group of subtasks, done once they all are. */

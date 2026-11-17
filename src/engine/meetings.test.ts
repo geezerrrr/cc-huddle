@@ -55,7 +55,7 @@ beforeEach(async () => {
         slug: "dice",
         status: "active",
         createdAt: 0,
-        settings: { review: true, meetingSize: "discussion" },
+        settings: { review: true, meetingSize: "discussion", parallel: false },
       },
       tasks: [],
       subtasks: [],

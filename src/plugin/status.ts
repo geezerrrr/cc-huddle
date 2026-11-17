@@ -51,7 +51,7 @@ export function statusText(work: Work): string {
   const busy = new Set(derived.busy);
   const { goal } = work;
   const lines = [
-    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)}; review ${goal.settings.review ? "on" : "off"}, ${goal.settings.meetingSize} meetings`,
+    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)}; review ${goal.settings.review ? "on" : "off"}, ${goal.settings.meetingSize} meetings, parallel ${goal.settings.parallel ? "on" : "off"}`,
     `Team: ${work.members.map((m) => (busy.has(m) ? `${m} (busy)` : m)).join(", ")}`,
   ];
   for (const meeting of work.meetings.filter((m) => m.status !== "approved"))

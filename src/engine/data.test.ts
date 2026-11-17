@@ -23,7 +23,7 @@ const fresh = (slug = "dice", createdAt = 0): GoalState => ({
     slug,
     status: "active",
     createdAt,
-    settings: { review: true, meetingSize: "discussion" },
+    settings: { review: true, meetingSize: "discussion", parallel: false },
   },
   tasks: [],
   subtasks: [],

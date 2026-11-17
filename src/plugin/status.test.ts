@@ -36,7 +36,7 @@ describe("statusText", () => {
         slug: "dice",
         status: "active",
         createdAt: 0,
-        settings: { review: true, meetingSize: "discussion" },
+        settings: { review: true, meetingSize: "discussion", parallel: false },
       },
       meetings: [
         {
@@ -73,7 +73,7 @@ describe("statusText", () => {
       tokens: {},
     });
     expect(text)
-      .toBe(`Goal "Dice": active, on branch huddle/dice/main; review on, discussion meetings
+      .toBe(`Goal "Dice": active, on branch huddle/dice/main; review on, discussion meetings, parallel off
 Team: glm (busy), sonnet
   Meeting [m1], hosted by sonnet: its plan waits for review
   Task "Game" [t1], accepted by the user

@@ -48,14 +48,14 @@ async function teamFile(name: string, text: string) {
   await writeFile(file, text);
 }
 
-const SETTINGS = { review: true, meetingSize: "discussion" } as const;
+const SETTINGS = { review: true, meetingSize: "discussion", parallel: false } as const;
 
 const keep = (engine: Engine) => {
   opened.push(engine);
   return engine;
 };
 const start = async (name = "Dice", with_: Partial<EngineOptions> = {}) =>
-  keep(await Engine.start({ ...options, ...with_ }, name, SETTINGS));
+  keep(await Engine.start({ ...options, ...with_ }, name));
 const takeUp = async (slug: string, with_: Partial<EngineOptions> = {}) =>
   keep(await Engine.takeUp({ ...options, ...with_ }, slug));
 /** Closes an engine the test is done with. */

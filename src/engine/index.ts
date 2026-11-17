@@ -12,6 +12,6 @@ export { planSchema, writtenPlan } from "./plan.ts";
 export { stopMembers } from "./processes.ts";
 export type { LiveRun, RecordEntry } from "./records.ts";
 export { RepositoryGoals } from "./repository.ts";
-export { claudeFolder, TeamError, userTeamFolder } from "./team.ts";
+export { claudeFolder, shipTeam, switchInTeam, TeamError, userTeamFolder } from "./team.ts";
 export type { Notice } from "./turns.ts";
 export * from "./types.ts";

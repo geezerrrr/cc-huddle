@@ -12,10 +12,10 @@ import {
   type GoalSettings,
   type HandedOver,
   RepositoryGoals,
+  switchInTeam,
   type Team,
 } from "../engine/index.ts";
 import { serialBy } from "../shared/serial.ts";
-import { readDefaults, writeDefaults } from "./defaults.ts";
 
 /** The key the session's changes of goal take turns on. */
 const TURN = "goal";
@@ -67,7 +67,7 @@ export class Session {
   }
 
   /**
-   * Starts a goal here, with the settings goals start with: refused while
+   * Starts a goal here, with the team's settings as they are now: refused while
    * this session's goal is active; a paused, archived or closed one is let
    * go, and a closed one is carried on from (§5).
    */
@@ -76,17 +76,23 @@ export class Session {
       const last = this.engine?.work.goal;
       const after = last?.status === "closed" ? goalBranch(last.slug) : undefined;
       await this.leave();
-      const settings = await readDefaults(this.options.dataFolder);
-      return this.run(await Engine.start(await this.engineOptions(), name, settings, after));
+      return this.run(await Engine.start(await this.engineOptions(), name, after));
     });
   }
 
-  /** Switches how this session's goal works, if it runs one, and how goals started after do (§6.1): the settings as they are now. */
-  async switchSettings(change: Partial<GoalSettings>): Promise<GoalSettings> {
-    const now = { ...(await readDefaults(this.options.dataFolder)), ...change };
-    await writeDefaults(this.options.dataFolder, now);
-    this.engine?.switchSettings(change);
-    return now;
+  /**
+   * Switches team settings (§6.1) in your `team.yaml`, for goals started
+   * after, and for this session's goal, if it runs one. Gives those the
+   * repository's `team.yaml` sets, left as they are.
+   */
+  async switchSettings(change: Partial<GoalSettings>): Promise<(keyof GoalSettings)[]> {
+    const { repo } = await this.repository();
+    const held = await switchInTeam(this.options.userTeam, repo.top, change);
+    const switched = Object.fromEntries(
+      Object.entries(change).filter(([key]) => !held.includes(key as keyof GoalSettings)),
+    );
+    this.engine?.switchSettings(switched);
+    return held;
   }
 
   /**

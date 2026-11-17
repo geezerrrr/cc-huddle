@@ -146,7 +146,11 @@ export type HuddleCalls = {
   };
   hand_off: { task: string };
   resume_goal: { goal: string };
-  switch_settings: { review?: boolean; meetingSize?: "small" | "discussion" | "large" };
+  switch_settings: {
+    review?: boolean;
+    meetingSize?: "small" | "discussion" | "large";
+    parallel?: boolean;
+  };
   goal_action: { action: "pause" | "resume" | "archive" | "delete" };
 };
 
