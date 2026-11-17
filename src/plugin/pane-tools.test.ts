@@ -381,4 +381,28 @@ Get it with show_plan, rewrite it with their words and change_plan. cc-huddle th
     });
     expect(session.current?.work.questions).toEqual([]);
   });
+
+  it("clean a closed goal up as you say, and run none after", async () => {
+    const dice = await session.start("Dice");
+    inside(dice).core.state.meetings.push({
+      id: "m1",
+      agenda: "Dice",
+      size: "small",
+      participants: ["glm"],
+      status: "review",
+      turns: [],
+      plan: { summary: "Dice", markdown: "# Dice", tasks: [] },
+    });
+    await call("review_plan", { meeting: "m1", decision: "drop" });
+    expect(dice.work.goal.status).toBe("closed");
+    const [cleanUp] = dice.work.questions;
+    expect(
+      await call("answer", {
+        question: cleanUp?.id ?? "",
+        answer: { kind: "option", option: "cleanUp" },
+      }),
+    ).toEqual({ text: `Answered ${cleanUp?.id ?? ""}.`, error: false });
+    expect(session.current).toBeUndefined();
+    expect(await session.goals()).toEqual([]);
+  });
 });

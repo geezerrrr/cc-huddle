@@ -1,4 +1,4 @@
-import { mkdtemp, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -25,6 +25,19 @@ import {
   type Subtask,
 } from "./types.ts";
 import { goalFiles } from "../shared/layout.ts";
+
+/** What the member resolving the hand-back's conflicts does in the goal's worktree, in place of a model's turn. */
+const resolving = vi.hoisted(() => ({
+  run: (_checkout: string, _signal: AbortSignal): Promise<void> => Promise.resolve(),
+}));
+
+vi.mock("./turns.ts", () => ({
+  turnDecoder: () => () => undefined,
+  runTurn: async (_prompt: string, _options: unknown, signal: AbortSignal) => {
+    await resolving.run(goalFiles(core.places.root).checkout, signal);
+    return { ok: true, text: "", tokens: 7 };
+  },
+}));
 
 const ME = {
   GIT_AUTHOR_NAME: "you",
@@ -234,6 +247,57 @@ describe("Goals", () => {
     expect(goal.status).toBe("closed");
   });
 
+  it("have the lead resolve the hand-back's conflicts, then close", async () => {
+    await conflicting();
+    resolving.run = async (checkout) => {
+      await writeFile(path.join(checkout, "README.md"), "roll and mine\n");
+      await git({ cwd: checkout }, ["add", "-A"]);
+    };
+    await goals.decide(await opened("handBack"), { kind: "decision", option: "merge" });
+    await opened("cleanUp");
+    expect(core.state.goal.status).toBe("closed");
+    expect(core.state.tokens).toEqual({ glm: 7 });
+    expect(await readFile(path.join(core.places.repo.top, "README.md"), "utf8")).toBe(
+      "roll and mine\n",
+    );
+  });
+
+  it("come back saying why when the lead leaves conflicts", async () => {
+    await conflicting();
+    resolving.run = () => Promise.resolve();
+    const asked = await opened("handBack");
+    await goals.decide(asked, { kind: "decision", option: "merge" });
+    const again = await vi.waitFor(() => {
+      const found = core.state.questions.find((q) => q.text);
+      if (!found) throw new Error("Not back yet");
+      return found;
+    }, 5000);
+    expect(again.text).toBe("Conflicts are left in README.md");
+    expect(core.state.goal.status).toBe("active");
+  });
+
+  it("stop resolving as the goal pauses, to ask again as it resumes", async () => {
+    await conflicting();
+    const { promise: started, resolve } = Promise.withResolvers<undefined>();
+    resolving.run = (_checkout, signal) => {
+      resolve(undefined);
+      return new Promise((_, reject) => {
+        signal.addEventListener("abort", () => {
+          reject(new Error("stopped"));
+        });
+      });
+    };
+    await goals.decide(await opened("handBack"), { kind: "decision", option: "merge" });
+    await started;
+    expect(goals.handingBack()).toEqual({ by: "glm" });
+    await goals.pause();
+    await vi.waitFor(() => {
+      expect(goals.handingBack()).toBeUndefined();
+    });
+    expect(core.state.goal.status).toBe("paused");
+    expect(core.state.questions).toEqual([]);
+  });
+
   it("offer to hand the work back on the acceptance that is all they wait on, or pause on accepting only", async () => {
     const { goal } = core.state;
     await doneWork(true);
@@ -251,13 +315,22 @@ describe("Goals", () => {
   });
 });
 
-/** A task of one subtask, done: merged into the goal's branch with a file, `withWork`. */
-async function doneWork(ownerAccepts: boolean, withWork = true) {
+/** Work done whose README.md conflicts with a commit of yours on main, the goal asking to hand it back. */
+async function conflicting() {
+  await doneWork(false, true, "README.md");
+  const top = core.places.repo.top;
+  await writeFile(path.join(top, "README.md"), "mine\n");
+  await git({ cwd: top, env: ME }, ["commit", "-q", "-am", "Mine"]);
+  goals.settle();
+}
+
+/** A task of one subtask, done: merged into the goal's branch with `file`, `withWork`. */
+async function doneWork(ownerAccepts: boolean, withWork = true, file = "dice.ts") {
   const { places } = core;
   await openGoal(places, "main");
   if (withWork) {
     const desk = await openDesk(places, "s1");
-    await writeFile(path.join(desk, "dice.ts"), "roll\n");
+    await writeFile(path.join(desk, file), "roll\n");
     await commitDesk(places, "s1", "glm", "Roll");
     await mergeDesk(places, "s1", "glm");
   }
