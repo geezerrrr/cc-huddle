@@ -114,7 +114,7 @@ describe("the MCP server", () => {
     await second.client.close();
     expect(await saved()).toMatchObject({ name: "Dice", status: "paused" });
     // Two servers start, slow while the other test files run alongside.
-  }, 20_000);
+  });
 
   it("closes its goal as the session ends: paused, its state written, the lock let go", async () => {
     await writeTeam();

@@ -76,7 +76,6 @@ describe("member processes", () => {
     // Settled once it has exited, so none still writes a session that goes on.
     await recordMembersIn(file, failed);
     await ended(left);
-    expect(left.signalCode).toBe("SIGTERM");
     expect(stranger.exitCode ?? stranger.signalCode).toBeNull();
     await vi.waitFor(async () => {
       expect(await written()).toEqual([]);

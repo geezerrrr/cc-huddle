@@ -36,9 +36,9 @@ const fresh = (slug = "dice", createdAt = 0): GoalState => ({
 describe("repoFolder", () => {
   it("is one for a repository and its worktrees, and another for another repository", () => {
     const at = (top: string, common: string) => repoFolder("/data", { top, common });
-    expect(at("/code/dice game", "/code/dice game/.git")).toMatch(
-      /^\/data\/repos\/dice-game-[0-9a-f]{12}$/,
-    );
+    const folder = at("/code/dice game", "/code/dice game/.git");
+    expect(path.dirname(folder)).toBe(path.join("/data", "repos"));
+    expect(path.basename(folder)).toMatch(/^dice-game-[0-9a-f]{12}$/);
     expect(at("/elsewhere/dice-wt", "/code/dice game/.git").slice(-12)).toBe(
       at("/code/dice game", "/code/dice game/.git").slice(-12),
     );
