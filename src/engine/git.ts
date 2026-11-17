@@ -443,58 +443,59 @@ export function dropDesk(places: Places, subtaskId: string): Promise<void> {
 }
 
 /**
- * Hands a goal's work back (§5): in its worktree, `base` is merged into the
- * goal's branch; clean, `base` fast-forwards to it, in the worktree that has
- * it checked out, or by its ref where none has. Conflicts stay in the goal's
- * worktree, the merge half done, for whoever resolves them; asked again, a
- * merge that has none left (resolved and staged, or committed) goes on.
- * Whatever git refuses throws, saying why: changes of yours in the way,
- * `base` moved meanwhile.
+ * Merges `base` into the goal's branch in its worktree, the first half of
+ * handing the goal's work back (§5): clean, or conflicts left there, the
+ * merge half done, for whoever resolves them. A merge left under way by an
+ * earlier try is theirs to finish too. What git refuses throws, saying why.
  */
-export function handBackGoal(
+export function mergeBase(
   places: Places,
   base: string,
   by: string,
-): Promise<{ kind: "merged" } | { kind: "conflict"; files: string[] }> {
+): Promise<{ kind: "clean" } | { kind: "conflict"; files: string[] }> {
   return perGoal(places, async () => {
-    const { repo } = places;
-    const tree = await setUpGoal(places);
-    const at = await worktreeAt(repo, tree);
+    const at = await worktreeAt(places.repo, await setUpGoal(places));
     const goal = { ...at, env: { ...at.env, ...authorEnv(by) } };
-    const ref = `refs/heads/${base}`;
-    if (!(await merging(goal))) {
-      // As git does by default, whatever your own setup says (merge.ff=only would refuse it).
-      const merge = await git(goal, ["-c", "merge.ff=true", "merge", "-q", "--no-edit", ref], {
-        allow: [1],
-      });
-      if (merge.code === 1 && !(await unmerged(goal)).length)
-        throw new GitError("merge", (merge.stderr || merge.stdout).trim());
-    }
-    if (await merging(goal)) {
-      const files = await unmerged(goal);
-      const left = [...files, ...(await marked(tree, await changed(goal)))];
-      if (left.length) return { kind: "conflict", files: [...new Set(left)] };
-      await git(goal, ["commit", "-q", "--no-edit"]);
-    }
-    const head = (await git(goal, ["rev-parse", "HEAD"])).stdout.trim();
-    const was = (await git({ cwd: repo.top }, ["rev-parse", ref])).stdout.trim();
-    const checkout = await checkedOut(repo, ref);
-    if (checkout) await git({ cwd: checkout }, ["merge", "-q", "--ff-only", head]);
-    else {
-      const ff = await git({ cwd: repo.top }, ["merge-base", "--is-ancestor", was, head], {
-        allow: [1],
-      });
-      if (ff.code === 1) throw new GitError("merge", `${base} moved meanwhile: merge again`);
-      await git({ cwd: repo.top }, ["update-ref", ref, head, was]);
-    }
-    return { kind: "merged" };
+    if (await merging(goal)) return { kind: "conflict", files: await unmerged(goal) };
+    // As git does by default, whatever your own setup says (merge.ff=only would refuse it).
+    const merge = await git(
+      goal,
+      ["-c", "merge.ff=true", "merge", "-q", "--no-edit", `refs/heads/${base}`],
+      { allow: [1] },
+    );
+    if (merge.code === 0) return { kind: "clean" };
+    const files = await unmerged(goal);
+    if (!files.length) throw new GitError("merge", (merge.stderr || merge.stdout).trim());
+    return { kind: "conflict", files };
   });
 }
 
-/** The files a merge under way in a worktree has staged or changed so far. */
-async function changed(at: At): Promise<string[]> {
-  const list = await git(at, ["diff", "--name-only", "-z", "HEAD"]);
-  return list.stdout.split("\0").filter(Boolean);
+/**
+ * Fast-forwards `base` to the goal's branch, the second half of handing the
+ * work back (§5): in the worktree that has it checked out, or by its ref
+ * where none has. What git refuses throws, saying why: changes of yours in
+ * the way, or `base` having commits the goal's branch lacks (it moved
+ * meanwhile, or the merge into the goal's branch wasn't finished).
+ */
+export function fastForward(places: Places, base: string): Promise<void> {
+  return perGoal(places, async () => {
+    const { repo } = places;
+    const ref = `refs/heads/${base}`;
+    const at = await worktreeAt(repo, await setUpGoal(places));
+    const head = (await git(at, ["rev-parse", "HEAD"])).stdout.trim();
+    const checkout = await checkedOut(repo, ref);
+    if (checkout) {
+      await git({ cwd: checkout }, ["merge", "-q", "--ff-only", head]);
+      return;
+    }
+    const was = (await git({ cwd: repo.top }, ["rev-parse", ref])).stdout.trim();
+    const ff = await git({ cwd: repo.top }, ["merge-base", "--is-ancestor", was, head], {
+      allow: [1],
+    });
+    if (ff.code === 1)
+      throw new GitError("merge", `${base} has commits the goal's branch lacks: merge again`);
+    await git({ cwd: repo.top }, ["update-ref", ref, head, was]);
+  });
 }
 
 /** The worktree that has `ref` checked out, if one has. */

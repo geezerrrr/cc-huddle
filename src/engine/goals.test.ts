@@ -28,7 +28,7 @@ import { goalFiles } from "../shared/layout.ts";
 
 /** What the member resolving the hand-back's conflicts does in the goal's worktree, in place of a model's turn. */
 const resolving = vi.hoisted(() => ({
-  run: (_checkout: string, _signal: AbortSignal): Promise<void> => Promise.resolve(),
+  run: (() => Promise.resolve()) as (checkout: string, signal: AbortSignal) => Promise<void>,
 }));
 
 vi.mock("./turns.ts", () => ({
@@ -247,11 +247,11 @@ describe("Goals", () => {
     expect(goal.status).toBe("closed");
   });
 
-  it("have the lead resolve the hand-back's conflicts, then close", async () => {
+  it("have the lead resolve the hand-back's conflicts and finish the merge, then close", async () => {
     await conflicting();
     resolving.run = async (checkout) => {
       await writeFile(path.join(checkout, "README.md"), "roll and mine\n");
-      await git({ cwd: checkout }, ["add", "-A"]);
+      await git({ cwd: checkout, env: ME }, ["commit", "-q", "-am", "Merge main"]);
     };
     await goals.decide(await opened("handBack"), { kind: "decision", option: "merge" });
     await opened("cleanUp");
@@ -262,7 +262,7 @@ describe("Goals", () => {
     );
   });
 
-  it("come back saying why when the lead leaves conflicts", async () => {
+  it("come back with what git says when the lead leaves the merge unfinished", async () => {
     await conflicting();
     resolving.run = () => Promise.resolve();
     const asked = await opened("handBack");
@@ -272,7 +272,7 @@ describe("Goals", () => {
       if (!found) throw new Error("Not back yet");
       return found;
     }, 5000);
-    expect(again.text).toBe("Conflicts are left in README.md");
+    expect(again.text).toContain("git merge");
     expect(core.state.goal.status).toBe("active");
   });
 

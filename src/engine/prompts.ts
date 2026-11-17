@@ -201,7 +201,7 @@ export function handBackPrompt(input: { goal: Goal; cwd: string; files: string[]
   const { goal, cwd, files } = input;
   return `The team's work on the goal "${goal.name}" is done, and is being merged back into the branch "${goal.base}" it was cut from. In the goal's worktree, ${cwd}, "${goal.base}" is being merged into the goal's branch, and the merge stopped on conflicts in: ${files.join(", ")}.
 
-Resolve them. Read both sides' commits (git log, git diff) to see what each side changed and why, and keep what both meant. Check the result as the repository's own instructions say to. Then stage everything and finish the merge with git commit. Change nothing the merge doesn't need.`;
+Resolve them, and finish the merge with git commit.`;
 }
 
 /** A teammate's question, with what the member asked has done on the goal. */

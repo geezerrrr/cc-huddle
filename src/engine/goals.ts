@@ -7,7 +7,7 @@
  */
 import { HAND_BACK, REFUSED, spend, workOf, type Core } from "./core.ts";
 import { lastAcceptance, over, type Work } from "./derive.ts";
-import { handBackGoal, hasWork, removeGoal } from "./git.ts";
+import { fastForward, hasWork, mergeBase, removeGoal } from "./git.ts";
 import { can, GOAL_MACHINE, step } from "./machines.ts";
 import type { Meetings } from "./meetings.ts";
 import { handBackPrompt } from "./prompts.ts";
@@ -252,24 +252,24 @@ export class Goals {
 
   /**
    * Hands the work back (§5): `base` merged into the goal's branch, its
-   * conflicts resolved by the lead in a session of their own, then `base`
-   * fast-forwarded to it. Merged, the goal closes; else it comes back to
+   * conflicts the lead's to resolve and the merge theirs to finish, in a
+   * session of their own, then `base` fast-forwarded to it. Merged, the goal
+   * closes; where git refuses, or the lead's turn fails, it comes back to
    * you, saying why. Paused meanwhile, it stops, to be asked again.
    */
   private async handBack(handing: HandingBack) {
     const { core } = this;
     const { signal } = handing.abort;
+    const { base } = this.goal;
     const by = this.lead;
     try {
-      let merged = await handBackGoal(core.places, this.goal.base, by);
+      const merged = await mergeBase(core.places, base, by);
       if (merged.kind === "conflict") {
         handing.by = by;
         core.changed();
         await this.resolve(by, merged.files, signal);
-        merged = await handBackGoal(core.places, this.goal.base, by);
-        if (merged.kind === "conflict")
-          throw new Error(`Conflicts are left in ${merged.files.join(", ")}`);
       }
+      await fastForward(core.places, base);
       this.let(handing);
       // Paused meanwhile, it closes as it resumes: nothing is left to hand back.
       if (can(GOAL_MACHINE, this.goal.status, "close")) this.close();
