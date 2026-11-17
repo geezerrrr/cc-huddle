@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   busyMembers,
   derive,
+  forkOf,
   meetingResumes,
   over,
   reviewerOf,
@@ -251,6 +252,25 @@ describe("waitsIn", () => {
       { kind: "teammate", by: "bob", questionId: "q1" },
       { kind: "you", questionId: "q2" },
     ]);
+  });
+});
+
+describe("forkOf", () => {
+  it("is the member's own work depended on directly, merged, the one merged last", () => {
+    const own = (id: string, finishedAt: number) =>
+      subtask(id, { status: "done", session: `ann-${id}`, finishedAt });
+    const next = subtask("next", { dependsOn: ["a", "b", "bob", "running"] });
+    const state = work({
+      subtasks: [
+        own("a", 2),
+        own("b", 1),
+        subtask("bob", { assignee: "bob", status: "done", session: "bob-1", finishedAt: 3 }),
+        subtask("running", { status: "running", session: "ann-r" }),
+        next,
+      ],
+    });
+    expect(forkOf(state, next)?.id).toBe("a");
+    expect(forkOf(state, subtask("fresh", { dependsOn: ["bob"] }))).toBeUndefined();
   });
 });
 

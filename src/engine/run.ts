@@ -65,8 +65,9 @@ function teamServer(collaboration: Collaboration, delivered: (handover: Handover
 }
 
 /**
- * Runs a subtask from `opening` (its brief, or why it goes on in `resume`)
- * until it delivers, fails or `signal` stops it. Its own tools are allowed in
+ * Runs a subtask from `opening` (its brief, or why it goes on in `resume`;
+ * with `fork`, its brief in a fork of `resume`) until it delivers, fails or
+ * `signal` stops it. Its own tools are allowed in
  * its session and refused to the subagents it starts; every other call goes
  * through `gate`.
  */
@@ -74,6 +75,7 @@ export async function runSubtask(params: {
   options: MemberOptions;
   opening: string;
   resume?: string;
+  fork?: boolean;
   gate: CanUseTool;
   collaboration: Collaboration;
   listener: TurnListener;
@@ -82,6 +84,8 @@ export async function runSubtask(params: {
   const { options, gate, signal } = params;
   let handover: Handover | undefined;
   let session = params.resume;
+  // Only the first turn forks: the reminder goes on in the fork.
+  let forking = params.fork;
   const decode = turnDecoder(keepingSession(params.listener, (id) => (session = id)));
   const canUseTool: CanUseTool = (name, input, request) => {
     if (!OWN_TOOLS.has(name)) return gate(name, input, request);
@@ -99,6 +103,7 @@ export async function runSubtask(params: {
       {
         ...options,
         resume: session,
+        ...(forking && { forkSession: true }),
         mcpServers: teamServer(params.collaboration, (given) => (handover = given)),
         canUseTool,
       },
@@ -109,6 +114,7 @@ export async function runSubtask(params: {
   let tokens = 0;
   try {
     let outcome = await turn(params.opening);
+    forking = false;
     tokens += outcome.tokens;
     if (outcome.ok && !handover && !signal.aborted) {
       outcome = await turn(DELIVER_REMINDER);

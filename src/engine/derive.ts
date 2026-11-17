@@ -288,6 +288,23 @@ export function upstreamOf(state: Pick<GoalState, "subtasks">, subtask: Subtask)
 }
 
 /**
+ * The subtask whose session a subtask's first run forks (§4.3): of those it
+ * depends on directly, one of its member's own, merged, the one merged last.
+ * None: its first run is a session of its own.
+ */
+export function forkOf(state: Pick<GoalState, "subtasks">, subtask: Subtask): Subtask | undefined {
+  return state.subtasks
+    .filter(
+      (s) =>
+        subtask.dependsOn.includes(s.id) &&
+        s.assignee === subtask.assignee &&
+        s.status === "done" &&
+        s.session !== undefined,
+    )
+    .sort((a, b) => (b.finishedAt ?? 0) - (a.finishedAt ?? 0))[0];
+}
+
+/**
  * Whether a meeting can go on from where it stopped: it stopped before its
  * plan, and its goal is active. Who is busy changes by the minute; it is
  * asked as the meeting starts.

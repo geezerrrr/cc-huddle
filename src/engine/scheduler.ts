@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import {
   busyMembers,
   canSendBack,
+  forkOf,
   planned,
   reviewerOf,
   taskDone,
@@ -429,7 +430,8 @@ export class Scheduler {
 
   /**
    * Runs a subtask in its worktree: from its brief, or in its last session
-   * with why it goes on. Delivered, its worktree is committed in its member's
+   * with why it goes on. A first run carrying on its member's own work forks
+   * that work's session (§4.3). Delivered, its worktree is committed in its member's
    * name and it goes on to be merged.
    */
   private async startRun(subtask: Subtask) {
@@ -438,6 +440,7 @@ export class Scheduler {
     // What it goes on with in its last session; with none kept, your words for it go into the brief.
     const goOn = subtask.session ? subtask.goOn : undefined;
     const notes = goOn ? [] : (subtask.goOn ?? []);
+    const fork = goOn ? undefined : forkOf(core.state, subtask);
     subtask.goOn = undefined;
     this.move(subtask, "start");
     subtask.startedAt = Date.now();
@@ -464,8 +467,9 @@ export class Scheduler {
               plan: this.planOf(task),
               upstream: upstreamOf(core.state, subtask),
               notes,
+              ...(fork && { forked: fork }),
             }),
-        ...(goOn && { resume: subtask.session }),
+        ...(goOn ? { resume: subtask.session } : fork && { resume: fork.session, fork: true }),
         gate: this.questions.gate({
           from: member.name,
           subtaskId: subtask.id,

@@ -191,6 +191,25 @@ describe("Scheduler", () => {
     );
   });
 
+  it("starts a member's work on their own merged work in a fork of its session, in a new worktree", async () => {
+    const s1 = subtask("s1");
+    const s2 = subtask("s2", { dependsOn: ["s1"] });
+    core.state.subtasks.push(s1, s2);
+    vi.mocked(runSubtask)
+      .mockImplementationOnce(async (run) => {
+        run.listener.session?.("glm-s1", "glm-5");
+        return delivering({ "rules.txt": "roll\n" })(run);
+      })
+      .mockImplementationOnce(delivering({ "board.txt": "[]\n" }));
+    scheduler.pump();
+    await settled(s2, "done");
+    const [first, second] = vi.mocked(runSubtask).mock.calls.map(([run]) => run);
+    expect(first).not.toHaveProperty("resume");
+    expect(second).toMatchObject({ resume: "glm-s1", fork: true });
+    expect(second?.options.cwd).not.toBe(first?.options.cwd);
+    expect(second?.opening).toContain('This conversation goes on from your work on "Make s1"');
+  });
+
   it("takes new work as tasks and pending subtasks, their dependencies by key", () => {
     vi.mocked(runSubtask).mockImplementation(working);
     const planned = (key: string, assignee: string, dependsOn: string[] = []) => ({

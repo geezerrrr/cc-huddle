@@ -349,5 +349,5 @@ Checked on Claude Code 2.1.322 and Agent SDK 0.3.322, with a probe plugin and a 
 Left:
 
 - Whether the pane redraws smoothly, polling its socket every 500 ms, while a meeting streams.
-- Whether a member's session forked into a new worktree (§4.3) is found and reads its cache: Claude Code keeps sessions by working folder, and the cache lasts five minutes on an API key, an hour on a subscription within its usage, or as `CLAUDE_CODE_PROMPT_CACHE_TTL` in a member's `env` says. A fork's first turn shows which in `usage.cache_creation`.
+- Whether a member's session forked into a new worktree (§4.3) reads its cache. It is found, though Claude Code keeps sessions by working folder: the fork carries the whole conversation, is told its new working folder, and is kept under it. The cache lasts five minutes on an API key, an hour on a subscription within its usage, or as `CLAUDE_CODE_PROMPT_CACHE_TTL` in a member's `env` says. A fork's first turn shows which in `usage.cache_creation`.
 - What sending a task back does to work already built on it. Today the subtask you pick goes on in its session; nothing else is told.

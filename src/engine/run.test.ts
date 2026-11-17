@@ -116,6 +116,24 @@ describe("runSubtask", () => {
     ]);
   });
 
+  it("forks the session it is given on its first turn only, and is reminded in the fork", async () => {
+    const seen = turns(
+      function* () {
+        yield init("fork");
+        yield done();
+      },
+      async function* ({ call }) {
+        await call("deliver", { summary: "Done now", files: [] });
+        yield done();
+      },
+    );
+    await run({ resume: "s0", fork: true });
+    expect(seen.map((t) => [t.options.resume, t.options.forkSession])).toEqual([
+      ["s0", true],
+      ["fork", undefined],
+    ]);
+  });
+
   it("fails when it still hasn't delivered, or the delivery was refused", async () => {
     const silent: Script = async function* ({ call }) {
       yield init("s1");

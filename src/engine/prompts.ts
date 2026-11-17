@@ -65,6 +65,8 @@ export function taskBrief(input: {
   plan?: string;
   upstream: readonly Upstream[];
   notes: readonly GoOn[];
+  /** Your own subtask whose session this one forks (§4.3). */
+  forked?: Subtask;
 }): string {
   const { goal, task, subtask } = input;
   const lines = [
@@ -77,6 +79,11 @@ export function taskBrief(input: {
     ...(task.ownerAccepts ? ["", OWNER_CHECKS] : []),
     "",
     `Your worktree is ${input.cwd}, on branch ${input.branch}.`,
+    ...(input.forked
+      ? [
+          `This conversation goes on from your work on "${input.forked.title}", which is merged into the goal's branch. This subtask is new work in a new worktree: work there, not in the one before.`,
+        ]
+      : []),
   ];
   if (input.plan)
     lines.push("", "The plan your team agreed on, which this subtask is part of:", "", input.plan);
