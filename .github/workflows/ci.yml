@@ -33,7 +33,8 @@ jobs:
       - uses: jdx/mise-action@v5
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
-      - run: pnpm lint
+      # The mod's types (plugin/tsconfig.json) are written by an interactive Claude Code session, so CI lints all but the mod.
+      - run: pnpm lint --ignore-pattern plugin/hooks
       - run: pnpm format:check
       - name: plugin/dist is built from the source
         run: |
