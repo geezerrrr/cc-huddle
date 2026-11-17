@@ -7,7 +7,7 @@
  */
 import { HAND_BACK, REFUSED, spend, workOf, type Core } from "./core.ts";
 import { lastAcceptance, over, type Work } from "./derive.ts";
-import { fastForward, hasWork, mergeBase, removeGoal } from "./git.ts";
+import { behindBase, fastForward, hasWork, removeGoal } from "./git.ts";
 import { can, GOAL_MACHINE, step } from "./machines.ts";
 import type { Meetings } from "./meetings.ts";
 import { handBackPrompt } from "./prompts.ts";
@@ -31,7 +31,7 @@ const LIFE = "life";
 
 /**
  * The goal handing its work back, or finding out whether it has any to: how
- * to stop it, who resolves its conflicts while one does, and when it ends.
+ * to stop it, who merges its base in while one does, and when it ends.
  */
 interface HandingBack {
   abort: AbortController;
@@ -251,11 +251,11 @@ export class Goals {
   }
 
   /**
-   * Hands the work back (§5): `base` merged into the goal's branch, its
-   * conflicts the lead's to resolve and the merge theirs to finish, in a
-   * session of their own, then `base` fast-forwarded to it. Merged, the goal
-   * closes; where git refuses, or the lead's turn fails, it comes back to
-   * you, saying why. Paused meanwhile, it stops, to be asked again.
+   * Hands the work back (§5): `base` fast-forwarded to the goal's branch,
+   * the lead first merging `base` in, in a session of their own, where it
+   * has commits the goal's branch lacks. Merged, the goal closes; where git
+   * refuses, or the lead's turn fails, it comes back to you, saying why.
+   * Paused meanwhile, it stops, to be asked again.
    */
   private async handBack(handing: HandingBack) {
     const { core } = this;
@@ -263,11 +263,10 @@ export class Goals {
     const { base } = this.goal;
     const by = this.lead;
     try {
-      const merged = await mergeBase(core.places, base, by);
-      if (merged.kind === "conflict") {
+      if (await behindBase(core.places, base)) {
         handing.by = by;
         core.changed();
-        await this.resolve(by, merged.files, signal);
+        await this.resolve(by, signal);
       }
       await fastForward(core.places, base);
       this.let(handing);
@@ -281,14 +280,14 @@ export class Goals {
     }
   }
 
-  /** The member `by` resolves the hand-back's `files` in conflict, in the goal's worktree, in a session of their own. */
-  private async resolve(by: string, files: string[], signal: AbortSignal) {
+  /** The member `by` merges the goal's base into its branch, in the goal's worktree, in a session of their own. */
+  private async resolve(by: string, signal: AbortSignal) {
     const { core } = this;
     const member = core.team.members.find((m) => m.name === by);
     if (!member) throw new Error(`${by} isn't on the goal's team`);
     const cwd = goalFiles(core.places.root).checkout;
     const outcome = await runTurn(
-      handBackPrompt({ goal: this.goal, cwd, files }),
+      handBackPrompt({ goal: this.goal, cwd }),
       {
         ...core.options(member, "merge", cwd),
         canUseTool: this.questions.gate({ from: by, signal }),
@@ -301,7 +300,7 @@ export class Goals {
   }
 
   /**
-   * Who leads the goal's end: resolves its hand-back's conflicts, and puts
+   * Who leads the goal's end: merges its base in to hand the work back, and puts
    * its decisions to you. The host of its meeting, else the member its work
    * was given to.
    */

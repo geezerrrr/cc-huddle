@@ -26,10 +26,10 @@ import {
 } from "./types.ts";
 import { goalFiles } from "../shared/layout.ts";
 
-/** What the member resolving the hand-back's conflicts does in the goal's worktree, in place of a model's turn. */
-const resolving = vi.hoisted(() => ({
-  run: (() => Promise.resolve()) as (checkout: string, signal: AbortSignal) => Promise<void>,
-}));
+/** What the member merging the goal's base in does in the goal's worktree, in place of a model's turn. */
+const resolving: { run: (checkout: string, signal: AbortSignal) => Promise<void> } = vi.hoisted(
+  () => ({ run: () => Promise.resolve() }),
+);
 
 vi.mock("./turns.ts", () => ({
   turnDecoder: () => () => undefined,
@@ -247,9 +247,10 @@ describe("Goals", () => {
     expect(goal.status).toBe("closed");
   });
 
-  it("have the lead resolve the hand-back's conflicts and finish the merge, then close", async () => {
+  it("have the lead merge in what your branch gained meanwhile, then close", async () => {
     await conflicting();
     resolving.run = async (checkout) => {
+      await git({ cwd: checkout, env: ME }, ["merge", "-q", "main"], { allow: [1] });
       await writeFile(path.join(checkout, "README.md"), "roll and mine\n");
       await git({ cwd: checkout, env: ME }, ["commit", "-q", "-am", "Merge main"]);
     };
@@ -276,7 +277,7 @@ describe("Goals", () => {
     expect(core.state.goal.status).toBe("active");
   });
 
-  it("stop resolving as the goal pauses, to ask again as it resumes", async () => {
+  it("stop merging as the goal pauses, to ask again as it resumes", async () => {
     await conflicting();
     const { promise: started, resolve } = Promise.withResolvers<undefined>();
     resolving.run = (_checkout, signal) => {
@@ -332,7 +333,7 @@ async function doneWork(ownerAccepts: boolean, withWork = true, file = "dice.ts"
     const desk = await openDesk(places, "s1");
     await writeFile(path.join(desk, file), "roll\n");
     await commitDesk(places, "s1", "glm", "Roll");
-    await mergeDesk(places, "s1", "glm");
+    await mergeDesk(places, "s1");
   }
   core.state.tasks.push({ id: "t1", title: "Game", outcome: "", ownerAccepts });
   const done: Subtask = {

@@ -295,48 +295,6 @@ export function commitDesk(
   });
 }
 
-/** What merging a delivery came to: merged into the goal, or conflicts (text ones for the member, the rest for you). */
-type MergeOutcome = { kind: "merged" } | { kind: "conflict"; text: string[]; other: string[] };
-
-/** A conflict git wrote into a text file (its lines may end in \r\n). */
-const MARKERS = /^<{7} [\s\S]*?^={7}\r?$[\s\S]*?^>{7} /m;
-
-/** Of the files a merge left in conflict in a subtask's worktree, those still holding conflict markers. */
-export const unresolved = (places: Places, subtaskId: string, files: string[]) =>
-  marked(goalFiles(places.root).desk(subtaskId), files);
-
-/** Of `files` in the worktree `tree`, those holding conflict markers. */
-async function marked(tree: string, files: string[]): Promise<string[]> {
-  const found = await Promise.all(
-    // One deleted on a side has no markers.
-    files.map(async (file) =>
-      MARKERS.test(await ifThere(readFile(path.join(tree, file), "utf8"), "")),
-    ),
-  );
-  return files.filter((_, i) => found[i]);
-}
-
-/** The files a merge left in conflict in a worktree that git still has as unmerged. */
-async function unmerged(at: At): Promise<string[]> {
-  const list = await git(at, ["diff", "--name-only", "-z", "--diff-filter=U"]);
-  return list.stdout.split("\0").filter(Boolean);
-}
-
-/**
- * The conflicts a subtask's worktree has, if any: text ones (markers in them)
- * apart from the rest (binary, deleted on one side).
- */
-async function conflicts(
-  places: Places,
-  subtaskId: string,
-  at: At,
-): Promise<Extract<MergeOutcome, { kind: "conflict" }> | undefined> {
-  const files = await unmerged(at);
-  if (!files.length) return undefined;
-  const text = await unresolved(places, subtaskId, files);
-  return { kind: "conflict", text, other: files.filter((file) => !text.includes(file)) };
-}
-
 /** Takes a subtask's worktree and its branch away. */
 async function removeDesk(places: Places, subtaskId: string) {
   const desk = goalFiles(places.root).desk(subtaskId);
@@ -351,89 +309,30 @@ async function removeDesk(places: Places, subtaskId: string) {
   );
 }
 
+/** Whether `ancestor` is in the history of `commit` (both as git names them). */
+async function contains(at: At, commit: string, ancestor: string): Promise<boolean> {
+  const found = await git(at, ["merge-base", "--is-ancestor", ancestor, commit], { allow: [1] });
+  return found.code === 0;
+}
+
 /**
- * Merges a delivered subtask into its goal: the goal's branch is merged into
- * the subtask's worktree, and when that is clean the goal's branch moves up
- * to it and the worktree goes with its branch. Conflicts stay in the
- * worktree, the merge half done. Safe to run again: a subtask merged already
- * is gone with its branch.
+ * Merges a delivered subtask into its goal (§5): the goal's branch
+ * fast-forwards to the subtask's, and its worktree goes with its branch.
+ * `behind` where the goal's branch has commits the subtask's lacks, for its
+ * member to merge in; what else git refuses throws, saying why. Safe to run
+ * again: a subtask merged already is gone with its branch.
  */
-export function mergeDesk(places: Places, subtaskId: string, by: string): Promise<MergeOutcome> {
+export function mergeDesk(places: Places, subtaskId: string): Promise<"merged" | "behind"> {
   return perGoal(places, async () => {
     const { repo, slug } = places;
-    const folder = goalFiles(places.root).desk(subtaskId);
-    if (!(await exists(folder))) {
-      const branch = subtaskBranch(slug, subtaskId);
-      if (!(await hasBranch(repo, branch))) return { kind: "merged" };
-      await checkOut(repo, folder, branch);
-    }
-    const at = await worktreeAt(repo, folder);
-    const desk = { ...at, env: { ...at.env, ...authorEnv(by) } };
-    if (await merging(desk)) {
-      const found = await conflicts(places, subtaskId, desk);
-      if (found) return found;
-      await git(desk, ["commit", "-q", "--no-edit"]);
-    } else {
-      // As git does by default, whatever your own setup says (merge.ff=only would refuse it).
-      const merge = await git(
-        desk,
-        ["-c", "merge.ff=true", "merge", "-q", "--no-edit", goalBranch(slug)],
-        { allow: [1] },
-      );
-      if (merge.code === 1) {
-        const found = await conflicts(places, subtaskId, desk);
-        if (found) return found;
-        throw new GitError("merge", (merge.stderr || merge.stdout).trim());
-      }
-    }
-    const head = (await git(desk, ["rev-parse", "HEAD"])).stdout.trim();
+    const branch = subtaskBranch(slug, subtaskId);
+    if (!(await hasBranch(repo, branch))) return "merged";
     const goal = await worktreeAt(repo, await setUpGoal(places));
+    const head = (await git(goal, ["rev-parse", `refs/heads/${branch}`])).stdout.trim();
+    if (!(await contains(goal, head, "HEAD"))) return "behind";
     await git(goal, ["merge", "-q", "--ff-only", head]);
     await removeDesk(places, subtaskId);
-    return { kind: "merged" };
-  });
-}
-
-/** A file's path as a pathspec that means only that file (`[id]`, `*` in a name aren't patterns). */
-const literally = (file: string) => `:(literal)${file}`;
-
-/**
- * Your pick for conflicts that can't be merged line by line: the subtask's
- * version or the goal's, for each file (a file deleted on that side goes).
- * Text conflicts stay for the member.
- */
-export function pickSide(
-  places: Places,
-  subtaskId: string,
-  files: string[],
-  side: "ours" | "theirs",
-): Promise<void> {
-  return perGoal(places, async () => {
-    const desk = await worktreeAt(places.repo, goalFiles(places.root).desk(subtaskId));
-    const stages = await git(desk, ["ls-files", "-u", "-z", "--", ...files.map(literally)]);
-    const wanted = side === "ours" ? "2" : "3";
-    const kept = new Set(
-      stages.stdout
-        .split("\0")
-        .filter(Boolean)
-        .map((line) => line.split("\t"))
-        .filter(([meta]) => meta?.split(" ")[2] === wanted)
-        .map(([, file]) => file),
-    );
-    for (const file of files) {
-      if (kept.has(file)) {
-        await git(desk, ["checkout", `--${side}`, "--", literally(file)]);
-        await git(desk, ["add", "--", literally(file)]);
-      } else await git(desk, ["rm", "-q", "--", literally(file)]);
-    }
-  });
-}
-
-/** Calls off a merge a subtask's worktree is in the middle of, to try it again from scratch. */
-export function abortMerge(places: Places, subtaskId: string): Promise<void> {
-  return perGoal(places, async () => {
-    const desk = await worktreeAt(places.repo, goalFiles(places.root).desk(subtaskId));
-    if (await merging(desk)) await git(desk, ["merge", "--abort"]);
+    return "merged";
   });
 }
 
@@ -442,37 +341,17 @@ export function dropDesk(places: Places, subtaskId: string): Promise<void> {
   return perGoal(places, () => removeDesk(places, subtaskId));
 }
 
-/**
- * Merges `base` into the goal's branch in its worktree, the first half of
- * handing the goal's work back (§5): clean, or conflicts left there, the
- * merge half done, for whoever resolves them. A merge left under way by an
- * earlier try is theirs to finish too. What git refuses throws, saying why.
- */
-export function mergeBase(
-  places: Places,
-  base: string,
-  by: string,
-): Promise<{ kind: "clean" } | { kind: "conflict"; files: string[] }> {
+/** Whether `base` has commits the goal's branch lacks, to merge in before handing the work back (§5). */
+export function behindBase(places: Places, base: string): Promise<boolean> {
   return perGoal(places, async () => {
-    const at = await worktreeAt(places.repo, await setUpGoal(places));
-    const goal = { ...at, env: { ...at.env, ...authorEnv(by) } };
-    if (await merging(goal)) return { kind: "conflict", files: await unmerged(goal) };
-    // As git does by default, whatever your own setup says (merge.ff=only would refuse it).
-    const merge = await git(
-      goal,
-      ["-c", "merge.ff=true", "merge", "-q", "--no-edit", `refs/heads/${base}`],
-      { allow: [1] },
-    );
-    if (merge.code === 0) return { kind: "clean" };
-    const files = await unmerged(goal);
-    if (!files.length) throw new GitError("merge", (merge.stderr || merge.stdout).trim());
-    return { kind: "conflict", files };
+    const goal = await worktreeAt(places.repo, await setUpGoal(places));
+    return !(await contains(goal, "HEAD", `refs/heads/${base}`));
   });
 }
 
 /**
- * Fast-forwards `base` to the goal's branch, the second half of handing the
- * work back (§5): in the worktree that has it checked out, or by its ref
+ * Fast-forwards `base` to the goal's branch, handing the goal's work back
+ * (§5): in the worktree that has it checked out, or by its ref
  * where none has. What git refuses throws, saying why: changes of yours in
  * the way, or `base` having commits the goal's branch lacks (it moved
  * meanwhile, or the merge into the goal's branch wasn't finished).
@@ -489,10 +368,7 @@ export function fastForward(places: Places, base: string): Promise<void> {
       return;
     }
     const was = (await git({ cwd: repo.top }, ["rev-parse", ref])).stdout.trim();
-    const ff = await git({ cwd: repo.top }, ["merge-base", "--is-ancestor", was, head], {
-      allow: [1],
-    });
-    if (ff.code === 1)
+    if (!(await contains({ cwd: repo.top }, head, was)))
       throw new GitError("merge", `${base} has commits the goal's branch lacks: merge again`);
     await git({ cwd: repo.top }, ["update-ref", ref, head, was]);
   });

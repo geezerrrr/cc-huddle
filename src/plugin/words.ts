@@ -170,11 +170,6 @@ export function needWords(
             ...(detail && { detail }),
           };
         }
-        case "conflict":
-          return {
-            headline: `Merging "${title ?? ""}" is stuck. What now?`,
-            detail: question.decision.files.join(", "),
-          };
         case "merge":
           return {
             headline: `Merging "${title ?? ""}" is stuck. What now?`,

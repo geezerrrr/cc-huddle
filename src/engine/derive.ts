@@ -32,7 +32,7 @@ export interface Work extends Omit<GoalState, "questions"> {
   meetingsNow: Readonly<Record<string, MeetingNow>>;
   /** The goal's worktree: its branch checked out, where its work can be tried. */
   checkout: string;
-  /** The goal handing its work back now (§4.1): `by`, the member resolving its conflicts, while one is. */
+  /** The goal handing its work back now (§4.1): `by`, the member merging its base in, while one is. */
   handingBack?: { by?: string };
 }
 

@@ -19,13 +19,12 @@ import {
 import { REFUSED, spend, workOf, type Core } from "./core.ts";
 import { errorText } from "../shared/errors.ts";
 import {
-  abortMerge,
   commitDesk,
   dropDesk,
   GitError,
+  goalBranch,
   mergeDesk,
   openDesk,
-  pickSide,
   subtaskBranch,
 } from "./git.ts";
 import { actionEvent, can, step, SUBTASK_MACHINE, type SubtaskEvent } from "./machines.ts";
@@ -246,9 +245,7 @@ export class Scheduler {
     }
     // Deleted work, stopped already: nothing to stop.
     if (!actionEvent(subtask.status, "stop")) return;
-    // A merge under way finishes (stopMerge is only while it waits on you); that one is undone, its worktree back as delivered.
-    if (subtask.status === "waitingInMerge") await abortMerge(this.core.places, subtask.id);
-    // Stopped meanwhile: that stop did it.
+    // A merge under way finishes: stopMerge is only while it waits on you.
     const event = actionEvent(subtask.status, "stop");
     if (!event) return;
     live?.abort.abort();
@@ -271,7 +268,6 @@ export class Scheduler {
       goOn: undefined,
       delivery: undefined,
       review: undefined,
-      conflict: undefined,
     });
     this.core.changed();
     this.pump();
@@ -292,9 +288,8 @@ export class Scheduler {
 
   /**
    * Answers a decision put to you (Questions.answer) and carries it out: on a
-   * stuck review (review again, skip it, send it back), on a merge (keep one
-   * side of the files that can't be merged line by line, or try again), on a
-   * task done (accept it, which is all it takes for work built on it to
+   * stuck review (review again, skip it, send it back), on a merge git
+   * refused (try again, or stop), on a task done (accept it, which is all it takes for work built on it to
    * start; or send one of its subtasks, `sentBack` or else the last one done,
    * back with what to change). Throws as answering does, and when the
    * subtask sent back isn't one done in the task.
@@ -327,13 +322,7 @@ export class Scheduler {
       }
     } else if (subtask.status === "waitingInMerge") {
       if (pick === "stop") await this.stop(subtask);
-      else {
-        if (pick === "retry") await abortMerge(this.core.places, subtask.id);
-        else if (question.decision.kind === "conflict" && (pick === "ours" || pick === "theirs"))
-          await pickSide(this.core.places, subtask.id, question.decision.files, pick);
-        // Stopped meanwhile: that stop stands.
-        if (can(SUBTASK_MACHINE, subtask.status, "remerge")) this.move(subtask, "remerge");
-      }
+      else this.move(subtask, "remerge");
     }
     this.core.changed();
     this.pump();
@@ -457,7 +446,7 @@ export class Scheduler {
       outcome = await runSubtask({
         options: core.options(member, "work", desk),
         opening: goOn
-          ? goOnMessage(goOn, subtask)
+          ? goOnMessage(goOn, goalBranch(goal.slug))
           : taskBrief({
               goal,
               task,
@@ -521,7 +510,6 @@ export class Scheduler {
       for (const reason of held) goOnWith(subtask, reason);
     } else if (outcome.status === "delivered") {
       subtask.delivery = { ...outcome.handover, at: Date.now() };
-      subtask.conflict = undefined;
       this.move(subtask, core.state.goal.settings.review ? "review" : "merge");
     } else {
       this.move(subtask, outcome.status === "failed" ? "fail" : "stop");
@@ -576,33 +564,27 @@ export class Scheduler {
   }
 
   /**
-   * Merges a delivery into its goal's branch. Clean, the subtask is done.
-   * Text conflicts go back to its member, in their session and worktree;
-   * files that can't be merged line by line, or git failing, wait on your
-   * decision.
+   * Merges a delivery into its goal's branch (§5), the goal's branch
+   * fast-forwarding to it: the subtask is done. Behind the goal's branch, it
+   * goes back to its member, in their session, to merge that in; git
+   * refusing otherwise, it waits on your decision.
    */
   private async startMerge(subtask: Subtask) {
     const { core } = this;
     const { end } = this.begin(subtask, "merge");
     try {
       // Git failing is put to you; anything else is a bug, and goes on up.
-      const merged = await mergeDesk(core.places, subtask.id, subtask.assignee).catch(
-        (error: unknown) => {
-          if (error instanceof GitError) return error;
-          throw error;
-        },
-      );
+      const merged = await mergeDesk(core.places, subtask.id).catch((error: unknown) => {
+        if (error instanceof GitError) return error;
+        throw error;
+      });
       if (merged instanceof GitError) this.ask(subtask, DECISIONS.failedMerge(), errorText(merged));
-      else if (merged.kind === "merged") {
+      else if (merged === "merged") {
         this.move(subtask, "merged");
-        subtask.conflict = undefined;
         this.finished(subtask);
-      } else if (merged.other.length) {
-        this.ask(subtask, DECISIONS.mergeFiles(merged.other), "");
       } else {
-        this.move(subtask, "conflict");
-        subtask.conflict = { files: merged.text };
-        if (subtask.session) goOnWith(subtask, { why: "conflict" });
+        this.move(subtask, "behind");
+        if (subtask.session) goOnWith(subtask, { why: "behind" });
       }
     } finally {
       end();

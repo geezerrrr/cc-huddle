@@ -312,7 +312,7 @@ describe("Scheduler", () => {
     expect(s1.error).toContain("../escape.txt, missing.txt");
   });
 
-  it("sends a text conflict back to its member, who resolves it in the same session", async () => {
+  it("sends a delivery behind the goal back to its member, who merges the goal in in the same session", async () => {
     const s1 = subtask("s1");
     const s2 = subtask("s2", { assignee: "sonnet" });
     core.state.subtasks.push(s1, s2);
@@ -326,9 +326,9 @@ describe("Scheduler", () => {
       })
       .mockImplementationOnce(async (run) => {
         second = run;
-        expect(await run.collaboration.checkDelivery(["README.md"])).toMatchObject({
-          refused: expect.stringContaining("conflict markers are still in README.md") as string,
-        });
+        // The member merges as they see fit; here, by hand, leaving the commit to delivering.
+        const cwd = run.options.cwd ?? "";
+        await git({ cwd }, ["merge", "-q", goalBranch(core.places.slug)], { allow: [1] });
         return delivering({ "README.md": "from both\n" })(run);
       });
     s2.session = "sonnet-1";
@@ -337,7 +337,7 @@ describe("Scheduler", () => {
       expect(second).toBeDefined();
     });
     expect(second?.resume).toBe("sonnet-1");
-    expect(second?.opening).toContain("left conflicts in README.md");
+    expect(second?.opening).toContain(`${goalBranch(core.places.slug)}, moved on`);
     await settled(s2, "done");
     expect(await onGoal("README.md")).toBe("from both\n");
   });
@@ -602,34 +602,6 @@ describe("Scheduler", () => {
           "The user sent your task back, asking for:\nBigger numbers\nMake those changes, then deliver again.",
       });
       await settled(s1, "done");
-    });
-
-    it("keep one side of a file that can't be merged line by line", async () => {
-      const s1 = subtask("s1");
-      const s2 = subtask("s2", { assignee: "sonnet" });
-      core.state.subtasks.push(s1, s2);
-      vi.mocked(runSubtask)
-        .mockImplementationOnce(delivering({ "logo.bin": "glm\0\n" }))
-        .mockImplementationOnce(async (run) => {
-          await settled(s1, "done");
-          return delivering({ "logo.bin": "sonnet\0\n" })(run);
-        });
-      scheduler.pump();
-      await eventually(() => {
-        expect(core.state.questions).toMatchObject([
-          {
-            kind: "decision",
-            decision: {
-              kind: "conflict",
-              options: ["ours", "theirs", "retry"],
-              files: ["logo.bin"],
-            },
-          },
-        ]);
-      });
-      await decide(core.state.questions[0]?.id ?? "", { option: "ours" });
-      await settled(s2, "done");
-      expect(await onGoal("logo.bin")).toBe("sonnet\0\n");
     });
   });
 

@@ -55,11 +55,11 @@ export const SUBTASK_MACHINE = {
   /** The reviewer, or you, sent it back. */
   reject: { from: ["reviewing", "waitingInReview"], to: "pending" },
   merged: { from: ["merging"], to: "done" },
-  /** Merging it left text conflicts for its assignee to resolve. */
-  conflict: { from: ["merging"], to: "pending" },
-  /** Files it can't merge line by line, or git failing: it waits on your decision. */
+  /** The goal's branch has commits its branch lacks: back to its assignee to merge them in. */
+  behind: { from: ["merging"], to: "pending" },
+  /** Git refusing the fast-forward otherwise: it waits on your decision. */
   askMerge: { from: ["merging"], to: "waitingInMerge" },
-  /** You kept a side, or had it merged again. */
+  /** You had it merged again. */
   remerge: { from: ["waitingInMerge"], to: "merging" },
   /** From the start: no session, delivery or worktree. */
   retry: { from: ["failed", "stopped", "stoppedInReview", "stoppedInMerge"], to: "pending" },

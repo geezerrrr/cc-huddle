@@ -58,7 +58,7 @@ export function statusText(work: Work): string {
   ];
   if (work.handingBack)
     lines.push(
-      `  Merging back into ${goal.base}${work.handingBack.by ? `: ${work.handingBack.by} resolves its conflicts` : ""}`,
+      `  Merging back into ${goal.base}${work.handingBack.by ? `: ${work.handingBack.by} merges it in first` : ""}`,
     );
   for (const meeting of work.meetings.filter((m) => m.status !== "approved"))
     lines.push(

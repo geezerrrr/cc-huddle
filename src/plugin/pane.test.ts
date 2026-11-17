@@ -431,9 +431,9 @@ describe("paneTeam", () => {
         subtaskId: "rules",
       }),
       question("q6", {
-        text: "a.png\nb.png",
+        text: "git merge: Not possible to fast-forward",
         kind: "decision",
-        decision: DECISIONS.mergeFiles(["a.png", "b.png"]),
+        decision: DECISIONS.failedMerge(),
         subtaskId: "rules",
       }),
     ];
@@ -449,11 +449,10 @@ describe("paneTeam", () => {
     });
     expect(merge).toMatchObject({
       headline: 'Merging "rules" is stuck. What now?',
-      detail: "a.png, b.png",
+      detail: "git merge: Not possible to fast-forward",
       options: [
-        { value: "ours", label: "Keep ours" },
-        { value: "theirs", label: "Take theirs" },
         { value: "retry", label: "Retry" },
+        { value: "stop", label: "Stop" },
       ],
     });
     expect(merge).not.toHaveProperty("note");

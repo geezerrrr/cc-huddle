@@ -28,7 +28,7 @@ export type SessionKind = "work" | "readOnly" | "merge";
 const called = (member: Member) => `${member.name} (${member.role.title})`;
 
 const TASK_WAYS = `# How you work on a subtask
-- You work in a git worktree of your own, on a branch cut from the goal's branch, which is merged into the goal's branch once you deliver. Teammates working at the same time each have theirs, so you never get in each other's way. Stay in yours.
+- You work in a git worktree of your own, on a branch cut from the goal's branch; once you deliver, the goal's branch moves up to yours. Teammates working at the same time each have theirs, so you never get in each other's way. Stay in yours.
 - You needn't commit: delivering commits whatever you leave uncommitted, under your name.
 - When you need information or a decision from a teammate (an interface, a design detail), ask them with ask_teammate. It waits for their answer.
 - When you need the user to decide something or give you what only they have, ask with AskUserQuestion, offering options, and wait for the answer. Don't just write that you are waiting: the user may not be watching.
@@ -105,7 +105,7 @@ export function taskBrief(input: {
  * The first message of a run that goes on in the session of the one before
  * (Subtask.goOn): each thing that came up since, once, in the order it came.
  */
-export function goOnMessage(reasons: readonly GoOn[], subtask: Subtask): string {
+export function goOnMessage(reasons: readonly GoOn[], goalBranch: string): string {
   const said = ({ why, note = "" }: GoOn) => {
     switch (why) {
       case "held":
@@ -114,8 +114,8 @@ export function goOnMessage(reasons: readonly GoOn[], subtask: Subtask): string 
         return "The user asks you to go on from where you stopped.";
       case "rejected":
         return `The review sent your delivery back. Fix what it says, then deliver again:\n${note}`;
-      case "conflict":
-        return `Merging your delivery into the goal's branch left conflicts in ${subtask.conflict?.files.join(", ") ?? ""}. The merge is under way in your worktree, the conflict markers in those files. Resolve them, keeping what both sides meant, then deliver again.`;
+      case "behind":
+        return `The goal's branch, ${goalBranch}, moved on before your delivery merged. Merge it into your branch, then deliver again.`;
       case "revised":
         return `The user sent your task back, asking for:\n${note}\nMake those changes, then deliver again.`;
     }
@@ -160,8 +160,6 @@ export const TEAMMATE_REPLIES = {
 export const DELIVERY_REFUSED = {
   missing: (desk: string, files: readonly string[]) =>
     `Not delivered: these aren't files in your worktree (${desk}): ${files.join(", ")}. Deliver the files that are there.`,
-  conflicted: (files: readonly string[]) =>
-    `Not delivered: conflict markers are still in ${files.join(", ")}. Resolve them first, keeping what both sides meant, then deliver.`,
 };
 
 /** What a member hears back from a call that waited on you. */
@@ -196,12 +194,10 @@ Files: ${files}
 Their worktree is ${input.cwd}. Read the files, and whatever else you need there, to check the work against the criteria, and stop once you can tell. Pass it when it meets them, even if you would have done it differently; send it back only for what really falls short, and say exactly what to fix.`;
 }
 
-/** What the member resolving a goal's hand-back is told (§5): the merge stopped on conflicts in `files`. */
-export function handBackPrompt(input: { goal: Goal; cwd: string; files: string[] }): string {
-  const { goal, cwd, files } = input;
-  return `The team's work on the goal "${goal.name}" is done, and is being merged back into the branch "${goal.base}" it was cut from. In the goal's worktree, ${cwd}, "${goal.base}" is being merged into the goal's branch, and the merge stopped on conflicts in: ${files.join(", ")}.
-
-Resolve them, and finish the merge with git commit.`;
+/** What the member merging a goal's work back is told (§5): its base has commits the goal's branch lacks. */
+export function handBackPrompt(input: { goal: Goal; cwd: string }): string {
+  const { goal, cwd } = input;
+  return `The team's work on the goal "${goal.name}" is done, to be handed back into the branch "${goal.base}" it was cut from, which has moved on meanwhile. In the goal's worktree, ${cwd}, merge "${goal.base}" into the goal's branch.`;
 }
 
 /** A teammate's question, with what the member asked has done on the goal. */

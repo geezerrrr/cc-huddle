@@ -110,8 +110,6 @@ export type HuddleOption =
   | "rereview"
   | "skip"
   | "sendBack"
-  | "ours"
-  | "theirs"
   | "retry"
   | "stop"
   | "accept"

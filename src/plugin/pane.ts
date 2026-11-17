@@ -462,8 +462,6 @@ const OPTION_LABELS: Record<PermissionOption | DecisionOption, string> = {
   rereview: "Review again",
   skip: "Skip the review",
   sendBack: "Send back",
-  ours: "Keep ours",
-  theirs: "Take theirs",
   retry: "Retry",
   stop: "Stop",
   accept: "Accept",

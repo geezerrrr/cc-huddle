@@ -98,9 +98,10 @@ export type Delivery = Handover & { at: number };
 /**
  * Why a subtask's next run goes on in its last session instead of starting
  * over: held (its goal paused), you went on, the review (or you) sent it
- * back, a merge left conflicts, or you sent its task back with what to change.
+ * back, the goal's branch moved on before it merged, or you sent its task
+ * back with what to change.
  */
-type GoOnReason = "held" | "continued" | "rejected" | "conflict" | "revised";
+type GoOnReason = "held" | "continued" | "rejected" | "behind" | "revised";
 
 /** One reason a subtask goes on in its session, with what it carries (the notes, the files, your words). */
 export interface GoOn {
@@ -130,8 +131,6 @@ export interface Subtask {
   delivery?: Delivery;
   /** The reviewer's last word: how many times it was sent back, and why. */
   review?: { rounds: number; notes?: string };
-  /** Merging it left these text files in conflict, for its assignee to resolve. */
-  conflict?: { files: string[] };
   error?: string;
   /** The session its last run was in. */
   session?: string;
@@ -239,8 +238,6 @@ export const DECISION_OPTIONS = [
   "rereview",
   "skip",
   "sendBack",
-  "ours",
-  "theirs",
   "retry",
   "stop",
   "accept",
@@ -257,17 +254,14 @@ export type DecisionOption = (typeof DECISION_OPTIONS)[number];
 /**
  * A decision: what it offers, and the option a note typed instead of a pick
  * goes with, `needed` where that option is no answer without one. On a
- * subtask: a review stuck or failed, a merge with files it can't merge line
- * by line (`conflict`, its `files`) or one git failed, a task done. On the
- * goal (§4.1): handing its work back, and cleaning up once it has.
+ * subtask: a review stuck or failed, a merge git refused, a task done. On
+ * the goal (§4.1): handing its work back, and cleaning up once it has.
  */
-export type Decision = {
+export interface Decision {
+  kind: "review" | "merge" | "delivery" | "handBack" | "cleanUp";
   options: DecisionOption[];
   note?: { option: "sendBack" | "revise"; needed?: true };
-} & (
-  | { kind: "review" | "merge" | "delivery" | "handBack" | "cleanUp" }
-  | { kind: "conflict"; files: string[] }
-);
+}
 
 /** The decisions there are, each as it is put to you. */
 export const DECISIONS = {
@@ -283,13 +277,7 @@ export const DECISIONS = {
     options: ["rereview", "skip", "sendBack"],
     note: { option: "sendBack", needed: true },
   }),
-  /** Files a merge can't take line by line: keep one side, or merge again. */
-  mergeFiles: (files: string[]): Decision => ({
-    kind: "conflict",
-    options: ["ours", "theirs", "retry"],
-    files,
-  }),
-  /** A merge git failed on: try again, or stop the subtask, its delivery standing. */
+  /** A merge git refused: try again, or stop the subtask, its delivery standing. */
   failedMerge: (): Decision => ({ kind: "merge", options: ["retry", "stop"] }),
   /** A task done that you accept: accept it, or send it back saying what to change. */
   delivery: (): Decision => ({

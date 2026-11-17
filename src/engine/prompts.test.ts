@@ -140,13 +140,15 @@ describe("goOnMessage", () => {
         { why: "rejected", note: "Scores overlap" },
         { why: "held" },
         { why: "revised", note: "Use blue" },
+        { why: "behind" },
       ],
-      subtask("s1"),
+      "huddle/dice/main",
     );
     expect(message.split("\n\n")).toEqual([
       "Your work was paused and now goes on. Pick up where you left off.",
       "The review sent your delivery back. Fix what it says, then deliver again:\nScores overlap",
       "The user sent your task back, asking for:\nUse blue\nMake those changes, then deliver again.",
+      "The goal's branch, huddle/dice/main, moved on before your delivery merged. Merge it into your branch, then deliver again.",
     ]);
   });
 });

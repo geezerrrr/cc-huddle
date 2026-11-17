@@ -1,15 +1,14 @@
 /**
  * What a running member does with its team (docs/design.md §4.3): asks a
  * teammate, who answers in a read-only session in the goal's worktree, and
- * hands its work over, taken only once its files are there and the conflicts
- * a merge left are resolved.
+ * hands its work over, taken only once its files are there.
  */
 import { stat } from "node:fs/promises";
 import path from "node:path";
 import { errorText } from "../shared/errors.ts";
 import { ifThere } from "../shared/files.ts";
 import { spend, type Core } from "./core.ts";
-import { openGoal, unresolved } from "./git.ts";
+import { openGoal } from "./git.ts";
 import { DELIVERY_REFUSED, TEAMMATE_REPLIES, teammateQuestion } from "./prompts.ts";
 import type { Questions } from "./questions.ts";
 import type { Collaboration } from "./run.ts";
@@ -85,9 +84,5 @@ async function checkDelivery(core: Core, subtask: Subtask, desk: string, files: 
     else missing.push(file);
   }
   if (missing.length) return { refused: DELIVERY_REFUSED.missing(desk, missing) };
-  const left = subtask.conflict
-    ? await unresolved(core.places, subtask.id, subtask.conflict.files)
-    : [];
-  if (left.length) return { refused: DELIVERY_REFUSED.conflicted(left) };
   return { files: [...new Set(kept)] };
 }
