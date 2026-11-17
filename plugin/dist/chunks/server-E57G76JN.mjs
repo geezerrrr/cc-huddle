@@ -99,17 +99,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path8) {
-      const ctrl = callVisitor(key, node, visitor, path8);
+    function visit_(key, node, visitor, path7) {
+      const ctrl = callVisitor(key, node, visitor, path7);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path8, ctrl);
-        return visit_(key, ctrl, visitor, path8);
+        replaceNode(key, path7, ctrl);
+        return visit_(key, ctrl, visitor, path7);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path8 = Object.freeze(path8.concat(node));
+          path7 = Object.freeze(path7.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = visit_(i, node.items[i], visitor, path8);
+            const ci = visit_(i, node.items[i], visitor, path7);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -120,13 +120,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path8 = Object.freeze(path8.concat(node));
-          const ck = visit_("key", node.key, visitor, path8);
+          path7 = Object.freeze(path7.concat(node));
+          const ck = visit_("key", node.key, visitor, path7);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path8);
+          const cv = visit_("value", node.value, visitor, path7);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -147,17 +147,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path8) {
-      const ctrl = await callVisitor(key, node, visitor, path8);
+    async function visitAsync_(key, node, visitor, path7) {
+      const ctrl = await callVisitor(key, node, visitor, path7);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path8, ctrl);
-        return visitAsync_(key, ctrl, visitor, path8);
+        replaceNode(key, path7, ctrl);
+        return visitAsync_(key, ctrl, visitor, path7);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path8 = Object.freeze(path8.concat(node));
+          path7 = Object.freeze(path7.concat(node));
           for (let i = 0; i < node.items.length; ++i) {
-            const ci = await visitAsync_(i, node.items[i], visitor, path8);
+            const ci = await visitAsync_(i, node.items[i], visitor, path7);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -168,13 +168,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path8 = Object.freeze(path8.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path8);
+          path7 = Object.freeze(path7.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path7);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path8);
+          const cv = await visitAsync_("value", node.value, visitor, path7);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -201,23 +201,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path8) {
+    function callVisitor(key, node, visitor, path7) {
       if (typeof visitor === "function")
-        return visitor(key, node, path8);
+        return visitor(key, node, path7);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path8);
+        return visitor.Map?.(key, node, path7);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path8);
+        return visitor.Seq?.(key, node, path7);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path8);
+        return visitor.Pair?.(key, node, path7);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path8);
+        return visitor.Scalar?.(key, node, path7);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path8);
+        return visitor.Alias?.(key, node, path7);
       return void 0;
     }
-    function replaceNode(key, path8, node) {
-      const parent = path8[path8.length - 1];
+    function replaceNode(key, path7, node) {
+      const parent = path7[path7.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -829,10 +829,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path8, value) {
+    function collectionFromPath(schema, path7, value) {
       let v = value;
-      for (let i = path8.length - 1; i >= 0; --i) {
-        const k = path8[i];
+      for (let i = path7.length - 1; i >= 0; --i) {
+        const k = path7[i];
         if (typeof k === "number" && Number.isInteger(k) && k >= 0) {
           const a = [];
           a[k] = v;
@@ -851,7 +851,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path8) => path8 == null || typeof path8 === "object" && !!path8[Symbol.iterator]().next().done;
+    var isEmptyPath = (path7) => path7 == null || typeof path7 === "object" && !!path7[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -881,11 +881,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path8, value) {
-        if (isEmptyPath(path8))
+      addIn(path7, value) {
+        if (isEmptyPath(path7))
           this.add(value);
         else {
-          const [key, ...rest] = path8;
+          const [key, ...rest] = path7;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -899,8 +899,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path8) {
-        const [key, ...rest] = path8;
+      deleteIn(path7) {
+        const [key, ...rest] = path7;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -914,8 +914,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path8, keepScalar) {
-        const [key, ...rest] = path8;
+      getIn(path7, keepScalar) {
+        const [key, ...rest] = path7;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -933,8 +933,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path8) {
-        const [key, ...rest] = path8;
+      hasIn(path7) {
+        const [key, ...rest] = path7;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -944,8 +944,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path8, value) {
-        const [key, ...rest] = path8;
+      setIn(path7, value) {
+        const [key, ...rest] = path7;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -3460,9 +3460,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path8, value) {
+      addIn(path7, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path8, value);
+          this.contents.addIn(path7, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3537,14 +3537,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path8) {
-        if (Collection.isEmptyPath(path8)) {
+      deleteIn(path7) {
+        if (Collection.isEmptyPath(path7)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path8) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path7) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3559,10 +3559,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path8, keepScalar) {
-        if (Collection.isEmptyPath(path8))
+      getIn(path7, keepScalar) {
+        if (Collection.isEmptyPath(path7))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path8, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path7, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3573,10 +3573,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path8) {
-        if (Collection.isEmptyPath(path8))
+      hasIn(path7) {
+        if (Collection.isEmptyPath(path7))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path8) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path7) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3593,13 +3593,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path8, value) {
-        if (Collection.isEmptyPath(path8)) {
+      setIn(path7, value) {
+        if (Collection.isEmptyPath(path7)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path8), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path7), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path8, value);
+          this.contents.setIn(path7, value);
         }
       }
       /**
@@ -5560,9 +5560,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path8) => {
+    visit.itemAtPath = (cst, path7) => {
       let item = cst;
-      for (const [field, index] of path8) {
+      for (const [field, index] of path7) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5571,23 +5571,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path8) => {
-      const parent = visit.itemAtPath(cst, path8.slice(0, -1));
-      const field = path8[path8.length - 1][0];
+    visit.parentCollection = (cst, path7) => {
+      const parent = visit.itemAtPath(cst, path7.slice(0, -1));
+      const field = path7[path7.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path8, item, visitor) {
-      let ctrl = visitor(item, path8);
+    function _visit(path7, item, visitor) {
+      let ctrl = visitor(item, path7);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i = 0; i < token.items.length; ++i) {
-            const ci = _visit(Object.freeze(path8.concat([[field, i]])), token.items[i], visitor);
+            const ci = _visit(Object.freeze(path7.concat([[field, i]])), token.items[i], visitor);
             if (typeof ci === "number")
               i = ci - 1;
             else if (ci === BREAK)
@@ -5598,10 +5598,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path8);
+            ctrl = ctrl(item, path7);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path8) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path7) : ctrl;
     }
     exports.visit = visit;
   }
@@ -7907,17 +7907,6 @@ async function worktreeAt(repo, tree) {
   if (!entry) throw new GitError("worktree", `${tree} isn't a worktree of ${repo.top}`);
   return { cwd: tree, env: { GIT_DIR: entry, GIT_WORK_TREE: tree } };
 }
-var merging = (at) => verifies(at, "MERGE_HEAD");
-function commitDesk(places, subtaskId, by, message) {
-  return perGoal(places, async () => {
-    const at = await worktreeAt(places.repo, goalFiles(places.root).desk(subtaskId));
-    const signed = { ...at, env: { ...at.env, ...authorEnv(by) } };
-    await git(signed, ["add", "-A"]);
-    const staged = await git(signed, ["diff", "--cached", "--quiet"], { allow: [1] });
-    if (staged.code === 1 || await merging(signed))
-      await git(signed, ["commit", "-q", "--allow-empty", "-m", message]);
-  });
-}
 async function removeDesk(places, subtaskId) {
   const desk = goalFiles(places.root).desk(subtaskId);
   await unlist(places.repo, desk);
@@ -8173,7 +8162,7 @@ var toolText = (text2) => ({ content: [{ type: "text", text: text2 }] });
 var called = (member) => `${member.name} (${member.role.title})`;
 var TASK_WAYS = `# How you work on a subtask
 - You work in a git worktree of your own, on a branch cut from the goal's branch; once you deliver, the goal's branch moves up to yours. Teammates working at the same time each have theirs, so you never get in each other's way. Stay in yours.
-- You needn't commit: delivering commits whatever you leave uncommitted, under your name.
+- What you deliver is what you have committed on your branch.
 - When you need information or a decision from a teammate (an interface, a design detail), ask them with ask_teammate. It waits for their answer.
 - When you need the user to decide something or give you what only they have, ask with AskUserQuestion, offering options, and wait for the answer. Don't just write that you are waiting: the user may not be watching.
 - When you are done, call deliver with a summary of a few sentences (what you did, anything to watch out for) and the files that are the result. Your subtask isn't done until you deliver; then end your turn.`;
@@ -8260,9 +8249,6 @@ var TEAMMATE_REPLIES = {
   unknown: (name, others) => `There's no teammate called "${name}". Your teammates: ${others.join(", ") || "none"}.`,
   answered: (name, text2) => `${name} answered: ${text2}`,
   failed: (name, error) => `${name} couldn't answer just now: ${error}`
-};
-var DELIVERY_REFUSED = {
-  missing: (desk, files) => `Not delivered: these aren't files in your worktree (${desk}): ${files.join(", ")}. Deliver the files that are there.`
 };
 var PERMISSION_REPLIES = {
   /** Its turn ended first. */
@@ -8413,6 +8399,10 @@ Requirements:
 - plan_markdown is the plan document for the user and the team: the goal and scope; what was decided, why, and what was turned down; where people didn't agree and how you ruled; what the meeting didn't get to; then who does what, dependencies and risks.
 - summary states the outcome in one sentence.`;
 }
+var planAgain = (faults) => `The team can't carry out this plan as written:
+${faults.map((fault) => `- ${fault}`).join("\n")}
+
+Write the plan again with these fixed.`;
 var PLAN_FIELDS = {
   summary: "The outcome in one sentence",
   markdown: "The plan document",
@@ -9324,42 +9314,50 @@ function loopingDependencies(tasks) {
   for (const key of waitsOn.keys()) if (!state.has(key)) follow(key);
   return loops;
 }
-function soundPlan(plan, loops) {
-  const used = /* @__PURE__ */ new Set();
-  const tasks = plan.tasks.filter((task) => task.subtasks.length).map((task, n) => ({
-    title: task.title || `Task ${String(n + 1)}`,
-    outcome: task.outcome,
-    ownerAccepts: task.owner_accepts,
-    subtasks: task.subtasks.map((sub, i) => {
-      let key = sub.key || `t${String(n + 1)}-${String(i + 1)}`;
-      while (used.has(key)) key = `${key}'`;
-      used.add(key);
-      return {
-        key,
-        title: sub.title || `Subtask ${String(i + 1)}`,
-        description: sub.description,
-        assignee: sub.assignee,
-        dependsOn: sub.depends_on,
-        acceptance: sub.acceptance
-      };
-    })
-  }));
-  if (!tasks.length) throw new Error("The plan has no tasks");
-  const subtasks = tasks.flatMap((task) => task.subtasks);
-  for (const subtask2 of subtasks)
-    subtask2.dependsOn = [...new Set(subtask2.dependsOn)].filter(
-      (key) => key !== subtask2.key && used.has(key)
+function planFaults(plan) {
+  const faults = [];
+  if (!plan.tasks.length) faults.push("It has no tasks.");
+  for (const task of plan.tasks)
+    if (!task.subtasks.length) faults.push(`The task "${task.title}" has no subtasks.`);
+  const subtasks = plan.tasks.flatMap((task) => task.subtasks);
+  const keys = subtasks.map((s) => s.key);
+  if (keys.includes("")) faults.push("A subtask has no key.");
+  const twice = [...new Set(keys.filter((key, i) => key && keys.indexOf(key) !== i))];
+  if (twice.length) faults.push(`These keys are used more than once: ${twice.join(", ")}.`);
+  const unknown = subtasks.flatMap(
+    (s) => s.depends_on.filter((key) => !keys.includes(key)).map((key) => `${s.key} on ${key}`)
+  );
+  if (unknown.length)
+    faults.push(`These dependencies name a key no subtask has: ${unknown.join(", ")}.`);
+  if (faults.length) return faults;
+  const looping = loopingDependencies(
+    plan.tasks.map((task) => ({
+      ownerAccepts: task.owner_accepts,
+      subtasks: task.subtasks.map((s) => ({ key: s.key, dependsOn: s.depends_on }))
+    }))
+  );
+  if (looping.length)
+    faults.push(
+      `These dependencies go round in a loop, a task the user accepts counting as waited on whole: ${looping.map(([key, dependency]) => `${key} on ${dependency}`).join(", ")}.`
     );
-  const looping = loopingDependencies(tasks);
-  if (looping.length && loops === "refuse")
-    throw new Error(
-      `These dependencies go round in a loop, counting a task you accept as waited on whole: ${looping.map(([key, dependency]) => `${key} on ${dependency}`).join(", ")}. Drop them, or accept fewer tasks.`
-    );
-  for (const [key, dependency] of looping) {
-    const subtask2 = subtasks.find((s) => s.key === key);
-    if (subtask2) subtask2.dependsOn = subtask2.dependsOn.filter((k) => k !== dependency);
-  }
-  return { summary: plan.summary, markdown: plan.plan_markdown, tasks };
+  return faults;
+}
+function soundPlan(plan) {
+  const faults = planFaults(plan);
+  if (faults.length) throw new Error(`The plan can't be carried out: ${faults.join(" ")}`);
+  return {
+    summary: plan.summary,
+    markdown: plan.plan_markdown,
+    tasks: plan.tasks.map((task) => ({
+      title: task.title,
+      outcome: task.outcome,
+      ownerAccepts: task.owner_accepts,
+      subtasks: task.subtasks.map(({ depends_on, ...subtask2 }) => ({
+        ...subtask2,
+        dependsOn: depends_on
+      }))
+    }))
+  };
 }
 
 // src/engine/meeting-run.ts
@@ -9461,9 +9459,15 @@ var MeetingRun = class {
     this.now.hands = [];
     const names = this.ctx.members.map((m) => m.name);
     const schema = hostPlanSchema(names);
-    const closing = await this.speak(this.host, meetingClosing(this.ctx), { schema });
-    this.signal.throwIfAborted();
-    const plan = soundPlan(hostWritten(schema.parse(closing.structured)), "drop");
+    const write = async (prompt) => {
+      const closing = await this.speak(this.host, prompt, { schema });
+      this.signal.throwIfAborted();
+      return hostWritten(schema.parse(closing.structured));
+    };
+    let written2 = await write(meetingClosing(this.ctx));
+    const faults = planFaults(written2);
+    if (faults.length) written2 = await write(planAgain(faults));
+    const plan = soundPlan(written2);
     this.said(this.host, plan.summary, "summary");
     this.meeting.seats = void 0;
     return plan;
@@ -9684,11 +9688,12 @@ var Meetings = class {
   /**
    * Your changes to a plan under review: `plan` is the whole plan, which may
    * give work to any member and names the tasks you accept, as the
-   * change_plan tool took it (planSchema). Dependencies that loop are refused.
+   * change_plan tool took it (planSchema). One the scheduler can't carry out
+   * is refused, saying why.
    */
   change(id, plan) {
     const { meeting: meeting2 } = this.underReview(id, "change");
-    meeting2.plan = soundPlan(plan, "refuse");
+    meeting2.plan = soundPlan(plan);
     this.core.changed();
   }
   /**
@@ -10251,11 +10256,9 @@ function teamServer(collaboration, delivered) {
         summary: z5.string().trim().min(1).describe(RUN_TOOLS.deliver.summary),
         files: z5.array(z5.string()).describe(RUN_TOOLS.deliver.files)
       },
-      async ({ summary, files }) => {
-        const checked = await collaboration.checkDelivery(files);
-        if ("refused" in checked) return toolText(checked.refused);
-        delivered({ summary, files: checked.files });
-        return toolText(RUN_TOOLS.deliver.done);
+      ({ summary, files }) => {
+        delivered({ summary, files });
+        return Promise.resolve(toolText(RUN_TOOLS.deliver.done));
       }
     )
   ]);
@@ -10308,12 +10311,9 @@ async function runSubtask(params) {
 }
 
 // src/engine/collaboration.ts
-import { stat } from "node:fs/promises";
-import path4 from "node:path";
 function collaborationOf(core, questions, run2) {
   return {
-    askTeammate: (name, question) => askTeammate(core, questions, run2, name, question),
-    checkDelivery: (files) => checkDelivery(core, run2.subtask, run2.desk, files)
+    askTeammate: (name, question) => askTeammate(core, questions, run2, name, question)
   };
 }
 async function askTeammate(core, questions, { from, subtask: subtask2, signal }, name, question) {
@@ -10348,19 +10348,6 @@ async function askTeammate(core, questions, { from, subtask: subtask2, signal },
   } catch (error) {
     return TEAMMATE_REPLIES.failed(target.name, errorText(error));
   }
-}
-async function checkDelivery(core, subtask2, desk, files) {
-  const kept = [];
-  const missing = [];
-  for (const file of files) {
-    const relative = path4.relative(desk, path4.resolve(desk, file));
-    const inside = relative !== "" && !relative.startsWith("..") && !path4.isAbsolute(relative);
-    const there = inside && (await ifThere(stat(path4.join(desk, relative)), void 0))?.isFile() === true;
-    if (there) kept.push(relative.split(path4.sep).join("/"));
-    else missing.push(file);
-  }
-  if (missing.length) return { refused: DELIVERY_REFUSED.missing(desk, missing) };
-  return { files: [...new Set(kept)] };
 }
 
 // src/engine/review.ts
@@ -10748,7 +10735,6 @@ var Scheduler = class {
         collaboration: collaborationOf(core, this.questions, {
           from: member,
           subtask: subtask2,
-          desk,
           signal: abort.signal
         }),
         listener: {
@@ -10766,15 +10752,6 @@ var Scheduler = class {
         },
         signal: abort.signal
       });
-      if (outcome.status === "delivered")
-        await commitDesk(
-          core.places,
-          subtask2.id,
-          member.name,
-          `${subtask2.title}
-
-${outcome.handover.summary}`
-        );
     } catch (error) {
       outcome = { status: "failed", error: errorText(error), tokens: outcome?.tokens ?? 0 };
     }
@@ -11222,9 +11199,9 @@ async function executableOf(pid) {
 }
 
 // src/plugin/plugin-id.ts
-import path5 from "node:path";
+import path4 from "node:path";
 var PLUGIN = "cc-huddle";
-var pluginId = (dataFolder2) => `${PLUGIN}@${path5.basename(dataFolder2).slice(PLUGIN.length + 1)}`;
+var pluginId = (dataFolder2) => `${PLUGIN}@${path4.basename(dataFolder2).slice(PLUGIN.length + 1)}`;
 async function idsIn(file) {
   let settings;
   try {
@@ -11237,9 +11214,9 @@ async function idsIn(file) {
 }
 async function pluginIds(dataFolder2, configFolder, projectFolder) {
   const files = [
-    path5.join(configFolder, "settings.json"),
-    path5.join(projectFolder, ".claude", "settings.json"),
-    path5.join(projectFolder, ".claude", "settings.local.json")
+    path4.join(configFolder, "settings.json"),
+    path4.join(projectFolder, ".claude", "settings.json"),
+    path4.join(projectFolder, ".claude", "settings.local.json")
   ];
   const found = await Promise.all(files.map(idsIn));
   return [.../* @__PURE__ */ new Set([pluginId(dataFolder2), ...found.flat()])];
@@ -11250,7 +11227,7 @@ import { randomBytes } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { createServer, request } from "node:http";
 import { tmpdir } from "node:os";
-import path6 from "node:path";
+import path5 from "node:path";
 import { text } from "node:stream/consumers";
 import { z as z7 } from "zod";
 
@@ -11833,8 +11810,8 @@ function viewer(session2) {
 function socketAddress() {
   if (process.platform === "win32")
     return { address: `\\\\.\\pipe\\huddle-${randomBytes(12).toString("hex")}` };
-  const folder = mkdtempSync(path6.join(tmpdir(), "cc-huddle-"));
-  return { address: path6.join(folder, "pane.sock"), folder };
+  const folder = mkdtempSync(path5.join(tmpdir(), "cc-huddle-"));
+  return { address: path5.join(folder, "pane.sock"), folder };
 }
 var asked = async (schema, request2) => schema.parse(JSON.parse(await text(request2) || "{}"));
 async function servePane(session2) {
@@ -11888,8 +11865,8 @@ function askToLetGo(address, slug) {
 }
 
 // src/plugin/session-mode.ts
-import path7 from "node:path";
-var fileOf = (dataFolder2, session2) => path7.join(sessionsFolder(dataFolder2), `${String(session2)}.mode`);
+import path6 from "node:path";
+var fileOf = (dataFolder2, session2) => path6.join(sessionsFolder(dataFolder2), `${String(session2)}.mode`);
 function modeOf(dataFolder2, session2) {
   return textIfThere(fileOf(dataFolder2, session2));
 }
