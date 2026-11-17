@@ -8458,8 +8458,16 @@ var Questions = class {
    * task sent back without what to change.
    */
   answer(id, answer) {
+    this.answered(this.fitting(id, answer), answer);
+  }
+  /** The question `id`, where `answer` fits it; throws as answering does. */
+  fitting(id, answer) {
     const question = this.find(id);
     if (!this.fits(question, answer)) throw new Error(DOESNT_FIT);
+    return question;
+  }
+  /** Closes `question` with `answer`, checked already (fitting). */
+  answered(question, answer) {
     this.close(question, answer);
   }
   /**
@@ -10575,26 +10583,24 @@ var Scheduler = class {
   /**
    * Answers a decision put to you (Questions.answer) and carries it out: on a
    * stuck review (review again, skip it, send it back), on a merge git
-   * refused (try again, or stop), on a task done (accept it, which is all it takes for work built on it to
-   * start; or send one of its subtasks, `sentBack` or else the last one done,
-   * back with what to change). Throws as answering does, and when the
+   * refused (try again, or stop), on a task done (accept it, which is all it
+   * takes for work built on it to start; or send one of its subtasks,
+   * `sentBack` or else the last one done, back with what to change). Throws as answering does, and when the
    * subtask sent back isn't one done in the task.
    */
   async decide(id, answer) {
-    const question = this.questions.find(id);
+    const question = this.questions.fitting(id, answer);
     if (question.kind !== "decision" || !canSendBack(this.core.state, question, answer.sentBack))
       throw new Error(DOESNT_FIT);
-    this.questions.answer(id, answer);
-    const subtask2 = question.subtaskId && this.subtask(question.subtaskId);
-    if (!subtask2) return;
+    const subtask2 = question.subtaskId ? this.subtask(question.subtaskId) : void 0;
     const { option: pick, note = "" } = answer;
-    if (question.decision.kind === "delivery") {
-      const sentBack = this.subtask(answer.sentBack ?? subtask2.id);
-      if (pick === "revise" && sentBack) {
-        this.move(sentBack, "redo");
-        goOnWith(sentBack, { why: "revised", note });
-      }
-    } else if (subtask2.status === "waitingInReview") {
+    const sentBack = pick === "revise" && subtask2 && this.subtask(answer.sentBack ?? subtask2.id);
+    if (sentBack) {
+      this.move(sentBack, "redo");
+      goOnWith(sentBack, { why: "revised", note });
+    }
+    this.questions.answered(question, answer);
+    if (subtask2?.status === "waitingInReview") {
       subtask2.review = { ...subtask2.review, rounds: 0 };
       if (pick === "rereview") this.move(subtask2, "rereview");
       else if (pick === "skip") this.move(subtask2, "merge");
@@ -10605,7 +10611,7 @@ var Scheduler = class {
           goOnWith(subtask2, { why: "rejected", note: said.filter(Boolean).join("\n\n") });
         }
       }
-    } else if (subtask2.status === "waitingInMerge") {
+    } else if (subtask2?.status === "waitingInMerge") {
       if (pick === "stop") await this.stop(subtask2);
       else this.move(subtask2, "remerge");
     }
