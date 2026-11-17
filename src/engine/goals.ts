@@ -5,7 +5,8 @@
  * asking twice is the same as asking once. Also how the goal works, as you
  * switch it (§6.1).
  */
-import { REFUSED, type Core } from "./core.ts";
+import { REFUSED, workOf, type Core } from "./core.ts";
+import { over } from "./derive.ts";
 import { removeGoal } from "./git.ts";
 import { can, GOAL_MACHINE, step } from "./machines.ts";
 import type { Meetings } from "./meetings.ts";
@@ -35,6 +36,7 @@ export class Goals {
       const { goal } = this;
       if (goal.status === "paused") return;
       if (goal.status === "archived") throw new Error(REFUSED.archived(goal));
+      if (goal.status === "closed") throw new Error(REFUSED.closed(goal));
       goal.status = step(GOAL_MACHINE, goal.status, "pause");
       this.hold(false);
     });
@@ -45,6 +47,7 @@ export class Goals {
     return this.life(LIFE, () => {
       const { goal } = this;
       if (goal.status === "archived") return;
+      if (goal.status === "closed") throw new Error(REFUSED.closed(goal));
       goal.status = step(GOAL_MACHINE, goal.status, "archive");
       this.hold(true);
     });
@@ -74,12 +77,21 @@ export class Goals {
     return this.life(LIFE, async () => {
       const { core, goal } = this;
       if (!can(GOAL_MACHINE, goal.status, "delete"))
-        throw new Error(`The goal "${goal.name}" isn't archived: archive it before deleting it`);
+        throw new Error(
+          `The goal "${goal.name}" isn't archived or closed: archive it before deleting it`,
+        );
       // A merge under way finishes first, and so does a meeting being cancelled.
       await this.scheduler.release(core.state.subtasks.map((s) => s.id));
       await this.meetings.settled();
       await removeGoal(core.places);
     });
+  }
+
+  /** Closes the goal once nothing in it can go on (§4.1); the state changed, and this asks after every change. */
+  settle() {
+    const { goal } = this;
+    if (goal.status === "active" && over(workOf(this.core)))
+      goal.status = step(GOAL_MACHINE, goal.status, "close");
   }
 
   /** Switches how the goal works, from its next delivery and meeting on. */
@@ -93,6 +105,7 @@ export class Goals {
   private wake(): boolean {
     const { goal } = this;
     if (goal.status === "active") return false;
+    if (goal.status === "closed") throw new Error(REFUSED.closed(goal));
     goal.status = step(GOAL_MACHINE, goal.status, "resume");
     return true;
   }

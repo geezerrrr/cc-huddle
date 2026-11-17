@@ -90,6 +90,20 @@ export function acceptanceOf(state: Pick<Work, "questions" | "subtasks">, taskId
 export const accepted = (state: Pick<Work, "questions" | "subtasks">, taskId: string) =>
   taskDone(state, taskId) && !acceptanceOf(state, taskId);
 
+/** Whether the goal has had its one planning (§2): a meeting called, or work assigned. */
+export const planned = (state: Pick<GoalState, "meetings" | "subtasks">) =>
+  state.meetings.length > 0 || state.subtasks.length > 0;
+
+/**
+ * Whether nothing in the goal can go on (§4.1): no meeting that can, and
+ * every task done and accepted, or, with no tasks, its plan dropped.
+ */
+export function over(state: Pick<Work, "meetings" | "tasks" | "subtasks" | "questions">): boolean {
+  if (state.meetings.some((m) => m.status !== "approved" && m.status !== "dropped")) return false;
+  if (!state.tasks.length) return state.meetings.some((m) => m.status === "dropped");
+  return state.tasks.every((t) => accepted(state, t.id));
+}
+
 /** Whether a subtask handed over is taken up in `stage`: it is there and its goal is active. */
 const takenUpIn = (
   state: Pick<GoalState, "goal">,

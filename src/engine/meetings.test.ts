@@ -299,6 +299,14 @@ describe("Meetings", () => {
   });
 
   it("with a host who only runs it, hear only the members' judgments and give them all the work", async () => {
+    expect(() =>
+      meetings.start({
+        agenda: "x",
+        size: "small",
+        attendees: ["sonnet"],
+        hostOnly: true,
+      }),
+    ).toThrow("can't only run a meeting with nobody else");
     scripted();
     const original = vi.mocked(askOnce).getMockImplementation();
     const drafting: (string | undefined)[] = [];
@@ -330,14 +338,6 @@ describe("Meetings", () => {
     expect(closing?.schema?.safeParse(plan).success).toBe(false);
     expect(closing?.schema?.safeParse(sonnets).success).toBe(true);
     expect(meeting.status).toBe("review");
-    expect(() =>
-      meetings.start({
-        agenda: "x",
-        size: "small",
-        attendees: ["sonnet"],
-        hostOnly: true,
-      }),
-    ).toThrow("can't only run a meeting with nobody else");
   });
 
   it("fail with the error, and go on from where they stopped in the same sessions", async () => {
@@ -393,7 +393,13 @@ describe("Meetings", () => {
     expect(core.state.meetings[1]?.status).toBe("cancelled");
   });
 
-  it("can't be held with a busy member, a stranger, or a goal on hold", () => {
+  it("can't be held with a stranger, a goal on hold, or once the goal has had its planning", () => {
+    const call = (attendees: string[]) => () =>
+      meetings.start({ agenda: "x", size: "small", attendees });
+    expect(call(["ann"])).toThrow('There is no member called "ann"');
+    core.state.goal.status = "paused";
+    expect(call(["sonnet"])).toThrow('The goal "Dice" is paused');
+    core.state.goal.status = "active";
     core.state.subtasks.push({
       id: "s1",
       taskId: "t1",
@@ -405,12 +411,7 @@ describe("Meetings", () => {
       status: "running",
       progress: { done: 0, total: 0 },
     });
-    const call = (attendees: string[]) => () =>
-      meetings.start({ agenda: "x", size: "small", attendees });
-    expect(call(["sonnet", "glm"])).toThrow("glm is busy");
-    expect(call(["ann"])).toThrow('There is no member called "ann"');
-    core.state.goal.status = "paused";
-    expect(call(["sonnet"])).toThrow('The goal "Dice" is paused');
+    expect(call(["sonnet"])).toThrow("has its planning already");
   });
 });
 
@@ -463,13 +464,15 @@ describe("A plan under review", () => {
     await expect(meetings.cancel("m9")).rejects.toThrow("There is no such meeting");
   });
 
-  it("isn't approved once called off while its document is written, or with its goal paused", async () => {
+  it("isn't approved once called off while its document is written", async () => {
     const meeting = await reviewed();
     const approving = meetings.approve(meeting.id);
     await meetings.cancel(meeting.id);
     await expect(approving).rejects.toThrow("changed while it was being approved");
     expect(meeting.status).toBe("dropped");
+  });
 
+  it("isn't approved with its goal paused", async () => {
     const next = await reviewed();
     core.state.goal.status = "paused";
     await expect(meetings.approve(next.id)).rejects.toThrow('The goal "Dice" is paused');

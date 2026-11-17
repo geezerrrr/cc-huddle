@@ -6,7 +6,15 @@
  * goal's branch, one merge at a time.
  */
 import { randomUUID } from "node:crypto";
-import { busyMembers, canSendBack, reviewerOf, taskDone, waitsIn, upstreamOf } from "./derive.ts";
+import {
+  busyMembers,
+  canSendBack,
+  planned,
+  reviewerOf,
+  taskDone,
+  waitsIn,
+  upstreamOf,
+} from "./derive.ts";
 import { REFUSED, spend, workOf, type Core } from "./core.ts";
 import { errorText } from "../shared/errors.ts";
 import {
@@ -147,12 +155,13 @@ export class Scheduler {
 
   /**
    * Gives a member one subtask directly, as a task of its own: done once
-   * merged, not yours to accept (§7.1). Throws when the goal is archived or
-   * there is no such member.
+   * merged, not yours to accept (§7.1). Throws when the goal has had its
+   * planning (§2) or there is no such member.
    */
   assignOne(work: DirectWork): Subtask {
     const { goal } = this;
     if (goal.status === "archived") throw new Error(REFUSED.archived(goal));
+    if (planned(this.core.state)) throw new Error(REFUSED.planned(goal));
     if (!this.core.team.members.some((m) => m.name === work.assignee))
       throw new Error(REFUSED.noMember(work.assignee));
     const [added] = this.assign([

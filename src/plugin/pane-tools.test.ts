@@ -203,13 +203,18 @@ Get it with show_plan, rewrite it with their words and change_plan. cc-huddle th
     ]);
   });
 
-  it("hand the session a task for the team, with the goal it runs and its team", async () => {
+  it("hand the session a task for the team as a new goal, refused while its goal is under way", async () => {
     expect((await call("hand_off", { task: "Add a scoreboard" })).text).toBe(
-      "The user hands this to cc-huddle's team: take it on as cc-huddle's team skill says.\n\nAdd a scoreboard\n\nThis session runs no goal yet. The team: glm (Developer).",
+      "The user hands this to cc-huddle's team: take it on as cc-huddle's team skill says.\n\nAdd a scoreboard\n\nIt is a new goal: this session runs none yet. The team: glm (Developer).",
     );
-    await session.start("Dice");
+    const dice = await session.start("Dice");
+    expect(await call("hand_off", { task: "Add a scoreboard" })).toMatchObject({
+      error: true,
+      text: expect.stringContaining('This session\'s goal "Dice" is under way') as string,
+    });
+    await dice.goals.pause();
     expect((await call("hand_off", { task: "Add a scoreboard" })).text).toContain(
-      'This session runs the goal "Dice", under way. The team: glm (Developer).',
+      'It is a new goal: this session\'s goal "Dice" is paused, and starting the new one lets it go. The team: glm (Developer).',
     );
   });
 

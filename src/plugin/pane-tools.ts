@@ -138,15 +138,15 @@ export function addPaneTools(server: McpServer, session: Session, pane: PaneServ
   server.registerTool(
     "hand_off",
     {
-      description: `${PANE_ONLY} The prompt /huddle <task> gives the session: the task, for the team.`,
+      description: `${PANE_ONLY} The prompt /huddle <task> gives the session: the task, for the team. Refused while the session's goal is under way.`,
       inputSchema: handOffInput.shape,
       annotations: { readOnlyHint: true },
     },
     async ({ task }) => {
-      const engine = session.current;
-      // With no goal yet, what is wrong with the team's files is said now, before your session proposes anything (§6).
-      const members = engine ? engine.team.members : (await session.team()).members;
-      return toolText(handOffText(task, engine?.work.goal, members));
+      session.free();
+      // The task is a new goal, with the team as its files have it now: what is wrong with them is said now, before your session proposes anything (§6).
+      const { members } = await session.team();
+      return toolText(handOffText(task, session.current?.work.goal, members));
     },
   );
 
@@ -182,8 +182,8 @@ export function addPaneTools(server: McpServer, session: Session, pane: PaneServ
  */
 function handOffText(task: string, goal: Goal | undefined, members: readonly Member[]): string {
   const runs = goal
-    ? `This session runs the goal "${goal.name}", ${goal.status === "active" ? "under way" : goal.status}.`
-    : "This session runs no goal yet.";
+    ? `It is a new goal: this session's goal "${goal.name}" is ${goal.status}${goal.status === "closed" ? ", and the new one carries on from its branch" : ", and starting the new one lets it go"}.`
+    : "It is a new goal: this session runs none yet.";
   return [
     "The user hands this to cc-huddle's team: take it on as cc-huddle's team skill says.",
     "",

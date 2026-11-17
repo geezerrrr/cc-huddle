@@ -15,7 +15,9 @@ export const GOAL_MACHINE = {
   pause: { from: ["active"], to: "paused" },
   archive: { from: ["active", "paused"], to: "archived" },
   resume: { from: ["paused", "archived"], to: "active" },
-  delete: { from: ["archived"], to: "removed" },
+  /** Nothing in it can go on: every task done and accepted, or its plan dropped. */
+  close: { from: ["active"], to: "closed" },
+  delete: { from: ["archived", "closed"], to: "removed" },
 } as const satisfies Machine<GoalStatus | "removed">;
 
 export const MEETING_MACHINE = {

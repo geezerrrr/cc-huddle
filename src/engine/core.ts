@@ -48,6 +48,9 @@ export const workOf = (
 /** Why what you asked can't be done, as more than one part refuses it. */
 export const REFUSED = {
   archived: (goal: Goal) => `The goal "${goal.name}" is archived: resume it first`,
+  closed: (goal: Goal) => `The goal "${goal.name}" is closed: nothing in it can go on`,
+  planned: (goal: Goal) =>
+    `The goal "${goal.name}" has its planning already: a goal has one. More work is a new goal.`,
   noMember: (name: string) => `There is no member called "${name}"`,
 };
 

@@ -6,6 +6,7 @@
  */
 import {
   Engine,
+  goalBranch,
   type EngineOptions,
   type GoalEntry,
   type GoalSettings,
@@ -65,12 +66,18 @@ export class Session {
     return noGoalForModel(this.movedAway);
   }
 
-  /** Starts a goal here, with the settings goals start with: refused while this session's goal is active; a paused or archived one is let go. */
+  /**
+   * Starts a goal here, with the settings goals start with: refused while
+   * this session's goal is active; a paused, archived or closed one is let
+   * go, and a closed one is carried on from (§5).
+   */
   start(name: string): Promise<Engine> {
     return this.turn(TURN, async () => {
+      const last = this.engine?.work.goal;
+      const after = last?.status === "closed" ? goalBranch(last.slug) : undefined;
       await this.leave();
       const settings = await readDefaults(this.options.dataFolder);
-      return this.run(await Engine.start(await this.engineOptions(), name, settings));
+      return this.run(await Engine.start(await this.engineOptions(), name, settings, after));
     });
   }
 
@@ -136,10 +143,12 @@ export class Session {
     return (await this.repository()).team(this.options.userTeam);
   }
 
-  /** Of the repository's goals (`goals`), those this session doesn't run. */
+  /** Of the repository's goals (`goals`), those this session doesn't run and could take up: closed ones have nothing to go on with. */
   othersOf(goals: readonly GoalEntry[]): GoalEntry[] {
     const mine = this.engine?.work.goal.slug;
-    return goals.filter((entry) => entry.slug !== mine);
+    return goals.filter(
+      (entry) => entry.slug !== mine && !("state" in entry && entry.state.goal.status === "closed"),
+    );
   }
 
   /** The repository's goals this session doesn't run, oldest first. */
@@ -147,15 +156,20 @@ export class Session {
     return this.othersOf(await this.goals());
   }
 
+  /** Throws while this session's goal is active (§3.2): a session runs one goal, and another waits until it isn't. */
+  free() {
+    const goal = this.engine?.work.goal;
+    if (goal?.status === "active")
+      throw new Error(
+        `This session's goal "${goal.name}" is under way, and a session runs one goal: pause it first (/huddle pause), or use another session.`,
+      );
+  }
+
   /** Lets go of this session's goal before it runs another: refused while it is active. */
   private async leave() {
+    this.free();
     const was = this.engine;
     if (!was) return;
-    const { goal } = was.work;
-    if (goal.status === "active")
-      throw new Error(
-        `This session's goal "${goal.name}" is under way, and a session runs one goal.`,
-      );
     this.engine = undefined;
     this.changed(undefined);
     await was.close();

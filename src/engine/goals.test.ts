@@ -124,6 +124,20 @@ describe("Goals", () => {
     expect(scheduler.pump).toHaveBeenCalled();
   });
 
+  it("close once nothing in them can go on, and then only delete", async () => {
+    const { goal } = core.state;
+    core.state.meetings.push(meeting("m1", "review"));
+    goals.settle();
+    expect(goal.status).toBe("active");
+    core.state.meetings[0] = meeting("m1", "dropped");
+    goals.settle();
+    expect(goal.status).toBe("closed");
+    await expect(goals.pause()).rejects.toThrow("is closed: nothing in it can go on");
+    await expect(goals.archive()).rejects.toThrow("is closed");
+    await expect(goals.resume()).rejects.toThrow("is closed");
+    await goals.delete();
+  });
+
   it("resume the meetings a session stopped as it let the goal go, before other work", async () => {
     await goals.pause();
     await goals.resume(["m1"]);

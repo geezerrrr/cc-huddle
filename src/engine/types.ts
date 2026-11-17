@@ -26,7 +26,7 @@ export interface Member {
   settings?: Settings;
 }
 
-export type GoalStatus = "active" | "paused" | "archived";
+export type GoalStatus = "active" | "paused" | "archived" | "closed";
 
 /** One goal, on a branch of its own cut from your HEAD when it started (§5). */
 export interface Goal {
@@ -354,7 +354,7 @@ export interface GoalState {
 
 /** What a subtask waits on now (§4.5). `halted`: the upstream failed or was stopped. */
 export type Wait =
-  | { kind: "goal"; status: "paused" | "archived" }
+  | { kind: "goal"; status: Exclude<GoalStatus, "active"> }
   | { kind: "upstream"; by: string; subtaskId: string; halted: boolean }
   | { kind: "busy"; by: string }
   /** Its member starts another of theirs first: one going on in its session, else the earlier. */

@@ -246,6 +246,7 @@ describe("Scheduler", () => {
       title: "Scoreboard",
       ownerAccepts: false,
     });
+    expect(() => scheduler.assignOne(work)).toThrow("has its planning already");
     core.state.goal.status = "archived";
     expect(() => scheduler.assignOne(work)).toThrow("archived: resume it first");
   });

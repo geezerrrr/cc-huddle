@@ -100,12 +100,15 @@ export class Engine {
   /**
    * Starts a goal for this session, working as `settings` say (§6.1): a
    * folder of its own, the team copied into it as its files have it now (§6),
-   * and its branch cut from your HEAD, checked out in its own worktree.
+   * and its branch cut from your HEAD, or from `after`, the branch of the
+   * closed goal it carries on from, where you haven't merged that yet (§5),
+   * checked out in its own worktree.
    */
   static async start(
     options: EngineOptions,
     name: string,
     settings: GoalSettings,
+    after?: string,
   ): Promise<Engine> {
     const goals = await RepositoryGoals.of(options.dataFolder, options.cwd);
     const { repo } = goals;
@@ -121,7 +124,7 @@ export class Engine {
       await takeLock(files.lock, me, (holder) => options.takeOver(holder, slug));
       await copyTeam(files.team, copy);
       const places: Places = { repo, slug, root: folder };
-      await openGoal(places);
+      await openGoal(places, after);
       const state: GoalState = {
         goal: { name, slug, status: "active", createdAt: Date.now(), settings },
         tasks: [],
@@ -203,6 +206,7 @@ export class Engine {
       places,
       changed: () => {
         writer.changed();
+        engine.parts.goals.settle();
       },
       allowAlways: (rules) => engine.allow(rules),
       options: (member, kind, cwd) => engine.turnOptions(member, kind, cwd),

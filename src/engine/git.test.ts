@@ -124,6 +124,30 @@ describe("goals", () => {
     expect(await takenSlugs(places.repo)).toEqual(new Set(["dice"]));
   });
 
+  it("carries a goal on from a closed one's branch while your HEAD lacks its work", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    const before = await git({ cwd: repo }, ["rev-parse", "HEAD"]);
+    await git({ cwd: repo }, ["branch", "huddle/old/main"]);
+    await openGoal(places, "huddle/old/main");
+    expect((await git({ cwd: repo }, ["rev-parse", goalBranch("dice")])).stdout).toBe(
+      before.stdout,
+    );
+    await git({ cwd: repo, env: ME }, [
+      "commit-tree",
+      "-m",
+      "old work",
+      "-p",
+      "HEAD",
+      "HEAD^{tree}",
+    ]).then(({ stdout }) => git({ cwd: repo }, ["branch", "-f", "huddle/old/main", stdout.trim()]));
+    const next = { ...places, slug: "next", root: path.join(dir, "next") };
+    await openGoal(next, "huddle/old/main");
+    expect((await git({ cwd: repo }, ["rev-parse", goalBranch("next")])).stdout).toBe(
+      (await git({ cwd: repo }, ["rev-parse", "huddle/old/main"])).stdout,
+    );
+  });
+
   it("checks the goal out again when its folder was deleted by hand", async () => {
     await makeRepository();
     const places = await placesOf();

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { busyMembers, derive, meetingResumes, reviewerOf, waitsIn, type Work } from "./derive.ts";
+import {
+  busyMembers,
+  derive,
+  meetingResumes,
+  over,
+  reviewerOf,
+  waitsIn,
+  type Work,
+} from "./derive.ts";
 import { DECISIONS, type Ask, type Meeting, type Question, type Subtask } from "./types.ts";
 
 const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
@@ -212,6 +220,17 @@ describe("waitsIn", () => {
       { kind: "teammate", by: "bob", questionId: "q1" },
       { kind: "you", questionId: "q2" },
     ]);
+  });
+});
+
+describe("over", () => {
+  it("holds once every task is done and accepted, or the plan dropped, and no meeting can go on", () => {
+    expect(over(work({ tasks: [] }))).toBe(false);
+    expect(over(work({ tasks: [], meetings: [meeting({ status: "dropped" })] }))).toBe(true);
+    expect(over(work({ tasks: [], meetings: [meeting({ status: "failed" })] }))).toBe(false);
+    const done = subtask("s1", { status: "done" });
+    expect(over(work({ subtasks: [done] }))).toBe(true);
+    expect(over(work({ subtasks: [done, subtask("s2")] }))).toBe(false);
   });
 });
 

@@ -185,20 +185,35 @@ const perGoal = <T>(places: Places, task: () => Promise<T>) =>
 
 /**
  * Sets a goal up in git, or again what of it is missing: its branch cut from
- * your HEAD, checked out in its own worktree (again, if the folder was
- * deleted by hand). Inside a goal's git operation (perGoal).
+ * your HEAD, or from `after` (the branch of the goal it carries on from, §5)
+ * where that has commits your HEAD lacks, checked out in its own worktree
+ * (again, if the folder was deleted by hand). Inside a goal's git operation
+ * (perGoal).
  */
-async function setUpGoal(places: Places): Promise<string> {
+async function setUpGoal(places: Places, after?: string): Promise<string> {
   const { repo, slug } = places;
   const branch = goalBranch(slug);
   const folder = goalFiles(places.root).checkout;
-  if (!(await hasBranch(repo, branch))) await git({ cwd: repo.top }, ["branch", branch, "HEAD"]);
+  if (!(await hasBranch(repo, branch)))
+    await git({ cwd: repo.top }, [
+      "branch",
+      branch,
+      after && (await ahead(repo, after)) ? after : "HEAD",
+    ]);
   if (!(await exists(folder))) await checkOut(repo, folder, branch);
   return folder;
 }
 
 /** The goal's worktree, set up again first where it needs it (setUpGoal), as one of the goal's git operations. */
-export const openGoal = (places: Places) => perGoal(places, () => setUpGoal(places));
+export const openGoal = (places: Places, after?: string) =>
+  perGoal(places, () => setUpGoal(places, after));
+
+/** Whether `branch` is there and has commits your HEAD doesn't. */
+async function ahead(repo: Repository, branch: string): Promise<boolean> {
+  if (!(await hasBranch(repo, branch))) return false;
+  const { stdout } = await git({ cwd: repo.top }, ["rev-list", "--count", `HEAD..${branch}`]);
+  return Number(stdout.trim()) > 0;
+}
 
 /**
  * A subtask's worktree: its own if there (a run going on keeps it), its

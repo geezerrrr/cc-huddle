@@ -204,7 +204,7 @@ export function addTools(server: McpServer, session: Session) {
     "goal_action",
     {
       description:
-        "Pause this session's goal (its runs stop, to go on later in their sessions), resume it, archive it, or delete it once archived: its folder, worktrees and subtask branches go, its own branch stays. Delete only when the user has confirmed it.",
+        "Pause this session's goal (its runs stop, to go on later in their sessions), resume it, archive it, or delete it once archived or closed: its folder, worktrees and subtask branches go, its own branch stays. Delete only when the user has confirmed it.",
       inputSchema: goalActionInput.shape,
       annotations: { destructiveHint: true },
     },

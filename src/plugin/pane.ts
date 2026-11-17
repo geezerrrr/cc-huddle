@@ -267,12 +267,12 @@ function taskWhere(work: Work, derived: Derived, subtasks: Subtask[]): string | 
 }
 
 /**
- * The band's task lines, while the goal isn't archived: each task that isn't
+ * The band's task lines, while the goal isn't archived or closed: each task that isn't
  * done, with where it stands; one done that waits for you to accept it says so.
  */
 function taskLines(work: Work, derived: Derived): string[] {
   const lines: string[] = [];
-  if (work.goal.status === "archived") return lines;
+  if (work.goal.status === "archived" || work.goal.status === "closed") return lines;
   for (const task of work.tasks) {
     const subtasks = work.subtasks.filter((s) => s.taskId === task.id);
     const where = acceptanceOf(work, task.id)
@@ -350,10 +350,11 @@ export function paneTeam(
   );
   const meeting = shownMeeting(work);
   const { goal } = work;
+  // Only a goal on hold goes on: an active one is under way, a closed one has nothing left.
   const here =
-    goal.status === "active"
-      ? []
-      : [{ slug: goal.slug, label: goalLabel(work, `${goal.status}, in this session`) }];
+    goal.status === "paused" || goal.status === "archived"
+      ? [{ slug: goal.slug, label: goalLabel(work, `${goal.status}, in this session`) }]
+      : [];
   return {
     opened,
     band: bandText(work, asked.length),

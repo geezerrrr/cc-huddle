@@ -10,7 +10,7 @@ import { errorText } from "../shared/errors.ts";
 import { writeWhole } from "../shared/files.ts";
 import { goalFiles } from "../shared/layout.ts";
 import { REFUSED, workOf, type Core } from "./core.ts";
-import { busyMembers, meetingResumes } from "./derive.ts";
+import { meetingResumes, planned } from "./derive.ts";
 import { openGoal } from "./git.ts";
 import { can, MEETING_MACHINE, step } from "./machines.ts";
 import { MeetingRun } from "./meeting-run.ts";
@@ -49,6 +49,7 @@ export class Meetings {
   /** Calls a meeting, or throws why it can't be held now. */
   start(call: MeetingCall): Meeting {
     const { core } = this;
+    if (planned(core.state)) throw new Error(REFUSED.planned(core.state.goal));
     const named = [...new Set(call.attendees)];
     const attendees = named.length
       ? named
@@ -174,9 +175,6 @@ export class Meetings {
     const names = new Set(core.team.members.map((m) => m.name));
     const stranger = attendees.find((name) => !names.has(name));
     if (stranger) throw new Error(REFUSED.noMember(stranger));
-    const busy = busyMembers(workOf(core));
-    const taken = attendees.find((name) => busy.has(name));
-    if (taken) throw new Error(`${taken} is busy: working, reviewing, or at another meeting`);
     return [host, ...rest];
   }
 
