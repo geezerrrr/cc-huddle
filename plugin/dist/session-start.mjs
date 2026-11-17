@@ -7538,14 +7538,47 @@ function derive(state) {
   };
 }
 
-// src/engine/core.ts
-var workOf = (core) => ({
-  ...core.state,
-  questions: [...core.state.questions, ...core.questionsNow()],
-  members: core.team.members.map((m) => m.name),
-  underWay: core.underWay(),
-  meetingsNow: core.meetingsNow()
+// src/shared/layout.ts
+import { createHash } from "node:crypto";
+import path from "node:path";
+function repoFolder(dataFolder2, repo) {
+  const name = path.basename(repo.top).replace(/[^\w.-]+/g, "-");
+  const hash2 = createHash("sha256").update(repo.common).digest("hex").slice(0, 12);
+  return path.join(dataFolder2, "repos", `${name}-${hash2}`);
+}
+var goalsFolder = (repoFolder2) => path.join(repoFolder2, "goals");
+var goalFolder = (repoFolder2, slug) => path.join(goalsFolder(repoFolder2), slug);
+var goalFiles = (folder2) => ({
+  state: path.join(folder2, "state.json"),
+  lock: path.join(folder2, "lock"),
+  members: path.join(folder2, "members.json"),
+  /** The goal's copy of the team (team.ts copyTeam). */
+  team: path.join(folder2, "team.json"),
+  /** A member's settings file (policy.ts writeSettings). */
+  settings: (member) => path.join(folder2, "settings", `${member}.json`),
+  /** The worktree the goal's branch is checked out in. */
+  checkout: path.join(folder2, "checkout"),
+  /** The worktree a subtask works in. */
+  desk: (subtaskId) => path.join(folder2, "desks", subtaskId),
+  /** What a subtask's runs did (records.ts). */
+  record: (subtaskId) => path.join(folder2, "records", `${subtaskId}.jsonl`),
+  /** An approved plan's document. */
+  plan: (meetingId) => path.join(folder2, "plans", `${meetingId}.md`)
 });
+
+// src/engine/core.ts
+var workOf = (core) => {
+  const handingBack = core.handingBack();
+  return {
+    ...core.state,
+    questions: [...core.state.questions, ...core.questionsNow()],
+    members: core.team.members.map((m) => m.name),
+    underWay: core.underWay(),
+    meetingsNow: core.meetingsNow(),
+    checkout: goalFiles(core.places.root).checkout,
+    ...handingBack && { handingBack }
+  };
+};
 
 // src/engine/data.ts
 import { mkdir as mkdir2, readdir as readdir2, readFile as readFile3 } from "node:fs/promises";
@@ -7583,34 +7616,6 @@ async function jsonIfThere(file2) {
   }
 }
 var namesIfThere = (folder2) => ifThere(readdir(folder2), []);
-
-// src/shared/layout.ts
-import { createHash } from "node:crypto";
-import path from "node:path";
-function repoFolder(dataFolder2, repo) {
-  const name = path.basename(repo.top).replace(/[^\w.-]+/g, "-");
-  const hash2 = createHash("sha256").update(repo.common).digest("hex").slice(0, 12);
-  return path.join(dataFolder2, "repos", `${name}-${hash2}`);
-}
-var goalsFolder = (repoFolder2) => path.join(repoFolder2, "goals");
-var goalFolder = (repoFolder2, slug) => path.join(goalsFolder(repoFolder2), slug);
-var goalFiles = (folder2) => ({
-  state: path.join(folder2, "state.json"),
-  lock: path.join(folder2, "lock"),
-  members: path.join(folder2, "members.json"),
-  /** The goal's copy of the team (team.ts copyTeam). */
-  team: path.join(folder2, "team.json"),
-  /** A member's settings file (policy.ts writeSettings). */
-  settings: (member) => path.join(folder2, "settings", `${member}.json`),
-  /** The worktree the goal's branch is checked out in. */
-  checkout: path.join(folder2, "checkout"),
-  /** The worktree a subtask works in. */
-  desk: (subtaskId) => path.join(folder2, "desks", subtaskId),
-  /** What a subtask's runs did (records.ts). */
-  record: (subtaskId) => path.join(folder2, "records", `${subtaskId}.jsonl`),
-  /** An approved plan's document. */
-  plan: (meetingId) => path.join(folder2, "plans", `${meetingId}.md`)
-});
 
 // src/shared/serial.ts
 function serialBy() {
@@ -53538,13 +53543,16 @@ var RepositoryGoals = class _RepositoryGoals {
   }
   /** A goal as its files left it, with nothing under way: as a session that doesn't run it reads it. */
   async stored(slug, state) {
-    const { team } = await readCopy(this.goal(slug).files.team);
+    const { folder: folder2, files } = this.goal(slug);
+    const { team } = await readCopy(files.team);
     return workOf({
       state,
       team,
+      places: { repo: this.repo, slug, root: folder2 },
       underWay: () => [],
       meetingsNow: () => ({}),
-      questionsNow: () => []
+      questionsNow: () => [],
+      handingBack: () => void 0
     });
   }
 };
@@ -53626,7 +53634,8 @@ function callText(permission) {
 function needWords(question, work) {
   const subtask = work.subtasks.find((s) => s.id === question.subtaskId);
   const title = subtask?.title;
-  const about = title ? ` for "${title}"` : "";
+  const about = title ? ` for "${title}"` : question.subtaskId ? "" : " while merging the goal back";
+  const { goal } = work;
   switch (question.kind) {
     case "permission":
       return {
@@ -53655,15 +53664,35 @@ function needWords(question, work) {
             detail: question.text
           };
         case "delivery": {
-          const delivered = work.subtasks.filter((s) => s.taskId === subtask?.taskId && s.delivery).map((s) => `- ${s.title}, by ${s.assignee}: ${s.delivery?.summary ?? ""}`);
+          const delivered = deliveredText(
+            work,
+            work.subtasks.filter((s) => s.taskId === subtask?.taskId)
+          );
+          const last = question.decision.options.includes("acceptMerge");
           return {
-            headline: `The task "${question.text}" is done. Accept it?`,
-            ...delivered.length && { detail: delivered.join("\n") }
+            headline: last ? `The task "${question.text}" is done, and with it the goal. Accept it, and merge the goal into ${goal.base}?` : `The task "${question.text}" is done. Accept it?`,
+            detail: delivered
           };
         }
+        case "handBack":
+          return {
+            headline: question.text ? `Merging "${goal.name}" into ${goal.base} came back. Merge again?` : `"${goal.name}" is done. Merge it into ${goal.base}?`,
+            detail: question.text || deliveredText(work, work.subtasks)
+          };
+        case "cleanUp":
+          return {
+            headline: `"${goal.name}" is closed. Clean it up: its worktree, its branch, its records?`
+          };
       }
   }
 }
+var deliveredText = (work, subtasks) => [
+  ...subtasks.flatMap(
+    (s) => s.delivery ? [`- ${s.title}, by ${s.assignee}: ${s.delivery.summary}`] : []
+  ),
+  `Try it in ${work.checkout}`
+].join("\n");
+var takeable = (entry) => !("state" in entry && entry.state.goal.status === "closed");
 var whereOf = (entry) => entry.holder ? "elsewhere" : !("state" in entry) ? "unreadable" : entry.state.goal.status === "archived" ? "archived" : "paused";
 var WHERE_WORDS = {
   elsewhere: "in another session",
@@ -53686,6 +53715,7 @@ function subtaskLine(subtask, { waits }, work) {
   if (step2) parts.push(step2);
   parts.push(...waits.map((w) => waitText(w, work)));
   if (subtask.error) parts.push(`error: ${subtask.error}`);
+  if (subtask.delivery) parts.push(`delivered: ${subtask.delivery.summary}`);
   return `    - ${subtask.title} [${subtask.id}], ${subtask.assignee}: ${parts.join(", ")}`;
 }
 function questionLine(question, work) {
@@ -53699,9 +53729,13 @@ function statusText(work) {
   const busy = new Set(derived2.busy);
   const { goal } = work;
   const lines = [
-    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)}; review ${goal.settings.review ? "on" : "off"}, ${goal.settings.meetingSize} meetings, parallel ${goal.settings.parallel ? "on" : "off"}`,
+    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)} (cut from ${goal.base}, checked out in ${work.checkout}); review ${goal.settings.review ? "on" : "off"}, ${goal.settings.meetingSize} meetings, parallel ${goal.settings.parallel ? "on" : "off"}`,
     `Team: ${work.members.map((m) => busy.has(m) ? `${m} (busy)` : m).join(", ")}`
   ];
+  if (work.handingBack)
+    lines.push(
+      `  Merging back into ${goal.base}${work.handingBack.by ? `: ${work.handingBack.by} resolves its conflicts` : ""}`
+    );
   for (const meeting of work.meetings.filter((m) => m.status !== "approved"))
     lines.push(
       `  Meeting [${meeting.id}], ${hostText(meeting)}: ${meetingStatus(meeting, work.meetingsNow[meeting.id])}${derived2.resumable.includes(meeting.id) ? "; it can go on" : ""}`
@@ -53746,7 +53780,7 @@ async function sessionContext(cwd, dataFolder2, session) {
 ${status}`
     );
   }
-  const others = othersText(goals.filter((g) => g !== mine));
+  const others = othersText(goals.filter((g) => g !== mine && takeable(g)));
   if (others) parts.push(`cc-huddle: ${others}`);
   return parts.length ? parts.join("\n\n") : void 0;
 }

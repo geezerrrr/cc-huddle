@@ -7464,7 +7464,13 @@ var DECISION_OPTIONS = [
   "retry",
   "stop",
   "accept",
-  "revise"
+  "revise",
+  "acceptMerge",
+  "acceptOnly",
+  "merge",
+  "notNow",
+  "cleanUp",
+  "keep"
 ];
 var DECISIONS = {
   /** A review that sent the delivery back too often: send it back with its notes, and your words if you add some. */
@@ -7492,12 +7498,23 @@ var DECISIONS = {
     kind: "delivery",
     options: ["accept", "revise"],
     note: { option: "revise", needed: true }
-  })
+  }),
+  /** The same, where it is all the goal still waits on: accepting it can hand the goal's work back too. */
+  lastDelivery: () => ({
+    kind: "delivery",
+    options: ["acceptMerge", "acceptOnly", "revise"],
+    note: { option: "revise", needed: true }
+  }),
+  /** The goal's work all done: merge it back into the branch it was cut from, or not now (it pauses). */
+  handBack: () => ({ kind: "handBack", options: ["merge", "notNow"] }),
+  /** The goal closed: delete it with its worktree and branch, or keep it. */
+  cleanUp: () => ({ kind: "cleanUp", options: ["cleanUp", "keep"] })
 };
 var noteNeeded = (decision, option) => decision.note?.option === option && decision.note.needed === true;
 var PERMISSION_OPTIONS = ["once", "always", "deny"];
 var toYou = (question) => question.kind !== "teammate";
 var isAcceptance = (question) => question.kind === "decision" && question.decision.kind === "delivery";
+var onGoal = (question) => question.kind === "decision" && (question.decision.kind === "handBack" || question.decision.kind === "cleanUp");
 var SUBTASK_ACTIONS = ["stop", "continue", "retry"];
 var GOAL_ACTIONS = ["pause", "resume", "archive", "delete"];
 
@@ -7533,6 +7550,11 @@ function acceptanceOf(state, taskId) {
 }
 var accepted = (state, taskId) => taskDone(state, taskId) && !acceptanceOf(state, taskId);
 var planned = (state) => state.meetings.length > 0 || state.subtasks.length > 0;
+var workDone = (state) => state.tasks.length > 0 && state.tasks.every((t) => taskDone(state, t.id));
+function lastAcceptance(state) {
+  const open2 = state.questions.filter(isAcceptance);
+  return workDone(state) && open2.length === 1 ? open2[0] : void 0;
+}
 function over(state) {
   if (state.meetings.some((m) => m.status !== "approved" && m.status !== "dropped")) return false;
   if (!state.tasks.length) return state.meetings.some((m) => m.status === "dropped");
@@ -7575,7 +7597,7 @@ function reviewerAway(state, subtask2) {
 function startWaits(state, subtask2, busy) {
   const { goal } = state;
   if (goal.status !== "active") return [{ kind: "goal", status: goal.status }];
-  const unmerged = (d) => ({
+  const unmerged2 = (d) => ({
     kind: "upstream",
     by: d.assignee,
     subtaskId: d.id,
@@ -7584,12 +7606,12 @@ function startWaits(state, subtask2, busy) {
   const upstream = subtask2.dependsOn.flatMap((id) => {
     const d = state.subtasks.find((s) => s.id === id);
     if (!d) return [];
-    if (d.status !== "done") return [unmerged(d)];
+    if (d.status !== "done") return [unmerged2(d)];
     if (d.taskId === subtask2.taskId) return [];
     if (!state.tasks.find((t) => t.id === d.taskId)?.ownerAccepts || accepted(state, d.taskId))
       return [];
     const rest = state.subtasks.find((s) => s.taskId === d.taskId && s.status !== "done");
-    if (rest) return [unmerged(rest)];
+    if (rest) return [unmerged2(rest)];
     const acceptance = acceptanceOf(state, d.taskId);
     return acceptance ? [{ kind: "acceptance", questionId: acceptance.id }] : [];
   });
@@ -7691,13 +7713,19 @@ import { existsSync } from "node:fs";
 import { rm as rm3 } from "node:fs/promises";
 
 // src/engine/core.ts
-var workOf = (core) => ({
-  ...core.state,
-  questions: [...core.state.questions, ...core.questionsNow()],
-  members: core.team.members.map((m) => m.name),
-  underWay: core.underWay(),
-  meetingsNow: core.meetingsNow()
-});
+var workOf = (core) => {
+  const handingBack = core.handingBack();
+  return {
+    ...core.state,
+    questions: [...core.state.questions, ...core.questionsNow()],
+    members: core.team.members.map((m) => m.name),
+    underWay: core.underWay(),
+    meetingsNow: core.meetingsNow(),
+    checkout: goalFiles(core.places.root).checkout,
+    ...handingBack && { handingBack }
+  };
+};
+var HAND_BACK = "hand-back";
 var REFUSED = {
   archived: (goal) => `The goal "${goal.name}" is archived: resume it first`,
   closed: (goal) => `The goal "${goal.name}" is closed: nothing in it can go on`,
@@ -7829,24 +7857,30 @@ async function checkOut(repo, folder, branch, from) {
 var subtaskBranch = (slug, subtaskId) => `${goalBranches(slug)}${subtaskId}`;
 var serial = serialBy();
 var perGoal = (places, task) => serial(goalFiles(places.root).checkout, task);
-async function setUpGoal(places, after) {
+async function setUpGoal(places, from = "HEAD") {
   const { repo, slug } = places;
   const branch = goalBranch(slug);
   const folder = goalFiles(places.root).checkout;
-  if (!await hasBranch(repo, branch))
-    await git({ cwd: repo.top }, [
-      "branch",
-      branch,
-      after && await ahead2(repo, after) ? after : "HEAD"
-    ]);
+  if (!await hasBranch(repo, branch)) await git({ cwd: repo.top }, ["branch", branch, from]);
   if (!await exists(folder)) await checkOut(repo, folder, branch);
   return folder;
 }
-var openGoal = (places, after) => perGoal(places, () => setUpGoal(places, after));
-async function ahead2(repo, branch) {
-  if (!await hasBranch(repo, branch)) return false;
-  const { stdout } = await git({ cwd: repo.top }, ["rev-list", "--count", `HEAD..${branch}`]);
-  return Number(stdout.trim()) > 0;
+var openGoal = (places, from) => perGoal(places, () => setUpGoal(places, from));
+async function currentBranch(folder) {
+  const found = await git({ cwd: folder }, ["symbolic-ref", "-q", "--short", "HEAD"], {
+    allow: [1]
+  });
+  return found.code === 0 ? found.stdout.trim() : void 0;
+}
+function hasWork(places, base) {
+  return perGoal(places, async () => {
+    const { stdout } = await git({ cwd: places.repo.top }, [
+      "rev-list",
+      "--count",
+      `refs/heads/${base}..${goalBranch(places.slug)}`
+    ]);
+    return Number(stdout.trim()) > 0;
+  });
 }
 function openDesk(places, subtaskId) {
   return perGoal(places, async () => {
@@ -7892,19 +7926,22 @@ function commitDesk(places, subtaskId, by, message) {
   });
 }
 var MARKERS = /^<{7} [\s\S]*?^={7}\r?$[\s\S]*?^>{7} /m;
-async function unresolved(places, subtaskId, files) {
-  const desk = goalFiles(places.root).desk(subtaskId);
-  const marked = await Promise.all(
+var unresolved = (places, subtaskId, files) => marked(goalFiles(places.root).desk(subtaskId), files);
+async function marked(tree, files) {
+  const found = await Promise.all(
     // One deleted on a side has no markers.
     files.map(
-      async (file) => MARKERS.test(await ifThere(readFile(path.join(desk, file), "utf8"), ""))
+      async (file) => MARKERS.test(await ifThere(readFile(path.join(tree, file), "utf8"), ""))
     )
   );
-  return files.filter((_, i) => marked[i]);
+  return files.filter((_, i) => found[i]);
+}
+async function unmerged(at) {
+  const list = await git(at, ["diff", "--name-only", "-z", "--diff-filter=U"]);
+  return list.stdout.split("\0").filter(Boolean);
 }
 async function conflicts(places, subtaskId, at) {
-  const list = await git(at, ["diff", "--name-only", "-z", "--diff-filter=U"]);
-  const files = list.stdout.split("\0").filter(Boolean);
+  const files = await unmerged(at);
   if (!files.length) return void 0;
   const text2 = await unresolved(places, subtaskId, files);
   return { kind: "conflict", text: text2, other: files.filter((file) => !text2.includes(file)) };
@@ -7981,7 +8018,54 @@ function abortMerge(places, subtaskId) {
 function dropDesk(places, subtaskId) {
   return perGoal(places, () => removeDesk(places, subtaskId));
 }
-function removeGoal(places) {
+function handBackGoal(places, base, by) {
+  return perGoal(places, async () => {
+    const { repo } = places;
+    const tree = await setUpGoal(places);
+    const at = await worktreeAt(repo, tree);
+    const goal = { ...at, env: { ...at.env, ...authorEnv(by) } };
+    const ref = `refs/heads/${base}`;
+    if (!await merging(goal)) {
+      const merge = await git(goal, ["-c", "merge.ff=true", "merge", "-q", "--no-edit", ref], {
+        allow: [1]
+      });
+      if (merge.code === 1 && !(await unmerged(goal)).length)
+        throw new GitError("merge", (merge.stderr || merge.stdout).trim());
+    }
+    if (await merging(goal)) {
+      const files = await unmerged(goal);
+      const left = [...files, ...await marked(tree, await changed(goal))];
+      if (left.length) return { kind: "conflict", files: [...new Set(left)] };
+      await git(goal, ["commit", "-q", "--no-edit"]);
+    }
+    const head = (await git(goal, ["rev-parse", "HEAD"])).stdout.trim();
+    const was = (await git({ cwd: repo.top }, ["rev-parse", ref])).stdout.trim();
+    const checkout = await checkedOut(repo, ref);
+    if (checkout) await git({ cwd: checkout }, ["merge", "-q", "--ff-only", head]);
+    else {
+      const ff = await git({ cwd: repo.top }, ["merge-base", "--is-ancestor", was, head], {
+        allow: [1]
+      });
+      if (ff.code === 1) throw new GitError("merge", `${base} moved meanwhile: merge again`);
+      await git({ cwd: repo.top }, ["update-ref", ref, head, was]);
+    }
+    return { kind: "merged" };
+  });
+}
+async function changed(at) {
+  const list = await git(at, ["diff", "--name-only", "-z", "HEAD"]);
+  return list.stdout.split("\0").filter(Boolean);
+}
+async function checkedOut(repo, ref) {
+  const list = await git({ cwd: repo.top }, ["worktree", "list", "--porcelain", "-z"]);
+  let tree;
+  for (const line of list.stdout.split("\0")) {
+    if (line.startsWith("worktree ")) tree = line.slice("worktree ".length);
+    else if (line === `branch ${ref}`) return tree;
+  }
+  return void 0;
+}
+function removeGoal(places, branchToo) {
   return perGoal(places, async () => {
     const { repo, slug } = places;
     const refs = await git({ cwd: repo.top }, [
@@ -7995,6 +8079,8 @@ function removeGoal(places) {
     const folder = goalFiles(places.root).checkout;
     await unlist(repo, folder);
     await rm(folder, { recursive: true, force: true });
+    if (branchToo)
+      await git({ cwd: repo.top }, ["branch", "-q", "-D", goalBranch(slug)], { allow: [1] });
   });
 }
 
@@ -8162,120 +8248,9 @@ async function listGoals(repoFolder2) {
   return found.filter((entry) => entry !== void 0).sort((a, b) => startedAt(a) - startedAt(b));
 }
 
-// src/engine/goals.ts
-var LIFE = "life";
-var Goals = class {
-  constructor(core, scheduler, meetings) {
-    this.core = core;
-    this.scheduler = scheduler;
-    this.meetings = meetings;
-  }
-  core;
-  scheduler;
-  meetings;
-  life = serialBy();
-  /**
-   * Pauses the goal: its runs stop, to go on in their sessions when it is
-   * resumed, and a meeting under way is cancelled; a plan in review stays,
-   * to approve once it goes on.
-   */
-  pause() {
-    return this.life(LIFE, () => {
-      const { goal } = this;
-      if (goal.status === "paused") return;
-      if (goal.status === "archived") throw new Error(REFUSED.archived(goal));
-      if (goal.status === "closed") throw new Error(REFUSED.closed(goal));
-      goal.status = step(GOAL_MACHINE, goal.status, "pause");
-      this.hold(false);
-    });
-  }
-  /** Archives the goal as it stands: its work held as when paused, and its plans in review dropped. */
-  archive() {
-    return this.life(LIFE, () => {
-      const { goal } = this;
-      if (goal.status === "archived") return;
-      if (goal.status === "closed") throw new Error(REFUSED.closed(goal));
-      goal.status = step(GOAL_MACHINE, goal.status, "archive");
-      this.hold(true);
-    });
-  }
-  /**
-   * Puts a paused or archived goal back to work, from where it was; then the
-   * meetings a session stopped as it let the goal go (§3.2), and only then
-   * other work, so a meeting's members go back to it before anything else
-   * takes them.
-   */
-  resume(meetings = []) {
-    return this.life(LIFE, () => {
-      if (!this.wake()) return;
-      for (const id of meetings) this.meetings.resume(id);
-      this.core.changed();
-      this.scheduler.pump();
-    });
-  }
-  /**
-   * Takes an archived goal out of the repository for good: its subtasks'
-   * worktrees and branches, and its own worktree. Its branch stays, yours to
-   * merge or delete. The engine removes the goal's folder after (Engine.delete).
-   */
-  delete() {
-    return this.life(LIFE, async () => {
-      const { core, goal } = this;
-      if (!can(GOAL_MACHINE, goal.status, "delete"))
-        throw new Error(
-          `The goal "${goal.name}" isn't archived or closed: archive it before deleting it`
-        );
-      await this.scheduler.release(core.state.subtasks.map((s) => s.id));
-      await this.meetings.settled();
-      await removeGoal(core.places);
-    });
-  }
-  /** Closes the goal once nothing in it can go on (§4.1); the state changed, and this asks after every change. */
-  settle() {
-    const { goal } = this;
-    if (goal.status === "active" && over(workOf(this.core)))
-      goal.status = step(GOAL_MACHINE, goal.status, "close");
-  }
-  /** Switches how the goal works, from its next delivery and meeting on. */
-  switchSettings(change) {
-    const { goal } = this;
-    goal.settings = { ...goal.settings, ...change };
-    this.core.changed();
-  }
-  /** Makes the goal active again; false when it was already. */
-  wake() {
-    const { goal } = this;
-    if (goal.status === "active") return false;
-    if (goal.status === "closed") throw new Error(REFUSED.closed(goal));
-    goal.status = step(GOAL_MACHINE, goal.status, "resume");
-    return true;
-  }
-  get goal() {
-    return this.core.state.goal;
-  }
-  /** Holds the goal's work, cancels its meeting under way and, `plansToo`, its plans in review. */
-  hold(plansToo) {
-    this.scheduler.hold();
-    for (const meeting2 of this.core.state.meetings)
-      if (meeting2.status === "running" || plansToo && meeting2.status === "review")
-        void this.meetings.cancel(meeting2.id);
-    this.core.changed();
-  }
-};
-
-// src/engine/meetings.ts
-import { randomUUID } from "node:crypto";
-
-// src/engine/meeting-run.ts
-import { tool } from "@anthropic-ai/claude-agent-sdk";
-import { z as z3 } from "zod";
-
 // src/shared/text.ts
 var listOf = (items) => new Intl.ListFormat("en", { type: "conjunction" }).format(items);
 var toolText = (text2) => ({ content: [{ type: "text", text: text2 }] });
-
-// src/engine/plan.ts
-import { z } from "zod";
 
 // src/engine/prompts.ts
 var called = (member) => `${member.name} (${member.role.title})`;
@@ -8393,6 +8368,12 @@ ${delivery.summary}
 Files: ${files}
 
 Their worktree is ${input.cwd}. Read the files, and whatever else you need there, to check the work against the criteria, and stop once you can tell. Pass it when it meets them, even if you would have done it differently; send it back only for what really falls short, and say exactly what to fix.`;
+}
+function handBackPrompt(input) {
+  const { goal, cwd: cwd2, files } = input;
+  return `The team's work on the goal "${goal.name}" is done, and is being merged back into the branch "${goal.base}" it was cut from. In the goal's worktree, ${cwd2}, "${goal.base}" is being merged into the goal's branch, and the merge stopped on conflicts in: ${files.join(", ")}.
+
+Resolve them. Read both sides' commits (git log, git diff) to see what each side changed and why, and keep what both meant. Check the result as the repository's own instructions say to. Then stage everything and finish the merge with git commit. Change nothing the merge doesn't need.`;
 }
 function teammateQuestion(input) {
   const own = input.own.map(
@@ -8528,106 +8509,219 @@ var PLAN_FIELDS = {
   ownerAccepts: "Whether the user accepts this task themselves once it is done"
 };
 
-// src/engine/plan.ts
-var taskShape = (assignee) => ({
-  title: z.string().trim(),
-  outcome: z.string().trim().describe(PLAN_FIELDS.outcome),
-  subtasks: z.array(
-    z.object({
-      key: z.string().trim().describe(PLAN_FIELDS.key),
-      title: z.string().trim(),
-      description: z.string().trim(),
-      assignee,
-      depends_on: z.array(z.string()).describe(PLAN_FIELDS.dependsOn),
-      acceptance: z.string().trim()
-    })
-  )
-});
-var planShape = (task) => z.object({
-  summary: z.string().trim().describe(PLAN_FIELDS.summary),
-  plan_markdown: z.string().trim().describe(PLAN_FIELDS.markdown),
-  tasks: z.array(task)
-});
-var planSchema = (assignee) => planShape(
-  z.object({
-    ...taskShape(assignee),
-    owner_accepts: z.boolean().default(false).describe(PLAN_FIELDS.ownerAccepts)
-  })
+// src/engine/questions.ts
+import { randomUUID } from "node:crypto";
+var ASK_TOOL = "AskUserQuestion";
+var DOESNT_FIT = "That answer doesn't fit the question.";
+var ruleText = ({ toolName, ruleContent }) => ruleContent === void 0 ? toolName : `${toolName}(${ruleContent})`;
+var alwaysRules = (request2) => request2.matchedAskRule || request2.suppressAlwaysAllowRule ? [] : (request2.suggestions ?? []).flatMap(
+  (update) => update.type === "addRules" && update.behavior === "allow" ? update.rules : []
 );
-var hostPlanSchema = (members2) => planShape(z.object(taskShape(z.enum(members2).describe(PLAN_FIELDS.assignee))));
-var hostWritten = (plan) => ({
-  ...plan,
-  tasks: plan.tasks.map((task) => ({ ...task, owner_accepts: false }))
-});
-var writtenPlan = (plan) => ({
-  summary: plan.summary,
-  plan_markdown: plan.markdown,
-  tasks: plan.tasks.map((task) => ({
-    title: task.title,
-    outcome: task.outcome,
-    owner_accepts: task.ownerAccepts,
-    subtasks: task.subtasks.map(({ dependsOn, ...subtask2 }) => ({
-      ...subtask2,
-      depends_on: dependsOn
-    }))
-  }))
-});
-function loopingDependencies(tasks) {
-  const taskOf = new Map(tasks.flatMap((t) => t.subtasks.map((s) => [s.key, t])));
-  const waitsOn = new Map(tasks.flatMap((t) => t.subtasks.map((s) => [s.key, s.dependsOn])));
-  const state = /* @__PURE__ */ new Map();
-  const loops = [];
-  const follow = (key) => {
-    state.set(key, "open");
-    for (const dependency of waitsOn.get(key) ?? []) {
-      const task = taskOf.get(dependency);
-      if (!task) continue;
-      const awaited = task.ownerAccepts && task !== taskOf.get(key) ? task.subtasks.map((s) => s.key) : [dependency];
-      if (awaited.some((k) => state.get(k) === "open")) loops.push([key, dependency]);
-      else for (const k of awaited) if (!state.has(k)) follow(k);
-    }
-    state.set(key, "done");
-  };
-  for (const key of waitsOn.keys()) if (!state.has(key)) follow(key);
-  return loops;
-}
-function soundPlan(plan, loops) {
-  const used = /* @__PURE__ */ new Set();
-  const tasks = plan.tasks.filter((task) => task.subtasks.length).map((task, n) => ({
-    title: task.title || `Task ${String(n + 1)}`,
-    outcome: task.outcome,
-    ownerAccepts: task.owner_accepts,
-    subtasks: task.subtasks.map((sub, i) => {
-      let key = sub.key || `t${String(n + 1)}-${String(i + 1)}`;
-      while (used.has(key)) key = `${key}'`;
-      used.add(key);
-      return {
-        key,
-        title: sub.title || `Subtask ${String(i + 1)}`,
-        description: sub.description,
-        assignee: sub.assignee,
-        dependsOn: sub.depends_on,
-        acceptance: sub.acceptance
-      };
-    })
-  }));
-  if (!tasks.length) throw new Error("The plan has no tasks");
-  const subtasks = tasks.flatMap((task) => task.subtasks);
-  for (const subtask2 of subtasks)
-    subtask2.dependsOn = [...new Set(subtask2.dependsOn)].filter(
-      (key) => key !== subtask2.key && used.has(key)
-    );
-  const looping = loopingDependencies(tasks);
-  if (looping.length && loops === "refuse")
-    throw new Error(
-      `These dependencies go round in a loop, counting a task you accept as waited on whole: ${looping.map(([key, dependency]) => `${key} on ${dependency}`).join(", ")}. Drop them, or accept fewer tasks.`
-    );
-  for (const [key, dependency] of looping) {
-    const subtask2 = subtasks.find((s) => s.key === key);
-    if (subtask2) subtask2.dependsOn = subtask2.dependsOn.filter((k) => k !== dependency);
+var Questions = class {
+  constructor(inbox) {
+    this.inbox = inbox;
   }
-  return { summary: plan.summary, markdown: plan.plan_markdown, tasks };
-}
+  inbox;
+  /** What members' turns wait on now. */
+  live = [];
+  /** Questions a member's turn waits on: question id → resume it (undefined: called off). */
+  waiting = /* @__PURE__ */ new Map();
+  /** What members' turns wait on now: they end with the turn, and aren't in the state. */
+  now() {
+    return this.live;
+  }
+  /**
+   * The `canUseTool` of a member's turn: its questions with choices and
+   * every call its rules don't cover wait for you, and are called off when
+   * its run ends (`asker.signal`) or the SDK withdraws the request.
+   */
+  gate(asker) {
+    return (tool3, input, request2) => {
+      const who = { ...asker, signal: AbortSignal.any([asker.signal, request2.signal]) };
+      return tool3 === ASK_TOOL ? this.ask(who, input) : this.permit(who, tool3, input, request2);
+    };
+  }
+  /** A question put to you, open still; throws when it is no longer open. */
+  find(id) {
+    const question = this.all().find((q) => q.id === id && toYou(q));
+    if (!question) throw new Error("That question is no longer open.");
+    return question;
+  }
+  /**
+   * Answers a question put to you: a decision is the scheduler's to act on
+   * (Scheduler.decide). Throws when it is no longer open, or the answer
+   * doesn't fit it: not one of its options, not one pick per question, a
+   * task sent back without what to change.
+   */
+  answer(id, answer) {
+    const question = this.find(id);
+    if (!this.fits(question, answer)) throw new Error(DOESNT_FIT);
+    this.close(question, answer);
+  }
+  /**
+   * A member asks a teammate: the question is open while `answering` runs
+   * (the teammate's read-only turn), so the asker shows as waiting on them,
+   * and is closed when it settles. Its subtask's run stopping calls it
+   * off (cancelFor) and should stop `answering` too.
+   */
+  async toTeammate(asker, to, text2, answering) {
+    const question = this.open(asker, { text: text2, kind: "teammate", to });
+    try {
+      return await answering();
+    } finally {
+      if (this.live.includes(question)) this.close(question);
+    }
+  }
+  /**
+   * A stuck review, a merge that needs you, or a task done, on a subtask; or
+   * handing the goal's work back, or cleaning up (with why, or what, in
+   * `text`): it waits for your answer, no turn behind it. `on`: who puts
+   * it, and the subtask it is on, if one.
+   */
+  openDecision(on, decision, text2) {
+    const question = {
+      id: randomUUID(),
+      ...on,
+      text: text2,
+      kind: "decision",
+      decision
+    };
+    this.inbox.state.questions.push(question);
+    this.inbox.changed();
+  }
+  /**
+   * Calls off what a subtask's run waits on (the run ended or was stopped);
+   * with `decisions`, also your decisions on its review or merge (it left
+   * that stage).
+   */
+  cancelFor(subtaskId, decisions = false) {
+    this.cancelAll((q) => q.subtaskId === subtaskId && (decisions || q.kind !== "decision"));
+  }
+  /**
+   * Puts a decision to you again as `decision`, in its place: a question of
+   * its own, so the dialog asks it again as it is now, and an answer to it
+   * as it was no longer fits.
+   */
+  reask(question, decision) {
+    const { questions } = this.inbox.state;
+    questions[questions.indexOf(question)] = { ...question, id: randomUUID(), decision };
+    this.inbox.changed();
+  }
+  /** Calls off asking to hand the goal's work back: it was paused, and asks again as it resumes. */
+  cancelHandBack() {
+    this.cancelAll((q) => q.kind === "decision" && q.decision.kind === "handBack");
+  }
+  /** Calls off a task's delivery waiting on you, on one of `subtaskIds`, its subtasks: work in it is being done again. */
+  cancelDelivery(subtaskIds) {
+    this.cancelAll(
+      (q) => isAcceptance(q) && q.subtaskId !== void 0 && subtaskIds.includes(q.subtaskId)
+    );
+  }
+  /** A call the member's rules don't cover: allowed once, always, or denied. */
+  async permit(asker, tool3, input, request2) {
+    const rules = alwaysRules(request2);
+    const answer = await this.wait(asker, {
+      // A command comes with the member's own words for what it does.
+      text: request2.description ?? "",
+      kind: "permission",
+      permission: {
+        tool: tool3,
+        input,
+        options: rules.length ? ["once", "always", "deny"] : ["once", "deny"]
+      }
+    });
+    if (!answer) return { behavior: "deny", message: PERMISSION_REPLIES.calledOff };
+    switch (answer.option) {
+      case "once":
+        return { behavior: "allow", updatedInput: input };
+      case "always":
+        await this.inbox.allowAlways(rules.map(ruleText));
+        return {
+          behavior: "allow",
+          updatedInput: input,
+          updatedPermissions: [
+            { type: "addRules", rules, behavior: "allow", destination: "session" }
+          ]
+        };
+      case "deny":
+        return { behavior: "deny", message: PERMISSION_REPLIES.denied(answer.note) };
+    }
+  }
+  /** Questions with choices: your picks go back as the tool's answers. */
+  async ask(asker, input) {
+    const choices = input.questions.map((q) => ({
+      question: q.question,
+      header: q.header,
+      options: q.options.map((o) => ({ label: o.label, description: o.description })),
+      multiSelect: q.multiSelect
+    }));
+    const answer = await this.wait(asker, {
+      text: choices.map((c) => c.question).join("\n"),
+      kind: "choices",
+      choices
+    });
+    if (!answer) return { behavior: "deny", message: PERMISSION_REPLIES.calledOff };
+    const answers = Object.fromEntries(choices.map((c, i) => [c.question, answer.picks[i]]));
+    return { behavior: "allow", updatedInput: { ...input, answers } };
+  }
+  /** Whether `answer` is one `question` can take. */
+  fits(question, answer) {
+    switch (question.kind) {
+      case "permission":
+        return answer.kind === "permission" && question.permission.options.includes(answer.option);
+      case "choices":
+        return answer.kind === "choices" && answer.picks.length === question.choices.length;
+      case "decision":
+        return answer.kind === "decision" && question.decision.options.includes(answer.option) && (Boolean(answer.note) || !noteNeeded(question.decision, answer.option));
+    }
+  }
+  /**
+   * Puts a question to you and waits for your answer (answer() checks it
+   * fits). Undefined when the asker stops waiting first.
+   */
+  wait(asker, ask) {
+    if (asker.signal.aborted) return Promise.resolve(void 0);
+    const question = this.open(asker, ask);
+    return new Promise((resolve) => {
+      const callOff = () => {
+        this.close(question);
+      };
+      asker.signal.addEventListener("abort", callOff, { once: true });
+      this.waiting.set(question.id, (answer) => {
+        asker.signal.removeEventListener("abort", callOff);
+        resolve(answer);
+      });
+    });
+  }
+  /** A member's turn puts a question: to a teammate, or to you. */
+  open(asker, ask) {
+    const question = {
+      id: randomUUID(),
+      ...asker.subtaskId !== void 0 && { subtaskId: asker.subtaskId },
+      from: asker.from,
+      ...ask
+    };
+    this.live.push(question);
+    this.inbox.changed();
+    return question;
+  }
+  /** Every open question: your decisions, and what turns wait on. */
+  all() {
+    return [...this.inbox.state.questions, ...this.live];
+  }
+  /** Calls off every open question that `which` picks. */
+  cancelAll(which) {
+    for (const question of this.all().filter(which)) this.close(question);
+  }
+  /** Answers or calls off a question: it leaves, and whoever waits on it hears. */
+  close(question, answer) {
+    this.waiting.get(question.id)?.(answer);
+    this.waiting.delete(question.id);
+    this.live = this.live.filter((q) => q !== question);
+    this.inbox.state.questions = this.inbox.state.questions.filter((q) => q !== question);
+    this.inbox.changed();
+  }
+};
 
 // src/engine/turns.ts
 import { spawn as spawn2 } from "node:child_process";
@@ -8635,7 +8729,7 @@ import {
   createSdkMcpServer,
   query
 } from "@anthropic-ai/claude-agent-sdk";
-import { z as z2 } from "zod";
+import { z } from "zod";
 
 // src/engine/processes.ts
 import { execFile } from "node:child_process";
@@ -8966,7 +9060,7 @@ async function askOnce(params) {
       ...schema && {
         outputFormat: {
           type: "json_schema",
-          schema: z2.toJSONSchema(schema, { target: "draft-7" })
+          schema: z.toJSONSchema(schema, { target: "draft-7" })
         }
       }
     },
@@ -8978,6 +9072,381 @@ async function askOnce(params) {
   if (schema && outcome.structured === void 0)
     throw new Error("The model answered in words instead of the result asked for");
   return { text: outcome.text, structured: outcome.structured, session: session2 };
+}
+
+// src/engine/goals.ts
+var LIFE = "life";
+var Goals = class {
+  constructor(core, scheduler, meetings, questions) {
+    this.core = core;
+    this.scheduler = scheduler;
+    this.meetings = meetings;
+    this.questions = questions;
+  }
+  core;
+  scheduler;
+  meetings;
+  questions;
+  life = serialBy();
+  handing;
+  /**
+   * Pauses the goal: its runs stop, to go on in their sessions when it is
+   * resumed, and a meeting under way is cancelled; a plan in review stays,
+   * to approve once it goes on. Handing its work back stops, to be asked
+   * again as it resumes.
+   */
+  pause() {
+    return this.life(LIFE, () => {
+      const { goal } = this;
+      if (goal.status === "paused") return;
+      if (goal.status === "archived") throw new Error(REFUSED.archived(goal));
+      if (goal.status === "closed") throw new Error(REFUSED.closed(goal));
+      goal.status = step(GOAL_MACHINE, goal.status, "pause");
+      this.hold(false);
+    });
+  }
+  /** Archives the goal as it stands: its work held as when paused, and its plans in review dropped. */
+  archive() {
+    return this.life(LIFE, () => {
+      const { goal } = this;
+      if (goal.status === "archived") return;
+      if (goal.status === "closed") throw new Error(REFUSED.closed(goal));
+      goal.status = step(GOAL_MACHINE, goal.status, "archive");
+      this.hold(true);
+    });
+  }
+  /**
+   * Puts a paused or archived goal back to work, from where it was; then the
+   * meetings a session stopped as it let the goal go (§3.2), and only then
+   * other work, so a meeting's members go back to it before anything else
+   * takes them.
+   */
+  resume(meetings = []) {
+    return this.life(LIFE, () => {
+      if (!this.wake()) return;
+      for (const id of meetings) this.meetings.resume(id);
+      this.core.changed();
+      this.scheduler.pump();
+    });
+  }
+  /**
+   * Takes an archived or closed goal out of the repository for good: its
+   * subtasks' worktrees and branches, and its own worktree. An archived
+   * goal's branch stays, yours to merge or delete; a closed one's goes too.
+   * The engine removes the goal's folder after (Engine.delete).
+   */
+  delete() {
+    return this.life(LIFE, async () => {
+      const { core, goal } = this;
+      if (!can(GOAL_MACHINE, goal.status, "delete"))
+        throw new Error(
+          `The goal "${goal.name}" isn't archived or closed: archive it before deleting it`
+        );
+      await this.scheduler.release(core.state.subtasks.map((s) => s.id));
+      await this.meetings.settled();
+      await removeGoal(core.places, goal.status === "closed");
+    });
+  }
+  /** Stops handing the work back, as the engine shuts; settles once it has ended. */
+  async stop() {
+    this.handing?.abort.abort();
+    await this.handing?.ended;
+  }
+  /** The goal handing its work back now, for the rules to read (Work.handingBack). */
+  handingBack() {
+    const { handing } = this;
+    return handing && (handing.by === void 0 ? {} : { by: handing.by });
+  }
+  /**
+   * Moves an active goal on as its plan does (§4.1); the state changed, and
+   * this asks after every change. Its plan dropped, it closes. Its work done,
+   * the acceptance that is all it waits on offers to hand the work back too;
+   * with none waiting, it asks to hand the work back, or closes when there
+   * is none to.
+   */
+  settle() {
+    const { goal } = this;
+    if (goal.status !== "active" || this.handing) return;
+    const work = workOf(this.core);
+    const last = lastAcceptance(work);
+    if (last && !last.decision.options.includes("acceptMerge"))
+      this.questions.reask(last, DECISIONS.lastDelivery());
+    if (!over(work)) return;
+    if (!work.tasks.length) this.close();
+    else if (!work.questions.some(onGoal)) this.offer();
+  }
+  /**
+   * Carries out your decision on the goal (§4.1), or on the acceptance that
+   * is all it waits on: merge (accepting it too) hands the work back; not
+   * now (accepting it only) pauses the goal, which asks again as it resumes;
+   * keep leaves a closed goal as it is. Cleaning up is the engine's
+   * (Engine.answer). Throws as answering does.
+   */
+  async decide(question, answer) {
+    if (!question.decision.options.includes(answer.option)) throw new Error(DOESNT_FIT);
+    const active = this.goal.status === "active";
+    switch (answer.option) {
+      case "merge":
+      case "acceptMerge": {
+        const handing = active ? this.take() : void 0;
+        try {
+          if (answer.option === "merge") this.questions.answer(question.id, answer);
+          else await this.scheduler.decide(question.id, answer);
+        } catch (error) {
+          if (handing) this.let(handing);
+          throw error;
+        }
+        if (handing) handing.ended = this.handBack(handing);
+        return;
+      }
+      case "acceptOnly":
+        if (active) await this.pause();
+        await this.scheduler.decide(question.id, answer);
+        return;
+      case "notNow":
+        await this.pause();
+        return;
+      default:
+        this.questions.answer(question.id, answer);
+    }
+  }
+  /** Switches how the goal works, from its next delivery and meeting on. */
+  switchSettings(change) {
+    const { goal } = this;
+    goal.settings = { ...goal.settings, ...change };
+    this.core.changed();
+  }
+  /** Makes the goal active again; false when it was already. */
+  wake() {
+    const { goal } = this;
+    if (goal.status === "active") return false;
+    if (goal.status === "closed") throw new Error(REFUSED.closed(goal));
+    goal.status = step(GOAL_MACHINE, goal.status, "resume");
+    return true;
+  }
+  get goal() {
+    return this.core.state.goal;
+  }
+  /**
+   * Holds the goal's work, cancels its meeting under way and, `plansToo`,
+   * its plans in review; stops handing its work back, and calls off asking
+   * to.
+   */
+  hold(plansToo) {
+    this.scheduler.hold();
+    for (const meeting2 of this.core.state.meetings)
+      if (meeting2.status === "running" || plansToo && meeting2.status === "review")
+        void this.meetings.cancel(meeting2.id);
+    this.handing?.abort.abort();
+    this.questions.cancelHandBack();
+    this.core.changed();
+  }
+  /** Closes the goal (§4.1), and asks whether to clean it up. */
+  close() {
+    const { goal } = this;
+    goal.status = step(GOAL_MACHINE, goal.status, "close");
+    this.questions.openDecision({ from: this.lead }, DECISIONS.cleanUp(), "");
+  }
+  /** Asks to hand the work back; `text`, why it came back, if it did. */
+  ask(text2) {
+    this.questions.openDecision({ from: this.lead }, DECISIONS.handBack(), text2);
+  }
+  /** Asks to hand the work back once the goal's branch has commits the one it was cut from lacks; else closes. */
+  offer() {
+    const handing = this.take();
+    handing.ended = hasWork(this.core.places, this.goal.base).then(
+      (any) => {
+        this.let(handing);
+        if (this.goal.status !== "active") return;
+        if (any) this.ask("");
+        else this.close();
+      },
+      (error) => {
+        this.let(handing);
+        if (this.goal.status === "active") this.ask(errorText(error));
+      }
+    ).finally(() => {
+      this.core.changed();
+    });
+  }
+  /**
+   * Hands the work back (§5): `base` merged into the goal's branch, its
+   * conflicts resolved by the lead in a session of their own, then `base`
+   * fast-forwarded to it. Merged, the goal closes; else it comes back to
+   * you, saying why. Paused meanwhile, it stops, to be asked again.
+   */
+  async handBack(handing) {
+    const { core } = this;
+    const { signal } = handing.abort;
+    const by = this.lead;
+    try {
+      let merged = await handBackGoal(core.places, this.goal.base, by);
+      if (merged.kind === "conflict") {
+        handing.by = by;
+        core.changed();
+        await this.resolve(by, merged.files, signal);
+        merged = await handBackGoal(core.places, this.goal.base, by);
+        if (merged.kind === "conflict")
+          throw new Error(`Conflicts are left in ${merged.files.join(", ")}`);
+      }
+      this.let(handing);
+      if (can(GOAL_MACHINE, this.goal.status, "close")) this.close();
+    } catch (error) {
+      this.let(handing);
+      if (!signal.aborted && this.goal.status === "active") this.ask(errorText(error));
+    } finally {
+      core.changed();
+    }
+  }
+  /** The member `by` resolves the hand-back's `files` in conflict, in the goal's worktree, in a session of their own. */
+  async resolve(by, files, signal) {
+    const { core } = this;
+    const member = core.team.members.find((m) => m.name === by);
+    if (!member) throw new Error(`${by} isn't on the goal's team`);
+    const cwd2 = goalFiles(core.places.root).checkout;
+    const outcome = await runTurn(
+      handBackPrompt({ goal: this.goal, cwd: cwd2, files }),
+      {
+        ...core.options(member, "merge", cwd2),
+        canUseTool: this.questions.gate({ from: by, signal })
+      },
+      signal,
+      turnDecoder(core.recorder(HAND_BACK))
+    );
+    spend(core.state, by, outcome.tokens);
+    if (!outcome.ok) throw new Error(outcome.error);
+  }
+  /**
+   * Who leads the goal's end: resolves its hand-back's conflicts, and puts
+   * its decisions to you. The host of its meeting, else the member its work
+   * was given to.
+   */
+  get lead() {
+    const { meetings, subtasks } = this.core.state;
+    const meeting2 = meetings.find((m) => m.status === "approved") ?? meetings[0];
+    const lead = meeting2 ? hostOf(meeting2) : subtasks[0]?.assignee;
+    if (lead === void 0) throw new Error("The goal has neither a meeting nor work");
+    return lead;
+  }
+  /** Marks the goal handing its work back, or finding out whether it has any to. */
+  take() {
+    const handing = { abort: new AbortController() };
+    this.handing = handing;
+    return handing;
+  }
+  /** Lets go of `handing`, unless another took its place. */
+  let(handing) {
+    if (this.handing === handing) this.handing = void 0;
+  }
+};
+
+// src/engine/meetings.ts
+import { randomUUID as randomUUID2 } from "node:crypto";
+
+// src/engine/meeting-run.ts
+import { tool } from "@anthropic-ai/claude-agent-sdk";
+import { z as z3 } from "zod";
+
+// src/engine/plan.ts
+import { z as z2 } from "zod";
+var taskShape = (assignee) => ({
+  title: z2.string().trim(),
+  outcome: z2.string().trim().describe(PLAN_FIELDS.outcome),
+  subtasks: z2.array(
+    z2.object({
+      key: z2.string().trim().describe(PLAN_FIELDS.key),
+      title: z2.string().trim(),
+      description: z2.string().trim(),
+      assignee,
+      depends_on: z2.array(z2.string()).describe(PLAN_FIELDS.dependsOn),
+      acceptance: z2.string().trim()
+    })
+  )
+});
+var planShape = (task) => z2.object({
+  summary: z2.string().trim().describe(PLAN_FIELDS.summary),
+  plan_markdown: z2.string().trim().describe(PLAN_FIELDS.markdown),
+  tasks: z2.array(task)
+});
+var planSchema = (assignee) => planShape(
+  z2.object({
+    ...taskShape(assignee),
+    owner_accepts: z2.boolean().default(false).describe(PLAN_FIELDS.ownerAccepts)
+  })
+);
+var hostPlanSchema = (members2) => planShape(z2.object(taskShape(z2.enum(members2).describe(PLAN_FIELDS.assignee))));
+var hostWritten = (plan) => ({
+  ...plan,
+  tasks: plan.tasks.map((task) => ({ ...task, owner_accepts: false }))
+});
+var writtenPlan = (plan) => ({
+  summary: plan.summary,
+  plan_markdown: plan.markdown,
+  tasks: plan.tasks.map((task) => ({
+    title: task.title,
+    outcome: task.outcome,
+    owner_accepts: task.ownerAccepts,
+    subtasks: task.subtasks.map(({ dependsOn, ...subtask2 }) => ({
+      ...subtask2,
+      depends_on: dependsOn
+    }))
+  }))
+});
+function loopingDependencies(tasks) {
+  const taskOf = new Map(tasks.flatMap((t) => t.subtasks.map((s) => [s.key, t])));
+  const waitsOn = new Map(tasks.flatMap((t) => t.subtasks.map((s) => [s.key, s.dependsOn])));
+  const state = /* @__PURE__ */ new Map();
+  const loops = [];
+  const follow = (key) => {
+    state.set(key, "open");
+    for (const dependency of waitsOn.get(key) ?? []) {
+      const task = taskOf.get(dependency);
+      if (!task) continue;
+      const awaited = task.ownerAccepts && task !== taskOf.get(key) ? task.subtasks.map((s) => s.key) : [dependency];
+      if (awaited.some((k) => state.get(k) === "open")) loops.push([key, dependency]);
+      else for (const k of awaited) if (!state.has(k)) follow(k);
+    }
+    state.set(key, "done");
+  };
+  for (const key of waitsOn.keys()) if (!state.has(key)) follow(key);
+  return loops;
+}
+function soundPlan(plan, loops) {
+  const used = /* @__PURE__ */ new Set();
+  const tasks = plan.tasks.filter((task) => task.subtasks.length).map((task, n) => ({
+    title: task.title || `Task ${String(n + 1)}`,
+    outcome: task.outcome,
+    ownerAccepts: task.owner_accepts,
+    subtasks: task.subtasks.map((sub, i) => {
+      let key = sub.key || `t${String(n + 1)}-${String(i + 1)}`;
+      while (used.has(key)) key = `${key}'`;
+      used.add(key);
+      return {
+        key,
+        title: sub.title || `Subtask ${String(i + 1)}`,
+        description: sub.description,
+        assignee: sub.assignee,
+        dependsOn: sub.depends_on,
+        acceptance: sub.acceptance
+      };
+    })
+  }));
+  if (!tasks.length) throw new Error("The plan has no tasks");
+  const subtasks = tasks.flatMap((task) => task.subtasks);
+  for (const subtask2 of subtasks)
+    subtask2.dependsOn = [...new Set(subtask2.dependsOn)].filter(
+      (key) => key !== subtask2.key && used.has(key)
+    );
+  const looping = loopingDependencies(tasks);
+  if (looping.length && loops === "refuse")
+    throw new Error(
+      `These dependencies go round in a loop, counting a task you accept as waited on whole: ${looping.map(([key, dependency]) => `${key} on ${dependency}`).join(", ")}. Drop them, or accept fewer tasks.`
+    );
+  for (const [key, dependency] of looping) {
+    const subtask2 = subtasks.find((s) => s.key === key);
+    if (subtask2) subtask2.dependsOn = subtask2.dependsOn.filter((k) => k !== dependency);
+  }
+  return { summary: plan.summary, markdown: plan.plan_markdown, tasks };
 }
 
 // src/engine/meeting-run.ts
@@ -9253,7 +9722,7 @@ var Meetings = class {
     if (call.hostOnly && participants.length < 2)
       throw new Error(`${participants[0]} can't only run a meeting with nobody else at it`);
     const meeting2 = {
-      id: randomUUID(),
+      id: randomUUID2(),
       agenda: call.agenda,
       size: call.size,
       participants,
@@ -9703,203 +10172,6 @@ function sessionOptions(seat, kind, from) {
     ...readOnly && { tools: READ_ONLY_TOOLS, strictMcpConfig: true }
   };
 }
-
-// src/engine/questions.ts
-import { randomUUID as randomUUID2 } from "node:crypto";
-var ASK_TOOL = "AskUserQuestion";
-var DOESNT_FIT = "That answer doesn't fit the question.";
-var ruleText = ({ toolName, ruleContent }) => ruleContent === void 0 ? toolName : `${toolName}(${ruleContent})`;
-var alwaysRules = (request2) => request2.matchedAskRule || request2.suppressAlwaysAllowRule ? [] : (request2.suggestions ?? []).flatMap(
-  (update) => update.type === "addRules" && update.behavior === "allow" ? update.rules : []
-);
-var Questions = class {
-  constructor(inbox) {
-    this.inbox = inbox;
-  }
-  inbox;
-  /** What members' turns wait on now. */
-  live = [];
-  /** Questions a member's turn waits on: question id → resume it (undefined: called off). */
-  waiting = /* @__PURE__ */ new Map();
-  /** What members' turns wait on now: they end with the turn, and aren't in the state. */
-  now() {
-    return this.live;
-  }
-  /**
-   * The `canUseTool` of a member's turn: its questions with choices and
-   * every call its rules don't cover wait for you, and are called off when
-   * its run ends (`asker.signal`) or the SDK withdraws the request.
-   */
-  gate(asker) {
-    return (tool3, input, request2) => {
-      const who = { ...asker, signal: AbortSignal.any([asker.signal, request2.signal]) };
-      return tool3 === ASK_TOOL ? this.ask(who, input) : this.permit(who, tool3, input, request2);
-    };
-  }
-  /** A question put to you, open still; throws when it is no longer open. */
-  find(id) {
-    const question = this.all().find((q) => q.id === id && toYou(q));
-    if (!question) throw new Error("That question is no longer open.");
-    return question;
-  }
-  /**
-   * Answers a question put to you: a decision is the scheduler's to act on
-   * (Scheduler.decide). Throws when it is no longer open, or the answer
-   * doesn't fit it: not one of its options, not one pick per question, a
-   * task sent back without what to change.
-   */
-  answer(id, answer) {
-    const question = this.find(id);
-    if (!this.fits(question, answer)) throw new Error(DOESNT_FIT);
-    this.close(question, answer);
-  }
-  /**
-   * A member asks a teammate: the question is open while `answering` runs
-   * (the teammate's read-only turn), so the asker shows as waiting on them,
-   * and is closed when it settles. Its subtask's run stopping calls it
-   * off (cancelFor) and should stop `answering` too.
-   */
-  async toTeammate(asker, to, text2, answering) {
-    const question = this.open(asker, { text: text2, kind: "teammate", to });
-    try {
-      return await answering();
-    } finally {
-      if (this.live.includes(question)) this.close(question);
-    }
-  }
-  /**
-   * A stuck review, a merge that needs you, or a task done (with why, or
-   * what, in `text`): it waits for your answer, no turn behind it.
-   */
-  openDecision(subtask2, decision, text2) {
-    const question = {
-      id: randomUUID2(),
-      subtaskId: subtask2.id,
-      from: subtask2.assignee,
-      text: text2,
-      kind: "decision",
-      decision
-    };
-    this.inbox.state.questions.push(question);
-    this.inbox.changed();
-  }
-  /**
-   * Calls off what a subtask's run waits on (the run ended or was stopped);
-   * with `decisions`, also your decisions on its review or merge (it left
-   * that stage).
-   */
-  cancelFor(subtaskId, decisions = false) {
-    this.cancelAll((q) => q.subtaskId === subtaskId && (decisions || q.kind !== "decision"));
-  }
-  /** Calls off a task's delivery waiting on you, on one of `subtaskIds`, its subtasks: work in it is being done again. */
-  cancelDelivery(subtaskIds) {
-    this.cancelAll((q) => isAcceptance(q) && subtaskIds.includes(q.subtaskId));
-  }
-  /** A call the member's rules don't cover: allowed once, always, or denied. */
-  async permit(asker, tool3, input, request2) {
-    const rules = alwaysRules(request2);
-    const answer = await this.wait(asker, {
-      // A command comes with the member's own words for what it does.
-      text: request2.description ?? "",
-      kind: "permission",
-      permission: {
-        tool: tool3,
-        input,
-        options: rules.length ? ["once", "always", "deny"] : ["once", "deny"]
-      }
-    });
-    if (!answer) return { behavior: "deny", message: PERMISSION_REPLIES.calledOff };
-    switch (answer.option) {
-      case "once":
-        return { behavior: "allow", updatedInput: input };
-      case "always":
-        await this.inbox.allowAlways(rules.map(ruleText));
-        return {
-          behavior: "allow",
-          updatedInput: input,
-          updatedPermissions: [
-            { type: "addRules", rules, behavior: "allow", destination: "session" }
-          ]
-        };
-      case "deny":
-        return { behavior: "deny", message: PERMISSION_REPLIES.denied(answer.note) };
-    }
-  }
-  /** Questions with choices: your picks go back as the tool's answers. */
-  async ask(asker, input) {
-    const choices = input.questions.map((q) => ({
-      question: q.question,
-      header: q.header,
-      options: q.options.map((o) => ({ label: o.label, description: o.description })),
-      multiSelect: q.multiSelect
-    }));
-    const answer = await this.wait(asker, {
-      text: choices.map((c) => c.question).join("\n"),
-      kind: "choices",
-      choices
-    });
-    if (!answer) return { behavior: "deny", message: PERMISSION_REPLIES.calledOff };
-    const answers = Object.fromEntries(choices.map((c, i) => [c.question, answer.picks[i]]));
-    return { behavior: "allow", updatedInput: { ...input, answers } };
-  }
-  /** Whether `answer` is one `question` can take. */
-  fits(question, answer) {
-    switch (question.kind) {
-      case "permission":
-        return answer.kind === "permission" && question.permission.options.includes(answer.option);
-      case "choices":
-        return answer.kind === "choices" && answer.picks.length === question.choices.length;
-      case "decision":
-        return answer.kind === "decision" && question.decision.options.includes(answer.option) && (Boolean(answer.note) || !noteNeeded(question.decision, answer.option));
-    }
-  }
-  /**
-   * Puts a question to you and waits for your answer (answer() checks it
-   * fits). Undefined when the asker stops waiting first.
-   */
-  wait(asker, ask) {
-    if (asker.signal.aborted) return Promise.resolve(void 0);
-    const question = this.open(asker, ask);
-    return new Promise((resolve) => {
-      const callOff = () => {
-        this.close(question);
-      };
-      asker.signal.addEventListener("abort", callOff, { once: true });
-      this.waiting.set(question.id, (answer) => {
-        asker.signal.removeEventListener("abort", callOff);
-        resolve(answer);
-      });
-    });
-  }
-  /** A member's turn puts a question: to a teammate, or to you. */
-  open(asker, ask) {
-    const question = {
-      id: randomUUID2(),
-      subtaskId: asker.subtaskId,
-      from: asker.from,
-      ...ask
-    };
-    this.live.push(question);
-    this.inbox.changed();
-    return question;
-  }
-  /** Every open question: your decisions, and what turns wait on. */
-  all() {
-    return [...this.inbox.state.questions, ...this.live];
-  }
-  /** Calls off every open question that `which` picks. */
-  cancelAll(which) {
-    for (const question of this.all().filter(which)) this.close(question);
-  }
-  /** Answers or calls off a question: it leaves, and whoever waits on it hears. */
-  close(question, answer) {
-    this.waiting.get(question.id)?.(answer);
-    this.waiting.delete(question.id);
-    this.live = this.live.filter((q) => q !== question);
-    this.inbox.state.questions = this.inbox.state.questions.filter((q) => q !== question);
-    this.inbox.changed();
-  }
-};
 
 // src/engine/records.ts
 import { randomUUID as randomUUID3 } from "node:crypto";
@@ -10418,7 +10690,7 @@ var Scheduler = class {
     if (question.kind !== "decision" || !canSendBack(this.core.state, question, answer.sentBack))
       throw new Error(DOESNT_FIT);
     this.questions.answer(id, answer);
-    const subtask2 = this.subtask(question.subtaskId);
+    const subtask2 = question.subtaskId && this.subtask(question.subtaskId);
     if (!subtask2) return;
     const { option: pick, note = "" } = answer;
     if (question.decision.kind === "delivery") {
@@ -10472,7 +10744,7 @@ var Scheduler = class {
   /** A review or merge waits on your decision: `text`, what it came to, if it says more. */
   ask(subtask2, decision, text2) {
     this.move(subtask2, decision.kind === "review" ? "askReview" : "askMerge");
-    this.questions.openDecision(subtask2, decision, text2);
+    this.questions.openDecision({ from: subtask2.assignee, subtaskId: subtask2.id }, decision, text2);
   }
   /**
    * Moves a subtask by its machine. Leaving where it waits on you calls off
@@ -10550,7 +10822,7 @@ var Scheduler = class {
       const { goal } = this;
       const task = this.taskOf(subtask2);
       const desk = await openDesk(core.places, subtask2.id);
-      const recorder = core.recorder(subtask2);
+      const recorder = core.recorder(subtask2.id);
       outcome = await runSubtask({
         options: core.options(member, "work", desk),
         opening: goOn ? goOnMessage(goOn, subtask2) : taskBrief({
@@ -10705,7 +10977,11 @@ ${outcome.handover.summary}`
     subtask2.finishedAt = Date.now();
     subtask2.progress = { done: subtask2.progress.total, total: subtask2.progress.total };
     if (!taskDone(this.core.state, subtask2.taskId) || !this.taskOf(subtask2).ownerAccepts) return;
-    this.questions.openDecision(subtask2, DECISIONS.delivery(), this.taskOf(subtask2).title);
+    this.questions.openDecision(
+      { from: subtask2.assignee, subtaskId: subtask2.id },
+      DECISIONS.delivery(),
+      this.taskOf(subtask2).title
+    );
   }
 };
 
@@ -10737,18 +11013,22 @@ var RepositoryGoals = class _RepositoryGoals {
   }
   /** A goal as its files left it, with nothing under way: as a session that doesn't run it reads it. */
   async stored(slug, state) {
-    const { team } = await readCopy(this.goal(slug).files.team);
+    const { folder, files } = this.goal(slug);
+    const { team } = await readCopy(files.team);
     return workOf({
       state,
       team,
+      places: { repo: this.repo, slug, root: folder },
       underWay: () => [],
       meetingsNow: () => ({}),
-      questionsNow: () => []
+      questionsNow: () => [],
+      handingBack: () => void 0
     });
   }
 };
 
 // src/engine/engine.ts
+var GOAL_OPTIONS = ["acceptMerge", "acceptOnly"];
 var Engine = class _Engine {
   constructor(core, records, files, writer, options, copy) {
     this.core = core;
@@ -10759,7 +11039,7 @@ var Engine = class _Engine {
     const questions = new Questions(core);
     const scheduler = new Scheduler(core, questions);
     const meetings = new Meetings(core, scheduler);
-    const goals = new Goals(core, scheduler, meetings);
+    const goals = new Goals(core, scheduler, meetings, questions);
     this.parts = { questions, scheduler, meetings, goals, records };
     this.scheduler = scheduler;
     this.meetings = meetings;
@@ -10782,14 +11062,19 @@ var Engine = class _Engine {
   parts;
   /**
    * Starts a goal for this session: a folder of its own, the team copied
-   * into it as its files have it now, its settings too (§6, §6.1),
-   * and its branch cut from your HEAD, or from `after`, the branch of the
-   * closed goal it carries on from, where you haven't merged that yet (§5),
-   * checked out in its own worktree.
+   * into it as its files have it now, its settings too (§6, §6.1), and its
+   * branch cut from the branch your checkout is on, which it hands its work
+   * back to (§5), checked out in its own worktree. Refused on a detached
+   * HEAD: there is no branch to hand the work back to.
    */
-  static async start(options, name, after) {
+  static async start(options, name) {
     const goals = await RepositoryGoals.of(options.dataFolder, options.cwd);
     const { repo } = goals;
+    const base = await currentBranch(options.cwd);
+    if (!base)
+      throw new Error(
+        "Your checkout is on a detached HEAD: check out a branch first, for the goal to merge its work back into."
+      );
     const copy = await loadTeam(options.userTeam, repo.top);
     teamSettings(copy.settings, copy.team.members, options.env, options.plugins);
     const { slug, folder } = await newGoalFolder(goals.folder, name, await takenSlugs(repo));
@@ -10800,9 +11085,16 @@ var Engine = class _Engine {
       await takeLock(files.lock, me, (holder) => options.takeOver(holder, slug));
       await copyTeam(files.team, copy);
       const places = { repo, slug, root: folder };
-      await openGoal(places, after);
+      await openGoal(places, base);
       const state = {
-        goal: { name, slug, status: "active", createdAt: Date.now(), settings: copy.goalSettings },
+        goal: {
+          name,
+          slug,
+          status: "active",
+          createdAt: Date.now(),
+          settings: copy.goalSettings,
+          base
+        },
         tasks: [],
         subtasks: [],
         meetings: [],
@@ -10873,11 +11165,12 @@ var Engine = class _Engine {
       },
       allowAlways: (rules) => engine.allow(rules),
       options: (member, kind, cwd2) => engine.turnOptions(member, kind, cwd2),
-      recorder: (subtask2) => records.recorder(subtask2.id),
+      recorder: (id) => records.recorder(id),
       speech: (meeting2) => records.speech(meeting2),
       underWay: () => engine.parts.scheduler.underWay(),
       meetingsNow: () => engine.parts.meetings.now(),
-      questionsNow: () => engine.parts.questions.now()
+      questionsNow: () => engine.parts.questions.now(),
+      handingBack: () => engine.parts.goals.handingBack()
     };
     const engine = new _Engine(core, records, files, writer, options, copy);
     await engine.writeMemberSettings(copy);
@@ -10898,13 +11191,28 @@ var Engine = class _Engine {
     this.parts.goals.switchSettings(change);
   }
   /**
-   * Answers a question put to you, and carries out a decision (a stuck
-   * review, a merge, a task done). Throws when it is no longer open or the
-   * answer doesn't fit it.
+   * Answers a question put to you, and carries out a decision: on a subtask
+   * (a stuck review, a merge, a task done), or on the goal (handing its work
+   * back, cleaning up; §4.1). Cleaning up deletes the goal (delete): true
+   * then. Throws when it is no longer open or the answer doesn't fit it.
    */
   async answer(id, answer) {
-    if (answer.kind === "decision") await this.parts.scheduler.decide(id, answer);
-    else this.parts.questions.answer(id, answer);
+    const { questions, goals, scheduler } = this.parts;
+    if (answer.kind !== "decision") {
+      questions.answer(id, answer);
+      return false;
+    }
+    const question = questions.find(id);
+    if (question.kind !== "decision") throw new Error(DOESNT_FIT);
+    if (answer.option === "cleanUp") {
+      questions.answer(id, answer);
+      await this.delete();
+      return true;
+    }
+    if (onGoal(question) || GOAL_OPTIONS.includes(answer.option))
+      await goals.decide(question, answer);
+    else await scheduler.decide(id, answer);
+    return false;
   }
   /**
    * Closes the goal as the session ends or lets it go (§3.2): an active goal
@@ -10925,8 +11233,9 @@ var Engine = class _Engine {
     return stopped;
   }
   /**
-   * Deletes an archived goal for good (§4.1): its worktrees and subtask
-   * branches, then its folder. Its branch stays, yours to merge or delete.
+   * Deletes an archived or closed goal for good (§4.1): its worktrees and
+   * subtask branches, then its folder. An archived goal's branch stays,
+   * yours to merge or delete; a closed goal's goes too.
    */
   async delete() {
     await this.parts.goals.delete();
@@ -10949,7 +11258,11 @@ var Engine = class _Engine {
    */
   async shut() {
     try {
-      await Promise.all([this.parts.scheduler.close(), this.parts.meetings.close()]);
+      await Promise.all([
+        this.parts.scheduler.close(),
+        this.parts.meetings.close(),
+        this.parts.goals.stop()
+      ]);
       await Promise.all([this.writer.close(), this.parts.records.flush()]);
     } finally {
       await stopRecording();
@@ -11069,8 +11382,8 @@ function waitText(wait, work) {
       return `waits for "${first?.title ?? ""}" to start first`;
     }
     case "merge": {
-      const ahead3 = work.subtasks.find((s) => s.id === wait.subtaskId);
-      return `waits until "${ahead3?.title ?? ""}" is merged`;
+      const ahead2 = work.subtasks.find((s) => s.id === wait.subtaskId);
+      return `waits until "${ahead2?.title ?? ""}" is merged`;
     }
     case "teammate":
       return `asked ${wait.by}`;
@@ -11128,7 +11441,8 @@ function callText(permission) {
 function needWords(question, work) {
   const subtask2 = work.subtasks.find((s) => s.id === question.subtaskId);
   const title = subtask2?.title;
-  const about = title ? ` for "${title}"` : "";
+  const about = title ? ` for "${title}"` : question.subtaskId ? "" : " while merging the goal back";
+  const { goal } = work;
   switch (question.kind) {
     case "permission":
       return {
@@ -11157,15 +11471,34 @@ function needWords(question, work) {
             detail: question.text
           };
         case "delivery": {
-          const delivered = work.subtasks.filter((s) => s.taskId === subtask2?.taskId && s.delivery).map((s) => `- ${s.title}, by ${s.assignee}: ${s.delivery?.summary ?? ""}`);
+          const delivered = deliveredText(
+            work,
+            work.subtasks.filter((s) => s.taskId === subtask2?.taskId)
+          );
+          const last = question.decision.options.includes("acceptMerge");
           return {
-            headline: `The task "${question.text}" is done. Accept it?`,
-            ...delivered.length && { detail: delivered.join("\n") }
+            headline: last ? `The task "${question.text}" is done, and with it the goal. Accept it, and merge the goal into ${goal.base}?` : `The task "${question.text}" is done. Accept it?`,
+            detail: delivered
           };
         }
+        case "handBack":
+          return {
+            headline: question.text ? `Merging "${goal.name}" into ${goal.base} came back. Merge again?` : `"${goal.name}" is done. Merge it into ${goal.base}?`,
+            detail: question.text || deliveredText(work, work.subtasks)
+          };
+        case "cleanUp":
+          return {
+            headline: `"${goal.name}" is closed. Clean it up: its worktree, its branch, its records?`
+          };
       }
   }
 }
+var deliveredText = (work, subtasks) => [
+  ...subtasks.flatMap(
+    (s) => s.delivery ? [`- ${s.title}, by ${s.assignee}: ${s.delivery.summary}`] : []
+  ),
+  `Try it in ${work.checkout}`
+].join("\n");
 function planWords(plan, work) {
   const titles = new Map(plan.tasks.flatMap((t) => t.subtasks.map((s) => [s.key, s.title])));
   const lines = plan.tasks.map((task, i) => {
@@ -11180,6 +11513,7 @@ function planWords(plan, work) {
     detail: lines.join("\n")
   };
 }
+var takeable = (entry) => !("state" in entry && entry.state.goal.status === "closed");
 var whereOf = (entry) => entry.holder ? "elsewhere" : !("state" in entry) ? "unreadable" : entry.state.goal.status === "archived" ? "archived" : "paused";
 var WHERE_WORDS = {
   elsewhere: "in another session",
@@ -11398,6 +11732,7 @@ function bandText(work, needs) {
   if (work.meetings.some((m) => m.status === "review")) parts.push(PLAN_TO_REVIEW);
   const working = work.subtasks.filter((s) => s.status === "running").length;
   if (working) parts.push(`${String(working)} working`);
+  if (work.handingBack) parts.push(`merging into ${work.goal.base}`);
   if (needs) parts.push(`${plural(needs, "needs", "need")} you`);
   const { status } = work.goal;
   if (!parts.length) parts.push(status === "active" ? "idle" : status);
@@ -11525,7 +11860,13 @@ var OPTION_LABELS = {
   retry: "Retry",
   stop: "Stop",
   accept: "Accept",
-  revise: "Send back"
+  revise: "Send back",
+  acceptMerge: "Accept and merge",
+  acceptOnly: "Accept only",
+  merge: "Merge",
+  notNow: "Not now",
+  cleanUp: "Clean up",
+  keep: "Keep"
 };
 var NOTE_PROMPTS = {
   deny: "Or deny it, saying why",
@@ -11712,7 +12053,7 @@ function addPaneTools(server2, session2, pane2) {
       inputSchema: answerInput.shape
     },
     async ({ question, answer }) => {
-      await session2.goal.answer(
+      await session2.answer(
         question,
         answer.kind === "choices" ? answer : isPermission(answer.option) ? { kind: "permission", option: answer.option, note: answer.note } : { ...answer, kind: "decision", option: answer.option }
       );
@@ -11788,7 +12129,7 @@ function addPaneTools(server2, session2, pane2) {
   );
 }
 function handOffText(task, goal, members2) {
-  const runs = goal ? `It is a new goal: this session's goal "${goal.name}" is ${goal.status}${goal.status === "closed" ? ", and the new one carries on from its branch" : ", and starting the new one lets it go"}.` : "It is a new goal: this session runs none yet.";
+  const runs = goal ? `It is a new goal: this session's goal "${goal.name}" is ${goal.status}, and starting the new one lets it go.` : "It is a new goal: this session runs none yet.";
   return [
     "The user hands this to cc-huddle's team: take it on as cc-huddle's team skill says.",
     "",
@@ -11835,10 +12176,10 @@ var Session = class {
    * members run, found as a goal first opens. `changed`: the session's goal
    * is another now, or it has none.
    */
-  constructor(options, claude2, changed) {
+  constructor(options, claude2, changed2) {
     this.options = options;
     this.claude = claude2;
-    this.changed = changed;
+    this.changed = changed2;
   }
   options;
   claude;
@@ -11873,15 +12214,22 @@ var Session = class {
   }
   /**
    * Starts a goal here, with the team's settings as they are now: refused while
-   * this session's goal is active; a paused, archived or closed one is let
-   * go, and a closed one is carried on from (§5).
+   * this session's goal is active; a paused, archived or closed one is let go.
    */
   start(name) {
     return this.turn(TURN, async () => {
-      const last = this.engine?.work.goal;
-      const after = last?.status === "closed" ? goalBranch(last.slug) : void 0;
       await this.leave();
-      return this.run(await Engine.start(await this.engineOptions(), name, after));
+      return this.run(await Engine.start(await this.engineOptions(), name));
+    });
+  }
+  /** Answers a question put to you on the session's goal (Engine.answer): cleaning up, it runs none after. */
+  async answer(id, answer) {
+    const engine = this.goal;
+    if (!await engine.answer(id, answer)) return;
+    await this.turn(TURN, () => {
+      if (this.engine !== engine) return;
+      this.engine = void 0;
+      this.changed(void 0);
     });
   }
   /**
@@ -11949,9 +12297,7 @@ var Session = class {
   /** Of the repository's goals (`goals`), those this session doesn't run and could take up: closed ones have nothing to go on with. */
   othersOf(goals) {
     const mine = this.engine?.work.goal.slug;
-    return goals.filter(
-      (entry) => entry.slug !== mine && !("state" in entry && entry.state.goal.status === "closed")
-    );
+    return goals.filter((entry) => entry.slug !== mine && takeable(entry));
   }
   /** The repository's goals this session doesn't run, oldest first. */
   async others() {
@@ -12006,6 +12352,7 @@ function subtaskLine(subtask2, { waits }, work) {
   if (step2) parts.push(step2);
   parts.push(...waits.map((w) => waitText(w, work)));
   if (subtask2.error) parts.push(`error: ${subtask2.error}`);
+  if (subtask2.delivery) parts.push(`delivered: ${subtask2.delivery.summary}`);
   return `    - ${subtask2.title} [${subtask2.id}], ${subtask2.assignee}: ${parts.join(", ")}`;
 }
 function questionLine(question, work) {
@@ -12019,9 +12366,13 @@ function statusText(work) {
   const busy = new Set(derived.busy);
   const { goal } = work;
   const lines = [
-    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)}; review ${goal.settings.review ? "on" : "off"}, ${goal.settings.meetingSize} meetings, parallel ${goal.settings.parallel ? "on" : "off"}`,
+    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)} (cut from ${goal.base}, checked out in ${work.checkout}); review ${goal.settings.review ? "on" : "off"}, ${goal.settings.meetingSize} meetings, parallel ${goal.settings.parallel ? "on" : "off"}`,
     `Team: ${work.members.map((m) => busy.has(m) ? `${m} (busy)` : m).join(", ")}`
   ];
+  if (work.handingBack)
+    lines.push(
+      `  Merging back into ${goal.base}${work.handingBack.by ? `: ${work.handingBack.by} resolves its conflicts` : ""}`
+    );
   for (const meeting2 of work.meetings.filter((m) => m.status !== "approved"))
     lines.push(
       `  Meeting [${meeting2.id}], ${hostText(meeting2)}: ${meetingStatus(meeting2, work.meetingsNow[meeting2.id])}${derived.resumable.includes(meeting2.id) ? "; it can go on" : ""}`
@@ -12090,7 +12441,7 @@ function addTools(server2, session2) {
   server2.registerTool(
     "start_goal",
     {
-      description: "Start a goal in this session: something the user wants done. It gets its own branch, cut from the repository's HEAD (or from the session's last goal, closed, where HEAD lacks its work), and its own copy of the team. A session runs one goal: refused while its goal is under way. Then plan it once: a meeting of the members the user picked, or, with one picked, the task assigned to them. Nothing is added to a goal after.",
+      description: "Start a goal in this session: something the user wants done. It gets its own branch, cut from the branch the user's checkout is on, which it merges its work back into once done and the user agrees, and its own copy of the team. A session runs one goal: refused while its goal is under way. Then plan it once: a meeting of the members the user picked, or, with one picked, the task assigned to them. Nothing is added to a goal after.",
       inputSchema: { name: z9.string().trim().min(1).describe("A few words for what is wanted") }
     },
     async ({ name }) => {
@@ -12186,7 +12537,7 @@ function addTools(server2, session2) {
   server2.registerTool(
     "goal_action",
     {
-      description: "Pause this session's goal (its runs stop, to go on later in their sessions), resume it, archive it, or delete it once archived or closed: its folder, worktrees and subtask branches go, its own branch stays. Delete only when the user has confirmed it.",
+      description: "Pause this session's goal (its runs stop, to go on later in their sessions), resume it, archive it, or delete it once archived or closed: its folder, worktrees and subtask branches go, and its own branch stays unless it is closed (merged back by then). Delete only when the user has confirmed it.",
       inputSchema: goalActionInput.shape,
       annotations: { destructiveHint: true }
     },
@@ -12213,7 +12564,7 @@ function addTools(server2, session2) {
   server2.registerTool(
     "decide",
     {
-      description: "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask), a stuck review (rereview, skip, sendBack; one that failed goes back only with a note), or a merge (ours, theirs, retry; one git failed on: retry, stop).",
+      description: "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask; where it is all the goal waits on: acceptMerge, acceptOnly, revise), a stuck review (rereview, skip, sendBack; one that failed goes back only with a note), a merge (ours, theirs, retry; one git failed on: retry, stop), the goal's work to merge back into its branch (merge, or notNow, which pauses it), or a closed goal (cleanUp deletes it with its worktree and branch, keep). Only as the user decided.",
       inputSchema: {
         question: z9.string().describe("The id of what waits on the user"),
         decision: z9.enum(DECISION_OPTIONS),
@@ -12222,7 +12573,7 @@ function addTools(server2, session2) {
       }
     },
     async ({ question, decision, note, sent_back }) => {
-      await session2.goal.answer(question, {
+      await session2.answer(question, {
         kind: "decision",
         option: decision,
         note,
