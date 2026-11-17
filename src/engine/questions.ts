@@ -126,8 +126,18 @@ export class Questions {
    * task sent back without what to change.
    */
   answer(id: string, answer: Answer) {
+    this.answered(this.fitting(id, answer), answer);
+  }
+
+  /** The question `id`, where `answer` fits it; throws as answering does. */
+  fitting(id: string, answer: Answer): QuestionToYou {
     const question = this.find(id);
     if (!this.fits(question, answer)) throw new Error(DOESNT_FIT);
+    return question;
+  }
+
+  /** Closes `question` with `answer`, checked already (fitting). */
+  answered(question: QuestionToYou, answer: Answer) {
     this.close(question, answer);
   }
 

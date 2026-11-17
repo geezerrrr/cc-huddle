@@ -281,26 +281,25 @@ export class Scheduler {
   /**
    * Answers a decision put to you (Questions.answer) and carries it out: on a
    * stuck review (review again, skip it, send it back), on a merge git
-   * refused (try again, or stop), on a task done (accept it, which is all it takes for work built on it to
-   * start; or send one of its subtasks, `sentBack` or else the last one done,
-   * back with what to change). Throws as answering does, and when the
+   * refused (try again, or stop), on a task done (accept it, which is all it
+   * takes for work built on it to start; or send one of its subtasks,
+   * `sentBack` or else the last one done, back with what to change). Throws as answering does, and when the
    * subtask sent back isn't one done in the task.
    */
   async decide(id: string, answer: DecisionAnswer) {
-    const question = this.questions.find(id);
+    const question = this.questions.fitting(id, answer);
     if (question.kind !== "decision" || !canSendBack(this.core.state, question, answer.sentBack))
       throw new Error(DOESNT_FIT);
-    this.questions.answer(id, answer);
-    const subtask = question.subtaskId && this.subtask(question.subtaskId);
-    if (!subtask) return;
+    const subtask = question.subtaskId ? this.subtask(question.subtaskId) : undefined;
     const { option: pick, note = "" } = answer;
-    if (question.decision.kind === "delivery") {
-      const sentBack = this.subtask(answer.sentBack ?? subtask.id);
-      if (pick === "revise" && sentBack) {
-        this.move(sentBack, "redo");
-        goOnWith(sentBack, { why: "revised", note });
-      }
-    } else if (subtask.status === "waitingInReview") {
+    // Sent back, its work is redone before the question closes: closing it moves the goal on (Goals.settle), which would find the task done.
+    const sentBack = pick === "revise" && subtask && this.subtask(answer.sentBack ?? subtask.id);
+    if (sentBack) {
+      this.move(sentBack, "redo");
+      goOnWith(sentBack, { why: "revised", note });
+    }
+    this.questions.answered(question, answer);
+    if (subtask?.status === "waitingInReview") {
       // You decided: the count of times sent back starts over.
       subtask.review = { ...subtask.review, rounds: 0 };
       if (pick === "rereview") this.move(subtask, "rereview");
@@ -312,7 +311,7 @@ export class Scheduler {
           goOnWith(subtask, { why: "rejected", note: said.filter(Boolean).join("\n\n") });
         }
       }
-    } else if (subtask.status === "waitingInMerge") {
+    } else if (subtask?.status === "waitingInMerge") {
       if (pick === "stop") await this.stop(subtask);
       else this.move(subtask, "remerge");
     }

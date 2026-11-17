@@ -585,7 +585,13 @@ describe("Scheduler", () => {
         await expect(decide(id, { option: "revise", note: "Bigger", sentBack })).rejects.toThrow(
           "doesn't fit",
         );
+      // As its question closes, the goal moves on (Goals.settle): the task must no longer look done.
+      const asClosed: string[] = [];
+      core.changed = vi.fn(() => {
+        if (!core.state.questions.length) asClosed.push(s1.status);
+      });
       await decide(id, { option: "revise", note: "Bigger numbers" });
+      expect(asClosed[0]).toBe("pending");
       await eventually(() => {
         expect(runs()).toHaveLength(2);
       });
