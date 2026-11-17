@@ -240,7 +240,7 @@ const SPOKEN =
 
 /** What a meeting settles and what it leaves to whoever does the work (§4.2). */
 const MEETING_SCOPE =
-  "A meeting is for lining up, not for working out details. It settles the direction (what to make and the few choices that shape it), who does which piece, and which interfaces there are between the pieces (names, conventions or formats one piece defines and another uses) and who defines each. What an interface holds, and how anyone builds their piece, is worked out afterwards by whoever does it; whoever needs it asks them then. Don't tie pieces together that needn't be: every tie is one more interface to define and to get wrong.";
+  "A meeting is for lining up, not for working out details. It settles the direction (what to make and the few choices that shape it) and how the work is divided, judged by how big it is. How anyone builds their piece is worked out afterwards by whoever does it; whoever needs something of it asks them then.";
 
 /**
  * How each size of meeting is run: `raise` finishes "raise your hand only
@@ -316,7 +316,7 @@ export function meetingRound(ctx: MeetingBrief, member: Member) {
   return `${briefing(ctx, member)}${opened}:
 ${ctx.meeting.turns[0]?.text ?? ""}
 
-Everyone now gives a first judgment without hearing each other, so you haven't heard what the others think. Give your own: what you would do about each of the things to decide, not only those nearest your role, and why, which interfaces the pieces of work will need between them (which ones and between whom, not what they hold), and what could go wrong. Your role is the angle you see it from, not the limit of what you may speak to, so if you have a view on something outside it, say it. Don't say who takes which work; that comes when the plan is written. ${SPOKEN}`;
+Everyone now gives a first judgment without hearing each other, so you haven't heard what the others think. Give your own: what you would do about each of the things to decide, not only those nearest your role, and why; roughly how much code the whole work takes, as an order of magnitude (hundreds of lines, thousands, tens of thousands), not how long it takes; and what could go wrong. Your role is the angle you see it from, not the limit of what you may speak to, so if you have a view on something outside it, say it. Don't say who takes which work; that comes when the plan is written. ${SPOKEN}`;
 }
 
 /** Whether an attendee wants to speak next. */
@@ -324,7 +324,7 @@ export function meetingHand(ctx: MeetingBrief, member: Member) {
   return `${briefing(ctx, member)}Said since you last took it in:
 ${news(ctx, member)}
 
-Would you speak next? Raise your hand only if ${MEETING_KINDS[ctx.meeting.size].raise}. Agreeing with what was said is no reason to, and neither is what an interface holds or how a piece is built: that is for after the meeting, with whoever defines it. If you would, call raise_hand. If not, don't call it. Either way this isn't your turn to speak: nothing you write besides the call is heard.`;
+Would you speak next? Raise your hand only if ${MEETING_KINDS[ctx.meeting.size].raise}. Agreeing with what was said is no reason to, and neither is how a piece is built: that is for after the meeting, with whoever does it. If you would, call raise_hand. If not, don't call it. Either way this isn't your turn to speak: nothing you write besides the call is heard.`;
 }
 
 /** Someone given the floor speaks: `point` is what they raised their hand about, if they did. */
@@ -332,7 +332,7 @@ export function meetingAnswer(ctx: MeetingBrief, member: Member, point?: string)
   return `${briefing(ctx, member)}Said since you last took it in:
 ${news(ctx, member)}
 
-You have the floor${point ? `, for what you raised your hand about: ${point}` : ": the host has called on you"}. Say it to the person it's for and take up what they actually said. Agree only where you have a reason of your own; if you disagree, say so and why; don't make up a disagreement. Keep to what the meeting settles: don't add what an interface should hold or how you'll build your piece. ${SPOKEN}`;
+You have the floor${point ? `, for what you raised your hand about: ${point}` : ": the host has called on you"}. Say it to the person it's for and take up what they actually said. Agree only where you have a reason of your own; if you disagree, say so and why; don't make up a disagreement. Keep to what the meeting settles: don't add how you'll build your piece. ${SPOKEN}`;
 }
 
 /**
@@ -358,8 +358,8 @@ Times each has had the floor in the discussion: ${listOf(had)}.
 You can give the floor ${String(left)} more time${left === 1 ? "" : "s"} at most.
 
 ${first ? `You have now heard everyone's first judgment. ${meeting.hostOnly ? "Say how they differ, without taking a side: you only run this meeting." : "Say how they differ, yours among them: weigh your own against the others by what was said, like anyone's, not as the host's choice."}` : "Say something yourself only if you have something to add."}
-${meeting.hostOnly ? "" : "You're also a member: when someone questions or asks about your own piece, answer it yourself here, as a member, not by ruling on it.\n"}A hand is worth the floor only if it is about the direction, who does which piece, or which interfaces there are and who defines each. A hand about what an interface holds or how a piece is built isn't: don't give it the floor, and don't take it up or settle it yourself; at most say in a sentence whose it is to settle after the meeting. Among the hands worth it, give the floor to whoever has been challenged first, otherwise whoever has spoken least. You may also give it to someone without a hand up who should answer. When you give someone the floor, say what you need from them: a decision on the direction or on who does what, never what an interface holds or how they will build their piece.
-With no hand worth the floor, go back over what you set out to decide: is it true that ${MEETING_KINDS[meeting.size].settled}? Check it one thing at a time against what was actually said, not by whether anyone objects: nobody objecting isn't it, and a thing only one way was put forward for hasn't had its options compared. If not, give the floor to the one who should take up what's missing. If so and you haven't yet put the split to the room, put it now: the pieces of work, who takes each, and which interfaces there are and who defines each; give the floor to whoever relies most on others, to say whether that works for them. Anyone whose piece or needs are wrong will raise a hand. Once that is settled too, don't give the floor, whatever hands are up: close the talk in a sentence, and you'll write the plan after.
+${meeting.hostOnly ? "" : "You're also a member: when someone questions or asks about your own piece, answer it yourself here, as a member, not by ruling on it.\n"}A hand is worth the floor only if it is about the direction or how the work is divided. A hand about how a piece is built isn't: don't give it the floor, and don't take it up or settle it yourself; at most say in a sentence whose it is to settle after the meeting. Among the hands worth it, give the floor to whoever has been challenged first, otherwise whoever has spoken least. You may also give it to someone without a hand up who should answer. When you give someone the floor, say what you need from them: a decision on the direction or on how the work is divided, never how they will build their piece.
+With no hand worth the floor, go back over what you set out to decide: is it true that ${MEETING_KINDS[meeting.size].settled}? Check it one thing at a time against what was actually said, not by whether anyone objects: nobody objecting isn't it, and a thing only one way was put forward for hasn't had its options compared. If not, give the floor to the one who should take up what's missing. If so and you haven't yet put the division to the room, put it now, by how big the members judged the work: work of hundreds of lines is one member's; work of thousands and up is split where its parts can be done at the same time, and where they meet is part of the division. Give the floor to whoever's part depends most on others, to say whether that works for them. Anyone whose piece or needs are wrong will raise a hand. Once that is settled too, don't give the floor, whatever hands are up: close the talk in a sentence, and you'll write the plan after.
 Not calling give_floor closes the talk. What you write before and after the call is said to the room. ${SPOKEN}`;
 }
 
@@ -373,14 +373,11 @@ You're the host: turn the discussion into the final plan.
 Members (subtasks can only go to them): ${listOf(members.map(called))}${ctx.meeting.hostOnly ? "\nYou only ran the meeting: you take no work in it." : ""}
 
 Requirements:
-- Break the work into 1–4 tasks with 1–4 subtasks each; every subtask goes to exactly one member, whose name goes in assignee: ${listOf(members.map((m) => `"${m.name}"`))}. Who takes what is the split put to the room; where it wasn't, you decide, from their roles.
+- Break the work into 1–4 tasks with 1–4 subtasks each; every subtask goes to exactly one member, whose name goes in assignee: ${listOf(members.map((m) => `"${m.name}"`))}. Who takes what is the division put to the room; where it wasn't, you decide, from their roles.
 - Split by what each piece of work needs from another. In depends_on (the keys of other subtasks) a subtask names only the subtasks whose results it actually uses; it starts as soon as they are merged. Don't make sequential what can run in parallel.
-- When others wait only on something small and quick to make, such as an interface, types, a config or a skeleton, make it a subtask of its own, so they can start soon; its assignee defines that interface.
-- Every interface the meeting said someone defines and others use is defined in such a quick subtask at the start, by whoever defines it. A subtask that only needs to know an interface depends on the subtask defining it, not on the work behind it. Putting the real pieces together and checking the whole is a subtask of its own at the end.
-- Beyond that, don't split finer: one person's piece is one subtask, and one person's pieces that nobody waits on separately are one subtask. Every subtask carries a fixed cost (a new session getting to know the repository, a review, a merge).
+- Don't split finer than that: every subtask carries a fixed cost (a review, a merge), so split work only where its parts run at the same time or belong to different members.
 - Dependencies must not loop: no subtask may wait, directly or through others, on itself or on a subtask that waits on it.
 - Give every subtask a clear description and acceptance criteria: its member reads them, and the plan document, before starting.
-- In the description of every subtask that defines or uses an interface, name the interface and who defines it.
 - plan_markdown is the plan document for the user and the team: the goal and scope; what was decided, why, and what was turned down; where people didn't agree and how you ruled; what the meeting didn't get to; then who does what, dependencies and risks.
 - summary states the outcome in one sentence.`;
 }
