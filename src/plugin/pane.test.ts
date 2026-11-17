@@ -9,7 +9,7 @@ import {
   type Question,
   type Subtask,
 } from "../engine/types.ts";
-import { paneTeam as paneOf, viewEntries, viewLive } from "./pane.ts";
+import { followedOf, paneTeam as paneOf, viewEntries, viewLive } from "./pane.ts";
 
 /** The pane for a session running the goal of `work`, with no other goals. */
 const paneTeam = (work: Work, team: readonly Member[], others: readonly GoalEntry[] = []) =>
@@ -241,6 +241,24 @@ describe("paneTeam", () => {
         { id: "score", title: "score" },
       ],
     });
+  });
+
+  it("with parallel on, gives a member at several subtasks a row for each, each one followed when picked", () => {
+    const now = work();
+    now.goal.settings.parallel = true;
+    now.subtasks.push(
+      subtask("dice", { status: "running", startedAt: 2, progress: { done: 0, total: 0 } }),
+    );
+    const [glm] = paneTeam(now, members).members;
+    expect(glm).toMatchObject({
+      doing: "on 2 subtasks at once",
+      rows: [
+        { subtask: "rules", doing: 'works on "rules", step 2 of 3: Write the reroll' },
+        { subtask: "dice", doing: 'works on "dice"' },
+      ],
+    });
+    expect(followedOf("glm", now, "dice")?.id).toBe("dice");
+    expect(followedOf("glm", now)?.id).toBe("rules");
   });
 
   it("says who speaks at a meeting under way, and a plan to review", () => {

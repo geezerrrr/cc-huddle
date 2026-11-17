@@ -146,11 +146,13 @@ function ahead(state: Work, subtask: Subtask, alike: (s: Subtask) => boolean): S
 }
 
 /**
- * Whom a review that could go on waits for: its reviewer while they are at
- * something else (their own subtask, a meeting, a review under way or of
- * work delivered earlier), as everyone does one thing at a time.
+ * Whom a review that could go on waits for: with `parallel` off, its
+ * reviewer while they are at something else (their own subtask, a meeting,
+ * a review under way or of work delivered earlier), as everyone does one
+ * thing at a time; with it on, nobody (§4.5).
  */
 function reviewerAway(state: Work, subtask: Subtask): string | undefined {
+  if (state.goal.settings.parallel) return undefined;
   const reviewer = reviewerOf(state, subtask);
   const working = state.subtasks.some((s) => s.status === "running" && s.assignee === reviewer);
   const meeting = state.meetings.some(
@@ -166,7 +168,8 @@ function reviewerAway(state: Work, subtask: Subtask): string | undefined {
 
 /**
  * What a pending subtask waits on before it could start, its member's other
- * work aside: its goal, its upstream, and its member while busy.
+ * work aside: its goal, its upstream, and, with `parallel` off, its member
+ * while busy.
  */
 function startWaits(state: Work, subtask: Subtask, busy: Set<string>): Wait[] {
   const { goal } = state;
@@ -193,7 +196,9 @@ function startWaits(state: Work, subtask: Subtask, busy: Set<string>): Wait[] {
   });
   // Several upstreams in one other task wait on the same thing: once each.
   if (upstream.length) return [...new Map(upstream.map((w) => [JSON.stringify(w), w])).values()];
-  return busy.has(subtask.assignee) ? [{ kind: "busy", by: subtask.assignee }] : [];
+  return busy.has(subtask.assignee) && !goal.settings.parallel
+    ? [{ kind: "busy", by: subtask.assignee }]
+    : [];
 }
 
 /** What a subtask waits on in its stage; `busy` is busyMembers. */
@@ -211,7 +216,7 @@ export function waitsIn(state: Work, subtask: Subtask, busy: Set<string>): Wait[
   switch (subtask.status) {
     case "pending": {
       const waits = startWaits(state, subtask, busy);
-      if (waits.length) return waits;
+      if (waits.length || goal.settings.parallel) return waits;
       // A member starts one thing at a time: of theirs that could start, one
       // going on in its session first, else the first in the list.
       const could = state.subtasks.filter(

@@ -27,6 +27,7 @@ const askSchema = z.object({
   record: z
     .object({
       member: z.string(),
+      subtask: z.string().optional(),
       read: z.object({ subtask: z.string(), next }).optional(),
     })
     .optional(),
@@ -71,7 +72,8 @@ function viewer(session: () => Session) {
       speaker !== undefined &&
       engine.records.speaking(meeting, asked.speaking);
     // The member's record from where the pane read it, or from its start once they are on other work.
-    const followed = asked.record && engine && followedOf(asked.record.member, engine.work);
+    const followed =
+      asked.record && engine && followedOf(asked.record.member, engine.work, asked.record.subtask);
     const { read } = asked.record ?? {};
     const record =
       followed &&

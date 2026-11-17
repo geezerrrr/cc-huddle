@@ -185,6 +185,37 @@ describe("waitsIn", () => {
     expect(waitsIn(state, second, busyMembers(state))).toEqual([{ kind: "busy", by: "host" }]);
   });
 
+  it("with parallel on, starts and reviews a member's work whatever else they do; merges still go one at a time", () => {
+    const running = subtask("running", { status: "running" });
+    const fresh = subtask("fresh");
+    const next = subtask("next");
+    const review = subtask("review", {
+      status: "reviewing",
+      assignee: "bob",
+      delivery: { summary: "", files: [], at: 1 },
+    });
+    const later = subtask("later", {
+      status: "reviewing",
+      assignee: "bob",
+      delivery: { summary: "", files: [], at: 2 },
+    });
+    const state = work({ subtasks: [running, fresh, next, review, later] });
+    state.goal.settings.parallel = true;
+    state.goal.settings.review = true;
+    const busy = busyMembers(state);
+    expect(waitsIn(state, fresh, busy)).toEqual([]);
+    expect(waitsIn(state, next, busy)).toEqual([]);
+    expect(waitsIn(state, later, busy)).toEqual([]);
+    const merged = (id: string, at: number) =>
+      subtask(id, { status: "merging", delivery: { summary: "", files: [], at } });
+    const second = merged("m2", 2);
+    const merges = work({ subtasks: [merged("m1", 1), second] });
+    merges.goal.settings.parallel = true;
+    expect(waitsIn(merges, second, busyMembers(merges))).toEqual([
+      { kind: "merge", subtaskId: "m1" },
+    ]);
+  });
+
   it("has a review or merge under way go first, then the rest in delivery order, one at a time", () => {
     const at = (n: number) => ({ summary: "", files: [], at: n });
     const early = subtask("early", { status: "reviewing", assignee: "bob", delivery: at(1) });

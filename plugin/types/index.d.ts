@@ -59,6 +59,8 @@ export type HuddleMember = {
   doing: string;
   /** Whether they have a record to follow: a subtask they work on, or worked on. */
   followable: boolean;
+  /** With `parallel` on, each subtask they work on, while they work on more than one at once: selecting one follows it. */
+  rows?: { subtask: string; doing: string }[];
 };
 
 /** Something that waits on you, in words, with the answers it takes. */
@@ -183,15 +185,15 @@ export type HuddleRecord = HuddleRun & { subtask: string };
 /** The meeting turn being spoken: which speech it is, and who speaks it. */
 export type HuddleSpeaking = HuddleRun & { speech: string; speaker: string };
 
-/** The member whose record the pane follows, and the record as it has it, once read. */
-export type HuddleFollowed = { member: string; record?: HuddleRecord };
+/** The member whose record the pane follows, the subtask of theirs picked if one was, and the record as it has it, once read. */
+export type HuddleFollowed = { member: string; subtask?: string; record?: HuddleRecord };
 
 /** What the mod asks `POST /view` for. */
 export type HuddleAsk = {
   /** The revision of the team the pane has. */
   revision?: number;
-  /** The member whose record the pane follows, and the run it read up to which byte, if it read one. */
-  record?: { member: string; read?: { subtask: string; next: number } };
+  /** The member whose record the pane follows, the subtask of theirs picked if one was, and the run it read up to which byte, if it read one. */
+  record?: { member: string; subtask?: string; read?: { subtask: string; next: number } };
   /** The speech at the meeting the pane read as it is spoken, and up to which entry. */
   speaking?: { speech: string; next: number };
 };

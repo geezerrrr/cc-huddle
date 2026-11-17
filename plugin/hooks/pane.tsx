@@ -60,10 +60,10 @@ export async function openPane($: $) {
   scrollPane($, (await following($)) ? "end" : "start");
 }
 
-/** Shows a member's record in place of the team, or (null) the team again. */
-async function follow($: $, member: string | null) {
+/** Shows a member's record in place of the team, of their `subtask` if one is picked, or (null) the team again. */
+async function follow($: $, member: string | null, subtask?: string) {
   const was = await readFollowed($);
-  const now = member === null ? null : { member };
+  const now = member === null ? null : { member, ...(subtask && { subtask }) };
   await changeFollowed($, () => now);
   if ((was?.member ?? null) !== member) await $.ui.open({ id: PANE, title: paneTitle(now) });
   scrollPane($, (await following($)) ? "end" : "start");
@@ -146,7 +146,19 @@ function teamTab($: $, ui: Ui, now: HuddleTeam) {
             ) : (
               <Text>{name}</Text>
             )}
-            <Text>{member.doing}</Text>
+            {member.rows ? (
+              member.rows.map((row) => (
+                <Button
+                  key={`row-${row.subtask}`}
+                  plain
+                  onPress={() => follow($, member.name, row.subtask)}
+                >
+                  <Text>· {row.doing}</Text>
+                </Button>
+              ))
+            ) : (
+              <Text>{member.doing}</Text>
+            )}
           </Box>
         );
       })}
@@ -158,7 +170,9 @@ function teamTab($: $, ui: Ui, now: HuddleTeam) {
 async function recordPage($: $, ui: Ui, now: HuddleTeam, shown: string) {
   const { Box, Text } = ui;
   const member = now.members.find((m) => m.name === shown);
-  const record = (await readFollowed($))?.record;
+  const followed = await readFollowed($);
+  const record = followed?.record;
+  const row = member?.rows?.find((r) => r.subtask === followed?.subtask);
   return (
     <Box flexDirection="column" gap={1}>
       <Box flexDirection="column">
@@ -166,7 +180,7 @@ async function recordPage($: $, ui: Ui, now: HuddleTeam, shown: string) {
           <Text bold>{shown}</Text>
           {member && <Text dimColor>{member.line}</Text>}
         </Box>
-        {member && <Text>{member.doing}</Text>}
+        {member && <Text>{row?.doing ?? member.doing}</Text>}
       </Box>
       {runRows(ui, "record", record?.entries ?? [], record?.live)}
     </Box>

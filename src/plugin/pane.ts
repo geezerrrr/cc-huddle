@@ -77,10 +77,14 @@ function meetingOf(meeting: Meeting, work: Work): HuddleMeeting {
   };
 }
 
-/** The subtask a member's record follows: the one they work on, else the one they started last. */
-export function followedOf(member: string, work: Work): Subtask | undefined {
+/**
+ * The subtask a member's record follows: `picked`, one of theirs picked in
+ * the pane, else the one they work on, else the one they started last.
+ */
+export function followedOf(member: string, work: Work, picked?: string): Subtask | undefined {
   const own = work.subtasks.filter((s) => s.assignee === member);
   return (
+    own.find((s) => s.id === picked) ??
     own.find((s) => s.status === "running") ??
     own.filter((s) => s.startedAt).sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0))[0]
   );
@@ -96,10 +100,12 @@ function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>
     (m) => m.status === "running" && m.participants.includes(member.name),
   );
   const next = own.find((s) => s.status === "pending");
-  const running = at("running");
+  const runs = own.filter((s) => s.status === "running");
+  const running = runs[0];
   const handedOver = at("reviewing", "waitingInReview") ?? at("merging", "waitingInMerge");
   let doing: string;
-  if (running) doing = inProgressText(running);
+  if (runs.length > 1) doing = `on ${String(runs.length)} subtasks at once`;
+  else if (running) doing = inProgressText(running);
   else if (meeting) doing = `at the meeting on "${work.goal.name}"`;
   else if (reviewing) doing = `reviews "${reviewing.title}" by ${reviewing.assignee}`;
   else if (handedOver) doing = inProgressText(handedOver);
@@ -115,6 +121,9 @@ function memberOf(member: Member, work: Work, derived: ReturnType<typeof derive>
     ),
     doing,
     followable: followedOf(member.name, work) !== undefined,
+    ...(runs.length > 1 && {
+      rows: runs.map((s) => ({ subtask: s.id, doing: inProgressText(s) })),
+    }),
   };
 }
 

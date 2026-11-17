@@ -143,6 +143,7 @@ async function poll($: EngineInterface) {
       ...(following && {
         record: {
           member: following.member,
+          ...(following.subtask && { subtask: following.subtask }),
           ...(had && { read: { subtask: had.subtask, next: had.next } }),
         },
       }),
@@ -161,9 +162,20 @@ async function poll($: EngineInterface) {
     );
     // Only onto the record the read was from: you may have followed another meanwhile.
     await changeFollowed($, (was) => {
-      if (was?.member !== following?.member || was?.record?.next !== had?.next) return was;
+      if (
+        was?.member !== following?.member ||
+        was?.subtask !== following?.subtask ||
+        was?.record?.next !== had?.next
+      )
+        return was;
       const record = caughtUp(had, now.record, (a, b) => a.subtask === b.subtask);
-      return was && { member: was.member, ...(record && { record }) };
+      return (
+        was && {
+          member: was.member,
+          ...(was.subtask && { subtask: was.subtask }),
+          ...(record && { record }),
+        }
+      );
     });
   } catch (error) {
     // Outside a repository it waits for you; anything else is asked again.
