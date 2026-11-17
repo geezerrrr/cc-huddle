@@ -58,7 +58,7 @@ A library with no knowledge of Claude Code's interface. It holds:
 - **Scheduler**: starts every pending subtask whose upstream is merged and whose owner is free.
 - **Meetings**: turns, raised hands, the floor, the host's plan.
 - **Questions**: one inbox for everything that waits on a person.
-- **Git**: worktrees, delivery commits, serialized merges, conflict handling (§5).
+- **Git**: worktrees, delivery commits, serialized fast-forwards (§5).
 - **Turns**: one Agent SDK query per turn, one decoder for its message stream, one place that judges success.
 - **Policy**: the options of every session: tools, permission mode, the flag settings of §8, environment. It adds no sandbox or permission default of its own (§8).
 - **Prompts**: every prompt the engine sends, in one module.
@@ -169,9 +169,9 @@ Each attendee keeps one session for the whole meeting, in the goal's worktree. A
 | review waiting on you                                | you skip the review                                      | merging                                                 |
 | review waiting on you                                | you send it back                                         | pending, same session, with the notes                   |
 | merging                                              | merged                                                   | done                                                    |
-| merging                                              | text conflicts                                           | pending, same session, to resolve them                  |
-| merging                                              | files it can't merge line by line, or a git error        | merge waiting on you                                    |
-| merge waiting on you                                 | you keep a side, or merge it again                       | merging                                                 |
+| merging                                              | the goal's branch has commits its branch lacks           | pending, same session, to merge them in                 |
+| merging                                              | git refuses the fast-forward otherwise                   | merge waiting on you                                    |
+| merge waiting on you                                 | you have it merged again                                 | merging                                                 |
 | failed, stopped, stopped in review, stopped in merge | retry                                                    | pending, fresh session and worktree                     |
 | failed, stopped                                      | go on                                                    | pending, same session and worktree                      |
 | stopped in review                                    | go on                                                    | reviewing, its delivery standing                        |
@@ -190,13 +190,12 @@ A subtask's first run starts a session of its own, except where it carries on it
 
 A question has no status: it is open until answered, or called off when the asker stops waiting. What a member's turn waits on (a teammate's answer, your picks, your leave for a call) ends with the turn, so it lives with the questions and not in the state; only decisions, which no turn waits on, are in the state and outlive a restart.
 
-Kinds: a teammate's question (answered by that teammate in a read-only session), a question to you (Claude Code's own `AskUserQuestion`, intercepted), a permission request, a decision (stuck review, binary conflict, git error), a finished task you chose to accept, and the goal's handing its work back.
+Kinds: a teammate's question (answered by that teammate in a read-only session), a question to you (Claude Code's own `AskUserQuestion`, intercepted), a permission request, a decision (stuck review, git error), a finished task you chose to accept, and the goal's handing its work back.
 
 What each decision offers:
 
 - A review that sent the delivery back too often: review it again, skip the review, or send it back with its notes, and your note if you add one.
 - A review that failed: the same, but it has no notes, so it goes back only with a note you type.
-- Files git can't merge line by line: keep ours, take theirs, or merge again.
 - A merge git failed on: try again, or stop the subtask, its delivery standing.
 - A finished task you accept: accept it, or send it back with what to change. Where it is all the goal still waits on: accept it and merge the goal back, accept it only, or send it back.
 - Every task done, none waiting on you, or the merge back that came back saying why: merge the goal back, or not now (it pauses).
@@ -205,17 +204,17 @@ What each decision offers:
 ### 4.5 Derived, never stored
 
 - What a subtask waits on: an upstream subtask, a busy owner or reviewer, a merge ahead of it, a paused goal, a teammate's or your answer. Upstream work in a task you accept yourself is waited on as that whole task, done and accepted; in any other task, only the subtasks depended on, merged. With `parallel` off, a member starts one subtask at a time (one going on in its session first, then in the plan's order) and reviews one delivery at a time, the one under way first, then the rest in delivery order; with it on, neither waits on the member's other work. The goal merges one delivery at a time either way. What is under way isn't in the state (after a restart nothing is); the scheduler says, and the rules read it with the state. The scheduler starts exactly what these rules leave waiting on nothing.
-- With `parallel` off, a member's work that goes on in its session (held, sent back, conflicts, redone) goes before new work of theirs: new work that could start waits for it while it can start too.
+- With `parallel` off, a member's work that goes on in its session (held, sent back, behind the goal, redone) goes before new work of theirs: new work that could start waits for it while it can start too.
 - Who is busy, who reviews a delivery (the meeting's host, else another member), and whether a task you accept is accepted: done, with no acceptance waiting on you.
 - What you can do to each subtask, meeting and goal: asked of the same tables with `can`. The scheduler refuses anything else you ask of a subtask, saying why.
 
 ## 5. Git
 
 - A goal's branch `huddle/<goal>/main` is cut from your `HEAD` when it starts, and the goal keeps the branch your `HEAD` was on, to merge back into; a goal doesn't start on a detached `HEAD`. It is checked out in the goal's own worktree in the data folder. Meetings and reviews read the goal there, and merges land there. While the goal has that worktree, git keeps the branch from being checked out anywhere else, so nothing moves under a checkout of yours; diff it, merge it, or open the goal's folder. If the name is taken (any branch under `huddle/<goal>/`, from a deleted goal or another clone), the goal takes `<goal>-2` and so on.
-- Each subtask works in its own worktree on branch `huddle/<goal>/<subtask>` (a goal's branches share one folder of refs, since git can't hold both `huddle/<goal>` and `huddle/<goal>/<subtask>`), cut from the goal branch when it first starts, kept through send-backs, conflicts and pauses, removed when merged.
+- Each subtask works in its own worktree on branch `huddle/<goal>/<subtask>` (a goal's branches share one folder of refs, since git can't hold both `huddle/<goal>` and `huddle/<goal>/<subtask>`), cut from the goal branch when it first starts, kept through send-backs and pauses, removed when merged.
 - Delivering commits what is uncommitted in the worktree as the member (`<name> <member-id>@huddle.local`). Members needn't commit, and are told so; one that does, where its permissions let it, commits under its own name too, as its environment names it.
-- Merges run one at a time per goal, in delivery order: the goal branch is merged into the worktree, then the goal branch fast-forwards to it. Text conflicts go back to the member who delivered last, in their session. Binary and delete/modify conflicts and git errors become your decision.
-- Handing the work back, on your word (§4.1): in the goal's worktree, the branch it was cut from is merged into the goal's branch; with conflicts, the merge is given to a member to finish there, in a session of their own (the meeting's host, else the member the goal was given to); how they resolve it is theirs, and the engine checks none of it. Then the branch it was cut from fast-forwards to the goal's: in the worktree where it is checked out, or by its ref where it isn't. Whatever git refuses (changes of yours in the way, the branch moved meanwhile, the merge left unfinished) brings the merge back to you, saying why.
+- Merges are the members' own, with their own commands; the engine only fast-forwards branches, one at a time per goal, in delivery order. A delivery merges by the goal branch fast-forwarding to its branch. Where the goal branch has commits the delivery's branch lacks (another merged meanwhile), it goes back to its member, in their session, to merge the goal branch in, and is delivered again; how they merge, and whatever comes up as they do, is theirs, asking you with `AskUserQuestion` where they need you. Where git refuses the fast-forward otherwise, the merge waits on your decision, saying why.
+- Handing the work back, on your word (§4.1), the same way: the branch it was cut from fast-forwards to the goal's, in the worktree where it is checked out, or by its ref where it isn't. Where it has commits the goal's branch lacks, a member (the meeting's host, else the member the goal was given to) first merges it into the goal's branch, in the goal's worktree, in a session of their own. Whatever git refuses (changes of yours in the way, the merge left unfinished) brings the merge back to you, saying why.
 - Git runs with hooks, fsmonitor and signing off for the engine's own commands. It is the `git` on your `PATH`; members use it as they would anywhere.
 - cc-huddle never pushes, never runs `worktree prune`, and touches only `huddle/*` branches and, as a goal hands its work back on your word, the branch it was cut from.
 
@@ -287,7 +286,7 @@ A goal takes them with its copy of the team (§6). You switch them as Claude Cod
 4. The plan is ready: it is asked in Claude Code's question dialog, with its summary and its tasks, who does each subtask and what it waits on; the pane's "Needs you" has its document in full. Approve it, approve it and pick the tasks you accept yourself once done, or drop it. None is yours to accept by default: code is checked by its reviewer and its checks, and you would rarely read it line by line; a task is worth your own acceptance when only looking at it or trying it can judge it, and its members then say, as they deliver, how you check their part. What you type instead is the change you want: your session rewrites the plan with your words, and the changed plan is asked again. Any member can be given work, not only those who attended.
 5. Members work. Whatever needs you is asked at once in Claude Code's own question dialog, as your session's questions are, and you answer it with a key; one you dismiss waits in the pane's "Needs you" tab.
 6. A task is done once its last subtask merges, and the transcript says so. One you chose to accept waits for you instead: it is asked in the question dialog, with what each of its subtasks delivered and how to check it, in the goal's worktree, whose folder it names, accept it or send it back with what to change, and work in other tasks that builds on it waits until you accept it. Work assigned to one member as the goal starts is a task you don't accept.
-7. Once every task is done, the goal hands its work back (§4.1, §5): you say merge, and its branch is merged into the one it was cut from, conflicts resolved by a member; then it closes, and offers to clean up. What you want next, a change to finished work included, is the next goal: `/huddle <task>` again, cut from your `HEAD` with that work in it.
+7. Once every task is done, the goal hands its work back (§4.1, §5): you say merge, and the branch it was cut from moves up to its branch, a member first merging in whatever that branch gained meanwhile; then it closes, and offers to clean up. What you want next, a change to finished work included, is the next goal: `/huddle <task>` again, cut from your `HEAD` with that work in it.
 
 ### 7.2 What you see
 
@@ -327,7 +326,7 @@ Each row names the tests that show it, under `src/engine/`. They run the engine 
 | The team's memory is the lead's context, lost on compaction                   | All state is the engine's, in the data folder; your session holds none, so compacting or clearing it loses nothing           | By construction (§3.2); `engine.test.ts`: pauses what a session killed outright left active       |
 | A failed worker restarts from scratch                                         | An API error mid-subtask: "go on" resumes the same session in the same worktree                                              | `scheduler.test.ts`: go on with a failed subtask                                                  |
 | Review cannot send work back                                                  | A failed review returns the subtask to its member with the notes                                                             | `scheduler.test.ts`: sends it back with the notes                                                 |
-| Teammates overwrite each other's files                                        | Two subtasks edit one file: each in its worktree; the later merge's conflict goes back to its member                         | `scheduler.test.ts`: sends a text conflict back                                                   |
+| Teammates overwrite each other's files                                        | Two subtasks edit one file: each in its worktree; the later one, behind the goal, goes back to its member to merge it in     | `scheduler.test.ts`: sends a delivery behind the goal back                                        |
 | Closing the terminal loses the team's work                                    | Close Claude Code mid-run: its goal pauses; take it up again, and members go on in their sessions and worktrees              | `engine.test.ts`: pauses every active goal as it closes; `scheduler.test.ts`: stops with its goal |
 
 ## 10. Verified, and what is left
