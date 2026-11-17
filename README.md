@@ -46,7 +46,7 @@ One task done twice, all on Sonnet: building a playable mini-game into a 3D game
 
 The team made twice the calls and used fewer tokens. Each call sends the whole session so far: the single session grew to 289k, while each subtask starts a session of its own that holds only its part, 78k a call on average against 208k. Both versions were playable, and much alike.
 
-Each way ran once, and a model's output varies from run to run: one sample, not a benchmark. Many comparisons cost more than we can spend for now.
+We have run only a few comparisons like this, and a model's output varies from run to run, so take it as a sample, not a benchmark. Many more cost more than we can spend for now.
 
 ## How it works
 
