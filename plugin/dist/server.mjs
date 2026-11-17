@@ -5,7 +5,7 @@ import {
   exists,
   renameOver,
   running
-} from "./chunks/chunk-ZDX64WN4.mjs";
+} from "./chunks/chunk-NVEYXBYL.mjs";
 
 // src/plugin/bootstrap.ts
 import { execFile } from "node:child_process";
@@ -63,4 +63,4 @@ registerHooks({
     return bare && context.parentURL?.startsWith(ours) ? next(specifier, { ...context, parentURL: from }) : next(specifier, context);
   }
 });
-await import("./chunks/server-GE6BIUZT.mjs");
+await import("./chunks/server-MNK4BFEK.mjs");

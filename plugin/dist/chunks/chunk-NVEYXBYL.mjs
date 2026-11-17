@@ -136,6 +136,7 @@ function repoFolder(dataFolder2, repo) {
 }
 var goalsFolder = (repoFolder2) => path2.join(repoFolder2, "goals");
 var goalFolder = (repoFolder2, slug) => path2.join(goalsFolder(repoFolder2), slug);
+var recommendSettings = (repoFolder2) => path2.join(repoFolder2, "recommend.settings.json");
 var sessionsFolder = (dataFolder2) => path2.join(dataFolder2, "sessions");
 var depsFolder = (dataFolder2) => path2.join(dataFolder2, "deps");
 var goalFiles = (folder2) => ({
@@ -175,6 +176,7 @@ export {
   repoFolder,
   goalsFolder,
   goalFolder,
+  recommendSettings,
   sessionsFolder,
   depsFolder,
   goalFiles

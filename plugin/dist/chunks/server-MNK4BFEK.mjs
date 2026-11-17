@@ -13,6 +13,7 @@ import {
   ifThere,
   jsonIfThere,
   namesIfThere,
+  recommendSettings,
   renameOver,
   repoFolder,
   running,
@@ -20,7 +21,7 @@ import {
   textIfThere,
   windowsProcessField,
   writeWhole
-} from "./chunk-ZDX64WN4.mjs";
+} from "./chunk-NVEYXBYL.mjs";
 
 // node_modules/.pnpm/yaml@2.9.1/node_modules/yaml/dist/nodes/identity.js
 var require_identity = __commonJS({
@@ -8166,6 +8167,16 @@ var TASK_WAYS = `# How you work on a subtask
 - When you need information or a decision from a teammate (an interface, a design detail), ask them with ask_teammate. It waits for their answer.
 - When you need the user to decide something or give you what only they have, ask with AskUserQuestion, offering options, and wait for the answer. Don't just write that you are waiting: the user may not be watching.
 - When you are done, call deliver with a summary of a few sentences (what you did, anything to watch out for) and the files that are the result. Your subtask isn't done until you deliver; then end your turn.`;
+function recommendPrompt(task, members2) {
+  const team = members2.map(
+    (m) => `${m.name} (${[m.role.title, m.model].filter(Boolean).join(", ")})`
+  );
+  return `The team: ${team.join(", ")}.
+The task: ${task}
+The repository is the current directory; look at it as much as you need.
+
+Should the team do this together, or one member solo? If together, who takes part and who hosts; if solo, who. Say why.`;
+}
 function systemPrompt(kind, member, team) {
   const others = team.filter((m) => m.name !== member.name).map(called);
   const who = `# Who you are
@@ -10025,6 +10036,7 @@ var SESSION_VARS = [
   "CLAUDE_PLUGIN_ROOT",
   "CLAUDE_PROJECT_DIR"
 ];
+var withoutSession = (from) => Object.fromEntries(Object.entries(from).filter(([name]) => !SESSION_VARS.includes(name)));
 var READ_ONLY_TOOLS = ["Read", "Glob", "Grep", "WebSearch", "WebFetch"];
 function expandEnv(env, from) {
   const missing = /* @__PURE__ */ new Set();
@@ -10046,9 +10058,11 @@ function expandEnv(env, from) {
 }
 function memberSettings(team, member, from, plugins2) {
   const own = member.settings ? mergeSettings(team, member.settings) : team;
+  return guarded({ ...own, env: { ...own.env, ...expandEnv(member.env, from) } }, plugins2);
+}
+function guarded(own, plugins2) {
   return {
     ...own,
-    env: { ...own.env, ...expandEnv(member.env, from) },
     enabledPlugins: {
       ...own.enabledPlugins,
       ...Object.fromEntries(plugins2.map((id) => [id, false]))
@@ -10077,9 +10091,7 @@ function sessionOptions(seat, kind, from) {
   const readOnly = kind === "readOnly";
   const teamMode = seat.team.permissions?.defaultMode !== void 0;
   const mode = readOnly ? "dontAsk" : teamMode ? void 0 : seat.sessionMode;
-  const env = Object.fromEntries(
-    Object.entries(from).filter(([name]) => !SESSION_VARS.includes(name))
-  );
+  const env = withoutSession(from);
   return {
     cwd: seat.cwd,
     model: member.model,
@@ -10096,6 +10108,19 @@ function sessionOptions(seat, kind, from) {
     extraArgs: { name: `huddle-${member.name}` },
     pathToClaudeCodeExecutable: seat.claude,
     ...readOnly && { tools: READ_ONLY_TOOLS, strictMcpConfig: true }
+  };
+}
+function recommendOptions(claude2, cwd2, settings, from) {
+  return {
+    cwd: cwd2,
+    settings,
+    permissionMode: "dontAsk",
+    env: withoutSession(from),
+    systemPrompt: { type: "preset", preset: "claude_code" },
+    extraArgs: { name: "huddle-recommend" },
+    pathToClaudeCodeExecutable: claude2,
+    tools: READ_ONLY_TOOLS,
+    strictMcpConfig: true
   };
 }
 
@@ -11182,6 +11207,29 @@ var Engine = class _Engine {
   }
 };
 
+// src/engine/recommend.ts
+import { z as z7 } from "zod";
+var recommendationSchema = (names) => z7.object({
+  way: z7.enum(["together", "solo"]),
+  members: z7.array(z7.enum(names)).min(1).describe("Together: who takes part, the host first. Solo: the one member."),
+  why: z7.string()
+});
+async function recommend(task, team, at) {
+  const names = team.members.map((m) => m.name);
+  const settings = recommendSettings(at.folder);
+  await writeSettings(settings, guarded({}, at.plugins));
+  const schema = recommendationSchema(names);
+  const reply = await askOnce({
+    prompt: recommendPrompt(task, team.members),
+    options: recommendOptions(at.claude, at.cwd, settings, at.env),
+    schema,
+    signal: at.signal,
+    // Before a goal there is nobody to count them to.
+    spent: () => void 0
+  });
+  return schema.parse(reply.structured);
+}
+
 // src/plugin/claude.ts
 import { execFile as execFile2 } from "node:child_process";
 import { readlink } from "node:fs/promises";
@@ -11235,7 +11283,7 @@ import { createServer, request } from "node:http";
 import { tmpdir } from "node:os";
 import path5 from "node:path";
 import { text } from "node:stream/consumers";
-import { z as z7 } from "zod";
+import { z as z8 } from "zod";
 
 // src/plugin/pane.ts
 import { createHash } from "node:crypto";
@@ -11752,17 +11800,17 @@ var noGoalText = (moved) => moved ? `"${moved}" moved to another Claude Code ses
 var resumeRefusal = (name) => `"${name}" is under way in this session, which runs one goal: /huddle pause it first, or take the other up in another session.`;
 
 // src/plugin/pane-server.ts
-var next = z7.number().int().min(0);
-var askSchema = z7.object({
-  revision: z7.number().int().optional(),
-  record: z7.object({
-    member: z7.string(),
-    subtask: z7.string().optional(),
-    read: z7.object({ subtask: z7.string(), next }).optional()
+var next = z8.number().int().min(0);
+var askSchema = z8.object({
+  revision: z8.number().int().optional(),
+  record: z8.object({
+    member: z8.string(),
+    subtask: z8.string().optional(),
+    read: z8.object({ subtask: z8.string(), next }).optional()
   }).optional(),
-  speaking: z7.object({ speech: z7.string(), next }).optional()
+  speaking: z8.object({ speech: z8.string(), next }).optional()
 });
-var releaseSchema = z7.object({ goal: z7.string() });
+var releaseSchema = z8.object({ goal: z8.string() });
 var GOALS_MS = 2e3;
 function viewer(session2) {
   let revision = 0;
@@ -11838,7 +11886,7 @@ async function servePane(session2) {
         response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify(answer));
       },
       (error) => {
-        const status = error instanceof z7.ZodError || error instanceof SyntaxError ? 400 : error instanceof GitError ? 409 : 500;
+        const status = error instanceof z8.ZodError || error instanceof SyntaxError ? 400 : error instanceof GitError ? 409 : 500;
         response.writeHead(status, { "content-type": "text/plain" }).end(errorText(error));
       }
     );
@@ -11878,39 +11926,39 @@ function modeOf(dataFolder2, session2) {
 }
 
 // src/plugin/pane-tools.ts
-import { z as z8 } from "zod";
+import { z as z9 } from "zod";
 var isPermission = (option) => PERMISSION_OPTIONS.includes(option);
 var PANE_ONLY = "For cc-huddle's pane only: your session never calls it.";
-var answerSchema = z8.discriminatedUnion("kind", [
-  z8.object({
-    kind: z8.literal("option"),
-    option: z8.enum([...PERMISSION_OPTIONS, ...DECISION_OPTIONS]),
-    note: z8.string().trim().optional().describe("Why it is denied, or what to change"),
-    sentBack: z8.string().optional().describe("The subtask a revised task goes back to")
+var answerSchema = z9.discriminatedUnion("kind", [
+  z9.object({
+    kind: z9.literal("option"),
+    option: z9.enum([...PERMISSION_OPTIONS, ...DECISION_OPTIONS]),
+    note: z9.string().trim().optional().describe("Why it is denied, or what to change"),
+    sentBack: z9.string().optional().describe("The subtask a revised task goes back to")
   }),
-  z8.object({
-    kind: z8.literal("choices"),
-    picks: z8.array(z8.string()).describe("One pick per question with choices")
+  z9.object({
+    kind: z9.literal("choices"),
+    picks: z9.array(z9.string()).describe("One pick per question with choices")
   })
 ]);
-var answerInput = z8.object({
-  question: z8.string(),
+var answerInput = z9.object({
+  question: z9.string(),
   answer: answerSchema
 });
-var reviewInput = z8.object({
-  meeting: z8.string(),
-  decision: z8.enum(["approve", "drop", "change"]),
-  accept: z8.array(z8.number().int().min(0)).optional().describe("The tasks you accept, by place"),
-  change: z8.string().trim().optional().describe("The change you want, as you typed it")
+var reviewInput = z9.object({
+  meeting: z9.string(),
+  decision: z9.enum(["approve", "drop", "change"]),
+  accept: z9.array(z9.number().int().min(0)).optional().describe("The tasks you accept, by place"),
+  change: z9.string().trim().optional().describe("The change you want, as you typed it")
 });
-var handOffInput = z8.object({ task: z8.string().trim().min(1) });
-var resumeInput = z8.object({
-  goal: z8.string().regex(SLUG).describe("The goal's slug")
+var handOffInput = z9.object({ task: z9.string().trim().min(1) });
+var resumeInput = z9.object({
+  goal: z9.string().regex(SLUG).describe("The goal's slug")
 });
-var settingsInput = z8.object({
-  review: z8.boolean().optional(),
-  meetingSize: z8.enum(MEETING_SIZES).optional(),
-  parallel: z8.boolean().optional()
+var settingsInput = z9.object({
+  review: z9.boolean().optional(),
+  meetingSize: z9.enum(MEETING_SIZES).optional(),
+  parallel: z9.boolean().optional()
 });
 function addPaneTools(server2, session2, pane2) {
   server2.registerTool(
@@ -12165,6 +12213,19 @@ var Session = class {
   async goals() {
     return (await this.repository()).list();
   }
+  /** How the team best takes on `task`, in your words, as a goal started now would have it (recommend.ts). */
+  async recommend(task, signal) {
+    const goals = await this.repository();
+    const { env, plugins: plugins2, userTeam: userTeam2 } = this.options;
+    return recommend(task, await goals.team(userTeam2), {
+      folder: goals.folder,
+      cwd: goals.repo.top,
+      claude: await this.claude(),
+      plugins: plugins2,
+      env,
+      signal
+    });
+  }
   /** The team a goal started now would have; throws what is wrong with its files. */
   async team() {
     return (await this.repository()).team(this.options.userTeam);
@@ -12218,7 +12279,7 @@ var Session = class {
 var noGoalForModel = (moved) => moved ? `The goal "${moved}" moved to another Claude Code session. The user brings it back with /huddle resume.` : "This session runs no goal: start one (start_goal), or the user takes one up with /huddle resume.";
 
 // src/plugin/tools.ts
-import { z as z9 } from "zod";
+import { z as z10 } from "zod";
 
 // src/plugin/status.ts
 function subtaskLine(subtask2, { waits }, work) {
@@ -12273,30 +12334,30 @@ function othersText(others) {
 }
 
 // src/plugin/tools.ts
-var meeting = z9.string().describe("The meeting's id");
-var subtask = z9.string().describe("The subtask's id");
-var goalActionInput = z9.object({ action: z9.enum(GOAL_ACTIONS) });
+var meeting = z10.string().describe("The meeting's id");
+var subtask = z10.string().describe("The subtask's id");
+var goalActionInput = z10.object({ action: z10.enum(GOAL_ACTIONS) });
 function memberName(members2) {
-  if (!members2) return z9.string().trim().describe("A member's name");
+  if (!members2) return z10.string().trim().describe("A member's name");
   const names = members2.map((m) => m.name);
-  return z9.enum(names).describe(`One of the team: ${rosterOf(members2)}`);
+  return z10.enum(names).describe(`One of the team: ${rosterOf(members2)}`);
 }
 var meetingInput = (member) => ({
-  agenda: z9.string().trim().min(1).describe("What to plan, with everything the user said about it"),
-  size: z9.enum(MEETING_SIZES).optional().describe(
+  agenda: z10.string().trim().min(1).describe("What to plan, with everything the user said about it"),
+  size: z10.enum(MEETING_SIZES).optional().describe(
     "How long the discussion runs, only when the user asked for this meeting's own; the goal's when left out"
   ),
-  attendees: z9.array(member).default([]).describe("The host first; everyone when empty"),
-  host_only: z9.boolean().default(false).describe(
+  attendees: z10.array(member).default([]).describe("The host first; everyone when empty"),
+  host_only: z10.boolean().default(false).describe(
     "True when the host only runs the meeting: no view of their own and no work in the plan. Leave it out for a host who also takes part from their role, the usual"
   )
 });
 var changePlanInput = (member) => ({ meeting, plan: planSchema(member) });
 var assignInput = (member) => ({
   assignee: member,
-  title: z9.string().trim().min(1),
-  description: z9.string().trim().describe("Everything the user said about it"),
-  acceptance: z9.string().trim().default("").describe("When it counts as done")
+  title: z10.string().trim().min(1),
+  description: z10.string().trim().describe("Everything the user said about it"),
+  acceptance: z10.string().trim().default("").describe("When it counts as done")
 });
 function addTools(server2, session2) {
   server2.registerTool(
@@ -12314,10 +12375,27 @@ function addTools(server2, session2) {
     }
   );
   server2.registerTool(
+    "recommend",
+    {
+      description: "Before a goal starts: whether the user's task is better done by the team together or by one member solo, and who. It is judged in a session of its own that sees only the task, the team and the repository, read-only. Returns the recommendation and why; ask the user with it.",
+      inputSchema: {
+        task: z10.string().trim().min(1).describe("The user's task, in their own words")
+      },
+      annotations: { readOnlyHint: true }
+    },
+    async ({ task }, { signal }) => {
+      const { way, members: members2, why } = await session2.recommend(task, signal);
+      const who = members2.join(", ");
+      return toolText(
+        way === "together" ? `Recommended: the team together, ${who}, the first hosting. Why: ${why}` : `Recommended: ${who} solo. Why: ${why}`
+      );
+    }
+  );
+  server2.registerTool(
     "start_goal",
     {
       description: "Start a goal in this session: something the user wants done. It gets its own branch, cut from the branch the user's checkout is on, which it merges its work back into once done and the user agrees, and its own copy of the team. A session runs one goal: refused while its goal is under way. Then plan it once: a meeting of the members the user picked, or, with one picked, the task assigned to them. Nothing is added to a goal after.",
-      inputSchema: { name: z9.string().trim().min(1).describe("A few words for what is wanted") }
+      inputSchema: { name: z10.string().trim().min(1).describe("A few words for what is wanted") }
     },
     async ({ name }) => {
       const { goal } = (await session2.start(name)).work;
@@ -12428,7 +12506,7 @@ function addTools(server2, session2) {
     "subtask_action",
     {
       description: "Stop a subtask; continue a stopped or failed one in its session and worktree; or retry one from the start.",
-      inputSchema: { subtask, action: z9.enum(SUBTASK_ACTIONS) }
+      inputSchema: { subtask, action: z10.enum(SUBTASK_ACTIONS) }
     },
     async ({ subtask: id, action }) => {
       const engine = session2.goal;
@@ -12441,10 +12519,10 @@ function addTools(server2, session2) {
     {
       description: "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask; where it is all the goal waits on: acceptMerge, acceptOnly, revise), a stuck review (rereview, skip, sendBack; one that failed goes back only with a note), a merge (ours, theirs, retry; one git failed on: retry, stop), the goal's work to merge back into its branch (merge, or notNow, which pauses it), or a closed goal (cleanUp deletes it with its worktree and branch, keep). Only as the user decided.",
       inputSchema: {
-        question: z9.string().describe("The id of what waits on the user"),
-        decision: z9.enum(DECISION_OPTIONS),
-        note: z9.string().trim().optional().describe("What to change, in the user's words"),
-        sent_back: z9.string().optional().describe("The subtask a revised task goes back to")
+        question: z10.string().describe("The id of what waits on the user"),
+        decision: z10.enum(DECISION_OPTIONS),
+        note: z10.string().trim().optional().describe("What to change, in the user's words"),
+        sent_back: z10.string().optional().describe("The subtask a revised task goes back to")
       }
     },
     async ({ question, decision, note, sent_back }) => {
