@@ -1,8 +1,11 @@
 <h1 align="center">cc-huddle</h1>
 
 <p align="center">
-  <strong>Multi-agent orchestration for Claude Code.</strong><br>
-  A Claude Code plugin that runs a team of Claude Code sessions on your repository, each member on the model you choose.
+  <strong>Multi-agent orchestration for Claude Code.</strong>
+</p>
+
+<p align="center">
+  <strong>English</strong> · <a href="README.zh-CN.md">简体中文</a>
 </p>
 
 <p align="center">
@@ -11,71 +14,42 @@
   <img src="https://img.shields.io/badge/Claude%20Code-plugin-D97757" alt="Claude Code plugin">
 </p>
 
-<p align="center">
-  <img src="docs/media/demo.gif" alt="cc-huddle: a team meets, plans and builds a dice game in parallel, shown in its pane beside the Claude Code session" width="900">
-</p>
-
-> **Status: early (0.1).** The engine is tested against scripted model streams; long runs with real models are still few. Expect rough edges, and please [report them](https://github.com/geezerrrr/cc-huddle/issues).
-
-## Why cc-huddle
-
-Compared with most tools that run several agents, cc-huddle:
-
-- **Runs inside Claude Code.** It is a plugin in your session, and every member is a full Claude Code session: the same agent loop, tools, settings and permissions you already use, each member on the model and provider you choose.
-- **Keeps the process in code.** State machines decide what starts, what waits and what counts as done; the models only do the work. The state is kept in files, so a goal outlives your session and `/huddle resume` goes on where it stopped.
-- **Plans in a meeting.** The members you pick discuss the task from their own roles before the plan is written, which suits open questions and loose requirements. Nothing starts until you approve the plan.
-- **Isolates and checks the work.** Each subtask has its own git worktree. Another member reviews each delivery against its acceptance criteria before it merges, and your branch changes only when you say.
-- **Leaves the decisions to you.** Plans, finished work, permissions and members' questions come to you in Claude Code's dialog; no model answers them for you.
-
-For one focused job, a single session or a subagent is cheaper and quicker. cc-huddle is for work with several parts and dependencies.
-
-### A trial
-
-One task done twice, all on Sonnet: building a playable mini-game into a 3D game, once by a single session and once by a team of five.
-
-|                     | One session | A team of five                       |
-| ------------------- | ----------- | ------------------------------------ |
-| Time                | 25m 33s     | 26m 44s, the meeting 3m 12s of it    |
-| Tokens              | 14.87M      | 12.79M: meeting 0.69M, reviews 0.79M |
-| Code                | 1,703 lines | 3,260 lines, 880 of them tests       |
-| Model calls at work | 70          | 143                                  |
+cc-huddle is a Claude Code plugin that runs a team of Claude Code sessions on your repository. The members meet to plan your task, build it in parallel and review each other's work. You approve the plan and the result, and your session stays free in the meantime.
 
 <p align="center">
-  <img src="docs/media/context-per-call.svg" alt="Context sent with each model call: the single session grows to 289k over 70 calls; each of the team's seven subtask sessions starts fresh and stays under 143k" width="760">
+  <img src="docs/media/demo.gif" alt="cc-huddle: a team meets, plans and builds a feature in parallel, shown in its pane beside the Claude Code session" width="900">
 </p>
 
-The team made twice the calls and used fewer tokens. Each call sends the whole session so far: the single session grew to 289k, while each subtask starts a session of its own that holds only its part, 78k a call on average against 208k. Both versions were playable, and much alike.
+> **Status: early (0.1).** Tested against scripted model streams and a few real runs. Expect rough edges, and please [report them](https://github.com/geezerrrr/cc-huddle/issues).
 
-We have run only a few comparisons like this, and a model's output varies from run to run, so take it as a sample, not a benchmark. Many more cost more than we can spend for now.
+## Features
 
-## How it works
-
-<p align="center">
-  <img src="docs/media/how-it-works.svg" alt="Task, meeting, plan you approve, parallel work, review (sent back with notes when it fails), merge into huddle/&lt;goal&gt;/main, then into your branch on your word" width="900">
-</p>
-
-- **Meeting.** The members you pick discuss the task in turns, read-only. The host writes a plan of tasks with owners, dependencies and acceptance criteria; you approve it, change it or drop it.
-- **Work.** Each subtask runs in its own worktree as a Claude Code session on its member's model, as soon as what it waits on is merged: a fresh one, or, where it builds on the same member's own work, a fork of that work's session. Members can ask each other questions.
-- **Review and merge.** Another member checks each delivery against its acceptance criteria and passes it or sends it back with notes. Passed work merges into `huddle/<goal>/main` one subtask at a time; work behind the goal goes back to its author to merge the goal in.
-- **You.** Plans to approve, finished tasks to accept, permission requests and members' questions come to you in Claude Code's dialog, or wait in the pane; your session's model can't answer them. A task you accept comes with what was done, how to check it, and the goal's worktree to try it in. Once the work is done, the goal asks to merge back into the branch it was cut from; a member merges in whatever your branch gained meanwhile, and cc-huddle never pushes.
-
-The full design, state machines included, is [docs/design.md](docs/design.md).
+- **You hold the source of truth.** The team works from the plan you approve, and every decision after that comes back to you, never to a lead model.
+- **Process in code.** State machines decide what starts, what waits and what counts as done. The models only do the work.
+- **One short meeting.** Members discuss the task in turns, then the host writes the plan: tasks, owners, dependencies and acceptance criteria. It suits open questions and loose requirements.
+- **Isolated, reviewed work.** Each subtask gets its own git worktree, and another member reviews it against its acceptance criteria before it merges.
+- **Durable state.** State lives in files, not in a session's context. Close the terminal, and `/huddle resume` picks up where it stopped.
+- **Small contexts.** Each subtask runs in its own session, which holds only its part. In [one trial](docs/trial.md), a team of five used fewer tokens than a single session.
+- **Any model, one harness.** Each member runs on the model you choose, from any Anthropic-compatible provider, all inside Claude Code with your settings, permissions and CLAUDE.md.
 
 ## Install
 
-Requirements: Claude Code 2.1.322 or later, Node.js 22.15 or later with npm on your `PATH`, and git. The plugin's MCP server installs its own dependencies with npm on its first start.
-
-From GitHub, in a terminal:
-
-```sh
-claude plugin install cc-huddle --marketplace geezerrrr/cc-huddle
-```
-
-Or inside Claude Code:
+Inside Claude Code:
 
 ```
 /plugin marketplace add geezerrrr/cc-huddle
 /plugin install cc-huddle@geezerrrr
+```
+
+Restart Claude Code afterwards. cc-huddle needs Claude Code 2.1.322 or later, Node.js 22.15 or later with npm on your `PATH`, and git. It installs its own dependencies with npm the first time it starts.
+
+<details>
+<summary>Other ways to install, update and uninstall</summary>
+
+From a terminal:
+
+```sh
+claude plugin install cc-huddle --marketplace geezerrrr/cc-huddle
 ```
 
 From a local clone:
@@ -86,76 +60,74 @@ claude plugin marketplace add ./cc-huddle
 claude plugin install cc-huddle@geezerrrr
 ```
 
-To try it without installing, start a session with the plugin loaded from the clone: `claude --plugin-dir ./cc-huddle/plugin`. The built plugin is committed, so there is nothing to build.
+Without installing, load the plugin from the clone: `claude --plugin-dir ./cc-huddle/plugin`. The built plugin is committed, so there is nothing to build.
 
-Restart Claude Code after installing. To update, `claude plugin update cc-huddle@geezerrrr`. To uninstall, `claude plugin uninstall cc-huddle@geezerrrr`: this removes the plugin's data folder with its worktrees and any work not yet delivered; work already merged stays on the `huddle/*` branches, and `--keep-data` keeps the folder.
+Update with `claude plugin update cc-huddle@geezerrrr`. Uninstall with `claude plugin uninstall cc-huddle@geezerrrr`: this deletes the plugin's data folder, including its worktrees and any work not yet delivered. Merged work stays on the `huddle/*` branches, and `--keep-data` keeps the folder.
+
+</details>
 
 ## Set up a team
 
-A team is a `team.yaml` listing the members, each with a role and the model it runs on. cc-huddle writes an example to `~/.claude/huddle/` the first time it starts, for all your repositories; a repository can add its own in `.claude/huddle/`:
+A team is a `team.yaml` that lists its members. The first time it starts, cc-huddle writes a commented example to `~/.claude/huddle/team.yaml`. List your members there; a repository can add its own in `.claude/huddle/`.
 
 ```yaml
 # ~/.claude/huddle/team.yaml
 members:
-  sonnet:
-    role: developer
-    model: sonnet
   opus:
     role: developer
     model: opus
+  sonnet:
+    role: developer
+    model: sonnet
+  deepseek:
+    role: developer
+    env:
+      ANTHROPIC_BASE_URL: https://api.deepseek.com/anthropic
+      ANTHROPIC_AUTH_TOKEN: ${DEEPSEEK_API_KEY}
+      ANTHROPIC_MODEL: deepseek-flash
 ```
 
-A member without `env` runs on your own Claude Code sign-in. A member on another provider gets its variables, any that Claude Code reads:
-
-```yaml
-glm:
-  role: designer
-  model: glm-5.3-flashx
-  env:
-    ANTHROPIC_BASE_URL: https://open.bigmodel.cn/api/anthropic
-    ANTHROPIC_AUTH_TOKEN: ${GLM_API_KEY}
-```
-
-`${VAR}` is filled in from your environment, so keys stay out of the files. A role is a name, the angle a member sees the work from; your team's own principles for it can go in `roles/<role>.md`, Markdown every member in that role reads. Effort, permissions per member and for the whole team, and a provider's full setup: [docs/configuration.md](docs/configuration.md).
+A member without `env` runs on your own Claude Code sign-in; one on another provider gets that provider's variables. `${VAR}` is read from your environment, so keys stay out of the file. A role is just a name, and your team's principles for it can go in `roles/<role>.md`. Effort, permissions and full provider setups are in [docs/configuration.md](docs/configuration.md).
 
 ## Use it
 
-Start Claude Code in a repository and hand the team a task:
+Start Claude Code in a repository and give the team a task:
 
 ```
-/huddle build a two-player dice game, opus on the rules, sonnet on the UI
+/huddle add Stripe subscriptions: checkout, webhooks and a billing page
 ```
 
-Each task is a goal of its own. A separate session that sees only your task, the team and the repository recommends the team together or one member solo, and your session asks you to start: one member picked takes the task; several meet and plan it. The team then works in the background; your session stays free.
+1. **Start.** cc-huddle recommends the whole team or a single member, and says why. You choose; a single member skips the meeting.
+2. **Plan.** The meeting runs in the background, and you can watch it in the pane. The plan then arrives in Claude Code's dialog: approve it, change it or drop it, and pick the tasks you want to accept yourself.
+3. **Build.** Members work in parallel; a subtask starts once the work it depends on is merged. They ask each other questions, and ask you when only you can answer.
+4. **Accept.** A task you picked comes back with what was done and how to check it.
+5. **Merge.** Work collects on `huddle/<goal>/main`. When it is all done, the goal asks to merge into the branch it was cut from, then offers to remove its worktree and branch. cc-huddle never pushes.
 
-| You type                          | What happens                                                                   |
-| --------------------------------- | ------------------------------------------------------------------------------ |
-| `/huddle <task>`                  | Hands the team a task, as a new goal                                           |
-| `/huddle`                         | Opens the pane: the meeting, the team, what needs you                          |
-| `/huddle status`                  | Prints where the session's goal stands                                         |
-| `/huddle pause`, `/huddle resume` | Pauses the session's goal; resumes it, or takes up another of the repository's |
-| `/huddle review on\|off`          | Turns review of deliveries on or off                                           |
-| `/huddle meeting <size>`          | Sets how long meetings run: `small`, `discussion` or `large`                   |
-| `/huddle parallel on\|off`        | Lets a member do several pieces of work at once                                |
+| You type                          | What happens                                                                      |
+| --------------------------------- | --------------------------------------------------------------------------------- |
+| `/huddle <task>`                  | Gives the team a task, as a new goal                                              |
+| `/huddle`                         | Opens the pane: the meeting, the team, what needs you                             |
+| `/huddle status`                  | Prints where the session's goal stands                                            |
+| `/huddle pause`, `/huddle resume` | Pauses the session's goal; resumes it, or picks up another goal in the repository |
+| `/huddle review on\|off`          | Turns review of deliveries on or off                                              |
+| `/huddle meeting <size>`          | Sets how long meetings run: `small`, `discussion` or `large`                      |
+| `/huddle parallel on\|off`        | Lets a member do several pieces of work at once                                   |
 
-You can also ask your session in words ("have opus do the scoreboard"). A session runs one goal; for more goals at once, run more sessions. A goal closes once its work is merged back into your branch, and offers to clean up its worktree and branch; until you merge, it waits paused, and `/huddle resume` asks again. `review`, `meeting` and `parallel` are kept in your `team.yaml`; like `/model`, a switch applies to the session's goal and goals started after. The band above the prompt keeps count: `cc-huddle · meeting · 3 working · 1 needs you`. Closing the session pauses its goal; `/huddle resume` goes on where it stopped.
-
-<table>
-  <tr>
-    <td width="50%"><img src="docs/media/meeting.png" alt="The meeting tab: members speak in turn as the plan takes shape"></td>
-    <td width="50%"><img src="docs/media/team.png" alt="The team tab: each member at what they do, and the tokens they've used"></td>
-  </tr>
-  <tr>
-    <td align="center">The meeting</td>
-    <td align="center">The team at work</td>
-  </tr>
-</table>
+You can also ask your session in plain words. A session runs one goal; for several at once, open several sessions.
 
 ## Cost and permissions
 
-- **Tokens.** Each member's turn is a Claude Code process on that member's provider, several at once. The pane shows the tokens each member has used.
+- **Tokens.** Each member's turn is its own Claude Code process on that member's provider, and several run at once. The pane shows each member's tokens.
 - **Permissions.** Members work under your Claude Code settings and your session's permission mode, plus the team's `settings.json`. Meetings, reviews and answers to teammates are read-only. Details: [What runs, and what it may do](docs/configuration.md#what-runs-and-what-it-may-do).
-- **Data.** Each goal's state, records and worktrees are in the plugin's data folder, outside your repository.
+- **Data.** Each goal's state, records and worktrees live in the plugin's data folder, outside your repository.
+
+## Design notes
+
+**When not to use it.** For one focused job, a single session or a subagent is cheaper and faster. cc-huddle is for work with several parts and dependencies.
+
+**One harness, many models.** This is our view from reviewing across tools, not a measurement. Every harness, whether Claude Code, Codex or Gemini CLI, has its own system prompt and agent loop, and so its own habits. A reviewer on a different harness objects to habits as well as to real faults, and some of its fixes make the work worse. Reviewing by hand, you filter: you take the findings back to the original tool and keep what it accepts. A team running on its own has nobody to filter, so every objection turns into rework. cc-huddle therefore varies the models, not the harness, and holds reviews to the acceptance criteria: a model asked only to find problems always finds more. If you see it differently, tell us in the [issues](https://github.com/geezerrrr/cc-huddle/issues).
+
+The full design, state machines included, is in [docs/design.md](docs/design.md).
 
 ## Contributing
 
