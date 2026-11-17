@@ -60,6 +60,7 @@ const question = (
 });
 
 const work = (): Work => ({
+  checkout: "/data/dice/checkout",
   members: ["glm", "sonnet"],
   underWay: [],
   meetingsNow: {},
@@ -69,6 +70,7 @@ const work = (): Work => ({
     status: "active",
     createdAt: 0,
     settings: { review: true, meetingSize: "discussion", parallel: false },
+    base: "main",
   },
   tasks: [
     {
@@ -216,7 +218,7 @@ describe("paneTeam", () => {
         id: "q3",
         from: "sonnet",
         headline: 'The task "Game" is done. Accept it?',
-        detail: "- board, by sonnet: A grid board.",
+        detail: "- board, by sonnet: A grid board.\nTry it in /data/dice/checkout",
         kind: "options",
         options: [{ value: "accept", label: "Accept" }],
         note: { option: "revise", label: "Send back", prompt: "What to change" },

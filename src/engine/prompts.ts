@@ -21,7 +21,8 @@ import {
  * The kinds of turn a member takes: working on a subtask, or reading only
  * (a meeting, an answer to a teammate, a review).
  */
-export type SessionKind = "work" | "readOnly";
+/** A member's turn: a subtask's run, a read-only one (a meeting, a review, an answer), or resolving the goal's hand-back (§5). */
+export type SessionKind = "work" | "readOnly" | "merge";
 
 /** A member by name and role, as their teammates know them. */
 const called = (member: Member) => `${member.name} (${member.role.title})`;
@@ -193,6 +194,14 @@ ${delivery.summary}
 Files: ${files}
 
 Their worktree is ${input.cwd}. Read the files, and whatever else you need there, to check the work against the criteria, and stop once you can tell. Pass it when it meets them, even if you would have done it differently; send it back only for what really falls short, and say exactly what to fix.`;
+}
+
+/** What the member resolving a goal's hand-back is told (§5): the merge stopped on conflicts in `files`. */
+export function handBackPrompt(input: { goal: Goal; cwd: string; files: string[] }): string {
+  const { goal, cwd, files } = input;
+  return `The team's work on the goal "${goal.name}" is done, and is being merged back into the branch "${goal.base}" it was cut from. In the goal's worktree, ${cwd}, "${goal.base}" is being merged into the goal's branch, and the merge stopped on conflicts in: ${files.join(", ")}.
+
+Resolve them. Read both sides' commits (git log, git diff) to see what each side changed and why, and keep what both meant. Check the result as the repository's own instructions say to. Then stage everything and finish the merge with git commit. Change nothing the merge doesn't need.`;
 }
 
 /** A teammate's question, with what the member asked has done on the goal. */

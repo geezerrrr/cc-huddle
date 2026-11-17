@@ -93,7 +93,7 @@ export function addTools(server: McpServer, session: Session) {
     "start_goal",
     {
       description:
-        "Start a goal in this session: something the user wants done. It gets its own branch, cut from the repository's HEAD (or from the session's last goal, closed, where HEAD lacks its work), and its own copy of the team. A session runs one goal: refused while its goal is under way. Then plan it once: a meeting of the members the user picked, or, with one picked, the task assigned to them. Nothing is added to a goal after.",
+        "Start a goal in this session: something the user wants done. It gets its own branch, cut from the branch the user's checkout is on, which it merges its work back into once done and the user agrees, and its own copy of the team. A session runs one goal: refused while its goal is under way. Then plan it once: a meeting of the members the user picked, or, with one picked, the task assigned to them. Nothing is added to a goal after.",
       inputSchema: { name: z.string().trim().min(1).describe("A few words for what is wanted") },
     },
     async ({ name }) => {
@@ -204,7 +204,7 @@ export function addTools(server: McpServer, session: Session) {
     "goal_action",
     {
       description:
-        "Pause this session's goal (its runs stop, to go on later in their sessions), resume it, archive it, or delete it once archived or closed: its folder, worktrees and subtask branches go, its own branch stays. Delete only when the user has confirmed it.",
+        "Pause this session's goal (its runs stop, to go on later in their sessions), resume it, archive it, or delete it once archived or closed: its folder, worktrees and subtask branches go, and its own branch stays unless it is closed (merged back by then). Delete only when the user has confirmed it.",
       inputSchema: goalActionInput.shape,
       annotations: { destructiveHint: true },
     },
@@ -235,7 +235,7 @@ export function addTools(server: McpServer, session: Session) {
     "decide",
     {
       description:
-        "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask), a stuck review (rereview, skip, sendBack; one that failed goes back only with a note), or a merge (ours, theirs, retry; one git failed on: retry, stop).",
+        "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask; where it is all the goal waits on: acceptMerge, acceptOnly, revise), a stuck review (rereview, skip, sendBack; one that failed goes back only with a note), a merge (ours, theirs, retry; one git failed on: retry, stop), the goal's work to merge back into its branch (merge, or notNow, which pauses it), or a closed goal (cleanUp deletes it with its worktree and branch, keep). Only as the user decided.",
       inputSchema: {
         question: z.string().describe("The id of what waits on the user"),
         decision: z.enum(DECISION_OPTIONS),
@@ -244,7 +244,7 @@ export function addTools(server: McpServer, session: Session) {
       },
     },
     async ({ question, decision, note, sent_back }) => {
-      await session.goal.answer(question, {
+      await session.answer(question, {
         kind: "decision",
         option: decision,
         note,

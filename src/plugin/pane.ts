@@ -304,6 +304,7 @@ function bandText(work: Work, needs: number): string {
   if (work.meetings.some((m) => m.status === "review")) parts.push(PLAN_TO_REVIEW);
   const working = work.subtasks.filter((s) => s.status === "running").length;
   if (working) parts.push(`${String(working)} working`);
+  if (work.handingBack) parts.push(`merging into ${work.goal.base}`);
   if (needs) parts.push(`${plural(needs, "needs", "need")} you`);
   const { status } = work.goal;
   if (!parts.length) parts.push(status === "active" ? "idle" : status);
@@ -467,6 +468,12 @@ const OPTION_LABELS: Record<PermissionOption | DecisionOption, string> = {
   stop: "Stop",
   accept: "Accept",
   revise: "Send back",
+  acceptMerge: "Accept and merge",
+  acceptOnly: "Accept only",
+  merge: "Merge",
+  notNow: "Not now",
+  cleanUp: "Clean up",
+  keep: "Keep",
 };
 
 /** What a note typed instead of a pick says, for the option it goes with. */

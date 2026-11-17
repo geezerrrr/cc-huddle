@@ -5,8 +5,8 @@
  * Each change to which goal it runs waits for the one before.
  */
 import {
+  type Answer,
   Engine,
-  goalBranch,
   type EngineOptions,
   type GoalEntry,
   type GoalSettings,
@@ -16,6 +16,7 @@ import {
   type Team,
 } from "../engine/index.ts";
 import { serialBy } from "../shared/serial.ts";
+import { takeable } from "./words.ts";
 
 /** The key the session's changes of goal take turns on. */
 const TURN = "goal";
@@ -68,15 +69,23 @@ export class Session {
 
   /**
    * Starts a goal here, with the team's settings as they are now: refused while
-   * this session's goal is active; a paused, archived or closed one is let
-   * go, and a closed one is carried on from (§5).
+   * this session's goal is active; a paused, archived or closed one is let go.
    */
   start(name: string): Promise<Engine> {
     return this.turn(TURN, async () => {
-      const last = this.engine?.work.goal;
-      const after = last?.status === "closed" ? goalBranch(last.slug) : undefined;
       await this.leave();
-      return this.run(await Engine.start(await this.engineOptions(), name, after));
+      return this.run(await Engine.start(await this.engineOptions(), name));
+    });
+  }
+
+  /** Answers a question put to you on the session's goal (Engine.answer): cleaning up, it runs none after. */
+  async answer(id: string, answer: Answer): Promise<void> {
+    const engine = this.goal;
+    if (!(await engine.answer(id, answer))) return;
+    await this.turn(TURN, () => {
+      if (this.engine !== engine) return;
+      this.engine = undefined;
+      this.changed(undefined);
     });
   }
 
@@ -152,9 +161,7 @@ export class Session {
   /** Of the repository's goals (`goals`), those this session doesn't run and could take up: closed ones have nothing to go on with. */
   othersOf(goals: readonly GoalEntry[]): GoalEntry[] {
     const mine = this.engine?.work.goal.slug;
-    return goals.filter(
-      (entry) => entry.slug !== mine && !("state" in entry && entry.state.goal.status === "closed"),
-    );
+    return goals.filter((entry) => entry.slug !== mine && takeable(entry));
   }
 
   /** The repository's goals this session doesn't run, oldest first. */

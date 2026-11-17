@@ -1,7 +1,7 @@
 import type { CanUseTool, PermissionUpdate } from "@anthropic-ai/claude-agent-sdk";
 import { describe, expect, it, vi } from "vitest";
 import { Questions, type Inbox } from "./questions.ts";
-import { DECISIONS, type Question, type Subtask } from "./types.ts";
+import { DECISIONS, type Question } from "./types.ts";
 
 /** An inbox over an empty state, recording the rules allowed always. */
 function inbox() {
@@ -226,27 +226,13 @@ describe("answer", () => {
   });
 });
 
-const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
-  id,
-  taskId: "t1",
-  title: id,
-  description: "",
-  acceptance: "",
-  assignee: "glm",
-  dependsOn: [],
-  status: "done",
-  progress: { done: 0, total: 0 },
-  ...fields,
-});
+/** Who a decision on subtask `id` is put by, and the subtask. */
+const on = (id: string) => ({ from: "glm", subtaskId: id });
 
 describe("decisions", () => {
   it("wait for you with no turn behind them, and come back answered", async () => {
     const { open, questions } = inbox();
-    questions.openDecision(
-      subtask("s1", { status: "reviewing" }),
-      DECISIONS.stuckReview(),
-      "Sent back three times",
-    );
+    questions.openDecision(on("s1"), DECISIONS.stuckReview(), "Sent back three times");
     const question = await opened(open);
     expect(question).toMatchObject({ from: "glm", subtaskId: "s1", kind: "decision" });
     expect(() => {
@@ -258,7 +244,7 @@ describe("decisions", () => {
 
   it("send a task back only with what to change", async () => {
     const { open, questions } = inbox();
-    questions.openDecision(subtask("s1"), DECISIONS.delivery(), "Dice game");
+    questions.openDecision(on("s1"), DECISIONS.delivery(), "Dice game");
     const { id } = await opened(open);
     expect(() => {
       questions.answer(id, { kind: "decision", option: "revise" });
@@ -276,7 +262,7 @@ describe("calling off", () => {
       subtaskId: "s1",
       signal: new AbortController().signal,
     })("Bash", command, request());
-    questions.openDecision(subtask("s1"), DECISIONS.failedMerge(), "git failed");
+    questions.openDecision(on("s1"), DECISIONS.failedMerge(), "git failed");
     await vi.waitFor(() => {
       expect(open()).toHaveLength(2);
     });
@@ -289,8 +275,8 @@ describe("calling off", () => {
 
   it("a task's delivery leaves its other decisions", () => {
     const { open, questions } = inbox();
-    questions.openDecision(subtask("s1"), DECISIONS.delivery(), "");
-    questions.openDecision(subtask("x", { taskId: "t2" }), DECISIONS.delivery(), "");
+    questions.openDecision(on("s1"), DECISIONS.delivery(), "");
+    questions.openDecision(on("x"), DECISIONS.delivery(), "");
     questions.cancelDelivery(["s1", "s2"]);
     expect(open().map((q) => q.subtaskId)).toEqual(["x"]);
   });

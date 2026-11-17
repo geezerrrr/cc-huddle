@@ -10,20 +10,23 @@ import { workOf, type Core, type Team } from "./core.ts";
 import type { Work } from "./derive.ts";
 import { newGoalFolder, readState, stateWriter, type StateWriter } from "./data.ts";
 import { goalFiles } from "../shared/layout.ts";
-import { openGoal, takenSlugs, type Places } from "./git.ts";
+import { currentBranch, openGoal, takenSlugs, type Places } from "./git.ts";
 import { Goals } from "./goals.ts";
 import { Meetings } from "./meetings.ts";
 import { sessionOptions, teamSettings, writeSettings } from "./policy.ts";
 import { recordMembersIn, stopRecording } from "./processes.ts";
 import { systemPrompt, type SessionKind } from "./prompts.ts";
-import { Questions, type Answer } from "./questions.ts";
+import { DOESNT_FIT, Questions, type Answer } from "./questions.ts";
 import { Records } from "./records.ts";
 import { Scheduler } from "./scheduler.ts";
 import { serialBy } from "../shared/serial.ts";
 import { allowInCopy, allowInTeam, copyTeam, loadTeam, readCopy, type TeamFiles } from "./team.ts";
-import type { GoalSettings, GoalState, Member } from "./types.ts";
+import { onGoal, type GoalSettings, type GoalState, type Member } from "./types.ts";
 import { releaseLock, takeLock, type Holder, type Runner } from "./lock.ts";
 import { RepositoryGoals } from "./repository.ts";
+
+/** The answers to the acceptance that is all the goal waits on which reach past it, to the goal (Goals.decide). */
+const GOAL_OPTIONS: readonly string[] = ["acceptMerge", "acceptOnly"];
 
 /** What a session stopped as it let its goal go, for the session taking it up to resume: its meetings under way. */
 export interface HandedOver {
@@ -89,7 +92,7 @@ export class Engine {
     const questions = new Questions(core);
     const scheduler = new Scheduler(core, questions);
     const meetings = new Meetings(core, scheduler);
-    const goals = new Goals(core, scheduler, meetings);
+    const goals = new Goals(core, scheduler, meetings, questions);
     this.parts = { questions, scheduler, meetings, goals, records };
     this.scheduler = scheduler;
     this.meetings = meetings;
@@ -99,14 +102,19 @@ export class Engine {
 
   /**
    * Starts a goal for this session: a folder of its own, the team copied
-   * into it as its files have it now, its settings too (§6, §6.1),
-   * and its branch cut from your HEAD, or from `after`, the branch of the
-   * closed goal it carries on from, where you haven't merged that yet (§5),
-   * checked out in its own worktree.
+   * into it as its files have it now, its settings too (§6, §6.1), and its
+   * branch cut from the branch your checkout is on, which it hands its work
+   * back to (§5), checked out in its own worktree. Refused on a detached
+   * HEAD: there is no branch to hand the work back to.
    */
-  static async start(options: EngineOptions, name: string, after?: string): Promise<Engine> {
+  static async start(options: EngineOptions, name: string): Promise<Engine> {
     const goals = await RepositoryGoals.of(options.dataFolder, options.cwd);
     const { repo } = goals;
+    const base = await currentBranch(options.cwd);
+    if (!base)
+      throw new Error(
+        "Your checkout is on a detached HEAD: check out a branch first, for the goal to merge its work back into.",
+      );
     const copy = await loadTeam(options.userTeam, repo.top);
     // What a member's environment lacks is said before anything is made.
     teamSettings(copy.settings, copy.team.members, options.env, options.plugins);
@@ -119,9 +127,16 @@ export class Engine {
       await takeLock(files.lock, me, (holder) => options.takeOver(holder, slug));
       await copyTeam(files.team, copy);
       const places: Places = { repo, slug, root: folder };
-      await openGoal(places, after);
+      await openGoal(places, base);
       const state: GoalState = {
-        goal: { name, slug, status: "active", createdAt: Date.now(), settings: copy.goalSettings },
+        goal: {
+          name,
+          slug,
+          status: "active",
+          createdAt: Date.now(),
+          settings: copy.goalSettings,
+          base,
+        },
         tasks: [],
         subtasks: [],
         meetings: [],
@@ -205,11 +220,12 @@ export class Engine {
       },
       allowAlways: (rules) => engine.allow(rules),
       options: (member, kind, cwd) => engine.turnOptions(member, kind, cwd),
-      recorder: (subtask) => records.recorder(subtask.id),
+      recorder: (id) => records.recorder(id),
       speech: (meeting) => records.speech(meeting),
       underWay: () => engine.parts.scheduler.underWay(),
       meetingsNow: () => engine.parts.meetings.now(),
       questionsNow: () => engine.parts.questions.now(),
+      handingBack: () => engine.parts.goals.handingBack(),
     };
     const engine = new Engine(core, records, files, writer, options, copy);
     await engine.writeMemberSettings(copy);
@@ -234,13 +250,28 @@ export class Engine {
   }
 
   /**
-   * Answers a question put to you, and carries out a decision (a stuck
-   * review, a merge, a task done). Throws when it is no longer open or the
-   * answer doesn't fit it.
+   * Answers a question put to you, and carries out a decision: on a subtask
+   * (a stuck review, a merge, a task done), or on the goal (handing its work
+   * back, cleaning up; §4.1). Cleaning up deletes the goal (delete): true
+   * then. Throws when it is no longer open or the answer doesn't fit it.
    */
-  async answer(id: string, answer: Answer) {
-    if (answer.kind === "decision") await this.parts.scheduler.decide(id, answer);
-    else this.parts.questions.answer(id, answer);
+  async answer(id: string, answer: Answer): Promise<boolean> {
+    const { questions, goals, scheduler } = this.parts;
+    if (answer.kind !== "decision") {
+      questions.answer(id, answer);
+      return false;
+    }
+    const question = questions.find(id);
+    if (question.kind !== "decision") throw new Error(DOESNT_FIT);
+    if (answer.option === "cleanUp") {
+      questions.answer(id, answer);
+      await this.delete();
+      return true;
+    }
+    if (onGoal(question) || GOAL_OPTIONS.includes(answer.option))
+      await goals.decide(question, answer);
+    else await scheduler.decide(id, answer);
+    return false;
   }
 
   /**
@@ -263,8 +294,9 @@ export class Engine {
   }
 
   /**
-   * Deletes an archived goal for good (§4.1): its worktrees and subtask
-   * branches, then its folder. Its branch stays, yours to merge or delete.
+   * Deletes an archived or closed goal for good (§4.1): its worktrees and
+   * subtask branches, then its folder. An archived goal's branch stays,
+   * yours to merge or delete; a closed goal's goes too.
    */
   async delete() {
     await this.parts.goals.delete();
@@ -289,7 +321,11 @@ export class Engine {
    */
   private async shut() {
     try {
-      await Promise.all([this.parts.scheduler.close(), this.parts.meetings.close()]);
+      await Promise.all([
+        this.parts.scheduler.close(),
+        this.parts.meetings.close(),
+        this.parts.goals.stop(),
+      ]);
       await Promise.all([this.writer.close(), this.parts.records.flush()]);
     } finally {
       await stopRecording();

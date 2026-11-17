@@ -185,34 +185,41 @@ const perGoal = <T>(places: Places, task: () => Promise<T>) =>
 
 /**
  * Sets a goal up in git, or again what of it is missing: its branch cut from
- * your HEAD, or from `after` (the branch of the goal it carries on from, §5)
- * where that has commits your HEAD lacks, checked out in its own worktree
- * (again, if the folder was deleted by hand). Inside a goal's git operation
- * (perGoal).
+ * `from` (the branch it was cut from, §5; HEAD where it is set up again),
+ * checked out in its own worktree (again, if the folder was deleted by hand).
+ * Inside a goal's git operation (perGoal).
  */
-async function setUpGoal(places: Places, after?: string): Promise<string> {
+async function setUpGoal(places: Places, from = "HEAD"): Promise<string> {
   const { repo, slug } = places;
   const branch = goalBranch(slug);
   const folder = goalFiles(places.root).checkout;
-  if (!(await hasBranch(repo, branch)))
-    await git({ cwd: repo.top }, [
-      "branch",
-      branch,
-      after && (await ahead(repo, after)) ? after : "HEAD",
-    ]);
+  if (!(await hasBranch(repo, branch))) await git({ cwd: repo.top }, ["branch", branch, from]);
   if (!(await exists(folder))) await checkOut(repo, folder, branch);
   return folder;
 }
 
 /** The goal's worktree, set up again first where it needs it (setUpGoal), as one of the goal's git operations. */
-export const openGoal = (places: Places, after?: string) =>
-  perGoal(places, () => setUpGoal(places, after));
+export const openGoal = (places: Places, from?: string) =>
+  perGoal(places, () => setUpGoal(places, from));
 
-/** Whether `branch` is there and has commits your HEAD doesn't. */
-async function ahead(repo: Repository, branch: string): Promise<boolean> {
-  if (!(await hasBranch(repo, branch))) return false;
-  const { stdout } = await git({ cwd: repo.top }, ["rev-list", "--count", `HEAD..${branch}`]);
-  return Number(stdout.trim()) > 0;
+/** The branch checked out in `folder`, a repository's checkout; none on a detached HEAD. */
+export async function currentBranch(folder: string): Promise<string | undefined> {
+  const found = await git({ cwd: folder }, ["symbolic-ref", "-q", "--short", "HEAD"], {
+    allow: [1],
+  });
+  return found.code === 0 ? found.stdout.trim() : undefined;
+}
+
+/** Whether the goal's branch has commits `base` lacks: work to hand back. */
+export function hasWork(places: Places, base: string): Promise<boolean> {
+  return perGoal(places, async () => {
+    const { stdout } = await git({ cwd: places.repo.top }, [
+      "rev-list",
+      "--count",
+      `refs/heads/${base}..${goalBranch(places.slug)}`,
+    ]);
+    return Number(stdout.trim()) > 0;
+  });
 }
 
 /**
@@ -295,19 +302,24 @@ type MergeOutcome = { kind: "merged" } | { kind: "conflict"; text: string[]; oth
 const MARKERS = /^<{7} [\s\S]*?^={7}\r?$[\s\S]*?^>{7} /m;
 
 /** Of the files a merge left in conflict in a subtask's worktree, those still holding conflict markers. */
-export async function unresolved(
-  places: Places,
-  subtaskId: string,
-  files: string[],
-): Promise<string[]> {
-  const desk = goalFiles(places.root).desk(subtaskId);
-  const marked = await Promise.all(
+export const unresolved = (places: Places, subtaskId: string, files: string[]) =>
+  marked(goalFiles(places.root).desk(subtaskId), files);
+
+/** Of `files` in the worktree `tree`, those holding conflict markers. */
+async function marked(tree: string, files: string[]): Promise<string[]> {
+  const found = await Promise.all(
     // One deleted on a side has no markers.
     files.map(async (file) =>
-      MARKERS.test(await ifThere(readFile(path.join(desk, file), "utf8"), "")),
+      MARKERS.test(await ifThere(readFile(path.join(tree, file), "utf8"), "")),
     ),
   );
-  return files.filter((_, i) => marked[i]);
+  return files.filter((_, i) => found[i]);
+}
+
+/** The files a merge left in conflict in a worktree that git still has as unmerged. */
+async function unmerged(at: At): Promise<string[]> {
+  const list = await git(at, ["diff", "--name-only", "-z", "--diff-filter=U"]);
+  return list.stdout.split("\0").filter(Boolean);
 }
 
 /**
@@ -319,8 +331,7 @@ async function conflicts(
   subtaskId: string,
   at: At,
 ): Promise<Extract<MergeOutcome, { kind: "conflict" }> | undefined> {
-  const list = await git(at, ["diff", "--name-only", "-z", "--diff-filter=U"]);
-  const files = list.stdout.split("\0").filter(Boolean);
+  const files = await unmerged(at);
   if (!files.length) return undefined;
   const text = await unresolved(places, subtaskId, files);
   return { kind: "conflict", text, other: files.filter((file) => !text.includes(file)) };
@@ -432,10 +443,77 @@ export function dropDesk(places: Places, subtaskId: string): Promise<void> {
 }
 
 /**
- * Takes a deleted goal out of the repository: its subtasks' worktrees and
- * branches and its own worktree. Its branch stays, yours to merge or delete.
+ * Hands a goal's work back (§5): in its worktree, `base` is merged into the
+ * goal's branch; clean, `base` fast-forwards to it, in the worktree that has
+ * it checked out, or by its ref where none has. Conflicts stay in the goal's
+ * worktree, the merge half done, for whoever resolves them; asked again, a
+ * merge that has none left (resolved and staged, or committed) goes on.
+ * Whatever git refuses throws, saying why: changes of yours in the way,
+ * `base` moved meanwhile.
  */
-export function removeGoal(places: Places): Promise<void> {
+export function handBackGoal(
+  places: Places,
+  base: string,
+  by: string,
+): Promise<{ kind: "merged" } | { kind: "conflict"; files: string[] }> {
+  return perGoal(places, async () => {
+    const { repo } = places;
+    const tree = await setUpGoal(places);
+    const at = await worktreeAt(repo, tree);
+    const goal = { ...at, env: { ...at.env, ...authorEnv(by) } };
+    const ref = `refs/heads/${base}`;
+    if (!(await merging(goal))) {
+      // As git does by default, whatever your own setup says (merge.ff=only would refuse it).
+      const merge = await git(goal, ["-c", "merge.ff=true", "merge", "-q", "--no-edit", ref], {
+        allow: [1],
+      });
+      if (merge.code === 1 && !(await unmerged(goal)).length)
+        throw new GitError("merge", (merge.stderr || merge.stdout).trim());
+    }
+    if (await merging(goal)) {
+      const files = await unmerged(goal);
+      const left = [...files, ...(await marked(tree, await changed(goal)))];
+      if (left.length) return { kind: "conflict", files: [...new Set(left)] };
+      await git(goal, ["commit", "-q", "--no-edit"]);
+    }
+    const head = (await git(goal, ["rev-parse", "HEAD"])).stdout.trim();
+    const was = (await git({ cwd: repo.top }, ["rev-parse", ref])).stdout.trim();
+    const checkout = await checkedOut(repo, ref);
+    if (checkout) await git({ cwd: checkout }, ["merge", "-q", "--ff-only", head]);
+    else {
+      const ff = await git({ cwd: repo.top }, ["merge-base", "--is-ancestor", was, head], {
+        allow: [1],
+      });
+      if (ff.code === 1) throw new GitError("merge", `${base} moved meanwhile: merge again`);
+      await git({ cwd: repo.top }, ["update-ref", ref, head, was]);
+    }
+    return { kind: "merged" };
+  });
+}
+
+/** The files a merge under way in a worktree has staged or changed so far. */
+async function changed(at: At): Promise<string[]> {
+  const list = await git(at, ["diff", "--name-only", "-z", "HEAD"]);
+  return list.stdout.split("\0").filter(Boolean);
+}
+
+/** The worktree that has `ref` checked out, if one has. */
+async function checkedOut(repo: Repository, ref: string): Promise<string | undefined> {
+  const list = await git({ cwd: repo.top }, ["worktree", "list", "--porcelain", "-z"]);
+  let tree: string | undefined;
+  for (const line of list.stdout.split("\0")) {
+    if (line.startsWith("worktree ")) tree = line.slice("worktree ".length);
+    else if (line === `branch ${ref}`) return tree;
+  }
+  return undefined;
+}
+
+/**
+ * Takes a deleted goal out of the repository: its subtasks' worktrees and
+ * branches and its own worktree. Its branch stays, yours to merge or delete,
+ * unless `branchToo`: a closed goal's is in the branch it was cut from.
+ */
+export function removeGoal(places: Places, branchToo: boolean): Promise<void> {
   return perGoal(places, async () => {
     const { repo, slug } = places;
     const refs = await git({ cwd: repo.top }, [
@@ -449,5 +527,7 @@ export function removeGoal(places: Places): Promise<void> {
     const folder = goalFiles(places.root).checkout;
     await unlist(repo, folder);
     await rm(folder, { recursive: true, force: true });
+    if (branchToo)
+      await git({ cwd: repo.top }, ["branch", "-q", "-D", goalBranch(slug)], { allow: [1] });
   });
 }

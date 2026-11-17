@@ -9,7 +9,8 @@ import type { MemberOptions } from "./policy.ts";
 import type { SessionKind } from "./prompts.ts";
 import type { Inbox } from "./questions.ts";
 import type { TurnListener } from "./turns.ts";
-import type { Goal, GoalState, Meeting, MeetingNow, Member, Question, Subtask } from "./types.ts";
+import { goalFiles } from "../shared/layout.ts";
+import type { Goal, GoalState, Meeting, MeetingNow, Member, Question } from "./types.ts";
 
 /** The team as configured (§6): its members in order. */
 export interface Team {
@@ -22,8 +23,8 @@ export interface Core extends Inbox {
   places: Places;
   /** The Agent SDK options of a member's turn of `kind` in `cwd`: their settings and system prompt. */
   options(member: Member, kind: SessionKind, cwd: string): MemberOptions;
-  /** Where what a subtask's runs do is told: its record, and whoever follows it live. */
-  recorder(subtask: Subtask): TurnListener;
+  /** Where what runs do is told: a subtask's, or the goal's hand-back's (HAND_BACK), by that id; its record, and whoever follows it live. */
+  recorder(id: string): TurnListener;
   /** Where what is said at a meeting is told as it is said, to whoever follows it. */
   speech(meeting: Meeting): TurnListener;
   /** The subtasks whose review or merge is under way now (Scheduler.underWay). */
@@ -32,18 +33,31 @@ export interface Core extends Inbox {
   meetingsNow(): Readonly<Record<string, MeetingNow>>;
   /** What members' turns wait on now (Questions.now). */
   questionsNow(): readonly Question[];
+  /** The goal handing its work back now (Goals.handingBack). */
+  handingBack(): Work["handingBack"];
 }
 
 /** The state as the rules read it (derive.ts). */
 export const workOf = (
-  core: Pick<Core, "state" | "team" | "underWay" | "meetingsNow" | "questionsNow">,
-): Work => ({
-  ...core.state,
-  questions: [...core.state.questions, ...core.questionsNow()],
-  members: core.team.members.map((m) => m.name),
-  underWay: core.underWay(),
-  meetingsNow: core.meetingsNow(),
-});
+  core: Pick<
+    Core,
+    "state" | "team" | "places" | "underWay" | "meetingsNow" | "questionsNow" | "handingBack"
+  >,
+): Work => {
+  const handingBack = core.handingBack();
+  return {
+    ...core.state,
+    questions: [...core.state.questions, ...core.questionsNow()],
+    members: core.team.members.map((m) => m.name),
+    underWay: core.underWay(),
+    meetingsNow: core.meetingsNow(),
+    checkout: goalFiles(core.places.root).checkout,
+    ...(handingBack && { handingBack }),
+  };
+};
+
+/** The id the goal's hand-back's run is recorded under, as a subtask's is under its own. */
+export const HAND_BACK = "hand-back";
 
 /** Why what you asked can't be done, as more than one part refuses it. */
 export const REFUSED = {

@@ -115,7 +115,13 @@ export type HuddleOption =
   | "retry"
   | "stop"
   | "accept"
-  | "revise";
+  | "revise"
+  | "acceptMerge"
+  | "acceptOnly"
+  | "merge"
+  | "notNow"
+  | "cleanUp"
+  | "keep";
 
 /**
  * What the `answer` tool takes as `answer`, as you pressed or typed it: an

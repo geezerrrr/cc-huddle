@@ -1,11 +1,13 @@
 /**
  * What the SessionStart hook tells your session (docs/design.md §3.3): the
  * goal it runs, if it does (after `/clear`), and the repository's goals it
- * can take up, read from their folders, as context. A repository with no
+ * can take up (closed ones are done with), read from their folders, as
+ * context. A repository with no
  * goals adds nothing.
  */
 import { GitError, RepositoryGoals } from "../engine/index.ts";
 import { othersText, statusText } from "./status.ts";
+import { takeable } from "./words.ts";
 
 /** The context for session `session` (its pid) in `cwd`. */
 export async function sessionContext(
@@ -32,7 +34,7 @@ export async function sessionContext(
       `This session runs cc-huddle's goal "${mine.state.goal.name}", as it stands:\n\n${status}`,
     );
   }
-  const others = othersText(goals.filter((g) => g !== mine));
+  const others = othersText(goals.filter((g) => g !== mine && takeable(g)));
   if (others) parts.push(`cc-huddle: ${others}`);
   return parts.length ? parts.join("\n\n") : undefined;
 }

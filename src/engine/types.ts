@@ -37,6 +37,8 @@ export interface Goal {
   /** When it started: the repository's goals are listed in that order. */
   createdAt: number;
   settings: GoalSettings;
+  /** The branch it was cut from, which it merges its work back into (§5). */
+  base: string;
 }
 
 /** How a goal works: the team's settings in `team.yaml` as it started, switched as `/model` is (§6.1). */
@@ -232,7 +234,7 @@ export interface Choice {
   multiSelect: boolean;
 }
 
-/** What you can decide on a stuck review, a merge that needs you, or a finished task. */
+/** What you can decide on a stuck review, a merge that needs you, a finished task, or the goal's handing its work back. */
 export const DECISION_OPTIONS = [
   "rereview",
   "skip",
@@ -243,19 +245,29 @@ export const DECISION_OPTIONS = [
   "stop",
   "accept",
   "revise",
+  "acceptMerge",
+  "acceptOnly",
+  "merge",
+  "notNow",
+  "cleanUp",
+  "keep",
 ] as const;
 export type DecisionOption = (typeof DECISION_OPTIONS)[number];
 
 /**
- * A decision on a subtask: what it offers, and the option a note typed
- * instead of a pick goes with, `needed` where that option is no answer
- * without one. A review stuck or failed, a merge with files it can't merge
- * line by line (`conflict`, its `files`) or one git failed, a task done.
+ * A decision: what it offers, and the option a note typed instead of a pick
+ * goes with, `needed` where that option is no answer without one. On a
+ * subtask: a review stuck or failed, a merge with files it can't merge line
+ * by line (`conflict`, its `files`) or one git failed, a task done. On the
+ * goal (§4.1): handing its work back, and cleaning up once it has.
  */
 export type Decision = {
   options: DecisionOption[];
   note?: { option: "sendBack" | "revise"; needed?: true };
-} & ({ kind: "review" | "merge" | "delivery" } | { kind: "conflict"; files: string[] });
+} & (
+  | { kind: "review" | "merge" | "delivery" | "handBack" | "cleanUp" }
+  | { kind: "conflict"; files: string[] }
+);
 
 /** The decisions there are, each as it is put to you. */
 export const DECISIONS = {
@@ -285,6 +297,16 @@ export const DECISIONS = {
     options: ["accept", "revise"],
     note: { option: "revise", needed: true },
   }),
+  /** The same, where it is all the goal still waits on: accepting it can hand the goal's work back too. */
+  lastDelivery: (): Decision => ({
+    kind: "delivery",
+    options: ["acceptMerge", "acceptOnly", "revise"],
+    note: { option: "revise", needed: true },
+  }),
+  /** The goal's work all done: merge it back into the branch it was cut from, or not now (it pauses). */
+  handBack: (): Decision => ({ kind: "handBack", options: ["merge", "notNow"] }),
+  /** The goal closed: delete it with its worktree and branch, or keep it. */
+  cleanUp: (): Decision => ({ kind: "cleanUp", options: ["cleanUp", "keep"] }),
 };
 
 /** Whether picking `option` is no answer to `decision` without a note. */
@@ -314,8 +336,8 @@ export interface Permission {
  */
 export type Question = {
   id: string;
-  /** The subtask it is about: whose run asks, or that you decide on. */
-  subtaskId: string;
+  /** The subtask it is about: whose run asks, or that you decide on; none for the goal's own decisions and its hand-back's run. */
+  subtaskId?: string;
   /** Who asks. */
   from: string;
   text: string;
@@ -339,8 +361,13 @@ export const toYou = (question: Question): question is QuestionToYou =>
   question.kind !== "teammate";
 
 /** A task done, waiting for you to accept it: the decision on its last subtask. */
-export const isAcceptance = (question: Question) =>
+export const isAcceptance = (question: Question): question is DecisionQuestion =>
   question.kind === "decision" && question.decision.kind === "delivery";
+
+/** A decision on the goal itself, not on a subtask: handing its work back, or cleaning up. */
+export const onGoal = (question: Question): question is DecisionQuestion =>
+  question.kind === "decision" &&
+  (question.decision.kind === "handBack" || question.decision.kind === "cleanUp");
 
 /** The state the engine saves for a goal: the goal, and its work. */
 export interface GoalState {

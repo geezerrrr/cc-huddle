@@ -59,6 +59,7 @@ describe("taskBrief", () => {
           status: "active",
           createdAt: 0,
           settings: { review: true, meetingSize: "discussion", parallel: false },
+          base: "main",
         },
         task: { id: "t1", title: "Board", outcome: "", ownerAccepts },
         subtask: subtask("Scoreboard"),
@@ -79,6 +80,7 @@ describe("taskBrief", () => {
         status: "active",
         createdAt: 0,
         settings: { review: true, meetingSize: "discussion", parallel: false },
+        base: "main",
       },
       task: {
         id: "t1",
@@ -180,6 +182,7 @@ describe("meeting prompts", () => {
       status: "active",
       createdAt: 0,
       settings: { review: true, meetingSize: "discussion", parallel: false },
+      base: "main",
     },
     attendees: [sonnet, glm],
     members: fields.hostOnly ? [glm] : [sonnet, glm],

@@ -91,7 +91,7 @@ export function addPaneTools(server: McpServer, session: Session, pane: PaneServ
       inputSchema: answerInput.shape,
     },
     async ({ question, answer }) => {
-      await session.goal.answer(
+      await session.answer(
         question,
         answer.kind === "choices"
           ? answer
@@ -183,7 +183,7 @@ export function addPaneTools(server: McpServer, session: Session, pane: PaneServ
  */
 function handOffText(task: string, goal: Goal | undefined, members: readonly Member[]): string {
   const runs = goal
-    ? `It is a new goal: this session's goal "${goal.name}" is ${goal.status}${goal.status === "closed" ? ", and the new one carries on from its branch" : ", and starting the new one lets it go"}.`
+    ? `It is a new goal: this session's goal "${goal.name}" is ${goal.status}, and starting the new one lets it go.`
     : "It is a new goal: this session runs none yet.";
   return [
     "The user hands this to cc-huddle's team: take it on as cc-huddle's team skill says.",

@@ -40,7 +40,7 @@ For one focused job, a single session or a subagent is cheaper and quicker. cc-h
 - **Meeting.** The members you pick discuss the task in turns, read-only. The host writes a plan of tasks with owners, dependencies and acceptance criteria; you approve it, change it or drop it.
 - **Work.** Each subtask runs in its own worktree as a Claude Code session on its member's model, as soon as what it waits on is merged: a fresh one, or, where it builds on the same member's own work, a fork of that work's session. Members can ask each other questions.
 - **Review and merge.** Another member checks each delivery against its acceptance criteria and passes it or sends it back with notes. Passed work merges into `huddle/<goal>/main` one subtask at a time; a conflict goes back to its author.
-- **You.** Plans to approve, finished tasks to accept, permission requests and members' questions come to you in Claude Code's dialog, or wait in the pane; your session's model can't answer them. A task you accept comes with what was done and how to check it. The goal branch is yours to merge: cc-huddle never pushes or touches your working tree.
+- **You.** Plans to approve, finished tasks to accept, permission requests and members' questions come to you in Claude Code's dialog, or wait in the pane; your session's model can't answer them. A task you accept comes with what was done, how to check it, and the goal's worktree to try it in. Once the work is done, the goal asks to merge back into the branch it was cut from; a member resolves any conflicts, and cc-huddle never pushes.
 
 The full design, state machines included, is [docs/design.md](docs/design.md).
 
@@ -121,7 +121,7 @@ Each task is a goal of its own. Your session proposes who takes part, by what th
 | `/huddle meeting <size>`          | Sets how long meetings run: `small`, `discussion` or `large`                   |
 | `/huddle parallel on\|off`        | Lets a member do several pieces of work at once                                |
 
-You can also ask your session in words ("have opus do the scoreboard"). A session runs one goal; for more goals at once, run more sessions. A goal closes once its tasks are done, and the next one in the session carries on from its branch. `review`, `meeting` and `parallel` are kept in your `team.yaml`; like `/model`, a switch applies to the session's goal and goals started after. The band above the prompt keeps count: `cc-huddle · meeting · 3 working · 1 needs you`. Closing the session pauses its goal; `/huddle resume` goes on where it stopped.
+You can also ask your session in words ("have opus do the scoreboard"). A session runs one goal; for more goals at once, run more sessions. A goal closes once its work is merged back into your branch, and offers to clean up its worktree and branch; until you merge, it waits paused, and `/huddle resume` asks again. `review`, `meeting` and `parallel` are kept in your `team.yaml`; like `/model`, a switch applies to the session's goal and goals started after. The band above the prompt keeps count: `cc-huddle · meeting · 3 working · 1 needs you`. Closing the session pauses its goal; `/huddle resume` goes on where it stopped.
 
 <table>
   <tr>

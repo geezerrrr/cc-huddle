@@ -41,6 +41,7 @@ const question = (fields: Pick<Question, "id" | "subtaskId"> & Ask): Question =>
 });
 
 const work = (fields: Partial<Work> = {}): Work => ({
+  checkout: "/data/dice/checkout",
   members: ["host", "ann", "bob"],
   underWay: [],
   meetingsNow: {},
@@ -50,6 +51,7 @@ const work = (fields: Partial<Work> = {}): Work => ({
     status: "active",
     createdAt: 0,
     settings: { review: true, meetingSize: "discussion", parallel: false },
+    base: "main",
   },
   tasks: [
     {
@@ -164,6 +166,7 @@ describe("waitsIn", () => {
         status: "paused",
         createdAt: 0,
         settings: { review: true, meetingSize: "discussion", parallel: false },
+        base: "main",
       },
     });
     const held = [{ kind: "goal", status: "paused" }];

@@ -63,6 +63,7 @@ beforeEach(async () => {
         status: "active",
         createdAt: 0,
         settings: { review: false, meetingSize: "discussion", parallel: false },
+        base: "main",
       },
       tasks: [{ id: "t1", title: "Board", outcome: "", ownerAccepts: true }],
       subtasks: [],
@@ -80,6 +81,7 @@ beforeEach(async () => {
     underWay: () => scheduler.underWay(),
     meetingsNow: () => ({}),
     questionsNow: () => questions.now(),
+    handingBack: () => undefined,
   };
   questions = new Questions(core);
   scheduler = new Scheduler(core, questions);

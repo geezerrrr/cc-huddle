@@ -3,11 +3,27 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Core } from "./core.ts";
-import { git, goalBranch, openDesk, openGoal, openRepository, subtaskBranch } from "./git.ts";
+import {
+  commitDesk,
+  git,
+  goalBranch,
+  mergeDesk,
+  openDesk,
+  openGoal,
+  openRepository,
+  subtaskBranch,
+} from "./git.ts";
 import { Goals } from "./goals.ts";
 import type { Meetings } from "./meetings.ts";
+import { Questions } from "./questions.ts";
 import type { Scheduler } from "./scheduler.ts";
-import type { Meeting, Member } from "./types.ts";
+import {
+  DECISIONS,
+  type DecisionQuestion,
+  type Meeting,
+  type Member,
+  type Subtask,
+} from "./types.ts";
 import { goalFiles } from "../shared/layout.ts";
 
 const ME = {
@@ -35,10 +51,12 @@ const meeting = (id: string, status: Meeting["status"]): Meeting => ({
 let dir: string;
 let core: Core;
 let goals: Goals;
+let questions: Questions;
 const scheduler = {
   hold: vi.fn(),
   pump: vi.fn(),
   release: vi.fn(() => Promise.resolve()),
+  decide: vi.fn(() => Promise.resolve()),
   assign: vi.fn(() => []),
 };
 const meetings = {
@@ -62,6 +80,7 @@ beforeEach(async () => {
         status: "active",
         createdAt: 0,
         settings: { review: false, meetingSize: "discussion", parallel: false },
+        base: "main",
       },
       tasks: [],
       subtasks: [],
@@ -79,8 +98,15 @@ beforeEach(async () => {
     underWay: () => [],
     meetingsNow: () => ({}),
     questionsNow: () => [],
+    handingBack: () => undefined,
   };
-  goals = new Goals(core, scheduler as unknown as Scheduler, meetings as unknown as Meetings);
+  questions = new Questions(core);
+  goals = new Goals(
+    core,
+    scheduler as unknown as Scheduler,
+    meetings as unknown as Meetings,
+    questions,
+  );
   vi.clearAllMocks();
 });
 
@@ -124,7 +150,7 @@ describe("Goals", () => {
     expect(scheduler.pump).toHaveBeenCalled();
   });
 
-  it("close once nothing in them can go on, and then only delete", async () => {
+  it("close once their plan is dropped, ask to clean up, and then only delete", async () => {
     const { goal } = core.state;
     core.state.meetings.push(meeting("m1", "review"));
     goals.settle();
@@ -132,6 +158,7 @@ describe("Goals", () => {
     core.state.meetings[0] = meeting("m1", "dropped");
     goals.settle();
     expect(goal.status).toBe("closed");
+    expect(core.state.questions).toMatchObject([{ from: "glm", decision: { kind: "cleanUp" } }]);
     await expect(goals.pause()).rejects.toThrow("is closed: nothing in it can go on");
     await expect(goals.archive()).rejects.toThrow("is closed");
     await expect(goals.resume()).rejects.toThrow("is closed");
@@ -174,4 +201,87 @@ describe("Goals", () => {
     expect(await exists(goalFiles(core.places.root).desk("s1"))).toBe(false);
     expect(await exists(goalFiles(core.places.root).checkout)).toBe(false);
   });
+
+  it("hand their work back once it is done, on your word, and close", async () => {
+    const { goal } = core.state;
+    await doneWork(false);
+    goals.settle();
+    const asked = await opened("handBack");
+    expect(asked.from).toBe("glm");
+
+    await goals.decide(asked, { kind: "decision", option: "notNow" });
+    expect(goal.status).toBe("paused");
+    expect(core.state.questions).toEqual([]);
+
+    await goals.resume();
+    goals.settle();
+    const again = await opened("handBack");
+    await goals.decide(again, { kind: "decision", option: "merge" });
+    const cleanUp = await opened("cleanUp");
+    expect(goal.status).toBe("closed");
+    const merged = await git({ cwd: core.places.repo.top }, ["show", "main:dice.ts"]);
+    expect(merged.stdout).toBe("roll\n");
+
+    await goals.decide(cleanUp, { kind: "decision", option: "keep" });
+    expect(core.state.questions).toEqual([]);
+  });
+
+  it("close with nothing to ask where there is no work to hand back", async () => {
+    const { goal } = core.state;
+    await doneWork(false, false);
+    goals.settle();
+    await opened("cleanUp");
+    expect(goal.status).toBe("closed");
+  });
+
+  it("offer to hand the work back on the acceptance that is all they wait on, or pause on accepting only", async () => {
+    const { goal } = core.state;
+    await doneWork(true);
+    questions.openDecision({ from: "glm", subtaskId: "s1" }, DECISIONS.delivery(), "Game");
+    goals.settle();
+    const [last] = core.state.questions;
+    expect(last?.decision.options).toEqual(["acceptMerge", "acceptOnly", "revise"]);
+    if (!last) throw new Error("No acceptance");
+    await goals.decide(last, { kind: "decision", option: "acceptOnly" });
+    expect(goal.status).toBe("paused");
+    expect(scheduler.decide).toHaveBeenCalledWith(last.id, {
+      kind: "decision",
+      option: "acceptOnly",
+    });
+  });
 });
+
+/** A task of one subtask, done: merged into the goal's branch with a file, `withWork`. */
+async function doneWork(ownerAccepts: boolean, withWork = true) {
+  const { places } = core;
+  await openGoal(places, "main");
+  if (withWork) {
+    const desk = await openDesk(places, "s1");
+    await writeFile(path.join(desk, "dice.ts"), "roll\n");
+    await commitDesk(places, "s1", "glm", "Roll");
+    await mergeDesk(places, "s1", "glm");
+  }
+  core.state.tasks.push({ id: "t1", title: "Game", outcome: "", ownerAccepts });
+  const done: Subtask = {
+    id: "s1",
+    taskId: "t1",
+    title: "Roll",
+    description: "",
+    acceptance: "",
+    assignee: "glm",
+    dependsOn: [],
+    status: "done",
+    progress: { done: 0, total: 0 },
+  };
+  core.state.subtasks.push(done);
+}
+
+/** The decision of `kind` once it is put to you. */
+async function opened(kind: "handBack" | "cleanUp"): Promise<DecisionQuestion> {
+  return vi.waitFor(() => {
+    const found = core.state.questions.find((q) => q.decision.kind === kind);
+    if (!found) throw new Error(`No ${kind} yet`);
+    return found;
+    // Its git work takes a while under a full run.
+  }, 5000);
+}

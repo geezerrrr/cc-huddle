@@ -304,7 +304,7 @@ export class Scheduler {
     if (question.kind !== "decision" || !canSendBack(this.core.state, question, answer.sentBack))
       throw new Error(DOESNT_FIT);
     this.questions.answer(id, answer);
-    const subtask = this.subtask(question.subtaskId);
+    const subtask = question.subtaskId && this.subtask(question.subtaskId);
     if (!subtask) return;
     const { option: pick, note = "" } = answer;
     if (question.decision.kind === "delivery") {
@@ -364,7 +364,7 @@ export class Scheduler {
   /** A review or merge waits on your decision: `text`, what it came to, if it says more. */
   private ask(subtask: Subtask, decision: Decision, text: string) {
     this.move(subtask, decision.kind === "review" ? "askReview" : "askMerge");
-    this.questions.openDecision(subtask, decision, text);
+    this.questions.openDecision({ from: subtask.assignee, subtaskId: subtask.id }, decision, text);
   }
 
   /**
@@ -453,7 +453,7 @@ export class Scheduler {
       const { goal } = this;
       const task = this.taskOf(subtask);
       const desk = await openDesk(core.places, subtask.id);
-      const recorder = core.recorder(subtask);
+      const recorder = core.recorder(subtask.id);
       outcome = await runSubtask({
         options: core.options(member, "work", desk),
         opening: goOn
@@ -619,6 +619,10 @@ export class Scheduler {
     subtask.finishedAt = Date.now();
     subtask.progress = { done: subtask.progress.total, total: subtask.progress.total };
     if (!taskDone(this.core.state, subtask.taskId) || !this.taskOf(subtask).ownerAccepts) return;
-    this.questions.openDecision(subtask, DECISIONS.delivery(), this.taskOf(subtask).title);
+    this.questions.openDecision(
+      { from: subtask.assignee, subtaskId: subtask.id },
+      DECISIONS.delivery(),
+      this.taskOf(subtask).title,
+    );
   }
 }

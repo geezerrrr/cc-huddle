@@ -144,7 +144,13 @@ export function needWords(
 ): { headline: string; detail?: string } {
   const subtask = work.subtasks.find((s) => s.id === question.subtaskId);
   const title = subtask?.title;
-  const about = title ? ` for "${title}"` : "";
+  // A question with no subtask comes from the goal's hand-back.
+  const about = title
+    ? ` for "${title}"`
+    : question.subtaskId
+      ? ""
+      : " while merging the goal back";
+  const { goal } = work;
   switch (question.kind) {
     case "permission":
       return {
@@ -175,17 +181,41 @@ export function needWords(
           };
         case "delivery": {
           // What each of its subtasks delivered, with how to check it, as its member said.
-          const delivered = work.subtasks
-            .filter((s) => s.taskId === subtask?.taskId && s.delivery)
-            .map((s) => `- ${s.title}, by ${s.assignee}: ${s.delivery?.summary ?? ""}`);
+          const delivered = deliveredText(
+            work,
+            work.subtasks.filter((s) => s.taskId === subtask?.taskId),
+          );
+          const last = question.decision.options.includes("acceptMerge");
           return {
-            headline: `The task "${question.text}" is done. Accept it?`,
-            ...(delivered.length && { detail: delivered.join("\n") }),
+            headline: last
+              ? `The task "${question.text}" is done, and with it the goal. Accept it, and merge the goal into ${goal.base}?`
+              : `The task "${question.text}" is done. Accept it?`,
+            detail: delivered,
           };
         }
+        case "handBack":
+          return {
+            headline: question.text
+              ? `Merging "${goal.name}" into ${goal.base} came back. Merge again?`
+              : `"${goal.name}" is done. Merge it into ${goal.base}?`,
+            detail: question.text || deliveredText(work, work.subtasks),
+          };
+        case "cleanUp":
+          return {
+            headline: `"${goal.name}" is closed. Clean it up: its worktree, its branch, its records?`,
+          };
       }
   }
 }
+
+/** What `subtasks` delivered, each with how to check it as its member said, and where to try it: the goal's worktree. */
+const deliveredText = (work: Work, subtasks: readonly Subtask[]) =>
+  [
+    ...subtasks.flatMap((s) =>
+      s.delivery ? [`- ${s.title}, by ${s.assignee}: ${s.delivery.summary}`] : [],
+    ),
+    `Try it in ${work.checkout}`,
+  ].join("\n");
 
 /**
  * A plan out for review, in words: what it is for, then its tasks numbered,
@@ -208,6 +238,10 @@ export function planWords(plan: Plan, work: Work): { headline: string; detail: s
 
 /** Where one of the repository's goals is: in another session, unreadable, archived, or paused, as a session that ended left it too. */
 type GoalWhere = "elsewhere" | "unreadable" | "archived" | "paused";
+
+/** Whether a goal of the repository's can be taken up: a closed one has nothing to go on with. */
+export const takeable = (entry: GoalEntry) =>
+  !("state" in entry && entry.state.goal.status === "closed");
 
 export const whereOf = (entry: GoalEntry): GoalWhere =>
   entry.holder

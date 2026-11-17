@@ -30,6 +30,7 @@ function subtaskLine(subtask: Subtask, { waits }: Derived["subtasks"][string], w
   if (step) parts.push(step);
   parts.push(...waits.map((w) => waitText(w, work)));
   if (subtask.error) parts.push(`error: ${subtask.error}`);
+  if (subtask.delivery) parts.push(`delivered: ${subtask.delivery.summary}`);
   return `    - ${subtask.title} [${subtask.id}], ${subtask.assignee}: ${parts.join(", ")}`;
 }
 
@@ -51,9 +52,13 @@ export function statusText(work: Work): string {
   const busy = new Set(derived.busy);
   const { goal } = work;
   const lines = [
-    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)}; review ${goal.settings.review ? "on" : "off"}, ${goal.settings.meetingSize} meetings, parallel ${goal.settings.parallel ? "on" : "off"}`,
+    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)} (cut from ${goal.base}, checked out in ${work.checkout}); review ${goal.settings.review ? "on" : "off"}, ${goal.settings.meetingSize} meetings, parallel ${goal.settings.parallel ? "on" : "off"}`,
     `Team: ${work.members.map((m) => (busy.has(m) ? `${m} (busy)` : m)).join(", ")}`,
   ];
+  if (work.handingBack)
+    lines.push(
+      `  Merging back into ${goal.base}${work.handingBack.by ? `: ${work.handingBack.by} resolves its conflicts` : ""}`,
+    );
   for (const meeting of work.meetings.filter((m) => m.status !== "approved"))
     lines.push(
       `  Meeting [${meeting.id}], ${hostText(meeting)}: ${meetingStatus(meeting, work.meetingsNow[meeting.id])}${derived.resumable.includes(meeting.id) ? "; it can go on" : ""}`,

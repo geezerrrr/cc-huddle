@@ -9,6 +9,7 @@ export { acceptanceOf, derive, inProgress, taskDone, type Work } from "./derive.
 export { Engine, type EngineOptions, type HandedOver } from "./engine.ts";
 export { GitError, goalBranch, SLUG } from "./git.ts";
 export { planSchema, writtenPlan } from "./plan.ts";
+export type { Answer } from "./questions.ts";
 export { stopMembers } from "./processes.ts";
 export type { LiveRun, RecordEntry } from "./records.ts";
 export { RepositoryGoals } from "./repository.ts";

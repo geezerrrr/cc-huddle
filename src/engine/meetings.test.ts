@@ -56,6 +56,7 @@ beforeEach(async () => {
         status: "active",
         createdAt: 0,
         settings: { review: true, meetingSize: "discussion", parallel: false },
+        base: "main",
       },
       tasks: [],
       subtasks: [],
@@ -73,6 +74,7 @@ beforeEach(async () => {
     underWay: () => [],
     meetingsNow: () => meetings.now(),
     questionsNow: () => [],
+    handingBack: () => undefined,
   };
   meetings = new Meetings(core, { pump, assign } as unknown as Scheduler);
   vi.mocked(askOnce).mockReset();

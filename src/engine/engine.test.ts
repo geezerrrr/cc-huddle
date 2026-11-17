@@ -325,6 +325,34 @@ describe("Engine", () => {
     });
   });
 
+  it("starts nothing on a detached HEAD: there is no branch to hand the work back to", async () => {
+    await git({ cwd: repo }, ["checkout", "-q", "--detach"]);
+    await expect(start()).rejects.toThrow("detached HEAD");
+  });
+
+  it("deletes a closed goal with its branch as you say to clean up", async () => {
+    const engine = await start();
+    const { state } = inside(engine).core;
+    state.meetings.push({
+      id: "m1",
+      agenda: "",
+      size: "small",
+      participants: ["glm"],
+      status: "dropped",
+      turns: [],
+    });
+    inside(engine).core.changed();
+    expect(engine.work.goal.status).toBe("closed");
+    const [cleanUp] = engine.work.questions;
+    expect(await engine.answer(cleanUp?.id ?? "", { kind: "decision", option: "cleanUp" })).toBe(
+      true,
+    );
+    opened.splice(0);
+    expect(await readdir(goals)).toEqual([]);
+    const refs = await git({ cwd: repo }, ["branch", "--list", "huddle/*"]);
+    expect(refs.stdout).toBe("");
+  });
+
   it("deletes an archived goal: its folder goes, its branch stays", async () => {
     const engine = await start();
     await expect(engine.delete()).rejects.toThrow("isn't archived");
@@ -362,7 +390,11 @@ describe("Engine", () => {
       tokens: 0,
     };
     inside(engine).core.state.subtasks.push(subtask);
-    inside(engine).parts.questions.openDecision(subtask, DECISIONS.delivery(), "Game");
+    inside(engine).parts.questions.openDecision(
+      { from: subtask.assignee, subtaskId: subtask.id },
+      DECISIONS.delivery(),
+      "Game",
+    );
     const [question] = engine.work.questions;
     await expect(
       engine.answer(question?.id ?? "", { kind: "decision", option: "revise" }),

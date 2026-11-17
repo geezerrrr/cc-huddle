@@ -42,13 +42,16 @@ export class RepositoryGoals {
 
   /** A goal as its files left it, with nothing under way: as a session that doesn't run it reads it. */
   async stored(slug: string, state: GoalState): Promise<Work> {
-    const { team } = await readCopy(this.goal(slug).files.team);
+    const { folder, files } = this.goal(slug);
+    const { team } = await readCopy(files.team);
     return workOf({
       state,
       team,
+      places: { repo: this.repo, slug, root: folder },
       underWay: () => [],
       meetingsNow: () => ({}),
       questionsNow: () => [],
+      handingBack: () => undefined,
     });
   }
 }

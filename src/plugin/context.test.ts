@@ -60,6 +60,7 @@ async function writeGoal(slug: string, status = "paused") {
           status,
           createdAt: slug.length,
           settings: { review: true, meetingSize: "discussion", parallel: false },
+          base: "main",
         },
         tasks: [],
         subtasks: [],
@@ -94,10 +95,11 @@ describe("the session's context", () => {
   it("tells a session that runs a goal where it stands (after /clear)", async () => {
     await writeGoal("dice", "active");
     await hold("dice", { pid: process.pid, session: SESSION, address: "here" });
-    expect(await sessionContext(repo, data, SESSION))
+    const said = await sessionContext(repo, data, SESSION);
+    expect(said?.replace(/checked out in [^)]+/, "checked out in …"))
       .toBe(`This session runs cc-huddle's goal "dice", as it stands:
 
-Goal "dice": active, on branch huddle/dice/main; review on, discussion meetings, parallel off
+Goal "dice": active, on branch huddle/dice/main (cut from main, checked out in …); review on, discussion meetings, parallel off
 Team: glm`);
   });
 

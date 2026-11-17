@@ -30,9 +30,13 @@ export interface Work extends Omit<GoalState, "questions"> {
   members: readonly string[];
   underWay: readonly string[];
   meetingsNow: Readonly<Record<string, MeetingNow>>;
+  /** The goal's worktree: its branch checked out, where its work can be tried. */
+  checkout: string;
+  /** The goal handing its work back now (§4.1): `by`, the member resolving its conflicts, while one is. */
+  handingBack?: { by?: string };
 }
 
-const openQuestions = (state: Pick<Work, "questions">, subtaskId: string) =>
+const openQuestions = (state: Pick<Work, "questions">, subtaskId: string | undefined) =>
   state.questions.filter((q) => q.subtaskId === subtaskId);
 
 const isActive = (state: Pick<GoalState, "goal">) => state.goal.status === "active";
@@ -94,9 +98,19 @@ export const accepted = (state: Pick<Work, "questions" | "subtasks">, taskId: st
 export const planned = (state: Pick<GoalState, "meetings" | "subtasks">) =>
   state.meetings.length > 0 || state.subtasks.length > 0;
 
+/** Whether the goal's work is all done (§4.1): it has tasks, and every one is done, whether or not you accept it yet. */
+export const workDone = (state: Pick<GoalState, "tasks" | "subtasks">) =>
+  state.tasks.length > 0 && state.tasks.every((t) => taskDone(state, t.id));
+
+/** The acceptance that is all the goal still waits on, if one is: its work done, and no other acceptance open. */
+export function lastAcceptance(state: Pick<Work, "tasks" | "subtasks" | "questions">) {
+  const open = state.questions.filter(isAcceptance);
+  return workDone(state) && open.length === 1 ? open[0] : undefined;
+}
+
 /**
- * Whether nothing in the goal can go on (§4.1): no meeting that can, and
- * every task done and accepted, or, with no tasks, its plan dropped.
+ * Whether nothing in the goal's plan can go on (§4.1): no meeting that can,
+ * and every task done and accepted, or, with no tasks, its plan dropped.
  */
 export function over(state: Pick<Work, "meetings" | "tasks" | "subtasks" | "questions">): boolean {
   if (state.meetings.some((m) => m.status !== "approved" && m.status !== "dropped")) return false;

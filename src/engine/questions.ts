@@ -28,17 +28,16 @@ import {
   toYou,
   type Question,
   type QuestionToYou,
-  type Subtask,
   type GoalState,
 } from "./types.ts";
 
 /** Claude Code's own tool for questions with choices. */
 const ASK_TOOL = "AskUserQuestion";
 
-/** A member waiting, on a subtask's run, until `signal` ends the run. */
+/** A member waiting, on a subtask's run or the goal's hand-back's, until `signal` ends the run. */
 interface Asker {
   from: string;
-  subtaskId: string;
+  subtaskId?: string;
   signal: AbortSignal;
 }
 
@@ -154,14 +153,15 @@ export class Questions {
   }
 
   /**
-   * A stuck review, a merge that needs you, or a task done (with why, or
-   * what, in `text`): it waits for your answer, no turn behind it.
+   * A stuck review, a merge that needs you, or a task done, on a subtask; or
+   * handing the goal's work back, or cleaning up (with why, or what, in
+   * `text`): it waits for your answer, no turn behind it. `on`: who puts
+   * it, and the subtask it is on, if one.
    */
-  openDecision(subtask: Subtask, decision: Decision, text: string) {
+  openDecision(on: { from: string; subtaskId?: string }, decision: Decision, text: string) {
     const question: DecisionQuestion = {
       id: randomUUID(),
-      subtaskId: subtask.id,
-      from: subtask.assignee,
+      ...on,
       text,
       kind: "decision",
       decision,
@@ -179,9 +179,27 @@ export class Questions {
     this.cancelAll((q) => q.subtaskId === subtaskId && (decisions || q.kind !== "decision"));
   }
 
+  /**
+   * Puts a decision to you again as `decision`, in its place: a question of
+   * its own, so the dialog asks it again as it is now, and an answer to it
+   * as it was no longer fits.
+   */
+  reask(question: DecisionQuestion, decision: Decision) {
+    const { questions } = this.inbox.state;
+    questions[questions.indexOf(question)] = { ...question, id: randomUUID(), decision };
+    this.inbox.changed();
+  }
+
+  /** Calls off asking to hand the goal's work back: it was paused, and asks again as it resumes. */
+  cancelHandBack() {
+    this.cancelAll((q) => q.kind === "decision" && q.decision.kind === "handBack");
+  }
+
   /** Calls off a task's delivery waiting on you, on one of `subtaskIds`, its subtasks: work in it is being done again. */
   cancelDelivery(subtaskIds: readonly string[]) {
-    this.cancelAll((q) => isAcceptance(q) && subtaskIds.includes(q.subtaskId));
+    this.cancelAll(
+      (q) => isAcceptance(q) && q.subtaskId !== undefined && subtaskIds.includes(q.subtaskId),
+    );
   }
 
   /** A call the member's rules don't cover: allowed once, always, or denied. */
@@ -285,7 +303,7 @@ export class Questions {
   ): Question {
     const question: Question = {
       id: randomUUID(),
-      subtaskId: asker.subtaskId,
+      ...(asker.subtaskId !== undefined && { subtaskId: asker.subtaskId }),
       from: asker.from,
       ...ask,
     };

@@ -5,10 +5,13 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   abortMerge,
   commitDesk,
+  currentBranch,
   dropDesk,
   git,
   GitError,
   goalBranch,
+  handBackGoal,
+  hasWork,
   mergeDesk,
   openDesk,
   openGoal,
@@ -383,9 +386,99 @@ describe("removing", () => {
     const places = await placesOf();
     await openDesk(places, "s1");
     await openDesk(places, "s2");
-    await removeGoal(places);
+    await removeGoal(places, false);
     expect(await branches()).toEqual(["huddle/dice/main"]);
     const worktrees = await git({ cwd: repo }, ["worktree", "list", "--porcelain"]);
     expect(worktrees.stdout.match(/^worktree /gm)).toHaveLength(1);
+  });
+});
+
+describe("handing a goal's work back", () => {
+  const placesOf = async () => ({
+    repo: await openRepository(repo),
+    slug: "dice",
+    root: path.join(dir, "data"),
+  });
+  const show = (ref: string, file: string) =>
+    git({ cwd: repo }, ["show", `${ref}:${file}`]).then((r) => r.stdout);
+  /** The goal's branch with a delivery of `file` merged into it. */
+  const goalWith = async (file: string, text: string) => {
+    const places = await placesOf();
+    await openGoal(places, "main");
+    const desk = await openDesk(places, "s1");
+    await writeFile(path.join(desk, file), text);
+    await commitDesk(places, "s1", "glm", `Write ${file}`);
+    await mergeDesk(places, "s1", "glm");
+    return places;
+  };
+  /** A commit of yours on the branch your checkout is on. */
+  const yours = async (file: string, text: string) => {
+    await writeFile(path.join(repo, file), text);
+    await git({ cwd: repo, env: ME }, ["add", "-A"]);
+    await git({ cwd: repo, env: ME }, ["commit", "-q", "-m", `Write ${file}`]);
+  };
+
+  it("knows the branch a checkout is on, and none on a detached HEAD", async () => {
+    await makeRepository();
+    expect(await currentBranch(repo)).toBe("main");
+    await git({ cwd: repo }, ["checkout", "-q", "--detach"]);
+    expect(await currentBranch(repo)).toBeUndefined();
+  });
+
+  it("fast-forwards the branch it was cut from, checked out in your checkout", async () => {
+    await makeRepository();
+    const places = await goalWith("dice.ts", "roll\n");
+    expect(await hasWork(places, "main")).toBe(true);
+    expect(await handBackGoal(places, "main", "glm")).toEqual({ kind: "merged" });
+    expect(await readFile(path.join(repo, "dice.ts"), "utf8")).toBe("roll\n");
+    expect(await hasWork(places, "main")).toBe(false);
+  });
+
+  it("merges in what you committed meanwhile, then moves your branch by its ref where it isn't checked out", async () => {
+    await makeRepository();
+    const places = await goalWith("dice.ts", "roll\n");
+    await yours("notes.md", "mine\n");
+    await git({ cwd: repo }, ["checkout", "-q", "-b", "elsewhere"]);
+    expect(await handBackGoal(places, "main", "glm")).toEqual({ kind: "merged" });
+    expect(await show("main", "dice.ts")).toBe("roll\n");
+    expect(await show("main", "notes.md")).toBe("mine\n");
+  });
+
+  it("leaves conflicts in the goal's worktree, and goes on once they are resolved and staged", async () => {
+    await makeRepository();
+    const places = await goalWith("README.md", "team\n");
+    await yours("README.md", "mine\n");
+    expect(await handBackGoal(places, "main", "glm")).toEqual({
+      kind: "conflict",
+      files: ["README.md"],
+    });
+    const checkout = goalFiles(places.root).checkout;
+    // Staged with its markers still in, it isn't resolved.
+    await git({ cwd: checkout }, ["add", "-A"]);
+    expect(await handBackGoal(places, "main", "glm")).toEqual({
+      kind: "conflict",
+      files: ["README.md"],
+    });
+    await writeFile(path.join(checkout, "README.md"), "team and mine\n");
+    await git({ cwd: checkout }, ["add", "-A"]);
+    expect(await handBackGoal(places, "main", "glm")).toEqual({ kind: "merged" });
+    expect(await readFile(path.join(repo, "README.md"), "utf8")).toBe("team and mine\n");
+  });
+
+  it("refuses to run over changes of yours, saying why", async () => {
+    await makeRepository();
+    const places = await goalWith("README.md", "team\n");
+    await writeFile(path.join(repo, "README.md"), "unsaved\n");
+    await expect(handBackGoal(places, "main", "glm")).rejects.toThrow(GitError);
+    expect(await readFile(path.join(repo, "README.md"), "utf8")).toBe("unsaved\n");
+  });
+
+  it("deletes a closed goal's branch with the rest of it", async () => {
+    await makeRepository();
+    const places = await goalWith("dice.ts", "roll\n");
+    await handBackGoal(places, "main", "glm");
+    await removeGoal(places, true);
+    const left = await git({ cwd: repo }, ["branch", "--list", "huddle/*"]);
+    expect(left.stdout).toBe("");
   });
 });
