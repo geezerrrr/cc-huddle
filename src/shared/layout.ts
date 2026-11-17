@@ -23,6 +23,10 @@ export const goalsFolder = (repoFolder: string) => path.join(repoFolder, "goals"
 export const goalFolder = (repoFolder: string, slug: string) =>
   path.join(goalsFolder(repoFolder), slug);
 
+/** The settings file a repository's recommending session runs under (recommend.ts). */
+export const recommendSettings = (repoFolder: string) =>
+  path.join(repoFolder, "recommend.settings.json");
+
 /** Where each session's permission mode is kept, by its pid (session-mode.ts). */
 export const sessionsFolder = (dataFolder: string) => path.join(dataFolder, "sessions");
 

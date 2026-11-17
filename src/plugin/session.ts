@@ -11,6 +11,8 @@ import {
   type GoalEntry,
   type GoalSettings,
   type HandedOver,
+  recommend,
+  type Recommendation,
   RepositoryGoals,
   switchInTeam,
   type Team,
@@ -151,6 +153,20 @@ export class Session {
   /** The repository's goals, oldest first. */
   async goals(): Promise<GoalEntry[]> {
     return (await this.repository()).list();
+  }
+
+  /** How the team best takes on `task`, in your words, as a goal started now would have it (recommend.ts). */
+  async recommend(task: string, signal: AbortSignal): Promise<Recommendation> {
+    const goals = await this.repository();
+    const { env, plugins, userTeam } = this.options;
+    return recommend(task, await goals.team(userTeam), {
+      folder: goals.folder,
+      cwd: goals.repo.top,
+      claude: await this.claude(),
+      plugins,
+      env,
+      signal,
+    });
   }
 
   /** The team a goal started now would have; throws what is wrong with its files. */

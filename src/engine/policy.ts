@@ -32,6 +32,10 @@ const SESSION_VARS = [
   "CLAUDE_PROJECT_DIR",
 ];
 
+/** `from` without the variables about your session (SESSION_VARS). */
+const withoutSession = (from: Env) =>
+  Object.fromEntries(Object.entries(from).filter(([name]) => !SESSION_VARS.includes(name)));
+
 /** Built-in tools a read-only session has: meetings, answers to teammates, reviews. */
 const READ_ONLY_TOOLS = ["Read", "Glob", "Grep", "WebSearch", "WebFetch"];
 
@@ -74,9 +78,16 @@ export function memberSettings(
   plugins: readonly string[],
 ): Settings {
   const own = (member.settings ? mergeSettings(team, member.settings) : team) as Settings;
+  return guarded({ ...own, env: { ...own.env, ...expandEnv(member.env, from) } }, plugins);
+}
+
+/**
+ * `own` with the guards every session cc-huddle starts has: cc-huddle off in
+ * it, and no message to or from your sessions.
+ */
+export function guarded(own: Settings, plugins: readonly string[]): Settings {
   return {
     ...own,
-    env: { ...own.env, ...expandEnv(member.env, from) },
     enabledPlugins: {
       ...own.enabledPlugins,
       ...Object.fromEntries(plugins.map((id) => [id, false])),
@@ -157,9 +168,7 @@ export function sessionOptions(seat: Seat, kind: SessionKind, from: Env): Member
   const readOnly = kind === "readOnly";
   const teamMode = seat.team.permissions?.defaultMode !== undefined;
   const mode = readOnly ? "dontAsk" : teamMode ? undefined : seat.sessionMode;
-  const env = Object.fromEntries(
-    Object.entries(from).filter(([name]) => !SESSION_VARS.includes(name)),
-  );
+  const env = withoutSession(from);
   return {
     cwd: seat.cwd,
     model: member.model,
@@ -176,5 +185,30 @@ export function sessionOptions(seat: Seat, kind: SessionKind, from: Env): Member
     extraArgs: { name: `huddle-${member.name}` },
     pathToClaudeCodeExecutable: seat.claude,
     ...(readOnly && { tools: READ_ONLY_TOOLS, strictMcpConfig: true }),
+  };
+}
+
+/**
+ * Agent SDK options for recommending how a task is taken on (recommend.ts):
+ * a read-only session in `cwd` that is nobody's, so with your settings'
+ * model and Claude Code's own system prompt, nothing of cc-huddle's in it
+ * (`settings`, its guards: guarded), and no MCP server.
+ */
+export function recommendOptions(
+  claude: string,
+  cwd: string,
+  settings: string,
+  from: Env,
+): MemberOptions {
+  return {
+    cwd,
+    settings,
+    permissionMode: "dontAsk",
+    env: withoutSession(from),
+    systemPrompt: { type: "preset", preset: "claude_code" },
+    extraArgs: { name: "huddle-recommend" },
+    pathToClaudeCodeExecutable: claude,
+    tools: READ_ONLY_TOOLS,
+    strictMcpConfig: true,
   };
 }

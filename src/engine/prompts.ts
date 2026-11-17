@@ -34,6 +34,21 @@ const TASK_WAYS = `# How you work on a subtask
 - When you need the user to decide something or give you what only they have, ask with AskUserQuestion, offering options, and wait for the answer. Don't just write that you are waiting: the user may not be watching.
 - When you are done, call deliver with a summary of a few sentences (what you did, anything to watch out for) and the files that are the result. Your subtask isn't done until you deliver; then end your turn.`;
 
+/**
+ * All a recommending session is told (recommend.ts): the team, your task in
+ * your words, and the one question, with nothing of how cc-huddle works.
+ */
+export function recommendPrompt(task: string, members: readonly Member[]): string {
+  const team = members.map(
+    (m) => `${m.name} (${[m.role.title, m.model].filter(Boolean).join(", ")})`,
+  );
+  return `The team: ${team.join(", ")}.
+The task: ${task}
+The repository is the current directory; look at it as much as you need.
+
+Should the team do this together, or one member solo? If together, who takes part and who hosts; if solo, who. Say why.`;
+}
+
 /** What is appended to Claude Code's system prompt for a member's session: who they are, and how to work. */
 export function systemPrompt(kind: SessionKind, member: Member, team: readonly Member[]): string {
   const others = team.filter((m) => m.name !== member.name).map(called);

@@ -2,7 +2,14 @@ import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { expandEnv, memberSettings, sessionOptions, writeSettings, type Seat } from "./policy.ts";
+import {
+  expandEnv,
+  memberSettings,
+  recommendOptions,
+  sessionOptions,
+  writeSettings,
+  type Seat,
+} from "./policy.ts";
 import type { Member } from "./types.ts";
 
 const glm: Member = {
@@ -171,5 +178,19 @@ describe("session options", () => {
       strictMcpConfig: true,
     });
     expect(reading).not.toHaveProperty("allowDangerouslySkipPermissions");
+  });
+
+  it("recommends in a read-only session that is nobody's: your settings' model, no system prompt of ours, no MCP server", () => {
+    const options = recommendOptions("/bin/claude", "/repo", "/data/recommend.json", from);
+    expect(options).toMatchObject({
+      cwd: "/repo",
+      settings: "/data/recommend.json",
+      permissionMode: "dontAsk",
+      systemPrompt: { type: "preset", preset: "claude_code" },
+      tools: ["Read", "Glob", "Grep", "WebSearch", "WebFetch"],
+      strictMcpConfig: true,
+    });
+    expect(options).not.toHaveProperty("model");
+    expect(options.env).toEqual({ PATH: "/bin" });
   });
 });

@@ -90,6 +90,27 @@ export function addTools(server: McpServer, session: Session) {
   );
 
   server.registerTool(
+    "recommend",
+    {
+      description:
+        "Before a goal starts: whether the user's task is better done by the team together or by one member solo, and who. It is judged in a session of its own that sees only the task, the team and the repository, read-only. Returns the recommendation and why; ask the user with it.",
+      inputSchema: {
+        task: z.string().trim().min(1).describe("The user's task, in their own words"),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    async ({ task }, { signal }) => {
+      const { way, members, why } = await session.recommend(task, signal);
+      const who = members.join(", ");
+      return toolText(
+        way === "together"
+          ? `Recommended: the team together, ${who}, the first hosting. Why: ${why}`
+          : `Recommended: ${who} solo. Why: ${why}`,
+      );
+    },
+  );
+
+  server.registerTool(
     "start_goal",
     {
       description:

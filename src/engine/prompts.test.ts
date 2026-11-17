@@ -7,6 +7,7 @@ import {
   meetingOpening,
   meetingRound,
   meetingSteer,
+  recommendPrompt,
   systemPrompt,
   taskBrief,
   teammateQuestion,
@@ -33,6 +34,17 @@ const subtask = (id: string, fields: Partial<Subtask> = {}): Subtask => ({
   status: "done",
   progress: { done: 0, total: 0 },
   ...fields,
+});
+
+describe("recommendPrompt", () => {
+  it("gives the team, the task in your words and the one question, nothing of cc-huddle's", () => {
+    const prompt = recommendPrompt("Make a dice game", [{ ...glm, model: "glm-5" }, sonnet]);
+    expect(prompt).toBe(`The team: glm (UI designer, glm-5), sonnet (Programmer).
+The task: Make a dice game
+The repository is the current directory; look at it as much as you need.
+
+Should the team do this together, or one member solo? If together, who takes part and who hosts; if solo, who. Say why.`);
+  });
 });
 
 describe("systemPrompt", () => {
