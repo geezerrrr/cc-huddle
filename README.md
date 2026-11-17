@@ -109,7 +109,7 @@ Start Claude Code in a repository and hand the team a task:
 /huddle build a two-player dice game, opus on the rules, sonnet on the UI
 ```
 
-Each task is a goal of its own. Your session proposes who takes part, by what the work needs, and asks you to start: one member picked takes the task; several meet and plan it. The team then works in the background; your session stays free.
+Each task is a goal of its own. A separate session that sees only your task, the team and the repository recommends the team together or one member solo, and your session asks you to start: one member picked takes the task; several meet and plan it. The team then works in the background; your session stays free.
 
 | You type                          | What happens                                                                   |
 | --------------------------------- | ------------------------------------------------------------------------------ |
