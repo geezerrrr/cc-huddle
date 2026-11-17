@@ -7550,6 +7550,7 @@ function acceptanceOf(state, taskId) {
 }
 var accepted = (state, taskId) => taskDone(state, taskId) && !acceptanceOf(state, taskId);
 var planned = (state) => state.meetings.length > 0 || state.subtasks.length > 0;
+var toMerge = (state) => state.goal.status === "paused" && state.tasks.length > 0 && over(state);
 var workDone = (state) => state.tasks.length > 0 && state.tasks.every((t) => taskDone(state, t.id));
 function lastAcceptance(state) {
   const open2 = state.questions.filter(isAcceptance);
@@ -11515,6 +11516,7 @@ function planWords(plan, work) {
 }
 var takeable = (entry) => !("state" in entry && entry.state.goal.status === "closed");
 var whereOf = (entry) => entry.holder ? "elsewhere" : !("state" in entry) ? "unreadable" : entry.state.goal.status === "archived" ? "archived" : "paused";
+var goalStatusText = (state) => toMerge(state) ? "waits to merge" : state.goal.status;
 var WHERE_WORDS = {
   elsewhere: "in another session",
   unreadable: "can't be read",
@@ -11526,7 +11528,10 @@ function progressOf2({ subtasks, meetings }) {
   return subtasks.length ? `${String(done)}/${String(subtasks.length)} subtasks done` : meetings.some((m) => m.status === "review") ? PLAN_TO_REVIEW : "no plan yet";
 }
 var goalLabel = (state, where) => `${state.goal.name} \xB7 ${progressOf2(state)} \xB7 ${where}`;
-var entryLabel = (entry) => "state" in entry ? goalLabel(entry.state, WHERE_WORDS[whereOf(entry)]) : `${entry.slug} \xB7 ${WHERE_WORDS.unreadable}: ${entry.unreadable}`;
+var entryLabel = (entry) => "state" in entry ? goalLabel(
+  entry.state,
+  whereOf(entry) === "paused" ? goalStatusText(entry.state) : WHERE_WORDS[whereOf(entry)]
+) : `${entry.slug} \xB7 ${WHERE_WORDS.unreadable}: ${entry.unreadable}`;
 var resumableOf = (others) => others.map((entry) => ({ slug: entry.slug, label: entryLabel(entry) }));
 
 // src/plugin/pane.ts
@@ -11734,8 +11739,7 @@ function bandText(work, needs) {
   if (working) parts.push(`${String(working)} working`);
   if (work.handingBack) parts.push(`merging into ${work.goal.base}`);
   if (needs) parts.push(`${plural(needs, "needs", "need")} you`);
-  const { status } = work.goal;
-  if (!parts.length) parts.push(status === "active" ? "idle" : status);
+  if (!parts.length) parts.push(work.goal.status === "active" ? "idle" : goalStatusText(work));
   return parts.join(" \xB7 ");
 }
 function othersBand(others) {
@@ -11774,7 +11778,7 @@ function paneTeam(mine, others, session2) {
   );
   const meeting2 = shownMeeting(work);
   const { goal } = work;
-  const here = goal.status === "paused" || goal.status === "archived" ? [{ slug: goal.slug, label: goalLabel(work, `${goal.status}, in this session`) }] : [];
+  const here = goal.status === "paused" || goal.status === "archived" ? [{ slug: goal.slug, label: goalLabel(work, `${goalStatusText(work)}, in this session`) }] : [];
   return {
     opened,
     band: bandText(work, asked2.length),
@@ -12366,7 +12370,7 @@ function statusText(work) {
   const busy = new Set(derived.busy);
   const { goal } = work;
   const lines = [
-    `Goal "${goal.name}": ${goal.status}, on branch ${goalBranch(goal.slug)} (cut from ${goal.base}, checked out in ${work.checkout}); review ${goal.settings.review ? "on" : "off"}, ${goal.settings.meetingSize} meetings, parallel ${goal.settings.parallel ? "on" : "off"}`,
+    `Goal "${goal.name}": ${goalStatusText(work)}, on branch ${goalBranch(goal.slug)} (cut from ${goal.base}, checked out in ${work.checkout}); review ${goal.settings.review ? "on" : "off"}, ${goal.settings.meetingSize} meetings, parallel ${goal.settings.parallel ? "on" : "off"}`,
     `Team: ${work.members.map((m) => busy.has(m) ? `${m} (busy)` : m).join(", ")}`
   ];
   if (work.handingBack)
