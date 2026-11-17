@@ -29,7 +29,7 @@ const called = (member: Member) => `${member.name} (${member.role.title})`;
 
 const TASK_WAYS = `# How you work on a subtask
 - You work in a git worktree of your own, on a branch cut from the goal's branch; once you deliver, the goal's branch moves up to yours. Teammates working at the same time each have theirs, so you never get in each other's way. Stay in yours.
-- You needn't commit: delivering commits whatever you leave uncommitted, under your name.
+- What you deliver is what you have committed on your branch.
 - When you need information or a decision from a teammate (an interface, a design detail), ask them with ask_teammate. It waits for their answer.
 - When you need the user to decide something or give you what only they have, ask with AskUserQuestion, offering options, and wait for the answer. Don't just write that you are waiting: the user may not be watching.
 - When you are done, call deliver with a summary of a few sentences (what you did, anything to watch out for) and the files that are the result. Your subtask isn't done until you deliver; then end your turn.`;
@@ -154,12 +154,6 @@ export const TEAMMATE_REPLIES = {
     `There's no teammate called "${name}". Your teammates: ${others.join(", ") || "none"}.`,
   answered: (name: string, text: string) => `${name} answered: ${text}`,
   failed: (name: string, error: string) => `${name} couldn't answer just now: ${error}`,
-};
-
-/** Why a delivery isn't taken, as its member is told. */
-export const DELIVERY_REFUSED = {
-  missing: (desk: string, files: readonly string[]) =>
-    `Not delivered: these aren't files in your worktree (${desk}): ${files.join(", ")}. Deliver the files that are there.`,
 };
 
 /** What a member hears back from a call that waited on you. */
@@ -386,6 +380,10 @@ Requirements:
 - plan_markdown is the plan document for the user and the team: the goal and scope; what was decided, why, and what was turned down; where people didn't agree and how you ruled; what the meeting didn't get to; then who does what, dependencies and risks.
 - summary states the outcome in one sentence.`;
 }
+
+/** The host's plan back to them, saying why the team can't carry it out (plan.ts planFaults). */
+export const planAgain = (faults: readonly string[]) =>
+  `The team can't carry out this plan as written:\n${faults.map((fault) => `- ${fault}`).join("\n")}\n\nWrite the plan again with these fixed.`;
 
 /** What each field of a plan is, as the host writes it and your session changes it (plan.ts). */
 export const PLAN_FIELDS = {

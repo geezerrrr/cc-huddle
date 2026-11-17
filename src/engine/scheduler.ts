@@ -18,15 +18,7 @@ import {
 } from "./derive.ts";
 import { REFUSED, spend, workOf, type Core } from "./core.ts";
 import { errorText } from "../shared/errors.ts";
-import {
-  commitDesk,
-  dropDesk,
-  GitError,
-  goalBranch,
-  mergeDesk,
-  openDesk,
-  subtaskBranch,
-} from "./git.ts";
+import { dropDesk, GitError, goalBranch, mergeDesk, openDesk, subtaskBranch } from "./git.ts";
 import { actionEvent, can, step, SUBTASK_MACHINE, type SubtaskEvent } from "./machines.ts";
 import { goOnMessage, taskBrief } from "./prompts.ts";
 import { DOESNT_FIT, type DecisionAnswer, type Questions } from "./questions.ts";
@@ -467,7 +459,6 @@ export class Scheduler {
         collaboration: collaborationOf(core, this.questions, {
           from: member,
           subtask,
-          desk,
           signal: abort.signal,
         }),
         listener: {
@@ -486,15 +477,8 @@ export class Scheduler {
         },
         signal: abort.signal,
       });
-      if (outcome.status === "delivered")
-        await commitDesk(
-          core.places,
-          subtask.id,
-          member.name,
-          `${subtask.title}\n\n${outcome.handover.summary}`,
-        );
     } catch (error) {
-      // Never left running: a worktree that can't be made, a commit that fails (the run's tokens still spent).
+      // Never left running: a worktree that can't be made (the run's tokens still spent).
       outcome = { status: "failed", error: errorText(error), tokens: outcome?.tokens ?? 0 };
     }
 

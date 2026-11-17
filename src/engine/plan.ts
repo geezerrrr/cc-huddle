@@ -105,47 +105,54 @@ export function loopingDependencies(
 }
 
 /**
- * A plan as written made sound: keys unique, blanks named, dependencies on
- * keys it doesn't have dropped, tasks with no subtasks left out. Dependencies
- * that loop are dropped from the host's plan (`loops: "drop"`); in yours they
- * are refused, with which ones they are. Throws when it plans nothing.
+ * What keeps a plan as written from being one the scheduler can carry out
+ * (docs/design.md §2), each said plainly; none when it can. Nothing in it is
+ * fixed for its writer.
  */
-export function soundPlan(plan: WrittenPlan, loops: "drop" | "refuse"): Plan {
-  const used = new Set<string>();
-  const tasks: PlanTask[] = plan.tasks
-    .filter((task) => task.subtasks.length)
-    .map((task, n) => ({
-      title: task.title || `Task ${String(n + 1)}`,
+export function planFaults(plan: WrittenPlan): string[] {
+  const faults: string[] = [];
+  if (!plan.tasks.length) faults.push("It has no tasks.");
+  for (const task of plan.tasks)
+    if (!task.subtasks.length) faults.push(`The task "${task.title}" has no subtasks.`);
+  const subtasks = plan.tasks.flatMap((task) => task.subtasks);
+  const keys = subtasks.map((s) => s.key);
+  if (keys.includes("")) faults.push("A subtask has no key.");
+  const twice = [...new Set(keys.filter((key, i) => key && keys.indexOf(key) !== i))];
+  if (twice.length) faults.push(`These keys are used more than once: ${twice.join(", ")}.`);
+  const unknown = subtasks.flatMap((s) =>
+    s.depends_on.filter((key) => !keys.includes(key)).map((key) => `${s.key} on ${key}`),
+  );
+  if (unknown.length)
+    faults.push(`These dependencies name a key no subtask has: ${unknown.join(", ")}.`);
+  if (faults.length) return faults;
+  const looping = loopingDependencies(
+    plan.tasks.map((task) => ({
+      ownerAccepts: task.owner_accepts,
+      subtasks: task.subtasks.map((s) => ({ key: s.key, dependsOn: s.depends_on })),
+    })),
+  );
+  if (looping.length)
+    faults.push(
+      `These dependencies go round in a loop, a task the user accepts counting as waited on whole: ${looping.map(([key, dependency]) => `${key} on ${dependency}`).join(", ")}.`,
+    );
+  return faults;
+}
+
+/** A plan as written, as the scheduler takes it; throws, saying why, when it can't carry it out (planFaults). */
+export function soundPlan(plan: WrittenPlan): Plan {
+  const faults = planFaults(plan);
+  if (faults.length) throw new Error(`The plan can't be carried out: ${faults.join(" ")}`);
+  return {
+    summary: plan.summary,
+    markdown: plan.plan_markdown,
+    tasks: plan.tasks.map((task) => ({
+      title: task.title,
       outcome: task.outcome,
       ownerAccepts: task.owner_accepts,
-      subtasks: task.subtasks.map((sub, i) => {
-        let key = sub.key || `t${String(n + 1)}-${String(i + 1)}`;
-        while (used.has(key)) key = `${key}'`;
-        used.add(key);
-        return {
-          key,
-          title: sub.title || `Subtask ${String(i + 1)}`,
-          description: sub.description,
-          assignee: sub.assignee,
-          dependsOn: sub.depends_on,
-          acceptance: sub.acceptance,
-        };
-      }),
-    }));
-  if (!tasks.length) throw new Error("The plan has no tasks");
-  const subtasks = tasks.flatMap((task) => task.subtasks);
-  for (const subtask of subtasks)
-    subtask.dependsOn = [...new Set(subtask.dependsOn)].filter(
-      (key) => key !== subtask.key && used.has(key),
-    );
-  const looping = loopingDependencies(tasks);
-  if (looping.length && loops === "refuse")
-    throw new Error(
-      `These dependencies go round in a loop, counting a task you accept as waited on whole: ${looping.map(([key, dependency]) => `${key} on ${dependency}`).join(", ")}. Drop them, or accept fewer tasks.`,
-    );
-  for (const [key, dependency] of looping) {
-    const subtask = subtasks.find((s) => s.key === key);
-    if (subtask) subtask.dependsOn = subtask.dependsOn.filter((k) => k !== dependency);
-  }
-  return { summary: plan.summary, markdown: plan.plan_markdown, tasks };
+      subtasks: task.subtasks.map(({ depends_on, ...subtask }) => ({
+        ...subtask,
+        dependsOn: depends_on,
+      })),
+    })),
+  };
 }

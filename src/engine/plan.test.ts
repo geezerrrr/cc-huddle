@@ -4,6 +4,7 @@ import {
   hostPlanSchema,
   hostWritten,
   loopingDependencies,
+  planFaults,
   planSchema,
   soundPlan,
   writtenPlan,
@@ -75,53 +76,28 @@ describe("loopingDependencies", () => {
 describe("soundPlan", () => {
   const yours = (plan: unknown) => planSchema(z.enum(["glm"])).parse(plan);
 
-  it("makes keys unique, names blanks, and drops what it can't keep", () => {
-    const plan = soundPlan(
-      yours(
-        raw(
-          { subtasks: [] },
-          { subtasks: [sub("a", ["a", "ghost", "b", "b"]), sub("b", ["a"]), sub("a")] },
+  it("takes a plan as written, fixing nothing in it", () => {
+    const plan = soundPlan(yours(raw({ subtasks: [sub("a"), sub("b", ["a", "a"])] })));
+    expect(plan.tasks[0]?.subtasks.map((s) => [s.key, s.dependsOn])).toEqual([
+      ["a", []],
+      ["b", ["a", "a"]],
+    ]);
+  });
+
+  it("says each thing that keeps the scheduler from carrying a plan out", () => {
+    expect(
+      planFaults(
+        yours(
+          raw({ subtasks: [] }, { subtasks: [sub("a", ["ghost"]), sub("b"), sub("a"), sub("")] }),
         ),
       ),
-      "drop",
-    );
-    expect(plan).toEqual({
-      summary: "Build the dice game",
-      markdown: "# Plan",
-      tasks: [
-        {
-          title: "Task 1",
-          outcome: "",
-          ownerAccepts: false,
-          subtasks: [
-            {
-              key: "a",
-              title: "a",
-              description: "",
-              assignee: "glm",
-              dependsOn: ["b"],
-              acceptance: "",
-            },
-            {
-              key: "b",
-              title: "b",
-              description: "",
-              assignee: "glm",
-              dependsOn: [],
-              acceptance: "",
-            },
-            {
-              key: "a'",
-              title: "a",
-              description: "",
-              assignee: "glm",
-              dependsOn: [],
-              acceptance: "",
-            },
-          ],
-        },
-      ],
-    });
+    ).toEqual([
+      'The task "" has no subtasks.',
+      "A subtask has no key.",
+      "These keys are used more than once: a.",
+      "These dependencies name a key no subtask has: a on ghost.",
+    ]);
+    expect(planFaults(yours(raw({ subtasks: [sub("a", ["a"])] })))[0]).toContain("a on a");
   });
 
   it("keeps the tasks you accept, and refuses dependencies of yours that loop through them", () => {
@@ -132,15 +108,12 @@ describe("soundPlan", () => {
           { subtasks: [sub("c"), sub("d", ["a"])] },
         ),
       );
-    expect(soundPlan(plan(false), "refuse").tasks.map((t) => t.ownerAccepts)).toEqual([
-      false,
-      false,
-    ]);
-    expect(() => soundPlan(plan(true), "refuse")).toThrow("d on a");
+    expect(soundPlan(plan(false)).tasks.map((t) => t.ownerAccepts)).toEqual([false, false]);
+    expect(() => soundPlan(plan(true))).toThrow("d on a");
   });
 
   it("refuses a plan with nothing in it", () => {
-    expect(() => soundPlan(yours(raw({ subtasks: [] })), "drop")).toThrow("no tasks");
+    expect(() => soundPlan(yours(raw()))).toThrow("It has no tasks");
   });
 
   it("reads back a plan written out whole (writtenPlan)", () => {
@@ -151,8 +124,7 @@ describe("soundPlan", () => {
           { subtasks: [sub("c", ["b"])] },
         ),
       ),
-      "refuse",
     );
-    expect(soundPlan(yours(writtenPlan(plan)), "refuse")).toEqual(plan);
+    expect(soundPlan(yours(writtenPlan(plan)))).toEqual(plan);
   });
 });

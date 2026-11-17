@@ -63,9 +63,8 @@ const done = (fields: Record<string, unknown> = {}) => ({
   ...fields,
 });
 
-const collaboration = (refuse?: string): Collaboration => ({
+const collaboration = (): Collaboration => ({
   askTeammate: (name, question) => Promise.resolve(`${name} answered ${question}`),
-  checkDelivery: (files) => Promise.resolve(refuse ? { refused: refuse } : { files }),
 });
 
 const run = (fields: Partial<Parameters<typeof runSubtask>[0]> = {}) =>
@@ -134,14 +133,13 @@ describe("runSubtask", () => {
     ]);
   });
 
-  it("fails when it still hasn't delivered, or the delivery was refused", async () => {
-    const silent: Script = async function* ({ call }) {
+  it("fails when it still hasn't delivered after a reminder", async () => {
+    const silent: Script = function* () {
       yield init("s1");
-      expect(await call("deliver", { summary: "Here", files: ["nope.ts"] })).toBe("Not there");
       yield done();
     };
     turns(silent, silent);
-    expect(await run({ collaboration: collaboration("Not there") })).toEqual({
+    expect(await run()).toEqual({
       status: "failed",
       error: "Ended without delivering, after a reminder",
       tokens: 4,

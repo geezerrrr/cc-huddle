@@ -102,9 +102,14 @@ const delivering =
   async (run: Run): Promise<RunOutcome> => {
     const cwd = run.options.cwd ?? "";
     for (const [file, text] of Object.entries(files)) await writeFile(path.join(cwd, file), text);
-    const checked = await run.collaboration.checkDelivery(Object.keys(files));
-    if ("refused" in checked) throw new Error(checked.refused);
-    return { status: "delivered", handover: { summary: "Done.", files: checked.files }, tokens: 3 };
+    // The member commits their work, as they would.
+    await git({ cwd, env: ME }, ["add", "-A"]);
+    await git({ cwd, env: ME }, ["commit", "-q", "--allow-empty", "-m", "Work"]);
+    return {
+      status: "delivered",
+      handover: { summary: "Done.", files: Object.keys(files) },
+      tokens: 3,
+    };
   };
 
 /** A run that goes on until it is stopped, as runSubtask does: at once, when stopped before it began. */
@@ -147,10 +152,11 @@ describe("Scheduler", () => {
     const log = await git({ cwd: core.places.repo.top }, [
       "log",
       "-1",
-      "--format=%an%n%s",
+      "--format=%s",
       goalBranch("dice"),
     ]);
-    expect(log.stdout.trim()).toBe("glm\nMake s1");
+    // The member's own commit, nothing of the engine's after it.
+    expect(log.stdout.trim()).toBe("Work");
     expect(s1).toMatchObject({ delivery: { summary: "Done.", files: ["score.txt"] } });
     expect(core.state.tokens).toEqual({ glm: 3 });
     expect(core.state.questions).toMatchObject([
@@ -299,19 +305,6 @@ describe("Scheduler", () => {
     expect(vi.mocked(runSubtask).mock.lastCall?.[0].opening).toContain("# Dice\n\nTwo players.");
   });
 
-  it("fails a run with its error, and refuses files not in the worktree", async () => {
-    const s1 = subtask("s1");
-    core.state.subtasks.push(s1);
-    vi.mocked(runSubtask).mockImplementation(async (run) => {
-      const checked = await run.collaboration.checkDelivery(["../escape.txt", "missing.txt"]);
-      return { status: "failed", error: JSON.stringify(checked), tokens: 1 };
-    });
-    scheduler.pump();
-    await settled(s1, "failed");
-    expect(s1.error).toContain("Not delivered: these aren't files in your worktree");
-    expect(s1.error).toContain("../escape.txt, missing.txt");
-  });
-
   it("sends a delivery behind the goal back to its member, who merges the goal in in the same session", async () => {
     const s1 = subtask("s1");
     const s2 = subtask("s2", { assignee: "sonnet" });
@@ -326,7 +319,7 @@ describe("Scheduler", () => {
       })
       .mockImplementationOnce(async (run) => {
         second = run;
-        // The member merges as they see fit; here, by hand, leaving the commit to delivering.
+        // The member merges as they see fit; here, by hand, committing the merge as they deliver.
         const cwd = run.options.cwd ?? "";
         await git({ cwd }, ["merge", "-q", goalBranch(core.places.slug)], { allow: [1] });
         return delivering({ "README.md": "from both\n" })(run);

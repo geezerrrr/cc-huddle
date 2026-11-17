@@ -11,7 +11,7 @@ import { tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { toolText } from "../shared/text.ts";
 import { spend, type Core } from "./core.ts";
-import { hostPlanSchema, hostWritten, soundPlan } from "./plan.ts";
+import { hostPlanSchema, hostWritten, planFaults, soundPlan } from "./plan.ts";
 import {
   MEETING_TOOLS,
   meetingAnswer,
@@ -20,6 +20,7 @@ import {
   meetingOpening,
   meetingRound,
   meetingSteer,
+  planAgain,
   type MeetingBrief,
 } from "./prompts.ts";
 import {
@@ -191,10 +192,17 @@ export class MeetingRun {
     // Who gets work in the plan: a host who only runs the meeting gets none.
     const names = this.ctx.members.map((m) => m.name) as [string, ...string[]];
     const schema = hostPlanSchema(names);
-    const closing = await this.speak(this.host, meetingClosing(this.ctx), { schema });
-    // Stopped as the plan came in: there is no plan, and it ends as any stop does.
-    this.signal.throwIfAborted();
-    const plan = soundPlan(hostWritten(schema.parse(closing.structured)), "drop");
+    const write = async (prompt: string) => {
+      const closing = await this.speak(this.host, prompt, { schema });
+      // Stopped as the plan came in: there is no plan, and it ends as any stop does.
+      this.signal.throwIfAborted();
+      return hostWritten(schema.parse(closing.structured));
+    };
+    let written = await write(meetingClosing(this.ctx));
+    // One the scheduler can't carry out goes back to the host once, saying why; a second fails the meeting.
+    const faults = planFaults(written);
+    if (faults.length) written = await write(planAgain(faults));
+    const plan = soundPlan(written);
     this.said(this.host, plan.summary, "summary");
     // With its plan out a meeting can't go on: the sessions it kept have served.
     this.meeting.seats = undefined;

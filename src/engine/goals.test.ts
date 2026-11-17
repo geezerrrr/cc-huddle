@@ -4,7 +4,6 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Core } from "./core.ts";
 import {
-  commitDesk,
   git,
   goalBranch,
   mergeDesk,
@@ -332,7 +331,8 @@ async function doneWork(ownerAccepts: boolean, withWork = true, file = "dice.ts"
   if (withWork) {
     const desk = await openDesk(places, "s1");
     await writeFile(path.join(desk, file), "roll\n");
-    await commitDesk(places, "s1", "glm", "Roll");
+    await git({ cwd: desk, env: ME }, ["add", "-A"]);
+    await git({ cwd: desk, env: ME }, ["commit", "-q", "-m", "Roll"]);
     await mergeDesk(places, "s1");
   }
   core.state.tasks.push({ id: "t1", title: "Game", outcome: "", ownerAccepts });

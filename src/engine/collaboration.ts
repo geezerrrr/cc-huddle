@@ -1,29 +1,24 @@
 /**
  * What a running member does with its team (docs/design.md §4.3): asks a
- * teammate, who answers in a read-only session in the goal's worktree, and
- * hands its work over, taken only once its files are there.
+ * teammate, who answers in a read-only session in the goal's worktree.
  */
-import { stat } from "node:fs/promises";
-import path from "node:path";
 import { errorText } from "../shared/errors.ts";
-import { ifThere } from "../shared/files.ts";
 import { spend, type Core } from "./core.ts";
 import { openGoal } from "./git.ts";
-import { DELIVERY_REFUSED, TEAMMATE_REPLIES, teammateQuestion } from "./prompts.ts";
+import { TEAMMATE_REPLIES, teammateQuestion } from "./prompts.ts";
 import type { Questions } from "./questions.ts";
 import type { Collaboration } from "./run.ts";
 import { askOnce } from "./turns.ts";
 import type { Member, Subtask } from "./types.ts";
 
-/** How `from`'s run on `subtask`, in worktree `desk`, reaches its team until `signal` ends it. */
+/** How `from`'s run on `subtask` reaches its team until `signal` ends it. */
 export function collaborationOf(
   core: Core,
   questions: Questions,
-  run: { from: Member; subtask: Subtask; desk: string; signal: AbortSignal },
+  run: { from: Member; subtask: Subtask; signal: AbortSignal },
 ): Collaboration {
   return {
     askTeammate: (name, question) => askTeammate(core, questions, run, name, question),
-    checkDelivery: (files) => checkDelivery(core, run.subtask, run.desk, files),
   };
 }
 
@@ -69,20 +64,4 @@ async function askTeammate(
   } catch (error) {
     return TEAMMATE_REPLIES.failed(target.name, errorText(error));
   }
-}
-
-/** A delivery's files as taken, relative to the worktree, or why it isn't taken. */
-async function checkDelivery(core: Core, subtask: Subtask, desk: string, files: string[]) {
-  const kept: string[] = [];
-  const missing: string[] = [];
-  for (const file of files) {
-    const relative = path.relative(desk, path.resolve(desk, file));
-    const inside = relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
-    const there =
-      inside && (await ifThere(stat(path.join(desk, relative)), undefined))?.isFile() === true;
-    if (there) kept.push(relative.split(path.sep).join("/"));
-    else missing.push(file);
-  }
-  if (missing.length) return { refused: DELIVERY_REFUSED.missing(desk, missing) };
-  return { files: [...new Set(kept)] };
 }

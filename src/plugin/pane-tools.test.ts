@@ -20,7 +20,17 @@ import type { Questions } from "../engine/questions.ts";
 import type { Records } from "../engine/records.ts";
 import type { Scheduler } from "../engine/scheduler.ts";
 
-vi.mock("../engine/run.ts", () => ({ runSubtask: vi.fn() }));
+// A run goes on until it is stopped, as a real one does.
+vi.mock("../engine/run.ts", () => ({
+  runSubtask: ({ signal }: { signal: AbortSignal }) =>
+    new Promise((resolve) => {
+      const stopped = () => {
+        resolve({ status: "stopped", tokens: 0 });
+      };
+      if (signal.aborted) stopped();
+      else signal.addEventListener("abort", stopped);
+    }),
+}));
 
 /** The engine's own state and parts, which a test sets work up through. */
 const inside = (engine: Engine) =>

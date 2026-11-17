@@ -25,8 +25,6 @@ const OWN_TOOLS = new Set([turnToolName("ask_teammate"), turnToolName("deliver")
 export interface Collaboration {
   /** What the member is told back. */
   askTeammate(name: string, question: string): Promise<string>;
-  /** A delivery's files as taken (relative to the worktree), or why it isn't taken. */
-  checkDelivery(files: string[]): Promise<{ files: string[] } | { refused: string }>;
 }
 
 /** How a run ended: its work handed over, failed, or stopped. */
@@ -54,11 +52,9 @@ function teamServer(collaboration: Collaboration, delivered: (handover: Handover
         summary: z.string().trim().min(1).describe(RUN_TOOLS.deliver.summary),
         files: z.array(z.string()).describe(RUN_TOOLS.deliver.files),
       },
-      async ({ summary, files }) => {
-        const checked = await collaboration.checkDelivery(files);
-        if ("refused" in checked) return toolText(checked.refused);
-        delivered({ summary, files: checked.files });
-        return toolText(RUN_TOOLS.deliver.done);
+      ({ summary, files }) => {
+        delivered({ summary, files });
+        return Promise.resolve(toolText(RUN_TOOLS.deliver.done));
       },
     ),
   ]);

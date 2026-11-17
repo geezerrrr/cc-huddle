@@ -271,30 +271,6 @@ async function worktreeAt(repo: Repository, tree: string): Promise<At> {
   return { cwd: tree, env: { GIT_DIR: entry, GIT_WORK_TREE: tree } };
 }
 
-/** Whether a worktree is in the middle of a merge. */
-const merging = (at: At) => verifies(at, "MERGE_HEAD");
-
-/**
- * Commits what a subtask's worktree holds and its member left uncommitted, in
- * the name of whoever delivered it, finishing a merge it was in: a delivery
- * is the worktree as it stands.
- */
-export function commitDesk(
-  places: Places,
-  subtaskId: string,
-  by: string,
-  message: string,
-): Promise<void> {
-  return perGoal(places, async () => {
-    const at = await worktreeAt(places.repo, goalFiles(places.root).desk(subtaskId));
-    const signed = { ...at, env: { ...at.env, ...authorEnv(by) } };
-    await git(signed, ["add", "-A"]);
-    const staged = await git(signed, ["diff", "--cached", "--quiet"], { allow: [1] });
-    if (staged.code === 1 || (await merging(signed)))
-      await git(signed, ["commit", "-q", "--allow-empty", "-m", message]);
-  });
-}
-
 /** Takes a subtask's worktree and its branch away. */
 async function removeDesk(places: Places, subtaskId: string) {
   const desk = goalFiles(places.root).desk(subtaskId);

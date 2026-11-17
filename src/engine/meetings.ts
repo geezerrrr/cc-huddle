@@ -110,11 +110,12 @@ export class Meetings {
   /**
    * Your changes to a plan under review: `plan` is the whole plan, which may
    * give work to any member and names the tasks you accept, as the
-   * change_plan tool took it (planSchema). Dependencies that loop are refused.
+   * change_plan tool took it (planSchema). One the scheduler can't carry out
+   * is refused, saying why.
    */
   change(id: string, plan: WrittenPlan) {
     const { meeting } = this.underReview(id, "change");
-    meeting.plan = soundPlan(plan, "refuse");
+    meeting.plan = soundPlan(plan);
     this.core.changed();
   }
 
