@@ -246,13 +246,13 @@ members:
     settings:
       permissions:
         allow: ["Bash(pnpm test *)"]
-  glm:
+  deepseek:
     role: designer
-    model: glm-5.3-flashx
     effort: max
     env:
-      ANTHROPIC_BASE_URL: https://open.bigmodel.cn/api/anthropic
-      ANTHROPIC_AUTH_TOKEN: ${GLM_API_KEY}
+      ANTHROPIC_BASE_URL: https://api.deepseek.com/anthropic
+      ANTHROPIC_AUTH_TOKEN: ${DEEPSEEK_API_KEY}
+      ANTHROPIC_MODEL: deepseek-flash
 ```
 
 `env` is written as in `.mcp.json`, and takes any variable Claude Code reads: `${VAR}` and `${VAR:-default}` are filled in from the environment cc-huddle runs in, so keys stay out of the files. A member without `env` runs on your own Claude Code sign-in. A member's `settings` go over the team's, as a scope above it.

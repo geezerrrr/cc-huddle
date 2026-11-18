@@ -23,13 +23,13 @@ members:
   sonnet:
     role: developer
     model: sonnet
-  glm:
+  deepseek:
     role: designer
-    model: glm-5.3-flashx
     effort: high
     env:
-      ANTHROPIC_BASE_URL: https://open.bigmodel.cn/api/anthropic
-      ANTHROPIC_AUTH_TOKEN: ${GLM_API_KEY}
+      ANTHROPIC_BASE_URL: https://api.deepseek.com/anthropic
+      ANTHROPIC_AUTH_TOKEN: ${DEEPSEEK_API_KEY}
+      ANTHROPIC_MODEL: deepseek-flash
     settings:
       permissions:
         deny: ["Bash"]
