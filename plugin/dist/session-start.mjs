@@ -53487,12 +53487,12 @@ members:
 #     settings:             # Claude Code settings of its own, over settings.json
 #       permissions:
 #         allow: ["Bash(pnpm test *)"]
-#   glm:
+#   deepseek:
 #     role: designer
-#     model: glm-5.3-flashx
 #     env:                  # what its Claude Code runs with; \${VAR} comes from your environment
-#       ANTHROPIC_BASE_URL: https://open.bigmodel.cn/api/anthropic
-#       ANTHROPIC_AUTH_TOKEN: \${GLM_API_KEY}
+#       ANTHROPIC_BASE_URL: https://api.deepseek.com/anthropic
+#       ANTHROPIC_AUTH_TOKEN: \${DEEPSEEK_API_KEY}
+#       ANTHROPIC_MODEL: deepseek-flash
 `,
   [path3.join("roles", "developer.md")]: `<!--
 A role file: what your team keeps to in this role, its own conventions and
