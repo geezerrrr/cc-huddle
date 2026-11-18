@@ -4,6 +4,13 @@ All notable changes to cc-huddle are listed here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-18
+
+### Changed
+
+- A goal starts from what your conversation with your session found out and settled about the task, as well as what you said: your session passes it on in the meeting's agenda or the assigned task.
+- A reviewer is given every file the delivery's branch changes, as git lists it, beside the files its member names, so the review reads what would merge.
+
 ## [0.1.0] - 2026-11-17
 
 ### Added
@@ -17,5 +24,6 @@ All notable changes to cc-huddle are listed here. The format follows [Keep a Cha
 - Example team files written to `~/.claude/huddle/` where missing, explained in comments; no built-in roles.
 - A member's subtask that builds on their own merged work forks that work's session, in a new worktree.
 
-[Unreleased]: https://github.com/geezerrrr/cc-huddle/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/geezerrrr/cc-huddle/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/geezerrrr/cc-huddle/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/geezerrrr/cc-huddle/releases/tag/v0.1.0
