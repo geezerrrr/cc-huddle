@@ -411,8 +411,8 @@ export class Scheduler {
   /**
    * Runs a subtask in its worktree: from its brief, or in its last session
    * with why it goes on. A first run carrying on its member's own work forks
-   * that work's session (§4.3). Delivered, its worktree is committed in its member's
-   * name and it goes on to be merged.
+   * that work's session (§4.3). Delivered, what its branch has committed goes
+   * on to be merged (§5): the engine commits nothing for its member.
    */
   private async startRun(subtask: Subtask) {
     const { core } = this;
