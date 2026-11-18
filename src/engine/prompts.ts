@@ -4,6 +4,7 @@
  */
 import { listOf } from "../shared/text.ts";
 import type { Upstream } from "./derive.ts";
+import type { Change } from "./git.ts";
 import {
   hostOf,
   type Delivery,
@@ -179,17 +180,29 @@ export const PERMISSION_REPLIES = {
     note ? `The user denied this and said: ${note}` : "The user denied this.",
 };
 
-/** What a reviewer is asked: the subtask, its acceptance criteria and what was delivered, checked in its worktree. */
+/** How many of a delivery's changed files a reviewer is told by name; a branch can change thousands (a lockfile, generated code). */
+const CHANGES_NAMED = 100;
+
+/**
+ * What a reviewer is asked: the subtask, its acceptance criteria, what was
+ * delivered and what its branch changes (`changes`, as git lists them),
+ * checked in its worktree.
+ */
 export function reviewPrompt(input: {
   task: Task;
   subtask: Subtask;
   delivery: Delivery;
+  changes: readonly Change[];
   cwd: string;
 }): string {
-  const { task, subtask, delivery } = input;
+  const { task, subtask, delivery, changes } = input;
   const files = delivery.files.length
     ? delivery.files.join(", ")
     : "none (the summary is the result)";
+  const named = changes.slice(0, CHANGES_NAMED).map((c) => `- ${c.path} (${c.kind})`);
+  if (changes.length > CHANGES_NAMED)
+    named.push(`- and ${String(changes.length - CHANGES_NAMED)} more`);
+  const changed = named.length ? named.join("\n") : "nothing: the branch changes no file";
   return `You're reviewing a teammate's delivery before it is merged into the goal's branch.
 
 Task: ${task.title}
@@ -200,7 +213,10 @@ ${subtask.assignee} delivered:
 ${delivery.summary}
 Files: ${files}
 
-Their worktree is ${input.cwd}. Read the files, and whatever else you need there, to check the work against the criteria, and stop once you can tell. Pass it when it meets them, even if you would have done it differently; send it back only for what really falls short, and say exactly what to fix.`;
+What their branch changes, as git lists it (this is what would be merged):
+${changed}
+
+Their worktree is ${input.cwd}. Read what it changes, and whatever else you need there, to check the work against the criteria, and stop once you can tell. Pass it when it meets them, even if you would have done it differently; send it back only for what really falls short, and say exactly what to fix.`;
 }
 
 /** What the member merging a goal's work back is told (§5): its base has commits the goal's branch lacks. */

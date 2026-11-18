@@ -245,6 +245,40 @@ export function openDesk(places: Places, subtaskId: string): Promise<string> {
   });
 }
 
+/** A file a subtask's branch changes, and how. */
+export interface Change {
+  path: string;
+  kind: "added" | "modified" | "deleted";
+}
+
+/**
+ * The files a subtask's branch changes since it was cut from the goal's
+ * (§4.3): what its delivery would merge, as git lists it.
+ */
+export function deskChanges(places: Places, subtaskId: string): Promise<Change[]> {
+  return perGoal(places, async () => {
+    const { slug } = places;
+    const { stdout } = await git({ cwd: places.repo.top }, [
+      "diff",
+      "--name-status",
+      "--no-renames",
+      "-z",
+      `refs/heads/${goalBranch(slug)}...refs/heads/${subtaskBranch(slug, subtaskId)}`,
+    ]);
+    // -z: each status, then its path, every field ended by NUL.
+    const fields = stdout.split("\0");
+    const changes: Change[] = [];
+    for (let i = 0; i + 1 < fields.length; i += 2) {
+      const status = fields[i];
+      const file = fields[i + 1];
+      if (!status || !file) continue;
+      const kind = status === "A" ? "added" : status === "D" ? "deleted" : "modified";
+      changes.push({ path: file, kind });
+    }
+    return changes;
+  });
+}
+
 /**
  * How git runs in one of cc-huddle's worktrees: pinned to its entry in the
  * repository's own `worktrees/` (the one whose `gitdir` names this folder),

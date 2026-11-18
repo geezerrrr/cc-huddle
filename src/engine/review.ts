@@ -1,10 +1,12 @@
 /**
  * Reviewing a delivery (docs/design.md §4.3): a read-only session of the
- * reviewer's in the subtask's worktree judges what was delivered against its
- * acceptance criteria, and passes it or gives the notes it goes back with.
+ * reviewer's in the subtask's worktree judges what was delivered, and what
+ * its branch changes, against its acceptance criteria, and passes it or
+ * gives the notes it goes back with.
  */
 import { z } from "zod";
 import { spend, type Core } from "./core.ts";
+import { deskChanges } from "./git.ts";
 import { reviewPrompt } from "./prompts.ts";
 import { askOnce } from "./turns.ts";
 import type { Delivery, Member, Subtask, Task } from "./types.ts";
@@ -28,7 +30,13 @@ export async function reviewDelivery(
 ): Promise<Verdict> {
   const { reviewer, task, subtask, delivery, desk, signal } = review;
   const reply = await askOnce({
-    prompt: reviewPrompt({ task, subtask, delivery, cwd: desk }),
+    prompt: reviewPrompt({
+      task,
+      subtask,
+      delivery,
+      changes: await deskChanges(core.places, subtask.id),
+      cwd: desk,
+    }),
     options: core.options(reviewer, "readOnly", desk),
     schema: verdictSchema,
     signal,

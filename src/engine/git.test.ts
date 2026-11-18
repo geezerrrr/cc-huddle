@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   currentBranch,
+  deskChanges,
   dropDesk,
   git,
   GitError,
@@ -208,6 +209,37 @@ describe("desks", () => {
     await rm(desk, { recursive: true });
     await openDesk(places, "s1");
     expect(await readFile(path.join(desk, "work.txt"), "utf8")).toBe("done\n");
+  });
+
+  it("lists what a subtask's branch changes since it was cut, as git does, whatever the goal did meanwhile", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    const desk = await openDesk(places, "s1");
+    await writeFile(path.join(desk, "README.md"), "changed\n");
+    await writeFile(path.join(desk, "new file.txt"), "new\n");
+    await committed(places, "s1", "Work");
+    await rm(path.join(desk, "new file.txt"));
+    await committed(places, "s1", "Drop it again");
+    await writeFile(path.join(desk, "rules.txt"), "roll\n");
+    await committed(places, "s1", "Rules");
+    // Another delivery merged into the goal is none of this one's changes.
+    const other = await openDesk(places, "s2");
+    await writeFile(path.join(other, "board.txt"), "[]\n");
+    await committed(places, "s2", "Board");
+    expect(await mergeDesk(places, "s2")).toBe("merged");
+    expect(await deskChanges(places, "s1")).toEqual([
+      { path: "README.md", kind: "modified" },
+      { path: "rules.txt", kind: "added" },
+    ]);
+  });
+
+  it("lists a deleted file as deleted", async () => {
+    await makeRepository();
+    const places = await placesOf();
+    const desk = await openDesk(places, "s1");
+    await rm(path.join(desk, "README.md"));
+    await committed(places, "s1", "Remove");
+    expect(await deskChanges(places, "s1")).toEqual([{ path: "README.md", kind: "deleted" }]);
   });
 });
 

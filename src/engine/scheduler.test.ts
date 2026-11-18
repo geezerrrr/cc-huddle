@@ -391,6 +391,9 @@ describe("Scheduler", () => {
         settings: "sonnet.json",
       });
       expect(review?.prompt).toContain("Acceptance criteria: Shows both scores");
+      expect(review?.prompt).toContain(
+        "What their branch changes, as git lists it (this is what would be merged):\n- score.txt (added)\n",
+      );
       expect(review?.schema?.safeParse({ pass: true, notes: "Fine." }).success).toBe(true);
       expect(s1).toMatchObject({ review: { rounds: 0, notes: "Fine." } });
       // The run is the author's, the review the reviewer's.

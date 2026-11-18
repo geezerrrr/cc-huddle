@@ -8,12 +8,14 @@ import {
   meetingRound,
   meetingSteer,
   recommendPrompt,
+  reviewPrompt,
   systemPrompt,
   taskBrief,
   teammateQuestion,
   type MeetingBrief,
 } from "./prompts.ts";
-import type { Meeting, MeetingTurn, Member, Subtask } from "./types.ts";
+import type { Change } from "./git.ts";
+import type { Meeting, MeetingTurn, Member, Subtask, Task } from "./types.ts";
 
 const member = (name: string, title: string): Member => ({
   name,
@@ -44,6 +46,46 @@ The task: Make a dice game
 The repository is the current directory; look at it as much as you need.
 
 Should the team do this together, or one member solo? If together, who takes part and who hosts; if solo, who. Say why.`);
+  });
+});
+
+describe("reviewPrompt", () => {
+  const task: Task = { id: "t1", title: "Dice", outcome: "A dice game", ownerAccepts: false };
+  const review = (changes: Change[]) =>
+    reviewPrompt({
+      task,
+      subtask: subtask("s1", { title: "Rules", acceptance: "Rolls two dice" }),
+      delivery: { summary: "Done.", files: ["rules.ts"], at: 0 },
+      changes,
+      cwd: "/desk",
+    });
+
+  it("names what the branch changes, as git lists it, beside what the member says they delivered", () => {
+    const prompt = review([
+      { path: "rules.ts", kind: "added" },
+      { path: "README.md", kind: "modified" },
+    ]);
+    expect(prompt).toContain(`Done.
+Files: rules.ts
+
+What their branch changes, as git lists it (this is what would be merged):
+- rules.ts (added)
+- README.md (modified)
+`);
+  });
+
+  it("names a hundred changed files and counts the rest", () => {
+    const changes = Array.from({ length: 103 }, (_, i) => ({
+      path: `gen/${String(i)}.ts`,
+      kind: "added" as const,
+    }));
+    const prompt = review(changes);
+    expect(prompt).toContain("- gen/99.ts (added)\n- and 3 more\n");
+    expect(prompt).not.toContain("gen/100.ts");
+  });
+
+  it("says when the branch changes no file", () => {
+    expect(review([])).toContain("nothing: the branch changes no file");
   });
 });
 
