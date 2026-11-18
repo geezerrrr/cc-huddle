@@ -7361,7 +7361,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 var plugin_default = {
   name: "cc-huddle",
   version: "0.1.0",
-  description: "A team of Claude Code sessions on your repository: any model per member, a meeting before the plan, state machines in charge of the process.",
+  description: "Agent orchestration for Claude Code, native on the Agent SDK: the team plans together, you approve, and a state machine runs the work in parallel worktrees.",
   author: {
     name: "geezerrrr"
   },
