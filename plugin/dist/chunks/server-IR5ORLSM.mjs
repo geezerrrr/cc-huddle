@@ -7893,6 +7893,28 @@ function openDesk(places, subtaskId) {
     return desk;
   });
 }
+function deskChanges(places, subtaskId) {
+  return perGoal(places, async () => {
+    const { slug } = places;
+    const { stdout } = await git({ cwd: places.repo.top }, [
+      "diff",
+      "--name-status",
+      "--no-renames",
+      "-z",
+      `refs/heads/${goalBranch(slug)}...refs/heads/${subtaskBranch(slug, subtaskId)}`
+    ]);
+    const fields = stdout.split("\0");
+    const changes = [];
+    for (let i = 0; i + 1 < fields.length; i += 2) {
+      const status = fields[i];
+      const file = fields[i + 1];
+      if (!status || !file) continue;
+      const kind = status === "A" ? "added" : status === "D" ? "deleted" : "modified";
+      changes.push({ path: file, kind });
+    }
+    return changes;
+  });
+}
 async function worktreeAt(repo, tree) {
   const real = (file) => ifThere(realpath(file), path.resolve(file));
   const here = await real(tree);
@@ -8266,9 +8288,14 @@ var PERMISSION_REPLIES = {
   calledOff: "Stopped.",
   denied: (note) => note ? `The user denied this and said: ${note}` : "The user denied this."
 };
+var CHANGES_NAMED = 100;
 function reviewPrompt(input) {
-  const { task, subtask: subtask2, delivery } = input;
+  const { task, subtask: subtask2, delivery, changes } = input;
   const files = delivery.files.length ? delivery.files.join(", ") : "none (the summary is the result)";
+  const named = changes.slice(0, CHANGES_NAMED).map((c) => `- ${c.path} (${c.kind})`);
+  if (changes.length > CHANGES_NAMED)
+    named.push(`- and ${String(changes.length - CHANGES_NAMED)} more`);
+  const changed = named.length ? named.join("\n") : "nothing: the branch changes no file";
   return `You're reviewing a teammate's delivery before it is merged into the goal's branch.
 
 Task: ${task.title}
@@ -8280,7 +8307,10 @@ ${subtask2.assignee} delivered:
 ${delivery.summary}
 Files: ${files}
 
-Their worktree is ${input.cwd}. Read the files, and whatever else you need there, to check the work against the criteria, and stop once you can tell. Pass it when it meets them, even if you would have done it differently; send it back only for what really falls short, and say exactly what to fix.`;
+What their branch changes, as git lists it (this is what would be merged):
+${changed}
+
+Their worktree is ${input.cwd}. Read what it changes, and whatever else you need there, to check the work against the criteria, and stop once you can tell. Pass it when it meets them, even if you would have done it differently; send it back only for what really falls short, and say exactly what to fix.`;
 }
 function handBackPrompt(input) {
   const { goal, cwd: cwd2 } = input;
@@ -10389,7 +10419,13 @@ var verdictSchema = z6.object({ pass: z6.boolean(), notes: z6.string().trim() })
 async function reviewDelivery(core, review) {
   const { reviewer, task, subtask: subtask2, delivery, desk, signal } = review;
   const reply = await askOnce({
-    prompt: reviewPrompt({ task, subtask: subtask2, delivery, cwd: desk }),
+    prompt: reviewPrompt({
+      task,
+      subtask: subtask2,
+      delivery,
+      changes: await deskChanges(core.places, subtask2.id),
+      cwd: desk
+    }),
     options: core.options(reviewer, "readOnly", desk),
     schema: verdictSchema,
     signal,
@@ -10723,8 +10759,8 @@ var Scheduler = class {
   /**
    * Runs a subtask in its worktree: from its brief, or in its last session
    * with why it goes on. A first run carrying on its member's own work forks
-   * that work's session (§4.3). Delivered, its worktree is committed in its member's
-   * name and it goes on to be merged.
+   * that work's session (§4.3). Delivered, what its branch has committed goes
+   * on to be merged (§5): the engine commits nothing for its member.
    */
   async startRun(subtask2) {
     const { core } = this;
@@ -12343,7 +12379,9 @@ function memberName(members2) {
   return z10.enum(names).describe(`One of the team: ${rosterOf(members2)}`);
 }
 var meetingInput = (member) => ({
-  agenda: z10.string().trim().min(1).describe("What to plan, with everything the user said about it"),
+  agenda: z10.string().trim().min(1).describe(
+    "What to plan: everything the user said about it, and what this conversation found out and settled about it"
+  ),
   size: z10.enum(MEETING_SIZES).optional().describe(
     "How long the discussion runs, only when the user asked for this meeting's own; the goal's when left out"
   ),
@@ -12356,7 +12394,9 @@ var changePlanInput = (member) => ({ meeting, plan: planSchema(member) });
 var assignInput = (member) => ({
   assignee: member,
   title: z10.string().trim().min(1),
-  description: z10.string().trim().describe("Everything the user said about it"),
+  description: z10.string().trim().describe(
+    "Everything the user said about it, and what this conversation found out and settled about it"
+  ),
   acceptance: z10.string().trim().default("").describe("When it counts as done")
 });
 var UPFRONT = { "anthropic/alwaysLoad": true };
