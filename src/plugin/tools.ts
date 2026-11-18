@@ -41,7 +41,13 @@ function memberName(members?: readonly Member[]): z.ZodType<string> {
 }
 
 const meetingInput = (member: z.ZodType<string>) => ({
-  agenda: z.string().trim().min(1).describe("What to plan, with everything the user said about it"),
+  agenda: z
+    .string()
+    .trim()
+    .min(1)
+    .describe(
+      "What to plan: everything the user said about it, and what this conversation found out and settled about it",
+    ),
   size: z
     .enum(MEETING_SIZES)
     .optional()
@@ -62,7 +68,12 @@ const changePlanInput = (member: z.ZodType<string>) => ({ meeting, plan: planSch
 const assignInput = (member: z.ZodType<string>) => ({
   assignee: member,
   title: z.string().trim().min(1),
-  description: z.string().trim().describe("Everything the user said about it"),
+  description: z
+    .string()
+    .trim()
+    .describe(
+      "Everything the user said about it, and what this conversation found out and settled about it",
+    ),
   acceptance: z.string().trim().default("").describe("When it counts as done"),
 });
 
