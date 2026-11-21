@@ -42,7 +42,7 @@ cc-huddle 是一个 Claude Code 插件，让一支 agent 团队在你的仓库�
 /plugin install cc-huddle@geezerrrr
 ```
 
-装完重启 Claude Code。运行环境：Claude Code 2.1.322 及以上、Node.js 22.15 及以上（需要能找到 npm）、git。第一次启动时会自动用 npm 安装依赖。
+装完重启 Claude Code。运行环境：Claude Code 2.1.330 及以上、Node.js 22.15 及以上（需要能找到 npm）、git。第一次启动时会自动用 npm 安装依赖。
 
 <details>
 <summary>其他安装方式，以及更新和卸载</summary>

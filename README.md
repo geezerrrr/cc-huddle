@@ -42,7 +42,7 @@ Inside Claude Code:
 /plugin install cc-huddle@geezerrrr
 ```
 
-Restart Claude Code afterwards. cc-huddle needs Claude Code 2.1.322 or later, Node.js 22.15 or later with npm on your `PATH`, and git. It installs its own dependencies with npm the first time it starts.
+Restart Claude Code afterwards. cc-huddle needs Claude Code 2.1.330 or later, Node.js 22.15 or later with npm on your `PATH`, and git. It installs its own dependencies with npm the first time it starts.
 
 <details>
 <summary>Other ways to install, update and uninstall</summary>
