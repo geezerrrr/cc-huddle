@@ -4,6 +4,12 @@ All notable changes to cc-huddle are listed here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-22
+
+### Changed
+
+- The Agent SDK is 0.3.330, and cc-huddle needs Claude Code 2.1.330 or later.
+
 ### Fixed
 
 - Members are told to commit their result before they deliver: what is left uncommitted isn't delivered and is lost once their work merges.
@@ -29,6 +35,7 @@ All notable changes to cc-huddle are listed here. The format follows [Keep a Cha
 - Example team files written to `~/.claude/huddle/` where missing, explained in comments; no built-in roles.
 - A member's subtask that builds on their own merged work forks that work's session, in a new worktree.
 
-[Unreleased]: https://github.com/geezerrrr/cc-huddle/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/geezerrrr/cc-huddle/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/geezerrrr/cc-huddle/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/geezerrrr/cc-huddle/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/geezerrrr/cc-huddle/releases/tag/v0.1.0
