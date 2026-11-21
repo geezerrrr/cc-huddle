@@ -1,0 +1,74 @@
+name: Agent SDK update
+
+# Daily: moves the Agent SDK to its newest version, the Claude Code it is
+# built for becoming the one the README says cc-huddle needs, and opens a pull
+# request once every check passes on it. A pull request this workflow opens
+# starts no other workflow, so the checks run here.
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+      - name: Find a newer Agent SDK
+        id: sdk
+        run: |
+          current=$(node -p "require('./package.json').dependencies['@anthropic-ai/claude-agent-sdk']")
+          latest=$(npm view @anthropic-ai/claude-agent-sdk version)
+          branch="update/agent-sdk-$latest"
+          if [ "$current" = "$latest" ]; then
+            echo "$current is the newest"
+          elif [ -n "$(gh pr list --head "$branch" --state all --json number --jq '.[].number')" ]; then
+            echo "$latest has a pull request already, open or closed"
+          else
+            echo "version=$latest" >> "$GITHUB_OUTPUT"
+            echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Move to it
+        if: steps.sdk.outputs.version
+        id: moved
+        run: |
+          built_for() {
+            node -p "JSON.parse(require('fs').readFileSync('node_modules/@anthropic-ai/claude-agent-sdk/package.json')).claudeCodeVersion"
+          }
+          pnpm install --frozen-lockfile
+          before=$(built_for)
+          pnpm add --save-exact "@anthropic-ai/claude-agent-sdk@${{ steps.sdk.outputs.version }}"
+          after=$(built_for)
+          sed -i "s/Claude Code ${before//./\\.}/Claude Code $after/" README.md README.zh-CN.md
+          echo "claude-code=$after" >> "$GITHUB_OUTPUT"
+          pnpm build
+      - name: Check it
+        if: steps.sdk.outputs.version
+        run: |
+          pnpm typecheck
+          pnpm lint --ignore-pattern plugin/hooks
+          pnpm format:check
+          pnpm test
+          npm install --global "@anthropic-ai/claude-code@${{ steps.moved.outputs.claude-code }}"
+          pnpm check:mod
+      - name: Open a pull request
+        if: steps.sdk.outputs.version
+        run: |
+          version=${{ steps.sdk.outputs.version }}
+          claude_code=${{ steps.moved.outputs.claude-code }}
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "${{ steps.sdk.outputs.branch }}"
+          git add package.json pnpm-lock.yaml README.md README.zh-CN.md
+          git commit -m "build: Agent SDK $version, for Claude Code $claude_code"
+          git add -A plugin/dist
+          git commit -m "build: plugin dist"
+          git push origin "${{ steps.sdk.outputs.branch }}"
+          gh pr create --title "Agent SDK $version" --body "The Agent SDK's newest version, $version, built for Claude Code $claude_code, which the README now says cc-huddle needs. Typecheck, lint, the tests and the mod check passed on Ubuntu; CI runs on every platform once it is merged."
