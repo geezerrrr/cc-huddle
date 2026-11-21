@@ -12562,7 +12562,7 @@ function addTools(server2, session2) {
   server2.registerTool(
     "decide",
     {
-      description: "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask; where it is all the goal waits on: acceptMerge, acceptOnly, revise), a stuck review (rereview, skip, sendBack; one that failed goes back only with a note), a merge (ours, theirs, retry; one git failed on: retry, stop), the goal's work to merge back into its branch (merge, or notNow, which pauses it), or a closed goal (cleanUp deletes it with its worktree and branch, keep). Only as the user decided.",
+      description: "Carry out the user's decision on something waiting on them: a task done (accept, or revise with what to change, `sent_back` naming the subtask; where it is all the goal waits on: acceptMerge, acceptOnly, revise), a stuck review (rereview, skip, sendBack; one that failed goes back only with a note), a merge git refused (retry, stop), the goal's work to merge back into its branch (merge, or notNow, which pauses it), or a closed goal (cleanUp deletes it with its worktree and branch, keep). Only as the user decided.",
       inputSchema: {
         question: z10.string().describe("The id of what waits on the user"),
         decision: z10.enum(DECISION_OPTIONS),
