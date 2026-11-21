@@ -26,6 +26,18 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
+  # The oldest Node.js the README names, which your session may start cc-huddle's server with.
+  test-oldest-node:
+    runs-on: ubuntu-latest
+    env:
+      MISE_NODE_VERSION: 22.15.0
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+      - run: node --version
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+
   check:
     runs-on: ubuntu-latest
     steps:
