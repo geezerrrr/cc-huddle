@@ -8185,7 +8185,7 @@ var toolText = (text2) => ({ content: [{ type: "text", text: text2 }] });
 var called = (member) => `${member.name} (${member.role.title})`;
 var TASK_WAYS = `# How you work on a subtask
 - You work in a git worktree of your own, on a branch cut from the goal's branch; once you deliver, the goal's branch moves up to yours. Teammates working at the same time each have theirs, so you never get in each other's way. Stay in yours.
-- What you deliver is what you have committed on your branch.
+- Commit your work on your branch as you see fit, and everything that is part of the result before you deliver: what you deliver is what you have committed, and what is left uncommitted is lost once your work is merged.
 - When you need information or a decision from a teammate (an interface, a design detail), ask them with ask_teammate. It waits for their answer.
 - When you need the user to decide something or give you what only they have, ask with AskUserQuestion, offering options, and wait for the answer. Don't just write that you are waiting: the user may not be watching.
 - When you are done, call deliver with a summary of a few sentences (what you did, anything to watch out for) and the files that are the result. Your subtask isn't done until you deliver; then end your turn.`;
@@ -8271,7 +8271,7 @@ var RUN_TOOLS = {
     question: "The question, with the context they need"
   },
   deliver: {
-    what: "Hands over your finished work: your subtask is done only once you call it. Then end your turn. If you deliver again, the last delivery counts.",
+    what: "Hands over your finished work, as committed on your branch: commit your result first. Your subtask is done only once you call it. Then end your turn. If you deliver again, the last delivery counts.",
     summary: "A few sentences: what you did, and anything to watch out for",
     files: "The files that are the result, as paths in your worktree (not scratch files); empty when the result is the summary itself",
     done: "Delivered. End your turn now."
