@@ -8,10 +8,6 @@ on:
 permissions:
   contents: read
 
-env:
-  # The Claude Code that validates and tests the mod: the version cc-huddle is checked on.
-  CLAUDE_CODE_VERSION: 2.1.322
-
 jobs:
   test:
     strategy:
@@ -56,5 +52,6 @@ jobs:
             echo "::error::plugin/dist is out of date: run pnpm build and commit it"
             exit 1
           fi
-      - run: npm install --global @anthropic-ai/claude-code@$CLAUDE_CODE_VERSION
+      # The Claude Code the Agent SDK is built for, which cc-huddle needs at least, validates and tests the mod.
+      - run: npm install --global "@anthropic-ai/claude-code@$(node -p "JSON.parse(require('fs').readFileSync('node_modules/@anthropic-ai/claude-agent-sdk/package.json')).claudeCodeVersion")"
       - run: pnpm check:mod
