@@ -4,6 +4,11 @@ All notable changes to cc-huddle are listed here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Fixed
+
+- Members are told to commit their result before they deliver: what is left uncommitted isn't delivered and is lost once their work merges.
+- Your session's `decide` tool no longer offers merge options that no longer exist.
+
 ## [0.1.1] - 2026-11-18
 
 ### Changed
