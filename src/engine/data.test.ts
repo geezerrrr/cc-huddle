@@ -122,4 +122,14 @@ describe("a repository's goals", () => {
     ]);
     releaseLock(chess.lock);
   });
+
+  it("are listed without a file beside them, as Finder leaves .DS_Store", async () => {
+    const repo = path.join(dir, "repo");
+    const files = goalFiles(path.join(goalsFolder(repo), "dice"));
+    const writer = stateWriter(files.state, () => fresh(), vi.fn());
+    writer.changed();
+    await writer.flush();
+    await writeFile(path.join(goalsFolder(repo), ".DS_Store"), "");
+    expect(await listGoals(repo)).toEqual([{ slug: "dice", state: fresh() }]);
+  });
 });
