@@ -4,6 +4,11 @@ All notable changes to cc-huddle are listed here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Fixed
+
+- `/huddle status`, and everything else that lists a repository's goals, no longer fails on a file in its goals folder, such as the `.DS_Store` Finder leaves.
+- The MCP server no longer fails to start a new version for a `.DS_Store` in its dependencies folder.
+
 ## [0.1.2] - 2026-11-22
 
 ### Changed
