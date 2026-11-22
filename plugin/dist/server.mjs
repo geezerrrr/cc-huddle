@@ -5,7 +5,7 @@ import {
   exists,
   renameOver,
   running
-} from "./chunks/chunk-NVEYXBYL.mjs";
+} from "./chunks/chunk-Z4ZXJDFO.mjs";
 
 // src/plugin/bootstrap.ts
 import { execFile } from "node:child_process";
@@ -50,7 +50,7 @@ if (!await installed()) {
       });
   }
   for (const name of await readdir(deps)) {
-    const [, pid] = name.split(".");
+    const pid = /\.(\d+)$/.exec(name)?.[1];
     if (path.join(deps, name) !== home && !(pid && running(Number(pid))))
       await rm(path.join(deps, name), { recursive: true, force: true });
   }
@@ -63,4 +63,4 @@ registerHooks({
     return bare && context.parentURL?.startsWith(ours) ? next(specifier, { ...context, parentURL: from }) : next(specifier, context);
   }
 });
-await import("./chunks/server-6EUGL6CO.mjs");
+await import("./chunks/server-XZWQU3XE.mjs");

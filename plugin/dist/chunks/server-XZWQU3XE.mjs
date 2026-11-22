@@ -13,6 +13,7 @@ import {
   ifThere,
   jsonIfThere,
   namesIfThere,
+  notThere,
   recommendSettings,
   renameOver,
   repoFolder,
@@ -21,7 +22,7 @@ import {
   textIfThere,
   windowsProcessField,
   writeWhole
-} from "./chunk-NVEYXBYL.mjs";
+} from "./chunk-Z4ZXJDFO.mjs";
 
 // node_modules/.pnpm/yaml@2.9.1/node_modules/yaml/dist/nodes/identity.js
 var require_identity = __commonJS({
@@ -8169,7 +8170,7 @@ async function listGoals(repoFolder2) {
       try {
         return { slug, state: await readState(files.state), ...held };
       } catch (error) {
-        if (errorCode(error) === "ENOENT" || errorCode(error) === "ENOTDIR") return void 0;
+        if (notThere(error)) return void 0;
         return { slug, unreadable: errorText(error), ...held };
       }
     })

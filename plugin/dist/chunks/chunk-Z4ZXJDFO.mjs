@@ -38,6 +38,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 // src/shared/errors.ts
 var errorText = (error) => error instanceof Error ? error.message : String(error);
 var errorCode = (error) => error.code;
+var notThere = (error) => errorCode(error) === "ENOENT" || errorCode(error) === "ENOTDIR";
 
 // src/shared/files.ts
 import { readFileSync } from "node:fs";
@@ -48,7 +49,7 @@ async function ifThere(reading, missing) {
   try {
     return await reading;
   } catch (error) {
-    if (errorCode(error) === "ENOENT" || errorCode(error) === "ENOTDIR") return missing;
+    if (notThere(error)) return missing;
     throw error;
   }
 }
@@ -60,7 +61,7 @@ function textIfThere(file) {
   try {
     return readFileSync(file, "utf8");
   } catch (error) {
-    if (errorCode(error) === "ENOENT") return void 0;
+    if (notThere(error)) return void 0;
     throw error;
   }
 }
@@ -163,6 +164,7 @@ export {
   __toESM,
   errorText,
   errorCode,
+  notThere,
   ifThere,
   exists,
   textIfThere,

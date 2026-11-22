@@ -7592,6 +7592,7 @@ import { mkdir as mkdir2, readdir as readdir2, readFile as readFile3 } from "nod
 // src/shared/errors.ts
 var errorText = (error62) => error62 instanceof Error ? error62.message : String(error62);
 var errorCode = (error62) => error62.code;
+var notThere = (error62) => errorCode(error62) === "ENOENT" || errorCode(error62) === "ENOTDIR";
 
 // src/shared/files.ts
 import { readFileSync } from "node:fs";
@@ -7600,7 +7601,7 @@ async function ifThere(reading, missing) {
   try {
     return await reading;
   } catch (error62) {
-    if (errorCode(error62) === "ENOENT" || errorCode(error62) === "ENOTDIR") return missing;
+    if (notThere(error62)) return missing;
     throw error62;
   }
 }
@@ -7608,7 +7609,7 @@ function textIfThere(file2) {
   try {
     return readFileSync(file2, "utf8");
   } catch (error62) {
-    if (errorCode(error62) === "ENOENT") return void 0;
+    if (notThere(error62)) return void 0;
     throw error62;
   }
 }
@@ -7755,7 +7756,7 @@ async function listGoals(repoFolder2) {
       try {
         return { slug, state: await readState(files.state), ...held };
       } catch (error62) {
-        if (errorCode(error62) === "ENOENT" || errorCode(error62) === "ENOTDIR") return void 0;
+        if (notThere(error62)) return void 0;
         return { slug, unreadable: errorText(error62), ...held };
       }
     })
