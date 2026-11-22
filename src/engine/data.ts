@@ -4,7 +4,7 @@
  * folder, and the goals listed with who holds each.
  */
 import { mkdir, readdir, readFile } from "node:fs/promises";
-import { errorCode, errorText } from "../shared/errors.ts";
+import { errorCode, errorText, notThere } from "../shared/errors.ts";
 import { writeWhole, namesIfThere } from "../shared/files.ts";
 import { goalFiles, goalsFolder, goalFolder } from "../shared/layout.ts";
 import { inOrder } from "../shared/serial.ts";
@@ -135,7 +135,7 @@ export async function listGoals(repoFolder: string): Promise<GoalEntry[]> {
       try {
         return { slug, state: await readState(files.state), ...held };
       } catch (error) {
-        if (errorCode(error) === "ENOENT" || errorCode(error) === "ENOTDIR") return undefined;
+        if (notThere(error)) return undefined;
         return { slug, unreadable: errorText(error), ...held };
       }
     }),

@@ -7,14 +7,14 @@ import { readFileSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { errorCode } from "./errors.ts";
+import { errorCode, notThere } from "./errors.ts";
 
 /** What `reading` gives, or `missing` when the file it reads isn't there; anything else is thrown. */
 export async function ifThere<T, M>(reading: Promise<T>, missing: M): Promise<T | M> {
   try {
     return await reading;
   } catch (error) {
-    if (errorCode(error) === "ENOENT" || errorCode(error) === "ENOTDIR") return missing;
+    if (notThere(error)) return missing;
     throw error;
   }
 }
@@ -31,7 +31,7 @@ export function textIfThere(file: string): string | undefined {
   try {
     return readFileSync(file, "utf8");
   } catch (error) {
-    if (errorCode(error) === "ENOENT") return undefined;
+    if (notThere(error)) return undefined;
     throw error;
   }
 }
