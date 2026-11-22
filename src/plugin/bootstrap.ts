@@ -65,8 +65,9 @@ if (!(await installed())) {
       });
   }
   // What earlier versions installed goes, and installs left half done by a process that ended.
+  // A draft's name ends in its installer's pid; nothing else here (a .DS_Store Finder left) names one.
   for (const name of await readdir(deps)) {
-    const [, pid] = name.split(".");
+    const pid = /\.(\d+)$/.exec(name)?.[1];
     if (path.join(deps, name) !== home && !(pid && running(Number(pid))))
       await rm(path.join(deps, name), { recursive: true, force: true });
   }
