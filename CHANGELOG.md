@@ -4,6 +4,8 @@ All notable changes to cc-huddle are listed here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-24
+
 ### Fixed
 
 - `/huddle status`, and everything else that lists a repository's goals, no longer fails on a file in its goals folder, such as the `.DS_Store` Finder leaves.
